@@ -1439,15 +1439,25 @@ function bindLinksChrome() {
   document.getElementById('add').onclick = () => openDrawer(null, () => renderLinks(routeToken));
 
   const form = document.getElementById('quick');
+  const qSlug = form.querySelector('[name=slug]'), qTarget = form.querySelector('[name=target_url]'), qBtn = form.querySelector('button');
+  // 后缀和默认地址至少填一个才能创建
+  const syncQuick = () => {
+    const empty = !qSlug.value.trim() && !qTarget.value.trim();
+    qBtn.disabled = empty;
+    qBtn.title = empty ? '请填写短链后缀或默认推广地址' : '';
+  };
+  qSlug.oninput = qTarget.oninput = syncQuick;
+  syncQuick();
   form.onsubmit = async (e) => {
     e.preventDefault();
+    if (!qSlug.value.trim() && !qTarget.value.trim()) { toast('请填写短链后缀或默认推广地址', 'bad'); qSlug.focus(); return; }
     const f = new FormData(form);
     let target = String(f.get('target_url')).trim();
     if (target && !/^https?:\/\//i.test(target)) target = 'https://' + target;
-    const btn = form.querySelector('button'); btn.disabled = true;
+    const btn = qBtn; btn.disabled = true;
     try {
       const link = await api('/links', { method: 'POST', body: { target_url: target, slug: String(f.get('slug')).trim() } });
-      form.reset();
+      form.reset(); syncQuick();
       await copy(shortUrl(link.slug), '短链已创建并复制');
       // 没填地址：直接进入详情页设置跳转规则
       if (!link.target_url) { location.hash = '#/link/' + link.id; return; }
@@ -1464,7 +1474,7 @@ function bindLinksChrome() {
       }
       renderLinks(routeToken);
     } catch (err) { toast(err.message, 'bad'); }
-    finally { btn.disabled = false; }
+    finally { syncQuick(); }
   };
 }
 
