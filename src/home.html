@@ -4,305 +4,530 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cligc link · 开源的短链接与访问分析</title>
-<meta name="description" content="cligc link 是一个免费开源、可自托管的短链接服务，运行在 Cloudflare Workers + D1 上：按国家 / 地区分流、来源追踪、实时访问分析，免费额度内零成本运行。">
-<meta property="og:title" content="cligc link · 开源的短链接与访问分析">
+<meta name="description" content="cligc link 是免费开源、可自托管的短链接服务，运行在 Cloudflare Workers + D1 上：按国家 / 地区分流、来源追踪、实时访问分析，免费额度内零成本运行。">
+<meta property="og:title" content="cligc link · 每一次点击，都去对的地方">
 <meta property="og:description" content="免费开源、可自托管的短链接服务。按地区分流、来源追踪、实时分析，几分钟部署到 Cloudflare。">
-<meta name="theme-color" content="#f5f6f8">
+<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#08090c" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234b83ff'/%3E%3Cstop offset='1' stop-color='%231f4fd1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M10.5 21.5 21.5 10.5M13.5 10.5h8v8' stroke='%23fff' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
+/* ==================================================================== tokens */
 :root {
-  --bg: #f5f6f8; --bg-2: #ffffff; --panel: #ffffff; --sunken: #f1f3f6; --text: #0d1321; --text-2: #4a5263; --muted: #8a92a3; --faint: #c6cbd4;
-  --line: #e5e8ee; --line-2: #eef0f4; --accent: #2f6bff; --accent-2: #edf2ff; --accent-3: #d9e4ff; --accent-ink: #1d4fd8; --violet: #7c5cff; --teal: #12b5a5;
-  --good: #0f9f5a; --good-bg: #e8f7ef;
-  --code-bg: #0f1420; --code-text: #d6dbe5;
-  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-  --ease: cubic-bezier(.16, 1, .3, 1);
-  --shadow: 0 1px 2px rgba(13,19,33,.04), 0 24px 48px -24px rgba(13,19,33,.18);
+  --bg: #f6f7f9; --bg-2: #eef0f4; --panel: #ffffff; --sunken: #f1f3f6;
+  --text: #0b1020; --text-2: #454d5e; --muted: #868e9e; --faint: #c5cad3;
+  --line: #e3e6ec; --line-2: #eceef2;
+  --accent: #2f6bff; --accent-2: #ecf1ff; --accent-3: #d6e2ff; --accent-ink: #1d4fd8;
+  --violet: #7c5cff; --teal: #10b3a3; --amber: #f2a93b; --good: #0f9f5a; --good-bg: #e6f6ee;
+  --ink: #0b1020; --ink-text: #f6f7f9;
+  --code-bg: #0c111b; --code-text: #d3d9e4;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --ease: cubic-bezier(.16, 1, .3, 1); --ease-io: cubic-bezier(.65, 0, .35, 1);
+  --shadow-1: 0 1px 2px rgba(11,16,32,.05);
+  --shadow-2: 0 1px 2px rgba(11,16,32,.04), 0 12px 32px -12px rgba(11,16,32,.14);
+  --shadow-3: 0 2px 4px rgba(11,16,32,.04), 0 40px 80px -32px rgba(11,16,32,.28);
+  --r: 20px;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0a0c10; --bg-2: #0e1116; --panel: #14171d; --sunken: #1b1f26; --text: #edeff3; --text-2: #b4bac6; --muted: #7c8494; --faint: #373d48;
-    --line: #232731; --line-2: #1c2028; --accent: #5f8fff; --accent-2: #18223a; --accent-3: #22325a; --accent-ink: #94b4ff; --violet: #9d85ff; --teal: #2fd0bf;
-    --good: #3cc985; --good-bg: #122a1e; --code-bg: #0b0e14;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 24px 48px -24px rgba(0,0,0,.7);
+    --bg: #08090c; --bg-2: #0d0f14; --panel: #121419; --sunken: #191c23;
+    --text: #eef0f4; --text-2: #b0b6c3; --muted: #757d8c; --faint: #2f343e;
+    --line: #20242c; --line-2: #1a1d24;
+    --accent: #5f8fff; --accent-2: #141d33; --accent-3: #1e2c52; --accent-ink: #9bb8ff;
+    --violet: #9d85ff; --teal: #2fd0bf; --good: #3cc985; --good-bg: #10261b;
+    --ink: #eef0f4; --ink-text: #08090c; --code-bg: #0b0e14;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -12px rgba(0,0,0,.6);
+    --shadow-3: 0 2px 4px rgba(0,0,0,.4), 0 40px 80px -32px rgba(0,0,0,.8);
+    color-scheme: dark;
   }
 }
+
+/* ==================================================================== base */
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+html { scroll-behavior: smooth; scroll-padding-top: 88px; -webkit-text-size-adjust: 100%; }
 html, body { margin: 0; }
-body { background: var(--bg); color: var(--text); font: 15px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
-  -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+body { background: var(--bg); color: var(--text); font: 16px/1.65 var(--sans); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden; text-rendering: optimizeLegibility; }
 a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; }
 ::selection { background: var(--accent-3); }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 10px; }
 svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.wrap { position: relative; width: 100%; max-width: 1140px; margin: 0 auto; padding: 0 24px; }
-section { position: relative; }
+.wrap { position: relative; width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+.mono { font-family: var(--mono); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* ---------------------------------------------------------------- 导航 */
-.nav { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(1.6) blur(14px); -webkit-backdrop-filter: saturate(1.6) blur(14px);
-  background: color-mix(in srgb, var(--bg) 78%, transparent); border-bottom: 1px solid transparent; transition: border-color .3s; }
-.nav.scrolled { border-bottom-color: var(--line); }
-.nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 740; font-size: 17px; letter-spacing: -.025em; }
-.brand em { font-style: normal; color: var(--muted); font-weight: 500; }
-.nav-links { display: flex; gap: 24px; font-size: 14px; color: var(--text-2); }
-.nav-links a { transition: color .15s; }
-.nav-links a:hover { color: var(--text); }
-.nav .sp { flex: 1; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 11px; font-size: 14px; font-weight: 600;
-  border: 1px solid var(--line); background: var(--panel); white-space: nowrap; cursor: pointer; color: var(--text);
-  transition: transform .15s var(--ease), background .15s, border-color .15s, box-shadow .2s; }
-.btn:hover { border-color: color-mix(in srgb, var(--line) 50%, var(--text) 20%); }
-.btn:active { transform: scale(.97); }
-.btn.primary { background: var(--text); color: var(--bg); border-color: transparent; }
-.btn.primary:hover { box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--text) 60%, transparent); }
-.btn.lg { height: 48px; padding: 0 22px; font-size: 15px; border-radius: 13px; }
-.btn.sm { height: 34px; padding: 0 12px; font-size: 13px; border-radius: 9px; }
-.btn .cf { width: 20px; height: 20px; }
+/* 细颗粒噪点：让大面积底色更有质感 */
+.grain { position: fixed; inset: -50%; z-index: 100; pointer-events: none; opacity: .035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+@media (prefers-color-scheme: dark) { .grain { opacity: .05; } }
 
-/* ---------------------------------------------------------------- 首屏 */
-.hero { padding: 84px 0 40px; text-align: center; overflow: hidden; }
-.hero-bg { position: absolute; inset: -80px 0 0; pointer-events: none; }
-.hero-bg::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(var(--faint) 1px, transparent 1px); background-size: 24px 24px; opacity: .6;
-  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 35%, #000, transparent 75%); mask-image: radial-gradient(ellipse 60% 55% at 50% 35%, #000, transparent 75%); }
-.hero-bg::after { content: ''; position: absolute; width: 1000px; height: 640px; left: 50%; top: 0; transform: translateX(-50%);
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 16%, transparent), transparent); }
-.badges { display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 4px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line);
-  font-size: 13px; color: var(--text-2); box-shadow: 0 1px 2px rgba(13,19,33,.04); }
-.badges span { padding: 2px 10px; border-radius: 999px; }
-.badges span:first-child { background: var(--accent-2); color: var(--accent-ink); font-weight: 600; }
-.badges a { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 2px 4px; }
-.badges a:hover { color: var(--text); }
-h1 { margin: 26px auto 0; max-width: 820px; font-size: clamp(38px, 6.4vw, 72px); line-height: 1.04; letter-spacing: -.045em; font-weight: 780; text-wrap: balance; }
-h1 .g { background: linear-gradient(100deg, var(--accent) 10%, var(--violet) 70%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.lead { margin: 24px auto 0; max-width: 620px; font-size: 18px; color: var(--text-2); text-wrap: pretty; }
-.cta { display: flex; justify-content: center; gap: 12px; margin-top: 36px; flex-wrap: wrap; }
-.cmd { display: inline-flex; align-items: center; gap: 12px; margin-top: 22px; padding: 6px 6px 6px 16px; border-radius: 12px; background: var(--panel);
-  border: 1px solid var(--line); font-family: var(--mono); font-size: 13px; color: var(--text-2); max-width: 100%; }
-.cmd b { color: var(--muted); font-weight: 400; user-select: none; }
-.cmd code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.copy { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; border: 0; background: var(--sunken); color: var(--text-2); cursor: pointer; flex: none;
-  transition: background .15s, color .15s; }
-.copy:hover { color: var(--text); }
-.copy .ok { display: none; color: var(--good); }
-.copy.done .ok { display: block; }
-.copy.done .no { display: none; }
-.rise { animation: rise .9s var(--ease) both; animation-delay: calc(var(--d, 0) * 80ms); }
-@keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+/* 按钮 */
+.btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 44px; padding: 0 18px; border-radius: 12px;
+  font-size: 15px; font-weight: 600; letter-spacing: -.01em; border: 1px solid var(--line); background: var(--panel); color: var(--text); white-space: nowrap; cursor: pointer;
+  transition: transform .2s var(--ease), box-shadow .3s var(--ease), border-color .2s, background .2s; }
+.btn:hover { border-color: color-mix(in srgb, var(--line) 40%, var(--text) 22%); transform: translateY(-1px); box-shadow: var(--shadow-2); }
+.btn:active { transform: translateY(0) scale(.98); }
+.btn.ink { background: var(--ink); color: var(--ink-text); border-color: transparent; }
+.btn.ink:hover { box-shadow: 0 14px 30px -12px color-mix(in srgb, var(--ink) 55%, transparent); }
+.btn.lg { height: 52px; padding: 0 24px; border-radius: 14px; font-size: 16px; }
+.btn.sm { height: 36px; padding: 0 14px; font-size: 13.5px; border-radius: 10px; }
+.btn .arr { transition: transform .3s var(--ease); }
+.btn:hover .arr { transform: translateX(3px); }
+.cf-logo { width: 22px; height: 22px; }
 
-/* ---------------------------------------------------------------- 产品预览 */
-.preview { margin: 64px auto 0; max-width: 1040px; border-radius: 20px; padding: 10px; background: color-mix(in srgb, var(--panel) 55%, transparent);
-  border: 1px solid var(--line); box-shadow: var(--shadow); text-align: left; }
-.app { display: grid; grid-template-columns: 172px 1fr; border-radius: 13px; overflow: hidden; border: 1px solid var(--line); background: var(--panel); font-size: 12px; }
-.app-side { background: var(--sunken); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
-.app-side .b { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; padding: 0 6px 14px; }
-.app-side .it { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; color: var(--text-2); }
-.app-side .it.on { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(13,19,33,.06); }
-.app-side .it svg { width: 14px; height: 14px; }
-.app-main { padding: 18px; display: grid; gap: 12px; min-width: 0; }
-.app-h { display: flex; align-items: center; justify-content: space-between; }
-.app-h b { font-size: 16px; letter-spacing: -.02em; }
-.seg { display: flex; gap: 2px; background: var(--sunken); padding: 2px; border-radius: 7px; color: var(--muted); }
-.seg span { padding: 2px 8px; border-radius: 5px; }
-.seg span.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(13,19,33,.08); }
-.kp { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.k { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.k small { color: var(--muted); display: flex; justify-content: space-between; }
-.k small i { font-style: normal; color: var(--good); background: var(--good-bg); padding: 0 5px; border-radius: 5px; font-weight: 600; }
-.k b { display: block; font-size: 20px; letter-spacing: -.03em; margin-top: 2px; font-variant-numeric: tabular-nums; }
-.row2 { display: grid; grid-template-columns: 1.7fr 1fr; gap: 10px; }
-.box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
-.box > small { color: var(--text-2); font-weight: 600; }
-.chart { height: 120px; margin-top: 6px; }
-.chart path.ln { stroke-dasharray: 600; stroke-dashoffset: 600; animation: draw 2.4s var(--ease) forwards .6s; }
-@keyframes draw { to { stroke-dashoffset: 0; } }
-.feed { display: grid; gap: 6px; margin-top: 8px; }
-.feed div { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 7px; animation: feed 6s infinite; animation-delay: calc(var(--n) * 2s); }
-.feed span { font-size: 13px; }
-.feed b { font-family: var(--mono); font-weight: 600; }
-.feed em { font-style: normal; color: var(--muted); margin-left: auto; white-space: nowrap; }
-@keyframes feed { 0%, 30%, 100% { background: transparent; } 5%, 20% { background: var(--accent-2); } }
-
-/* ---------------------------------------------------------------- 通用区块 */
-.sec { padding: 112px 0 0; }
-.sec-h { text-align: center; max-width: 640px; margin: 0 auto 52px; }
-.kicker { font-size: 13px; font-weight: 650; letter-spacing: .08em; color: var(--accent-ink); }
-h2 { margin: 10px 0 0; font-size: clamp(28px, 3.8vw, 42px); line-height: 1.15; letter-spacing: -.035em; font-weight: 760; text-wrap: balance; }
-.sec-h p { margin: 14px 0 0; color: var(--text-2); font-size: 16px; text-wrap: pretty; }
-.reveal { opacity: 0; transform: translateY(18px); transition: opacity .8s var(--ease), transform .8s var(--ease); transition-delay: calc(var(--d, 0) * 70ms); }
+/* 进场 */
+.rise { animation: rise 1s var(--ease) both; animation-delay: calc(var(--d, 0) * 90ms + 80ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(20px); filter: blur(4px); } }
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 1s var(--ease), transform 1s var(--ease); transition-delay: calc(var(--d, 0) * 80ms); }
 .reveal.in { opacity: 1; transform: none; }
 
-/* 功能 */
-.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.card { padding: 26px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .2s; }
-.card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
-.card .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 18px; background: var(--accent-2); color: var(--accent-ink); }
-.card .ic.v { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
-.card .ic.t { background: color-mix(in srgb, var(--teal) 14%, transparent); color: var(--teal); }
-.card h3 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -.015em; }
-.card p { margin: 0; color: var(--text-2); font-size: 14.5px; text-wrap: pretty; }
-.card.wide { grid-column: span 2; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
-.geo { display: grid; gap: 8px; }
-.geo div { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 11px; border: 1px solid var(--line); font-size: 13px; background: var(--bg-2); }
-.geo .f { font-size: 17px; width: 22px; text-align: center; }
-.geo code { font-family: var(--mono); margin-left: auto; color: var(--text-2); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.geo .src { background: var(--accent-2); border-color: color-mix(in srgb, var(--accent) 30%, transparent); font-family: var(--mono); font-weight: 650; color: var(--accent-ink); }
+/* ==================================================================== 导航 */
+.nav { position: fixed; top: 14px; left: 0; right: 0; z-index: 50; pointer-events: none; }
+.nav .bar { pointer-events: auto; display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 8px 0 16px; border-radius: 16px;
+  max-width: 1136px; margin: 0 auto; transition: background .4s var(--ease), box-shadow .4s var(--ease), border-color .4s; border: 1px solid transparent; }
+.nav.scrolled .bar { background: color-mix(in srgb, var(--panel) 78%, transparent); border-color: var(--line); box-shadow: var(--shadow-2);
+  backdrop-filter: saturate(1.8) blur(16px); -webkit-backdrop-filter: saturate(1.8) blur(16px); }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 750; font-size: 17px; letter-spacing: -.03em; margin-right: 20px; }
+.brand em { font-style: normal; color: var(--muted); font-weight: 500; margin-left: -4px; }
+.brand svg { transition: transform .5s var(--ease); }
+.brand:hover svg { transform: rotate(-8deg) scale(1.06); }
+.links { display: flex; gap: 2px; }
+.links a { padding: 8px 12px; border-radius: 10px; font-size: 14.5px; color: var(--text-2); transition: color .2s, background .2s; }
+.links a:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.nav .sp { flex: 1; }
+.gh { display: inline-flex; align-items: center; gap: 8px; }
 
-/* 流程 */
-.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
-.step { position: relative; padding: 26px; border-radius: 18px; border: 1px dashed var(--line); }
-.step::before { counter-increment: s; content: counter(s); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
-  background: var(--text); color: var(--bg); font-weight: 700; font-size: 14px; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
-.step h3 { margin: 0 0 6px; font-size: 16px; }
-.step p { margin: 0; color: var(--text-2); font-size: 14.5px; }
+/* ==================================================================== 首屏 */
+.hero { position: relative; padding: 168px 0 96px; overflow: hidden; }
+.hero::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(var(--line-2) 1px, transparent 1px), linear-gradient(90deg, var(--line-2) 1px, transparent 1px);
+  background-size: 56px 56px; -webkit-mask-image: radial-gradient(ellipse 80% 70% at 70% 30%, #000 10%, transparent 70%); mask-image: radial-gradient(ellipse 80% 70% at 70% 30%, #000 10%, transparent 70%); opacity: .8; }
+.glow { position: absolute; width: 760px; height: 760px; right: -160px; top: -180px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--violet) 10%, transparent) 55%, transparent);
+  filter: blur(10px); animation: float 14s var(--ease-io) infinite alternate; }
+@keyframes float { to { transform: translate(-60px, 40px) scale(1.08); } }
+.hero-grid > * { min-width: 0; }
+.hero-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: 64px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 10px; padding: 5px 14px 5px 5px; border-radius: 999px; background: color-mix(in srgb, var(--panel) 80%, transparent);
+  border: 1px solid var(--line); font-size: 13.5px; color: var(--text-2); backdrop-filter: blur(8px); transition: border-color .2s; }
+.pill:hover { border-color: color-mix(in srgb, var(--line) 40%, var(--text) 22%); }
+.pill b { padding: 2px 10px; border-radius: 999px; background: var(--ink); color: var(--ink-text); font-size: 12px; font-weight: 650; }
+.pill .arr { transition: transform .3s var(--ease); }
+.pill:hover .arr { transform: translateX(3px); }
+h1 { margin: 28px 0 0; font-size: clamp(44px, 6.6vw, 84px); line-height: 1.02; letter-spacing: -.055em; font-weight: 800; }
+h1 .l { display: block; }
+h1 .grad { background: linear-gradient(95deg, var(--accent) 0%, var(--violet) 55%, var(--accent) 100%); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: sheen 8s linear infinite; }
+@keyframes sheen { to { background-position: -200% 0; } }
+.lead { margin: 28px 0 0; max-width: 540px; font-size: 18.5px; line-height: 1.7; color: var(--text-2); text-wrap: pretty; }
+.cta { display: flex; gap: 12px; margin-top: 40px; flex-wrap: wrap; }
+.clone { display: flex; align-items: center; gap: 12px; margin-top: 28px; max-width: 520px; font-family: var(--mono); font-size: 13.5px; color: var(--muted); }
+.clone code { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.copy { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--text-2);
+  cursor: pointer; flex: none; transition: color .2s, border-color .2s, transform .2s var(--ease); }
+.copy:hover { color: var(--text); border-color: color-mix(in srgb, var(--line) 40%, var(--text) 22%); }
+.copy:active { transform: scale(.92); }
+.copy svg { width: 15px; height: 15px; grid-area: 1/1; transition: opacity .2s, transform .3s var(--ease); }
+.copy .ok { opacity: 0; transform: scale(.4); color: var(--good); }
+.copy.done .ok { opacity: 1; transform: none; }
+.copy.done .no { opacity: 0; transform: scale(.4); }
 
-/* 部署 */
-.deploy { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 40px; align-items: start; }
-.deploy-l h2 { margin-top: 10px; }
-.deploy-l p { color: var(--text-2); font-size: 16px; margin: 14px 0 26px; }
-.checks { display: grid; gap: 10px; margin: 0 0 30px; padding: 0; list-style: none; }
-.checks li { display: flex; gap: 10px; align-items: flex-start; color: var(--text-2); }
-.checks li svg { color: var(--good); margin-top: 3px; }
-.term { border-radius: 16px; background: var(--code-bg); color: var(--code-text); box-shadow: var(--shadow); overflow: hidden; border: 1px solid color-mix(in srgb, var(--line) 30%, transparent); }
-.term-h { display: flex; align-items: center; gap: 7px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
-.term-h i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
-.term-h i:nth-child(2) { background: #febc2e; } .term-h i:nth-child(3) { background: #28c840; }
-.term-h span { margin-left: 8px; font-size: 12px; color: #7d8696; font-family: var(--mono); }
-.term-b { padding: 8px 0 14px; font-family: var(--mono); font-size: 13px; line-height: 1.7; }
-.line { display: flex; align-items: flex-start; gap: 10px; padding: 6px 16px; }
-.line .c { color: #6b7385; display: block; }
-.line .p { color: #5f8fff; user-select: none; }
-.line code { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-all; }
-.line .copy { background: rgba(255,255,255,.06); color: #9aa3b2; width: 28px; height: 28px; }
-.line .copy:hover { color: #fff; }
+/* ---- 交互式跳转演示 ---- */
+.route { position: relative; border-radius: 24px; padding: 8px; background: color-mix(in srgb, var(--panel) 60%, transparent); border: 1px solid var(--line);
+  box-shadow: var(--shadow-3); backdrop-filter: blur(12px); }
+.route-in { border-radius: 18px; background: var(--panel); border: 1px solid var(--line); overflow: hidden; }
+.route-h { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line-2); font-size: 12.5px; color: var(--muted); }
+.route-h .live { display: inline-flex; align-items: center; gap: 7px; color: var(--good); font-weight: 600; }
+.route-h .live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: ping 1.8s infinite; }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 45%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+.route-h .sp { flex: 1; }
+.route-b { padding: 22px 22px 20px; }
+.node { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 14px; background: var(--sunken); }
+.node .ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; flex: none; background: var(--panel); color: var(--accent); box-shadow: var(--shadow-1); }
+.node .t { min-width: 0; }
+.node small { display: block; font-size: 12px; color: var(--muted); }
+.node .u { font-family: var(--mono); font-size: 15px; font-weight: 600; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .u b { color: var(--accent-ink); }
+.picker { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 16px 0 0; }
+.picker button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 6px; white-space: nowrap; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
+  font-size: 13px; color: var(--text-2); cursor: pointer; transition: border-color .2s, background .2s, color .2s, transform .2s var(--ease); }
+.picker button:hover { color: var(--text); border-color: color-mix(in srgb, var(--line) 40%, var(--text) 22%); }
+.picker button:active { transform: scale(.96); }
+.picker button[aria-checked="true"] { background: var(--ink); color: var(--ink-text); border-color: transparent; }
+.picker .f { font-size: 15px; line-height: 1; }
+.wire { position: relative; height: 56px; margin-left: 35px; }
+.wire svg { position: absolute; left: -1px; top: 0; width: 2px; height: 100%; overflow: visible; }
+.wire .base { stroke: var(--line); stroke-width: 2; stroke-dasharray: 3 5; }
+.wire .pulse { stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 18 120; stroke-dashoffset: 18; }
+.wire.go .pulse { animation: pulse .7s var(--ease) forwards; }
+@keyframes pulse { to { stroke-dashoffset: -60; } }
+.wire .lat { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+  padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); white-space: nowrap; }
+.dst { background: var(--accent-2); outline: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); outline-offset: -1px; }
+.dst .ic { color: var(--accent-ink); font-size: 20px; }
+.dst .swap { animation: swap .55s var(--ease) both; }
+@keyframes swap { from { opacity: 0; transform: translateY(8px); filter: blur(3px); } }
+.dst .rule { margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--accent-ink); background: var(--panel); padding: 3px 9px; border-radius: 999px; white-space: nowrap; flex: none; }
+.log { margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: var(--code-bg); color: var(--code-text); font-family: var(--mono); font-size: 12px; line-height: 1.75;
+  height: 104px; overflow: hidden; position: relative; }
+.log::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 26px; background: linear-gradient(var(--code-bg), transparent); pointer-events: none; }
+.log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: logline .45s var(--ease) both; }
+@keyframes logline { from { opacity: 0; transform: translateY(6px); } }
+.log .m { color: #5f8fff; } .log .k { color: #7c8597; } .log .s { color: #3cc985; }
 
-/* FAQ */
-.faq { max-width: 760px; margin: 0 auto; display: grid; gap: 10px; }
-details { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 0 20px; transition: border-color .2s; }
-details[open] { border-color: color-mix(in srgb, var(--line) 50%, var(--text) 18%); }
-summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; font-weight: 600; }
-summary::-webkit-details-marker { display: none; }
-summary svg { color: var(--muted); transition: transform .3s var(--ease); }
-details[open] summary svg { transform: rotate(45deg); }
-details p { margin: 0 0 18px; color: var(--text-2); }
+/* ==================================================================== 通用区块 */
+.sec { position: relative; padding: 144px 0 0; }
+.label { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); letter-spacing: .02em; }
+.label b { color: var(--accent-ink); font-weight: 600; }
+.label::after { content: ''; width: 32px; height: 1px; background: var(--faint); }
+h2 { margin: 18px 0 0; font-size: clamp(32px, 4.4vw, 56px); line-height: 1.08; letter-spacing: -.045em; font-weight: 780; text-wrap: balance; }
+h2 .mute { color: var(--muted); }
+.sec-h { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .7fr); gap: 48px; align-items: end; margin-bottom: 56px; }
+.nb { white-space: nowrap; }
+.sec-h p { margin: 0; color: var(--text-2); font-size: 17px; text-wrap: pretty; }
 
-/* 结尾 */
-.end { margin: 112px 0 0; padding: 64px 24px; border-radius: 24px; text-align: center; position: relative; overflow: hidden; background: var(--text); color: var(--bg); }
-.end::before { content: ''; position: absolute; inset: 0; background: radial-gradient(600px 300px at 50% 120%, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
-  opacity: .7; pointer-events: none; }
-.end h2 { position: relative; margin: 0; color: inherit; }
-.end p { position: relative; margin: 12px auto 28px; max-width: 520px; opacity: .72; }
-.end .cta { position: relative; margin-top: 0; }
-.end .btn { background: var(--bg); color: var(--text); border-color: transparent; }
-.end .btn.ghost { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 30%, transparent); }
+/* ---- 后台预览 ---- */
+.stage { perspective: 1800px; margin-top: 8px; }
+.shot { transform-origin: 50% 0; transform: rotateX(var(--rx, 16deg)) scale(var(--sc, .93)); transition: transform .1s linear; will-change: transform;
+  border-radius: 24px; padding: 10px; background: color-mix(in srgb, var(--panel) 55%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow-3); }
+.app { display: grid; grid-template-columns: 196px 1fr; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: var(--panel); font-size: 13px; }
+.app-side { background: var(--sunken); padding: 18px 12px; display: flex; flex-direction: column; gap: 4px; }
+.app-side .b { display: flex; align-items: center; gap: 8px; font-weight: 720; font-size: 14px; padding: 0 8px 18px; letter-spacing: -.02em; }
+.app-side .it { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; color: var(--text-2); }
+.app-side .it svg { width: 15px; height: 15px; }
+.app-side .it.on { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: var(--shadow-1); }
+.app-side .it.on svg { color: var(--accent); }
+.app-main { padding: 22px; display: grid; gap: 14px; min-width: 0; }
+.app-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.app-top b { font-size: 19px; letter-spacing: -.03em; }
+.seg { display: flex; gap: 2px; background: var(--sunken); padding: 3px; border-radius: 8px; color: var(--muted); font-size: 12px; }
+.seg span { padding: 3px 10px; border-radius: 6px; }
+.seg span.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow-1); }
+.kp { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.k { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.k small { color: var(--muted); display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.k small i { font-style: normal; color: var(--good); background: var(--good-bg); padding: 0 6px; border-radius: 6px; font-weight: 650; font-size: 11px; }
+.k b { display: block; font-size: 24px; letter-spacing: -.04em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.row2 { display: grid; grid-template-columns: 1.75fr 1fr; gap: 12px; }
+.box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.box > small { color: var(--text-2); font-weight: 600; font-size: 12.5px; }
+.chart { display: block; width: 100%; height: 150px; margin-top: 8px; }
+.chart .ln { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.in .chart .ln { animation: drawln 2.2s var(--ease) forwards .3s; }
+@keyframes drawln { to { stroke-dashoffset: 0; } }
+.chart .ar { opacity: 0; }
+.in .chart .ar { animation: fadein 1.4s var(--ease) forwards 1s; }
+@keyframes fadein { to { opacity: 1; } }
+.feed { display: grid; gap: 4px; margin-top: 8px; }
+.feed div { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; animation: hl 6s infinite; animation-delay: calc(var(--n) * 2s); }
+.feed b { font-family: var(--mono); font-weight: 600; font-size: 12.5px; }
+.feed span:first-child { font-size: 15px; }
+.feed em { font-style: normal; color: var(--muted); margin-left: auto; white-space: nowrap; font-size: 12px; }
+@keyframes hl { 0%, 30%, 100% { background: transparent; } 5%, 22% { background: var(--accent-2); } }
 
-footer { margin-top: 72px; border-top: 1px solid var(--line); }
-footer .wrap { display: flex; align-items: center; gap: 20px; min-height: 72px; color: var(--muted); font-size: 13px; flex-wrap: wrap; padding-top: 16px; padding-bottom: 16px; }
+/* ---- 数据条 ---- */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.stat { padding: 36px 28px; }
+.stat + .stat { border-left: 1px solid var(--line); }
+.stat b { display: block; font-size: clamp(36px, 4vw, 52px); line-height: 1; letter-spacing: -.05em; font-weight: 780; font-variant-numeric: tabular-nums; }
+.stat b small { font-size: .45em; letter-spacing: -.02em; color: var(--muted); font-weight: 600; margin-left: 4px; }
+.stat > span { display: block; margin-top: 14px; color: var(--text-2); font-size: 14.5px; }
+
+/* ---- 功能拼贴 ---- */
+.bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.tile { position: relative; padding: 30px; border-radius: var(--r); background: var(--panel); border: 1px solid var(--line); overflow: hidden; isolation: isolate;
+  transition: border-color .3s, transform .5s var(--ease), box-shadow .5s var(--ease); }
+.tile::before { content: ''; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity .4s;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%); }
+.tile:hover::before { opacity: 1; }
+.tile:hover { border-color: color-mix(in srgb, var(--line) 50%, var(--accent) 30%); }
+.tile h3 { margin: 0; font-size: 20px; line-height: 1.3; letter-spacing: -.03em; font-weight: 720; }
+.tile p { margin: 10px 0 0; color: var(--text-2); font-size: 15px; text-wrap: pretty; }
+.tile .tag { display: inline-flex; font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-bottom: 18px; }
+.t-geo { grid-column: span 4; grid-row: span 2; display: flex; flex-direction: column; }
+.t-ana, .t-src { grid-column: span 2; }
+.t-sec, .t-free, .t-oss { grid-column: span 2; }
+/* 地区规则可视化 */
+.rules { margin-top: auto; padding-top: 32px; display: grid; gap: 10px; }
+.rules .src { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--ink); color: var(--ink-text); font-family: var(--mono); font-size: 14px; font-weight: 600; }
+.rules .src svg { color: var(--accent); }
+.rules .rr { display: grid; grid-template-columns: 28px 120px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 13px 16px; border-radius: 14px; border: 1px solid var(--line);
+  font-size: 14px; background: var(--bg); transition: border-color .4s, background .4s, transform .5s var(--ease); }
+.rules .rr .f { font-size: 18px; text-align: center; }
+.rules .rr code { font-family: var(--mono); font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rules .rr em { font-style: normal; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rules .rr.on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-2); transform: translateX(6px); }
+.rules .rr.on code { color: var(--accent-ink); }
+/* 迷你柱状图 */
+.bars { display: flex; align-items: flex-end; gap: 5px; height: 84px; margin-top: 26px; }
+.bars i { flex: 1; border-radius: 4px 4px 2px 2px; background: linear-gradient(var(--accent), color-mix(in srgb, var(--accent) 35%, transparent)); transform-origin: bottom; transform: scaleY(.04); transition: transform 1s var(--ease); }
+.in .bars i { transform: scaleY(var(--h)); transition-delay: calc(var(--n) * 45ms + 200ms); }
+.bars i:last-child { background: linear-gradient(var(--violet), color-mix(in srgb, var(--violet) 35%, transparent)); }
+/* 来源 */
+.srcs { display: grid; gap: 8px; margin-top: 24px; }
+.srcs div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; font-size: 13px; }
+.srcs code { font-family: var(--mono); color: var(--text-2); }
+.srcs b { font-variant-numeric: tabular-nums; font-size: 13px; }
+.srcs i { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
+.srcs i::after { content: ''; display: block; height: 100%; width: var(--w); border-radius: 3px; background: var(--teal); transform-origin: left; transform: scaleX(0); transition: transform 1.1s var(--ease); }
+.in .srcs i::after { transform: scaleX(1); transition-delay: calc(var(--n) * 90ms + 200ms); }
+/* 安全 */
+.ts { display: flex; align-items: center; gap: 12px; margin-top: 24px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 14px; }
+.ts .cb { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; background: var(--good); color: #fff; }
+.ts .cb svg { width: 15px; height: 15px; stroke-width: 3; stroke-dasharray: 24; stroke-dashoffset: 24; }
+.in .ts .cb svg { animation: tick .6s var(--ease) forwards .5s; }
+@keyframes tick { to { stroke-dashoffset: 0; } }
+.ts small { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+/* 零成本 */
+.zero { display: flex; align-items: baseline; gap: 6px; margin-top: 18px; }
+.zero b { font-size: 64px; line-height: 1; letter-spacing: -.06em; font-weight: 800; }
+.zero span { color: var(--muted); font-size: 15px; }
+/* 开源 */
+.oss { display: flex; align-items: center; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+.oss span { font-family: var(--mono); font-size: 12px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--line); color: var(--text-2); background: var(--bg); }
+
+/* ---- 步骤 ---- */
+.steps { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+.steps::before { content: ''; position: absolute; left: 24px; right: calc(33.33% - 8px); top: 23px; height: 2px; background: linear-gradient(90deg, var(--accent), var(--violet));
+  transform-origin: left; transform: scaleX(0); transition: transform 1.6s var(--ease) .2s; }
+.steps.in::before { transform: scaleX(1); }
+.steps::after { content: ''; position: absolute; left: 24px; right: 24px; top: 23px; height: 2px; background: var(--line); z-index: -1; }
+.step .n { position: relative; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line);
+  font-family: var(--mono); font-weight: 700; font-size: 15px; box-shadow: var(--shadow-1); margin-bottom: 26px; transition: background .5s, color .5s, border-color .5s; }
+.steps.in .step .n { background: var(--ink); color: var(--ink-text); border-color: transparent; transition-delay: calc(var(--d) * 500ms + 200ms); }
+.step h3 { margin: 0; font-size: 21px; letter-spacing: -.03em; font-weight: 720; }
+.step p { margin: 10px 0 0; color: var(--text-2); font-size: 15.5px; text-wrap: pretty; }
+
+/* ---- 部署 ---- */
+.deploy { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 64px; align-items: center; }
+.deploy p.d { margin: 22px 0 0; color: var(--text-2); font-size: 17px; text-wrap: pretty; }
+.checks { display: grid; gap: 14px; margin: 32px 0 36px; padding: 0; list-style: none; }
+.checks li { display: flex; gap: 12px; align-items: center; color: var(--text-2); font-size: 15.5px; }
+.checks li svg { width: 22px; height: 22px; padding: 4px; border-radius: 7px; background: var(--good-bg); color: var(--good); stroke-width: 2.6; }
+.term { border-radius: 20px; background: var(--code-bg); color: var(--code-text); box-shadow: var(--shadow-3); overflow: hidden; border: 1px solid rgba(255,255,255,.06); }
+.term-h { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.term-h i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; } .term-h i:nth-child(2) { background: #febc2e; } .term-h i:nth-child(3) { background: #28c840; }
+.term-h span { margin-left: 10px; font-family: var(--mono); font-size: 12px; color: #6b7385; }
+.term-b { padding: 16px 0 20px; font-family: var(--mono); font-size: 13.5px; line-height: 1.7; min-height: 340px; }
+.tl { display: flex; align-items: flex-start; gap: 12px; padding: 5px 20px; }
+.tl.c { color: #5e6678; padding-top: 12px; }
+.tl.c:first-child { padding-top: 5px; }
+.tl .p { color: #5f8fff; user-select: none; }
+.tl code { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-all; }
+.tl code.typing::after { content: ''; display: inline-block; width: 8px; height: 1.1em; margin-left: 2px; vertical-align: -.18em; background: #5f8fff; animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.tl .copy { width: 28px; height: 28px; border: 0; background: rgba(255,255,255,.06); color: #8b94a5; opacity: 0; transition: opacity .2s, color .2s; }
+.tl:hover .copy, .tl .copy:focus-visible, .tl .copy.done { opacity: 1; }
+.tl .copy:hover { color: #fff; }
+@media (hover: none) { .tl .copy { opacity: 1; } }
+
+/* ---- FAQ ---- */
+.faq { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 64px; align-items: start; }
+.qa { border-top: 1px solid var(--line); }
+.q { border-bottom: 1px solid var(--line); }
+.ask { margin: 22px 0 0; color: var(--text-2); font-size: 16px; }
+.ask a { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; color: var(--accent-ink); font-weight: 600; background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0 1.5px; background-position: 0 100%; background-repeat: no-repeat; transition: background-size .4s var(--ease); }
+.ask a:hover { background-size: 100% 1.5px; }
+.ask a svg { width: 15px; height: 15px; transition: transform .3s var(--ease); }
+.ask a:hover svg { transform: translate(2px, -2px); }
+.q button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 26px 0; border: 0; background: none; cursor: pointer; text-align: left;
+  font-size: 18px; font-weight: 650; letter-spacing: -.02em; transition: color .2s; }
+.q button:hover { color: var(--accent-ink); }
+.q .pm { position: relative; width: 28px; height: 28px; border-radius: 9px; border: 1px solid var(--line); flex: none; transition: transform .5s var(--ease), background .3s, border-color .3s; }
+.q .pm::before, .q .pm::after { content: ''; position: absolute; left: 50%; top: 50%; width: 11px; height: 1.8px; border-radius: 1px; background: currentColor; transform: translate(-50%, -50%); }
+.q .pm::after { transform: translate(-50%, -50%) rotate(90deg); transition: transform .5s var(--ease); }
+.q.open .pm { background: var(--ink); color: var(--ink-text); border-color: transparent; transform: rotate(180deg); }
+.q.open .pm::after { transform: translate(-50%, -50%) rotate(0deg); }
+.q .a { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .5s var(--ease); }
+.q.open .a { grid-template-rows: 1fr; }
+.q .a > div { overflow: hidden; }
+.q .a p { margin: 0 0 26px; color: var(--text-2); font-size: 16px; max-width: 620px; text-wrap: pretty; }
+
+/* ---- 收尾 ---- */
+.end { position: relative; margin-top: 144px; border-radius: 32px; padding: 112px 32px; text-align: center; overflow: hidden; background: var(--ink); color: var(--ink-text); isolation: isolate; }
+.end::before { content: ''; position: absolute; inset: 0; z-index: -1; background-image: linear-gradient(color-mix(in srgb, var(--ink-text) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--ink-text) 7%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px; -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 100%, #000, transparent); mask-image: radial-gradient(ellipse 60% 70% at 50% 100%, #000, transparent); }
+.end::after { content: ''; position: absolute; z-index: -1; width: 900px; height: 500px; left: 50%; bottom: -300px; transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 60%, transparent), transparent); opacity: .8; }
+.end .mark { width: 64px; height: 64px; margin: 0 auto 32px; animation: bob 5s var(--ease-io) infinite alternate; }
+@keyframes bob { to { transform: translateY(-8px) rotate(-4deg); } }
+.end h2 { margin: 0; color: inherit; }
+.end p { margin: 20px auto 40px; max-width: 560px; font-size: 18px; opacity: .7; text-wrap: balance; }
+.end .cta { justify-content: center; margin: 0; }
+.end .btn { background: var(--ink-text); color: var(--ink); border-color: transparent; }
+.end .btn.ghost { background: transparent; color: var(--ink-text); border-color: color-mix(in srgb, var(--ink-text) 25%, transparent); }
+.end .btn.ghost:hover { border-color: color-mix(in srgb, var(--ink-text) 55%, transparent); }
+
+footer { margin-top: 56px; }
+footer .wrap { display: flex; align-items: center; gap: 24px; padding-top: 28px; padding-bottom: 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; flex-wrap: wrap; }
 footer .sp { flex: 1; }
+footer a { transition: color .2s; display: inline-flex; align-items: center; min-height: 40px; }
 footer a:hover { color: var(--text); }
 
-/* ---------------------------------------------------------------- 响应式 */
-@media (max-width: 960px) {
-  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .card.wide { grid-column: 1 / -1; }
-  .deploy { grid-template-columns: 1fr; }
-  .steps { grid-template-columns: 1fr; }
+/* ==================================================================== 响应式 */
+@media (max-width: 1080px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 64px; }
+  .hero { padding-top: 148px; }
+  .lead { max-width: 620px; }
+  .t-geo { grid-column: span 6; grid-row: auto; }
+  .t-ana, .t-src { grid-column: span 3; }
+  .sec-h { grid-template-columns: 1fr; gap: 18px; }
+  .deploy, .faq { grid-template-columns: 1fr; gap: 48px; }
+}
+@media (max-width: 860px) {
+  .links { display: none; }
+  .wrap { padding: 0 24px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stat:nth-child(3) { border-left: 0; }
+  .stat:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .t-sec, .t-free, .t-oss, .t-ana, .t-src { grid-column: span 3; }
+  .t-oss { grid-column: span 6; }
   .app { grid-template-columns: 1fr; } .app-side { display: none; }
   .row2 { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr; gap: 40px; }
+  .steps::before, .steps::after { left: 23px; right: auto; top: 24px; bottom: 24px; width: 2px; height: auto; }
+  .steps::before { transform: scaleY(0); transform-origin: top; background: linear-gradient(var(--accent), var(--violet)); }
+  .steps.in::before { transform: scaleY(1); }
+  .step { padding-left: 76px; position: relative; }
+  .step .n { position: absolute; left: 0; top: -6px; margin: 0; }
+  .sec { padding-top: 112px; }
 }
-@media (max-width: 640px) {
-  .nav-links { display: none; }
-  .nav .gh-text { display: none; }
-  .hero { padding-top: 56px; }
-  h1 { font-size: 31px; }
-  .lead { font-size: 16px; }
-  .grid { grid-template-columns: 1fr; }
-  .card.wide { grid-template-columns: 1fr; }
-  .kp { grid-template-columns: repeat(2, 1fr); }
-  .sec { padding-top: 84px; }
-  .wrap { padding: 0 16px; }
+@media (max-width: 600px) {
+  .wrap { padding: 0 18px; }
+  .nav { top: 10px; } .nav .bar { margin: 0 10px; }
+  .gh-t { display: none; }
+  .hero { padding: 120px 0 72px; }
+  h1 { font-size: 40px; letter-spacing: -.05em; }
+  h2 { font-size: 30px; }
+  .lead { font-size: 16.5px; margin-top: 22px; }
   .cta .btn { flex: 1 1 100%; }
-  .end { margin-top: 84px; border-radius: 20px; padding: 48px 20px; }
+  .route-b { padding: 16px; }
+  .kp { grid-template-columns: repeat(2, 1fr); }
+  .bento { grid-template-columns: 1fr; }
+  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss { grid-column: auto; }
+  .tile { padding: 24px; }
+  .rules .rr { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .rules .rr span:nth-child(2) { display: none; }
+  .stat { padding: 26px 18px; }
+  .q button { font-size: 16.5px; padding: 22px 0; }
+  .end { border-radius: 24px; padding: 80px 22px; margin-top: 112px; }
+  .term-b { font-size: 12.5px; min-height: 0; }
+  .shot { --rx: 0deg !important; --sc: 1 !important; padding: 6px; border-radius: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; transition-delay: 0ms !important; }
   .reveal { opacity: 1; transform: none; }
-  .chart path.ln { stroke-dashoffset: 0; }
+  .shot { --rx: 0deg !important; --sc: 1 !important; }
 }
 </style>
 </head>
 <body>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- 共享的 logo 渐变 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4b83ff"/><stop offset="1" stop-color="#1f4fd1"/></linearGradient></defs></svg>
 
 <header class="nav" id="nav">
-  <div class="wrap">
-    <a class="brand" href="#top" aria-label="cligc link">
-      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4b83ff"/><stop offset="1" stop-color="#1f4fd1"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M10.5 21.5 21.5 10.5M13.5 10.5h8v8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      cligc<em>link</em>
+  <div class="bar">
+    <a class="brand" href="#top" aria-label="cligc link 首页">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M10.5 21.5 21.5 10.5M13.5 10.5h8v8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      cligc <em>link</em>
     </a>
-    <nav class="nav-links" aria-label="页面导航">
-      <a href="#features">功能</a><a href="#how">工作方式</a><a href="#deploy">部署</a><a href="#faq">常见问题</a>
+    <nav class="links" aria-label="页面导航">
+      <a href="#product">产品</a><a href="#features">功能</a><a href="#deploy">部署</a><a href="#faq">常见问题</a>
     </nav>
     <span class="sp"></span>
-    <a class="btn sm" href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-      <span class="gh-text">GitHub</span>
+    <a class="btn sm gh" href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      <span class="gh-t">Star on GitHub</span>
     </a>
   </div>
 </header>
 
 <main id="top">
-  <!-- ============================================================ 首屏 -->
+  <!-- ================================================================ 首屏 -->
   <section class="hero">
-    <div class="hero-bg" aria-hidden="true"></div>
-    <div class="wrap">
-      <div class="badges rise" style="--d:0"><span>开源</span>免费 · MIT 协议 · 可自托管
-        <a href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">→</a></div>
-      <h1 class="rise" style="--d:1">短链接、地区分流、<br><span class="g">访问分析，一次部署。</span></h1>
-      <p class="lead rise" style="--d:2">cligc link 是运行在 Cloudflare Workers 上的开源短链服务。按国家 / 地区把访客送到不同的落地页，记录每次点击来自哪里，在免费额度内零成本运行。</p>
-      <div class="cta rise" style="--d:3">
-        <a class="btn primary lg" href="https://deploy.workers.cloudflare.com/?url=https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">
-          <svg class="cf" viewBox="0 0 24 24" aria-hidden="true"><path fill="#F38020" d="M16.5 16.8c.2-.6.1-1.1-.2-1.5-.3-.3-.7-.5-1.2-.6l-8.9-.1c-.1 0-.1 0-.2-.1v-.1c0-.1.1-.1.2-.2l9-.1c1.1 0 2.2-.9 2.6-2l.5-1.4v-.2C17.7 8.2 15.4 6.3 12.7 6.3c-2.5 0-4.6 1.6-5.4 3.8-.5-.4-1.2-.6-1.9-.5-1.2.1-2.2 1.1-2.3 2.3 0 .3 0 .6.1.9-2 .1-3.5 1.7-3.5 3.7 0 .2 0 .4.1.5 0 .1.1.1.1.1h16.4c.1 0 .2-.1.2-.2l.1-.1z"/><path fill="#FAAE40" d="M19.4 11.2h-.2c-.1 0-.1.1-.2.1l-.3 1.2c-.2.6-.1 1.1.2 1.5.3.3.7.5 1.2.6l1.9.1c.1 0 .1 0 .2.1v.1c0 .1-.1.1-.2.2l-2 .1c-1.1 0-2.2.9-2.6 2l-.1.4c0 .1 0 .1.1.1h6.8c.1 0 .1 0 .1-.1.1-.4.2-.9.2-1.3 0-2.8-2.3-5.1-5-5.1"/></svg>
-          一键部署到 Cloudflare</a>
-        <a class="btn lg" href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">在 GitHub 查看源码</a>
-      </div>
-      <div class="rise" style="--d:4">
-        <div class="cmd"><b>$</b><code>git clone https://github.com/ccvar/cligc_link.git</code>
-          <button class="copy" data-copy="git clone https://github.com/ccvar/cligc_link.git" aria-label="复制命令">
-            <svg class="i no" viewBox="0 0 24 24" style="width:15px;height:15px"><rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <svg class="i ok" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M20 6 9 17l-5-5"/></svg></button></div>
+    <div class="glow" aria-hidden="true"></div>
+    <div class="wrap hero-grid">
+      <div>
+        <a class="pill rise" style="--d:0" href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener"><b>开源</b>免费 · MIT · 运行在 Cloudflare Workers<svg class="i arr" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <h1><span class="l rise" style="--d:1">每一次点击，</span><span class="l rise grad" style="--d:2">都去对的地方。</span></h1>
+        <p class="lead rise" style="--d:3">cligc link 是开源、可自托管的短链接服务。同一个链接，按访客所在国家 / 地区送往不同的落地页，并清楚记录每一次点击来自哪里。</p>
+        <div class="cta rise" style="--d:4">
+          <a class="btn ink lg" href="https://deploy.workers.cloudflare.com/?url=https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">
+            <svg class="cf-logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="#F38020" d="M16.5 16.8c.2-.6.1-1.1-.2-1.5-.3-.3-.7-.5-1.2-.6l-8.9-.1c-.1 0-.1 0-.2-.1v-.1c0-.1.1-.1.2-.2l9-.1c1.1 0 2.2-.9 2.6-2l.5-1.4v-.2C17.7 8.2 15.4 6.3 12.7 6.3c-2.5 0-4.6 1.6-5.4 3.8-.5-.4-1.2-.6-1.9-.5-1.2.1-2.2 1.1-2.3 2.3 0 .3 0 .6.1.9-2 .1-3.5 1.7-3.5 3.7 0 .2 0 .4.1.5 0 .1.1.1.1.1h16.4c.1 0 .2-.1.2-.2l.1-.1z"/><path fill="#FAAE40" d="M19.4 11.2h-.2c-.1 0-.1.1-.2.1l-.3 1.2c-.2.6-.1 1.1.2 1.5.3.3.7.5 1.2.6l1.9.1c.1 0 .1 0 .2.1v.1c0 .1-.1.1-.2.2l-2 .1c-1.1 0-2.2.9-2.6 2l-.1.4c0 .1 0 .1.1.1h6.8c.1 0 .1 0 .1-.1.1-.4.2-.9.2-1.3 0-2.8-2.3-5.1-5-5.1"/></svg>
+            一键部署到 Cloudflare</a>
+          <a class="btn lg" href="#deploy">手动部署<svg class="i arr" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>
+        <div class="clone rise" style="--d:5"><span aria-hidden="true">$</span><code>git clone https://github.com/ccvar/cligc_link</code>
+          <button class="copy" data-copy="git clone https://github.com/ccvar/cligc_link.git" aria-label="复制 git clone 命令">
+            <svg class="i no" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <svg class="i ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></button></div>
       </div>
 
-      <!-- 后台界面预览（纯 HTML 绘制） -->
-      <div class="preview rise" style="--d:5" aria-label="后台界面预览">
-        <div class="app">
-          <div class="app-side">
-            <div class="b"><svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M10.5 21.5 21.5 10.5M13.5 10.5h8v8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>cligc</div>
-            <div class="it on"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>概览</div>
-            <div class="it"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>短链</div>
-          </div>
-          <div class="app-main">
-            <div class="app-h"><b>概览</b><div class="seg"><span>24 小时</span><span>7 天</span><span class="on">30 天</span><span>90 天</span></div></div>
-            <div class="kp">
-              <div class="k"><small>访问次数 <i>↗ 24%</i></small><b>12,846</b></div>
-              <div class="k"><small>独立访客 <i>↗ 18%</i></small><b>9,312</b></div>
-              <div class="k"><small>今日访问 <i>↗ 9%</i></small><b>486</b></div>
-              <div class="k"><small>活跃短链</small><b>38 <span style="font-size:12px;color:var(--muted);font-weight:500">/ 42</span></b></div>
+      <!-- 交互式跳转演示 -->
+      <div class="route rise" style="--d:3">
+        <div class="route-in">
+          <div class="route-h"><span class="live">实时演示</span><span class="sp"></span><span>选择访客所在地区 ↓</span></div>
+          <div class="route-b">
+            <div class="node">
+              <span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>
+              <div class="t"><small>同一个短链接</small><div class="u">go.example.com/<b>spring</b></div></div>
             </div>
-            <div class="row2">
-              <div class="box"><small>访问趋势</small>
-                <svg class="chart" viewBox="0 0 400 120" preserveAspectRatio="none" width="100%" aria-hidden="true">
-                  <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
-                  <path d="M0 92 C30 88 45 70 70 74 S110 86 135 66 S180 54 205 60 S250 40 275 44 S320 22 345 28 S385 10 400 6 L400 120 L0 120Z" fill="url(#ga)"/>
-                  <path d="M0 100 C30 98 45 92 70 94 S110 98 135 90 S180 84 205 88 S250 78 275 80 S320 70 345 72 S385 64 400 60" fill="none" stroke="var(--faint)" stroke-width="1.6" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
-                  <path class="ln" d="M0 92 C30 88 45 70 70 74 S110 86 135 66 S180 54 205 60 S250 40 275 44 S320 22 345 28 S385 10 400 6" fill="none" stroke="var(--accent)" stroke-width="2.2" vector-effect="non-scaling-stroke"/>
-                </svg></div>
-              <div class="box"><small>实时访问</small>
-                <div class="feed">
-                  <div style="--n:0"><span>🇨🇳</span><b>/spring</b><em>刚刚</em></div>
-                  <div style="--n:1"><span>🇺🇸</span><b>/app</b><em>1 分钟前</em></div>
-                  <div style="--n:2"><span>🇯🇵</span><b>/d11</b><em>2 分钟前</em></div>
-                </div></div>
+            <div class="picker" id="picker" role="radiogroup" aria-label="访客所在地区"></div>
+            <div class="wire" id="wire" aria-hidden="true">
+              <svg viewBox="0 0 2 56" preserveAspectRatio="none"><line class="base" x1="1" y1="0" x2="1" y2="56"/><line class="pulse" x1="1" y1="0" x2="1" y2="56"/></svg>
+              <span class="lat" id="lat">302 · 12 ms</span>
+            </div>
+            <div class="node dst" id="dst" aria-live="polite"></div>
+            <div class="log" id="log" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ 产品 -->
+  <section class="sec" id="product" style="padding-top:48px">
+    <div class="wrap">
+      <div class="sec-h">
+        <div class="reveal"><div class="label"><b>01</b> 管理后台</div><h2><span class="nb">一个后台，</span><span class="mute nb">看清每一次点击。</span></h2></div>
+        <p class="reveal" style="--d:1">访问趋势、独立访客、来源、地区、设备、活跃时段与实时访问流，都在一个界面里。和上一周期对比，变化一目了然。</p>
+      </div>
+      <div class="stage">
+        <div class="shot" id="shot">
+          <div class="app">
+            <div class="app-side">
+              <div class="b"><svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M10.5 21.5 21.5 10.5M13.5 10.5h8v8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>cligc</div>
+              <div class="it on"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>概览</div>
+              <div class="it"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>短链</div>
+            </div>
+            <div class="app-main">
+              <div class="app-top"><b>概览</b><div class="seg"><span>24 小时</span><span>7 天</span><span class="on">30 天</span><span>90 天</span></div></div>
+              <div class="kp">
+                <div class="k"><small>访问次数 <i>↗ 24%</i></small><b>12,846</b></div>
+                <div class="k"><small>独立访客 <i>↗ 18%</i></small><b>9,312</b></div>
+                <div class="k"><small>今日访问 <i>↗ 9%</i></small><b>486</b></div>
+                <div class="k"><small>活跃短链</small><b>38<span style="font-size:13px;color:var(--muted);font-weight:500;letter-spacing:0"> / 42</span></b></div>
+              </div>
+              <div class="row2">
+                <div class="box"><small>访问趋势</small>
+                  <svg class="chart" viewBox="0 0 400 150" preserveAspectRatio="none" aria-hidden="true">
+                    <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+                    <path class="ar" d="M0 118 C30 112 45 92 70 96 S110 110 135 86 S180 72 205 80 S250 54 275 58 S320 32 345 38 S385 14 400 8 L400 150 L0 150Z" fill="url(#ga)"/>
+                    <path d="M0 128 C30 126 45 118 70 120 S110 124 135 116 S180 108 205 112 S250 100 275 102 S320 92 345 94 S385 84 400 80" fill="none" stroke="var(--faint)" stroke-width="1.6" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+                    <path class="ln" pathLength="1" d="M0 118 C30 112 45 92 70 96 S110 110 135 86 S180 72 205 80 S250 54 275 58 S320 32 345 38 S385 14 400 8" fill="none" stroke="var(--accent)" stroke-width="2.4" vector-effect="non-scaling-stroke"/>
+                  </svg></div>
+                <div class="box"><small>实时访问</small>
+                  <div class="feed">
+                    <div style="--n:0"><span>🇨🇳</span><b>/spring</b><em>刚刚</em></div>
+                    <div style="--n:1"><span>🇺🇸</span><b>/app</b><em>1 分钟前</em></div>
+                    <div style="--n:2"><span>🇯🇵</span><b>/d11</b><em>2 分钟前</em></div>
+                    <div style="--n:3"><span>🇩🇪</span><b>/spring</b><em>4 分钟前</em></div>
+                  </div></div>
+              </div>
             </div>
           </div>
         </div>
@@ -310,117 +535,138 @@ footer a:hover { color: var(--text); }
     </div>
   </section>
 
-  <!-- ============================================================ 功能 -->
+  <!-- ================================================================ 数据 -->
+  <section class="sec" style="padding-top:112px">
+    <div class="wrap">
+      <div class="stats reveal" id="stats">
+        <div class="stat"><b><span data-to="0">0</span></b><span>需要维护的服务器</span></div>
+        <div class="stat"><b><span data-to="330">0</span><small>+</small></b><span>Cloudflare 边缘城市就近跳转</span></div>
+        <div class="stat"><b><span data-to="100000">0</span></b><span>每天免费请求额度</span></div>
+        <div class="stat"><b>MIT</b><span>开源协议，可免费商用</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ 功能 -->
   <section class="sec" id="features">
     <div class="wrap">
-      <div class="sec-h reveal"><div class="kicker">功能</div><h2>推广链接需要的，都在这里</h2>
-        <p>不只是把长链接变短。从创建、分流到分析，一个后台搞定。</p></div>
-      <div class="grid">
-        <article class="card wide reveal">
-          <div>
-            <div class="ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></div>
-            <h3>按国家 / 地区分流</h3>
-            <p>同一个短链接，中国访客去国内落地页，北美访客去英文站，其他地区走默认地址。规则可视化配置，还能模拟任意国家的跳转结果。</p>
-          </div>
-          <div class="geo" aria-hidden="true">
-            <div class="src">go.example.com/spring</div>
-            <div><span class="f">🇨🇳</span>中国大陆<code>shop.example.cn/spring</code></div>
-            <div><span class="f">🇺🇸</span>美国 · 加拿大<code>example.com/us</code></div>
-            <div><span class="f">🌐</span>其他地区<code>example.com/spring</code></div>
+      <div class="sec-h">
+        <div class="reveal"><div class="label"><b>02</b> 功能</div><h2><span class="nb">不只是把链接</span><span class="mute nb">变短。</span></h2></div>
+        <p class="reveal" style="--d:1">从创建、分流到分析，推广链接需要的能力都已内置。没有付费墙，没有功能阉割。</p>
+      </div>
+      <div class="bento">
+        <article class="tile t-geo reveal" id="geo">
+          <span class="tag">// geo routing</span>
+          <h3>按国家 / 地区分流</h3>
+          <p>同一个短链接，中国访客去国内落地页，北美访客去英文站，其他地区走默认地址。规则可视化配置，香港、澳门、台湾可单独设置。</p>
+          <div class="rules">
+            <div class="src"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>go.example.com/spring</div>
+            <div class="rr"><span class="f">🇨🇳</span><span>中国大陆</span><code>shop.example.cn/spring</code><em>58%</em></div>
+            <div class="rr"><span class="f">🇺🇸</span><span>美国 · 加拿大</span><code>example.com/us/spring</code><em>24%</em></div>
+            <div class="rr"><span class="f">🇪🇺</span><span>欧盟</span><code>example.com/eu/spring</code><em>11%</em></div>
+            <div class="rr"><span class="f">🌐</span><span>其他地区</span><code>example.com/spring</code><em>7%</em></div>
           </div>
         </article>
-        <article class="card reveal" style="--d:1">
-          <div class="ic v"><svg class="i" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/></svg></div>
+        <article class="tile t-ana reveal" style="--d:1">
+          <span class="tag">// analytics</span>
           <h3>实时访问分析</h3>
-          <p>访问趋势、独立访客、来源、国家城市、设备与浏览器、活跃时段热力图，并与上一周期对比。</p>
+          <p>趋势、访客、地区、设备、热力图，并与上一周期对比。</p>
+          <div class="bars" aria-hidden="true">
+            <i style="--h:.32;--n:0"></i><i style="--h:.48;--n:1"></i><i style="--h:.4;--n:2"></i><i style="--h:.62;--n:3"></i><i style="--h:.5;--n:4"></i><i style="--h:.72;--n:5"></i><i style="--h:.58;--n:6"></i><i style="--h:.84;--n:7"></i><i style="--h:.7;--n:8"></i><i style="--h:1;--n:9"></i>
+          </div>
         </article>
-        <article class="card reveal" style="--d:2">
-          <div class="ic t"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></div>
+        <article class="tile t-src reveal" style="--d:2">
+          <span class="tag">// attribution</span>
           <h3>精准来源追踪</h3>
-          <p>为每个投放站点生成带 <code style="font-family:var(--mono);font-size:.9em">?src=</code> 的链接，即使对方不发送 Referer，也能分清每次点击来自哪里。</p>
+          <p>每个渠道一个 <code class="mono" style="font-size:.9em">?src=</code>，不依赖 Referer。</p>
+          <div class="srcs" aria-hidden="true">
+            <div style="--n:0"><code>?src=newsletter</code><b>1,284</b><i style="--w:100%"></i></div>
+            <div style="--n:1"><code>?src=forum</code><b>846</b><i style="--w:66%"></i></div>
+            <div style="--n:2"><code>?src=partner</code><b>412</b><i style="--w:32%"></i></div>
+          </div>
         </article>
-        <article class="card reveal" style="--d:3">
-          <div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
-          <h3>全球边缘，就近跳转</h3>
-          <p>部署在 Cloudflare 全球数百个节点，访客从最近的节点完成跳转，统计写入在后台异步完成。</p>
+        <article class="tile t-sec reveal">
+          <span class="tag">// security</span>
+          <h3>安全的后台</h3>
+          <p>签名会话 + Turnstile 人机验证，挡住暴力破解；自动识别爬虫。</p>
+          <div class="ts" aria-hidden="true"><span class="cb"><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>验证通过<small>TURNSTILE</small></div>
         </article>
-        <article class="card reveal" style="--d:4">
-          <div class="ic v"><svg class="i" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
-          <h3>安全的管理后台</h3>
-          <p>签名 Cookie 会话、Turnstile 人机验证防暴力破解；自动识别爬虫，统计数据更干净。</p>
-        </article>
-        <article class="card reveal" style="--d:5">
-          <div class="ic t"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.6-1-1.7-1.5-3-1.5-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2-1.4 0-2.6-.6-3.2-1.6M12 6v2M12 16v2"/></svg></div>
+        <article class="tile t-free reveal" style="--d:1">
+          <span class="tag">// cost</span>
           <h3>零成本运行</h3>
-          <p>只用 Workers 和 D1，Cloudflare 免费额度每天可处理 10 万次请求，个人和小团队基本不花钱。</p>
+          <div class="zero"><b>¥0</b><span>/ 月</span></div>
+          <p>只用 Workers 与 D1，免费额度足够个人和小团队。</p>
+        </article>
+        <article class="tile t-oss reveal" style="--d:2">
+          <span class="tag">// open source</span>
+          <h3>完全开源</h3>
+          <p>代码透明，数据留在你自己的 Cloudflare 账号里，不收集、不上报。</p>
+          <div class="oss"><span>MIT</span><span>Workers</span><span>D1</span><span>无构建步骤</span></div>
         </article>
       </div>
     </div>
   </section>
 
-  <!-- ============================================================ 工作方式 -->
+  <!-- ================================================================ 流程 -->
   <section class="sec" id="how">
     <div class="wrap">
-      <div class="sec-h reveal"><div class="kicker">工作方式</div><h2>三步，从链接到洞察</h2></div>
-      <div class="steps">
-        <div class="step reveal"><h3>创建短链</h3><p>自定义后缀或自动生成，可以先建短链、之后再填推广地址，设置有效期和参数透传。</p></div>
-        <div class="step reveal" style="--d:1"><h3>配置跳转规则</h3><p>设置默认地址，再为不同国家 / 地区指定专属落地页，同一个国家只属于一条规则，不会冲突。</p></div>
-        <div class="step reveal" style="--d:2"><h3>投放并分析</h3><p>为每个渠道生成投放链接，在后台实时查看访问来源、地区、设备和每条规则的命中情况。</p></div>
+      <div class="sec-h">
+        <div class="reveal"><div class="label"><b>03</b> 工作方式</div><h2><span class="nb">三步，</span><span class="mute nb">从链接到洞察。</span></h2></div>
+      </div>
+      <div class="steps" id="steps">
+        <div class="step" style="--d:0"><div class="n">01</div><h3>创建短链</h3><p>自定义后缀或自动生成。可以先建短链、之后再填推广地址，并设置有效期和参数透传。</p></div>
+        <div class="step" style="--d:1"><div class="n">02</div><h3>配置跳转规则</h3><p>设置默认地址，再为不同国家 / 地区指定落地页。同一个国家只属于一条规则，永远不会冲突。</p></div>
+        <div class="step" style="--d:2"><div class="n">03</div><h3>投放并分析</h3><p>为每个渠道生成投放链接，在后台实时查看来源、地区、设备，以及每条规则的命中情况。</p></div>
       </div>
     </div>
   </section>
 
-  <!-- ============================================================ 部署 -->
+  <!-- ================================================================ 部署 -->
   <section class="sec" id="deploy">
     <div class="wrap deploy">
-      <div class="deploy-l reveal">
-        <div class="kicker">部署</div>
-        <h2>五分钟，拥有自己的短链服务</h2>
-        <p>点击「一键部署」自动创建 Worker 和数据库，或者用命令行手动部署。数据完全保存在你自己的 Cloudflare 账号中。</p>
+      <div class="reveal">
+        <div class="label"><b>04</b> 部署</div>
+        <h2><span class="nb">五分钟，</span><span class="mute nb">拥有自己的短链服务。</span></h2>
+        <p class="d">一键部署会自动创建 Worker 和数据库；也可以用命令行手动部署。数据完全保存在你自己的 Cloudflare 账号中。</p>
         <ul class="checks">
           <li><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>不需要服务器，不需要维护数据库</li>
           <li><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>表结构在首次访问时自动创建</li>
-          <li><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>可绑定自己的域名，例如 go.example.com</li>
+          <li><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>绑定自己的域名，例如 go.example.com</li>
         </ul>
-        <a class="btn primary" href="https://deploy.workers.cloudflare.com/?url=https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">一键部署到 Cloudflare</a>
+        <a class="btn ink lg" href="https://deploy.workers.cloudflare.com/?url=https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">一键部署到 Cloudflare<svg class="i arr" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </div>
-      <div class="term reveal" style="--d:1" role="region" aria-label="手动部署命令">
-        <div class="term-h"><i></i><i></i><i></i><span>terminal</span></div>
-        <div class="term-b">
-          <div class="line"><span class="c"># 1. 获取代码并安装依赖</span></div>
-          <div class="line"><span class="p">$</span><code>git clone https://github.com/ccvar/cligc_link.git &amp;&amp; cd cligc_link &amp;&amp; npm install</code><button class="copy" data-copy="git clone https://github.com/ccvar/cligc_link.git && cd cligc_link && npm install" aria-label="复制"><svg class="i no" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="i ok" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M20 6 9 17l-5-5"/></svg></button></div>
-          <div class="line"><span class="c"># 2. 创建数据库，把输出的 database_id 填入 wrangler.toml</span></div>
-          <div class="line"><span class="p">$</span><code>npx wrangler d1 create cligc-link</code><button class="copy" data-copy="npx wrangler d1 create cligc-link" aria-label="复制"><svg class="i no" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="i ok" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M20 6 9 17l-5-5"/></svg></button></div>
-          <div class="line"><span class="c"># 3. 设置后台密码和会话密钥，然后部署</span></div>
-          <div class="line"><span class="p">$</span><code>npx wrangler secret put ADMIN_PASSWORD</code><button class="copy" data-copy="npx wrangler secret put ADMIN_PASSWORD" aria-label="复制"><svg class="i no" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="i ok" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M20 6 9 17l-5-5"/></svg></button></div>
-          <div class="line"><span class="p">$</span><code>openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET</code><button class="copy" data-copy="openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET" aria-label="复制"><svg class="i no" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="i ok" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M20 6 9 17l-5-5"/></svg></button></div>
-          <div class="line"><span class="p">$</span><code>npx wrangler deploy</code><button class="copy" data-copy="npx wrangler deploy" aria-label="复制"><svg class="i no" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="i ok" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M20 6 9 17l-5-5"/></svg></button></div>
-        </div>
+      <div class="term reveal" style="--d:1" id="term" role="region" aria-label="手动部署命令">
+        <div class="term-h"><i></i><i></i><i></i><span>~/cligc_link — zsh</span></div>
+        <div class="term-b" id="termb"></div>
       </div>
     </div>
   </section>
 
-  <!-- ============================================================ 常见问题 -->
+  <!-- ================================================================ FAQ -->
   <section class="sec" id="faq">
-    <div class="wrap">
-      <div class="sec-h reveal"><div class="kicker">常见问题</div><h2>你可能想知道</h2></div>
-      <div class="faq">
-        <details class="reveal"><summary>真的免费吗？<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></summary>
-          <p>代码以 MIT 协议开源，可以免费使用、修改和商用。运行在你自己的 Cloudflare 账号上，Workers 免费版每天 10 万次请求、D1 免费版 5 GB 存储，绝大多数场景用不完。</p></details>
-        <details class="reveal" style="--d:1"><summary>访客的地区是怎么判断的？<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></summary>
-          <p>使用 Cloudflare 根据访客 IP 给出的国家 / 地区代码，无需额外的 IP 库。香港、澳门、台湾可以单独设置规则。</p></details>
-        <details class="reveal" style="--d:2"><summary>为什么推荐用 ?src= 区分来源？<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></summary>
-          <p>很多网站和 App 不发送 Referer，只看 Referer 会把大量访问记成"直接访问"。为每个投放渠道使用不同的 src 参数，来源统计会准确得多。</p></details>
-        <details class="reveal" style="--d:3"><summary>数据存在哪里？<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></summary>
-          <p>短链和访问记录都保存在你账号下的 D1 数据库里，可以随时导出 CSV。项目本身不收集、不上报任何数据。</p></details>
+    <div class="wrap faq">
+      <div class="reveal"><div class="label"><b>05</b> 常见问题</div><h2><span class="nb">你可能</span><span class="mute nb">想知道。</span></h2>
+        <p class="ask">没找到答案？<a href="https://github.com/ccvar/cligc_link/issues" target="_blank" rel="noopener">在 GitHub 提问<svg class="i" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></svg></a></p></div>
+      <div class="qa reveal" style="--d:1" id="qa">
+        <div class="q"><button aria-expanded="false">真的免费吗？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>代码以 MIT 协议开源，可以免费使用、修改和商用。服务运行在你自己的 Cloudflare 账号上：Workers 免费版每天 10 万次请求、D1 免费版 5 GB 存储，绝大多数场景用不完。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">访客所在的地区是怎么判断的？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>使用 Cloudflare 根据访客 IP 给出的国家 / 地区代码，不需要额外的 IP 库，也不会拖慢跳转。香港、澳门、台湾可以单独设置规则。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">为什么推荐用 ?src= 区分来源？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>很多网站和 App 不发送 Referer，只看 Referer 会把大量访问记成“直接访问”。为每个投放渠道使用不同的 src 参数，来源统计会准确得多，后台可以一键批量生成。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">数据存在哪里？安全吗？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>短链和访问记录都保存在你账号下的 D1 数据库里，可以随时导出 CSV。项目本身不收集、不上报任何数据；后台使用签名会话，并可开启 Turnstile 人机验证。</p></div></div></div>
       </div>
+    </div>
 
+    <div class="wrap">
       <div class="end reveal">
-        <h2>开始使用 cligc link</h2>
-        <p>免费、开源、可自托管。欢迎 Star、提 Issue 或贡献代码。</p>
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M10.5 21.5 21.5 10.5M13.5 10.5h8v8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h2>把每一次点击，<br>送到对的地方。</h2>
+        <p>免费、开源、可自托管。欢迎 Star、提 Issue，或者直接贡献代码。</p>
         <div class="cta">
           <a class="btn lg" href="https://deploy.workers.cloudflare.com/?url=https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">一键部署</a>
-          <a class="btn lg ghost" href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">在 GitHub 上 Star</a>
+          <a class="btn lg ghost" href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">在 GitHub 上 Star<svg class="i arr" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
       </div>
     </div>
@@ -429,30 +675,159 @@ footer a:hover { color: var(--text); }
 
 <footer>
   <div class="wrap">
-    <span>© __YEAR__ cligc link · MIT License</span><span class="sp"></span>
+    <span>© __YEAR__ cligc link</span><span>MIT License</span><span class="sp"></span>
     <a href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">GitHub</a>
     <a href="https://github.com/ccvar/cligc_link/issues" target="_blank" rel="noopener">反馈问题</a>
-    <span>运行于 Cloudflare Workers</span>
+    <a href="https://github.com/ccvar/cligc_link#readme" target="_blank" rel="noopener">文档</a>
   </div>
 </footer>
 
 <script>
-  // 导航栏滚动后显示分隔线
-  const nav = document.getElementById('nav');
-  addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 8), { passive: true });
+(() => {
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  // 滚动到视口时浮现
-  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
-  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+  /* ---------------------------------------------------------------- 导航 */
+  const nav = $('#nav');
+  const onScroll = () => nav.classList.toggle('scrolled', scrollY > 12);
+  addEventListener('scroll', onScroll, { passive: true }); onScroll();
 
-  // 复制命令
+  /* ---------------------------------------------------------------- 进入视口 */
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('in');
+    e.target.dispatchEvent(new Event('enter'));
+    io.unobserve(e.target);
+  }), { rootMargin: '0px 0px -12% 0px' });
+  document.querySelectorAll('.reveal, #steps, #shot').forEach((el) => io.observe(el));
+
+  /* ---------------------------------------------------------------- 复制 */
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-copy]');
     if (!b) return;
     try { await navigator.clipboard.writeText(b.dataset.copy); } catch {}
     b.classList.add('done');
-    setTimeout(() => b.classList.remove('done'), 1400);
+    clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('done'), 1500);
   });
+
+  /* ---------------------------------------------------------------- 跳转演示 */
+  const ROUTES = [
+    { c: 'CN', f: '🇨🇳', n: '中国', to: 'example.cn/spring', rule: '中国规则', ms: 9 },
+    { c: 'US', f: '🇺🇸', n: '美国', to: 'example.com/us', rule: '北美规则', ms: 14 },
+    { c: 'JP', f: '🇯🇵', n: '日本', to: 'example.jp/spring', rule: '日本规则', ms: 11 },
+    { c: 'DE', f: '🇩🇪', n: '德国', to: 'example.de/spring', rule: '欧盟规则', ms: 16 },
+    { c: 'BR', f: '🇧🇷', n: '巴西', to: 'example.com/spring', rule: '默认', ms: 21 },
+  ];
+  const picker = $('#picker'), dst = $('#dst'), wire = $('#wire'), lat = $('#lat'), log = $('#log');
+  picker.innerHTML = ROUTES.map((r, i) => `<button role="radio" aria-checked="false" data-i="${i}"><span class="f">${r.f}</span>${r.n}</button>`).join('');
+  let cur = -1, auto = true, timer;
+  const lines = [];
+  const select = (i) => {
+    if (i === cur) return;
+    cur = i;
+    const r = ROUTES[i];
+    picker.querySelectorAll('button').forEach((b, j) => b.setAttribute('aria-checked', String(j === i)));
+    wire.classList.remove('go'); void wire.offsetWidth; wire.classList.add('go');
+    lat.textContent = `302 · ${r.ms} ms`;
+    dst.innerHTML = `<span class="ic swap">${r.f}</span><div class="t swap"><small>来自${esc(r.n === '中国' ? '中国大陆' : r.n)}的访客会跳到</small><div class="u">${esc(r.to)}</div></div><span class="rule swap">${esc(r.rule)}</span>`;
+    const t = new Date();
+    const time = [t.getHours(), t.getMinutes(), t.getSeconds()].map((x) => String(x).padStart(2, '0')).join(':');
+    lines.push(`<div><span class="k">${time}</span>  <span class="m">${r.c}</span>  <span class="s">302 →</span> ${esc(r.to)}</div>`);
+    if (lines.length > 4) lines.shift();
+    log.innerHTML = lines.join('');
+  };
+  picker.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    auto = false; clearInterval(timer);
+    select(Number(b.dataset.i));
+  });
+  // 键盘：左右方向键切换
+  picker.addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    e.preventDefault(); auto = false; clearInterval(timer);
+    const n = (cur + (e.key === 'ArrowRight' ? 1 : -1) + ROUTES.length) % ROUTES.length;
+    select(n); picker.querySelectorAll('button')[n].focus();
+  });
+  select(0);
+  if (!REDUCED) timer = setInterval(() => { if (auto && !document.hidden) select((cur + 1) % ROUTES.length); }, 2800);
+
+  /* ---------------------------------------------------------------- 后台预览：滚动时由倾斜到平放 */
+  const shot = $('#shot');
+  if (!REDUCED) {
+    let raf = 0;
+    const tilt = () => {
+      raf = 0;
+      const r = shot.getBoundingClientRect(), vh = innerHeight;
+      const p = Math.min(1, Math.max(0, (vh - r.top) / (vh * .75)));
+      const e = 1 - Math.pow(1 - p, 3);
+      shot.style.setProperty('--rx', `${(1 - e) * 16}deg`);
+      shot.style.setProperty('--sc', String(.93 + e * .07));
+    };
+    addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(tilt); }, { passive: true });
+    tilt();
+  }
+
+  /* ---------------------------------------------------------------- 数字滚动 */
+  const nf = new Intl.NumberFormat('zh-CN');
+  $('#stats').addEventListener('enter', () => {
+    document.querySelectorAll('[data-to]').forEach((el) => {
+      const to = Number(el.dataset.to);
+      if (REDUCED || !to) { el.textContent = nf.format(to); return; }
+      const t0 = performance.now(), dur = 1600;
+      const step = (t) => {
+        const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 4);
+        el.textContent = nf.format(Math.round(to * e));
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+  });
+
+  /* ---------------------------------------------------------------- 卡片光斑 + 地区规则轮播 */
+  document.querySelectorAll('.tile').forEach((t) => t.addEventListener('pointermove', (e) => {
+    const r = t.getBoundingClientRect();
+    t.style.setProperty('--mx', `${e.clientX - r.left}px`); t.style.setProperty('--my', `${e.clientY - r.top}px`);
+  }));
+  const rr = document.querySelectorAll('#geo .rr');
+  let gi = 0;
+  const geoTick = () => { rr.forEach((el, i) => el.classList.toggle('on', i === gi)); gi = (gi + 1) % rr.length; };
+  $('#geo').addEventListener('enter', () => { geoTick(); if (!REDUCED) setInterval(() => { if (!document.hidden) geoTick(); }, 2200); });
+
+  /* ---------------------------------------------------------------- 终端逐字输入 */
+  const CMDS = [
+    ['# 1. 获取代码并安装依赖'], ['git clone https://github.com/ccvar/cligc_link.git && cd cligc_link && npm install', 1],
+    ['# 2. 创建数据库，把 database_id 填入 wrangler.toml'], ['npx wrangler d1 create cligc-link', 1],
+    ['# 3. 设置后台密码与会话密钥'], ['npx wrangler secret put ADMIN_PASSWORD', 1], ['openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET', 1],
+    ['# 4. 部署 🚀'], ['npx wrangler deploy', 1],
+  ];
+  const copyIc = '<svg class="i no" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="i ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
+  const termb = $('#termb');
+  termb.innerHTML = CMDS.map(([t, cmd]) => cmd
+    ? `<div class="tl"><span class="p">$</span><code data-full="${esc(t)}"></code><button class="copy" data-copy="${esc(t)}" aria-label="复制命令">${copyIc}</button></div>`
+    : `<div class="tl c"><code data-full="${esc(t)}"></code></div>`).join('');
+  const codes = [...termb.querySelectorAll('code')];
+  const fill = () => codes.forEach((c) => { c.textContent = c.dataset.full; c.classList.remove('typing'); });
+  if (REDUCED) fill();
+  else $('#term').addEventListener('enter', async () => {
+    for (const c of codes) {
+      const full = c.dataset.full, isCmd = !c.parentElement.classList.contains('c');
+      c.classList.add('typing');
+      if (isCmd) {
+        for (let i = 1; i <= full.length; i++) { c.textContent = full.slice(0, i); await new Promise((r) => setTimeout(r, 14 + Math.random() * 22)); }
+      } else { c.textContent = full; await new Promise((r) => setTimeout(r, 160)); }
+      c.classList.remove('typing');
+    }
+  });
+
+  /* ---------------------------------------------------------------- FAQ 手风琴 */
+  document.querySelectorAll('#qa .q button').forEach((b) => b.addEventListener('click', () => {
+    const q = b.parentElement, open = !q.classList.contains('open');
+    document.querySelectorAll('#qa .q.open').forEach((x) => { if (x !== q) { x.classList.remove('open'); x.querySelector('button').setAttribute('aria-expanded', 'false'); } });
+    q.classList.toggle('open', open); b.setAttribute('aria-expanded', String(open));
+  }));
+})();
 </script>
 </body>
 </html>

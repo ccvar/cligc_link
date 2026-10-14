@@ -27,7 +27,7 @@ export default {
       if (path === '/' || path === '') {
         if (env.HOME_URL) return Response.redirect(env.HOME_URL, 302);
         return new Response(HOME_HTML.replaceAll('__YEAR__', String(new Date().getUTCFullYear())), {
-          headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=300' },
+          headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=60' },
         });
       }
       return await handleRedirect(request, env, ctx, url);
