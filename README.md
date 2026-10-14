@@ -118,7 +118,25 @@ routes = [
 
 ### 来源统计
 
-来源的判定优先级：`src` 参数 > `utm_source` > Referer 域名 > `(direct)`。很多网站和 App 不发送 Referer，建议投放时使用详情页“高级设置”里生成的带 `?src=` 的链接。
+来源的判定优先级：`src` 参数 > `utm_source` > Referer 域名 > `(direct)`。
+
+**推荐用 `?src=` 区分渠道。** 在详情页“高级设置 · 按站点生成投放链接”里输入站点名，会为每个渠道生成形如 `https://go.example.com/spring?src=zhihu` 的链接。`src` 写在链接本身里，不受对方网站或 App 的任何设置影响，是最可靠的来源标记。
+
+**放到网页上时，不要给链接加 `rel="noreferrer"`。** Referer 是浏览器在跳转时告诉短链“访客从哪个网站来”的请求头，链接加了 `noreferrer` 就不会发送，Referer 统计会记成直接访问。推荐写法（每条投放链接旁的 `<>` 按钮可一键复制）：
+
+```html
+<a href="https://go.example.com/spring?src=zhihu" target="_blank" rel="noopener">活动详情</a>
+```
+
+`rel="noopener"` 防止新打开的页面操控原页面，可以保留；只是不要再加 `noreferrer`。
+
+即使不加 `noreferrer`，以下情况浏览器也不会发送 Referer，统计会记为 `(direct)`：
+
+- 对方页面或整站设置了 `referrerpolicy="no-referrer"` / `Referrer-Policy: no-referrer`；
+- 在微信、QQ、微博等 App 内打开，或从邮件客户端、文档中点击；
+- 从 https 页面跳到 http 页面。
+
+另外，出于隐私保护，浏览器跨站跳转时默认只发送来源网站的域名（如 `www.zhihu.com`），不包含具体页面路径。所以 Referer 适合看“来自哪个网站”，要区分同一网站上的不同投放位置，请使用不同的 `src`，例如 `?src=zhihu-answer`、`?src=zhihu-column`。
 
 ## 本地开发
 
