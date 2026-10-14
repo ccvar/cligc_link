@@ -1,0 +1,29 @@
+{
+  "name": "cligc-link",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create cligc-link",
+    "deploy:prod": "wrangler deploy -c wrangler.prod.toml"
+  },
+  "devDependencies": {
+    "wrangler": "^4.107.0"
+  },
+  "description": "自托管的短链接与访问分析服务，运行在 Cloudflare Workers + D1 上",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ccvar/cligc_link.git"
+  },
+  "keywords": [
+    "short-link",
+    "url-shortener",
+    "cloudflare-workers",
+    "d1",
+    "analytics",
+    "geo-routing"
+  ]
+}

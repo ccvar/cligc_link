@@ -1,0 +1,28 @@
+name = "cligc-link"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+# 绑定自己的域名（域名需托管在 Cloudflare），取消注释并修改：
+# routes = [
+#   { pattern = "go.example.com", custom_domain = true },
+# ]
+
+[vars]
+# 访问根路径 / 时跳转到的地址；留空则显示内置的产品首页
+HOME_URL = ""
+# 后台只允许通过这个域名访问；留空则任何域名的 /admin 都可访问
+ADMIN_HOST = ""
+# 后台登录页的 Cloudflare Turnstile 站点密钥（公开值）；留空则不启用人机验证
+TURNSTILE_SITEKEY = ""
+
+# D1 数据库：执行 `npx wrangler d1 create cligc-link`，把输出的 database_id 填到下面
+# 表结构会在首次请求时自动创建，无需手动初始化
+[[d1_databases]]
+binding = "DB"
+database_name = "cligc-link"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+# 密钥通过 `npx wrangler secret put <名称>` 设置，不要写在这里：
+#   ADMIN_PASSWORD    后台登录密码（必填）
+#   SESSION_SECRET    会话签名密钥，任意长随机字符串（必填），可用 `openssl rand -hex 32` 生成
+#   TURNSTILE_SECRET  Turnstile 服务端密钥（可选，与 TURNSTILE_SITEKEY 配套）
