@@ -415,7 +415,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 
 /* ================================================================ 跳转规则 */
 .rules { display: flex; flex-direction: column; padding-top: 8px; }
-.rule { display: grid; grid-template-columns: 38px minmax(0, 1fr) 170px auto; gap: 16px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line-2); transition: background .15s; }
+.rule { display: grid; grid-template-columns: 38px minmax(0, 1fr) 170px auto; gap: 16px; align-items: center; min-height: 88px; padding: 14px 20px; border-top: 1px solid var(--line-2); transition: background .15s; }
 .rule:hover { background: var(--panel-2); }
 .rule .ri { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--accent-2); color: var(--accent-ink); font-size: 18px; line-height: 1; }
 .rule.def .ri { background: var(--sunken); color: var(--text-2); }
@@ -423,6 +423,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .chip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: 7px; background: var(--sunken); font-size: 12.5px; white-space: nowrap; }
 .chip.more { color: var(--muted); }
 .chip.def { background: none; padding: 0; font-weight: 600; font-size: 13.5px; }
+.rule.def .rc .chip.def { height: 26px; }
 .tag-def { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; background: var(--sunken); border: 1px solid var(--line); color: var(--text-2); font-size: 11.5px; font-weight: 550; margin-left: 4px; }
 .rule .rc:has(.tag-def) { align-items: center; }
 .rule .ru { margin-top: 6px; color: var(--text-2); font-size: 13px; display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -430,7 +431,14 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .rule .ru a, .rule .ru span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rule .ru a:hover { color: var(--accent-ink); }
 .rule .ru .warn { color: var(--warn); }
-.rule .rn { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.rule .rc { align-items: center; min-height: 26px; }
+.rule .rn { display: inline-flex; align-items: center; height: 24px; padding: 0 2px 0 6px; color: var(--muted); font-size: 12.5px; }
+.rule .rn::before { content: '·'; margin-right: 6px; color: var(--faint); }
+.tag-fb { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 550;
+  color: var(--teal); background: color-mix(in srgb, var(--teal) 12%, transparent); margin-left: 4px; white-space: nowrap; }
+.tag-fb svg { width: 12px; height: 12px; }
+.rule .fbn { margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+.rule .fbn.has { color: var(--warn); }
 .rule .rh { font-size: 12px; color: var(--muted); }
 .rule .rh b { color: var(--text); font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; margin-right: 4px; }
 .rule .rh .bar { height: 5px; border-radius: 3px; background: var(--sunken); overflow: hidden; margin-top: 6px; }
@@ -610,6 +618,7 @@ const I = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   back: '<path d="m15 18-6-6 6-6"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
   out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
   dl: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
@@ -1781,19 +1790,20 @@ function rulesCard(link, s) {
   const hits = new Map((s.targets || []).map((x) => [x.k, x.n]));
   const total = Math.max(1, s.summary.total);
   const max = Math.max(1, ...(s.targets || []).map((x) => x.n));
-  const hitCell = (id) => {
+  const hitCell = (id, fallbacks) => {
     const n = hits.get(id) || 0;
-    return `<div class="rh"><b>${num(n)}</b>次 · ${Math.round((n / total) * 100)}%<div class="bar"><i style="width:${(n / max) * 100}%"></i></div></div>`;
+    return `<div class="rh"><b>${num(n)}</b>次 · ${Math.round((n / total) * 100)}%<div class="bar"><i style="width:${(n / max) * 100}%"></i></div>${
+      fallbacks != null ? `<div class="fbn ${fallbacks ? 'has' : ''}" title="累计回退到默认地址的次数">已回退 ${num(fallbacks)} 次</div>` : ''}</div>`;
   };
   const rows = link.targets.map((t) => `
     <div class="rule">
       <span class="ri">${(t.countries.length === 1 && flag(t.countries[0])) || ic('globe', 18)}</span>
       <div style="min-width:0">
-        <div class="rc">${countryChips(t.countries)}</div>
+        <div class="rc">${countryChips(t.countries)}${t.note ? `<span class="rn" title="备注">${esc(t.note)}</span>` : ''}${t.fallback
+          ? `<span class="tag-fb" title="访客打不开这个地址时，自动改去默认地址">${ic('undo', 12)}打不开时回退</span>` : ''}</div>
         <div class="ru">${ic('arrow', 13)}<a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.url)}">${esc(t.url)}</a></div>
-        ${t.note ? `<div class="rn">${esc(t.note)}</div>` : ''}
       </div>
-      ${hitCell(t.id)}
+      ${hitCell(t.id, t.fallback ? t.fallbacks : null)}
       <div class="acts"><button class="btn ghost icon" title="编辑规则" data-rule="${t.id}">${ic('edit')}</button>
         <button class="btn ghost icon" title="删除规则" data-rdel="${t.id}">${ic('trash')}</button></div>
     </div>`).join('');
@@ -1827,7 +1837,7 @@ function bindRules(link) {
     const t = link.targets.find((x) => x.countries.includes(c));
     const url = t ? t.url : link.target_url;
     res.innerHTML = url
-      ? `<span>会跳到</span><b title="${esc(url)}">${esc(url)}</b><span class="tag">${t ? '（命中地区规则）' : '（默认地址）'}</span>`
+      ? `<span>会跳到</span><b title="${esc(url)}">${esc(url)}</b><span class="tag">${!t ? '（默认地址）' : t.fallback && link.target_url ? '（命中地区规则，打不开时回退到默认地址）' : '（命中地区规则）'}</span>`
       : '<span>会看到</span><b class="warn">“链接暂不可用”</b><span class="tag">（未设置默认地址）</span>';
   };
   const start = store.get('sim', 'CN');
@@ -1868,6 +1878,10 @@ function openRuleDrawer(link, rule) {
         <input class="input" id="r-u" name="url" required placeholder="https://b.com/promo-cn" value="${esc(rule ? rule.url : '')}"></div>
       <div class="field"><label for="r-n">备注 <span class="hint" style="font-weight:400">可选</span></label>
         <input class="input" id="r-n" name="note" placeholder="例如：国内渠道落地页" value="${esc(rule ? rule.note : '')}"></div>
+      <label class="opt"><div class="tx"><b>打不开时回退到默认地址</b>
+        <span class="hint">跳转前先在访客的网络里检测这个地址能否打开，打不开就改去默认地址。能打开时只多约 0.2–1 秒，打不开时最多等 2.5 秒。仅支持 https 地址。</span>
+        ${link.target_url ? '' : '<span class="hint warn" style="display:block;margin-top:4px">当前短链还没有默认地址，设置后这个开关才会生效。</span>'}</div>
+        <span class="switch"><input type="checkbox" id="r-fb" ${rule ? (rule.fallback ? 'checked' : '') : 'checked'}><span class="t"></span></span></label>
       <div class="err" role="alert"></div>
     </div>
     <div class="df">
@@ -1924,7 +1938,7 @@ function openRuleDrawer(link, rule) {
     const btn = dr.querySelector('.df .primary'); btn.disabled = true;
     try {
       await api(`/links/${link.id}/targets${isNew ? '' : '/' + rule.id}`, {
-        method: isNew ? 'POST' : 'PUT', body: { countries: [...selected], url, note: dr.querySelector('#r-n').value },
+        method: isNew ? 'POST' : 'PUT', body: { countries: [...selected], url, note: dr.querySelector('#r-n').value, fallback: dr.querySelector('#r-fb').checked },
       });
       close(); toast(isNew ? '规则已添加' : '规则已保存');
       route();

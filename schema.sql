@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS link_targets (
   countries   TEXT NOT NULL,              -- 逗号分隔的 ISO 国家代码，如 "HK,MO,TW"
   url         TEXT NOT NULL,
   note        TEXT NOT NULL DEFAULT '',
+  fallback    INTEGER NOT NULL DEFAULT 0, -- 1 = 访客打不开该地址时回退到默认地址
+  fallbacks   INTEGER NOT NULL DEFAULT 0, -- 累计回退次数
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL,
   FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE

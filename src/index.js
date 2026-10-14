@@ -2,7 +2,9 @@ import ADMIN_HTML from './admin.html';
 import HOME_HTML from './home.html';
 import SCHEMA_SQL from '../schema.sql';
 
-const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt']);
+const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
+// 回退检测：访客浏览器内探测地区地址的超时时间
+const PROBE_TIMEOUT = 2500;
 const SLUG_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const SESSION_TTL = 7 * 24 * 3600 * 1000;
 // 未设置任何密码时使用的默认密码；用它登录后必须先修改密码才能使用后台
@@ -24,6 +26,7 @@ export default {
           headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
         });
       }
+      if (path === '/_fb' && request.method === 'POST') return await recordFallback(request, env);
       if (path === '/robots.txt') {
         return new Response('User-agent: *\nDisallow: /\n', { headers: { 'content-type': 'text/plain' } });
       }
@@ -64,6 +67,13 @@ async function migrate(env) {
   if (!cols.includes('rule_id')) {
     await env.DB.prepare('ALTER TABLE clicks ADD COLUMN rule_id INTEGER NOT NULL DEFAULT 0').run();
   }
+  const tcols = (await env.DB.prepare('PRAGMA table_info(link_targets)').all()).results.map((c) => c.name);
+  if (!tcols.includes('fallback')) {
+    await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN fallback INTEGER NOT NULL DEFAULT 0').run();
+  }
+  if (!tcols.includes('fallbacks')) {
+    await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN fallbacks INTEGER NOT NULL DEFAULT 0').run();
+  }
 }
 
 // ---------------------------------------------------------------- 跳转
@@ -80,32 +90,90 @@ async function handleRedirect(request, env, ctx, url) {
 
   // 按访问者所在国家 / 地区匹配跳转规则，未命中则用默认地址
   const country = request.cf?.country || '';
-  let ruleId = 0;
-  let target = link.target_url;
+  let rule = null;
   if (country) {
-    const rule = await env.DB.prepare(
-      `SELECT id, url FROM link_targets WHERE link_id = ? AND (',' || countries || ',') LIKE ?`
+    rule = await env.DB.prepare(
+      `SELECT id, url, fallback FROM link_targets WHERE link_id = ? AND (',' || countries || ',') LIKE ?`
     ).bind(link.id, `%,${country},%`).first();
-    if (rule) { ruleId = rule.id; target = rule.url; }
   }
-  if (!target) return notConfigured();
+  const ruleId = rule ? rule.id : 0;
+  const raw = rule ? rule.url : link.target_url;
+  if (!raw) return notConfigured();
 
-  if (link.pass_query) {
-    const t = new URL(target);
+  const withQuery = (u) => {
+    if (!link.pass_query) return u;
+    const t = new URL(u);
     for (const [k, v] of url.searchParams) {
       if (k !== 'src') t.searchParams.set(k, v);
     }
-    target = t.toString();
-  }
+    return t.toString();
+  };
+  const target = withQuery(raw);
 
   if (request.method === 'GET') {
     ctx.waitUntil(logClick(request, env, link.id, url, ruleId).catch((e) => console.error('log failed', e)));
+  }
+
+  // 规则开启了“打不开时回退”：先在访客浏览器里探测地区地址，连不上再改去默认地址。
+  // 爬虫 / 链接预览不执行脚本，直接跳转；http 地址在 https 页面里无法探测，也直接跳转。
+  if (rule && rule.fallback && link.target_url && request.method === 'GET'
+    && target.startsWith('https:') && !parseUA(request.headers.get('user-agent') || '').bot) {
+    const exp = Date.now() + 10 * 60 * 1000;
+    const sig = await hmac(await sessionSecret(env), `fb|${rule.id}|${exp}`);
+    return probePage(target, withQuery(link.target_url), { r: rule.id, e: exp, s: sig });
   }
 
   return new Response(null, {
     status: 302,
     headers: { location: target, 'cache-control': 'no-store, private' },
   });
+}
+
+// 过渡页：探测目标站点能否在访客网络中打开（任何 HTTP 响应都算能打开），失败则回退
+function probePage(target, backup, beacon) {
+  const js = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
+  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>正在跳转…</title>
+<noscript><meta http-equiv="refresh" content="0;url=${target.replace(/"/g, '&quot;')}"></noscript>
+<style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f7f9;color:#868e9e;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+@media (prefers-color-scheme:dark){body{background:#08090c;color:#757d8c}}
+.s{display:flex;align-items:center;gap:10px;opacity:0;transition:opacity .4s}.s.on{opacity:1}
+.d{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:r .8s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+</style></head><body><div class="s" id="s"><i class="d"></i>正在跳转…</div>
+<script>
+(function () {
+  var t = ${js(target)}, b = ${js(backup)}, fb = ${js(beacon)}, done = false;
+  setTimeout(function () { document.getElementById('s').className = 's on'; }, 500);
+  function go(u) { if (done) return; done = true; location.replace(u); }
+  function fail() {
+    if (done) return;
+    try { navigator.sendBeacon('/_fb', JSON.stringify(fb)); } catch (e) {}
+    go(b);
+  }
+  var timer = setTimeout(fail, ${PROBE_TIMEOUT});
+  try {
+    fetch(new URL('/favicon.ico', t).href, { mode: 'no-cors', cache: 'no-store', credentials: 'omit' })
+      .then(function () { clearTimeout(timer); go(t); }, function () { clearTimeout(timer); fail(); });
+  } catch (e) { clearTimeout(timer); go(t); }
+})();
+</script></body></html>`;
+  return new Response(html, {
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store, private', 'referrer-policy': 'no-referrer-when-downgrade' },
+  });
+}
+
+// 记录一次回退（由过渡页通过 sendBeacon 上报，带有效期签名）
+async function recordFallback(request, env) {
+  const body = await request.text().then((t) => JSON.parse(t)).catch(() => ({}));
+  const r = Number(body.r), e = Number(body.e);
+  if (!r || !e || e < Date.now() || typeof body.s !== 'string') return new Response(null, { status: 204 });
+  const secret = await sessionSecret(env);
+  if (await safeEqual(body.s, await hmac(secret, `fb|${r}|${e}`), secret)) {
+    await env.DB.prepare('UPDATE link_targets SET fallbacks = fallbacks + 1 WHERE id = ?').bind(r).run();
+  }
+  return new Response(null, { status: 204 });
 }
 
 async function logClick(request, env, linkId, url, ruleId) {
@@ -483,13 +551,14 @@ async function saveTarget(request, env, linkId, tid) {
 
   const now = Date.now();
   const note = cut(String(body.note || ''), 200);
+  const fallback = body.fallback ? 1 : 0;
   const row = tid
     ? await env.DB.prepare(
-      'UPDATE link_targets SET countries = ?, url = ?, note = ?, updated_at = ? WHERE id = ? AND link_id = ? RETURNING *'
-    ).bind(countries.join(','), url, note, now, tid, linkId).first()
+      'UPDATE link_targets SET countries = ?, url = ?, note = ?, fallback = ?, updated_at = ? WHERE id = ? AND link_id = ? RETURNING *'
+    ).bind(countries.join(','), url, note, fallback, now, tid, linkId).first()
     : await env.DB.prepare(
-      'INSERT INTO link_targets (link_id, countries, url, note, created_at, updated_at) VALUES (?,?,?,?,?,?) RETURNING *'
-    ).bind(linkId, countries.join(','), url, note, now, now).first();
+      'INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at) VALUES (?,?,?,?,?,?,?) RETURNING *'
+    ).bind(linkId, countries.join(','), url, note, fallback, now, now).first();
   if (!row) return json({ error: 'not found' }, 404);
   return json({ ...row, countries }, tid ? 200 : 201);
 }
