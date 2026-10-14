@@ -447,7 +447,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .rule .acts { display: flex; gap: 2px; justify-content: flex-end; width: 66px; }
 .rules .none { padding: 18px 20px; border-top: 1px solid var(--line-2); display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
 .sim { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 20px; border-top: 1px solid var(--line-2); background: var(--panel-2); border-radius: 0 0 var(--r-lg) var(--r-lg); font-size: 13px; color: var(--text-2); }
-.sim .combo { min-width: 200px; }
+.sim .combo { flex: none; }
 .sim .res > span:first-child { white-space: nowrap; }
 
 /* 提示框 */
@@ -475,27 +475,29 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 
 /* 可搜索的下拉框 */
 .combo { position: relative; }
-.combo-btn { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+.combo-btn { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 136px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
   cursor: pointer; font-size: 13px; text-align: left; transition: border-color .15s, box-shadow .15s; }
 .combo-btn:hover { border-color: color-mix(in srgb, var(--line) 60%, var(--text) 12%); }
 .combo-btn[aria-expanded="true"] { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-2); }
-.combo-btn .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-btn .nm { flex: 1; min-width: 0; max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .combo-btn code, .pop code { background: none; padding: 0; color: var(--muted); font-size: 11.5px; }
 .combo-btn > svg { color: var(--muted); transition: transform .2s var(--ease); }
 .combo-btn[aria-expanded="true"] > svg { transform: rotate(180deg); }
 .f { width: 20px; text-align: center; font-size: 15px; line-height: 1; flex: none; }
-.pop { position: fixed; z-index: 45; width: 300px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-3);
+.pop { position: fixed; z-index: 45; width: 240px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-3);
   display: flex; flex-direction: column; overflow: hidden; animation: popin .18s var(--ease-out) both; }
 @keyframes popin { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
 .pop.up { animation-name: popup; }
 @keyframes popup { from { opacity: 0; transform: translateY(4px) scale(.98); } }
-.pop .ps { position: relative; padding: 8px; border-bottom: 1px solid var(--line-2); }
-.pop .ps svg { position: absolute; left: 19px; top: 19px; color: var(--muted); }
-.pop .ps input { width: 100%; height: 34px; border: 0; border-radius: 8px; background: var(--sunken); padding: 0 10px 0 32px; font: inherit; font-size: 13px; color: var(--text); outline: none; }
+.pop .ps { position: relative; padding: 6px; border-bottom: 1px solid var(--line-2); }
+.pop .ps svg { position: absolute; left: 15px; top: 15px; width: 14px; height: 14px; color: var(--muted); }
+.pop .ps input { width: 100%; height: 32px; border: 0; border-radius: 8px; background: var(--sunken); padding: 0 10px 0 32px; font: inherit; font-size: 13px; color: var(--text); outline: none; }
 .pop .ps input::placeholder { color: var(--faint); }
-.pop .opts { overflow: auto; max-height: 280px; padding: 4px 6px 6px; overscroll-behavior: contain; }
-.pop .og { padding: 8px 8px 4px; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .04em; }
-.pop .oi { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 8px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.pop .opts { overflow: auto; max-height: 264px; padding: 4px; overscroll-behavior: contain; }
+.pop .og { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .04em; }
+.pop .oi { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.pop .oi .f { width: 18px; font-size: 14px; }
+.pop .oi > svg { width: 13px; height: 13px; }
 .pop .oi span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pop .oi.act { background: var(--sunken); }
 .pop .oi.sel { color: var(--accent-ink); font-weight: 600; }
@@ -1738,7 +1740,7 @@ function countryCombo(root, value, onChange) {
 
   let pop = null, input, opts, items = [], act = 0;
   const place = () => {
-    const r = btn.getBoundingClientRect(), w = Math.max(r.width, 300), h = pop.offsetHeight;
+    const r = btn.getBoundingClientRect(), w = Math.min(260, Math.max(r.width, 220), innerWidth - 16), h = pop.offsetHeight;
     pop.style.width = w + 'px';
     pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
     const up = innerHeight - r.bottom < h + 12 && r.top > innerHeight - r.bottom;
@@ -1782,7 +1784,7 @@ function countryCombo(root, value, onChange) {
   const open = () => {
     pop = document.createElement('div');
     pop.className = 'pop';
-    pop.innerHTML = `<div class="ps">${ic('search', 15)}<input placeholder="搜索国家、地区或代码" autocomplete="off" aria-label="搜索"></div><div class="opts" role="listbox"></div>`;
+    pop.innerHTML = `<div class="ps">${ic('search', 15)}<input placeholder="搜索国家或代码" autocomplete="off" aria-label="搜索国家或地区"></div><div class="opts" role="listbox"></div>`;
     document.body.appendChild(pop);
     input = pop.querySelector('input'); opts = pop.querySelector('.opts');
     btn.setAttribute('aria-expanded', 'true');
