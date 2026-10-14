@@ -480,6 +480,10 @@ async function validateLinkInput(body, env, currentId) {
 
 async function createLink(request, env) {
   const body = await request.json().catch(() => ({}));
+  // 后缀和默认推广地址至少填一个
+  if (!String(body.slug || '').trim() && !String(body.target_url || '').trim()) {
+    return json({ error: '请填写短链后缀或默认推广地址' }, 400);
+  }
   if (!body.slug) body.slug = await uniqueSlug(env);
   const { error, data } = await validateLinkInput(body, env);
   if (error) return json({ error }, 400);

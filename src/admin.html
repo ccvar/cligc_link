@@ -1528,6 +1528,18 @@ function openDrawer(link, onDone) {
   document.body.append(ov, dr);
   dr.querySelector(isNew ? '[name=slug]' : '[name=target_url]').focus();
 
+  // 新建时，后缀和默认推广地址至少填一个
+  const dSlug = dr.querySelector('[name=slug]'), dTarget = dr.querySelector('[name=target_url]'), dBtn = dr.querySelector('.df .primary');
+  const bothEmpty = () => !dSlug.value.trim() && !dTarget.value.trim();
+  const syncDrawer = () => {
+    if (!isNew) return;
+    dBtn.disabled = bothEmpty();
+    dBtn.title = dBtn.disabled ? '请填写短链后缀或默认推广地址' : '';
+  };
+  dSlug.addEventListener('input', syncDrawer);
+  dTarget.addEventListener('input', syncDrawer);
+  syncDrawer();
+
   const del = dr.querySelector('[data-del]');
   if (del) del.onclick = async () => {
     const ok = await confirmDialog({ title: `删除 /${link.slug}？`, text: '短链和它的全部访问记录都会被删除，无法恢复。', ok: '删除', danger: true });
@@ -1547,14 +1559,15 @@ function openDrawer(link, onDone) {
       enabled: f.get('enabled') === 'on', pass_query: f.get('pass_query') === 'on',
       expires_at: f.get('expires_at') ? new Date(f.get('expires_at')).getTime() : null,
     };
+    if (isNew && bothEmpty()) { dr.querySelector('.err').textContent = '请填写短链后缀或默认推广地址'; dSlug.focus(); return; }
     if (!isNew && !body.slug) delete body.slug;
-    const btn = dr.querySelector('.df .primary'); btn.disabled = true;
+    const btn = dBtn; btn.disabled = true;
     try {
       const saved = await api(isNew ? '/links' : '/links/' + link.id, { method: isNew ? 'POST' : 'PUT', body });
       close();
       if (isNew) { listState.flash = saved.id; await copy(shortUrl(saved.slug), '短链已创建并复制'); } else toast('已保存');
       onDone(saved);
-    } catch (err) { dr.querySelector('.err').textContent = err.message; btn.disabled = false; }
+    } catch (err) { dr.querySelector('.err').textContent = err.message; btn.disabled = false; syncDrawer(); }
   };
 }
 
