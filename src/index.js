@@ -1,6 +1,7 @@
 import ADMIN_HTML from './admin.html';
 import HOME_HTML from './home.html';
 import SCHEMA_SQL from '../schema.sql';
+import { renderSVG } from 'uqr';
 
 const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
 // 回退检测：访客浏览器内探测地区地址的超时时间
@@ -10,6 +11,10 @@ const SESSION_TTL = 7 * 24 * 3600 * 1000;
 // 未设置任何密码时使用的默认密码；用它登录后必须先修改密码才能使用后台
 const DEFAULT_PASSWORD = 'admin';
 const MIN_PASSWORD_LENGTH = 8;
+// 两步验证：连续输错 MFA_MAX_FAILS 次后锁定 MFA_LOCK_MS
+const MFA_MAX_FAILS = 5;
+const MFA_LOCK_MS = 15 * 60 * 1000;
+const MFA_TICKET_MS = 5 * 60 * 1000;
 
 export default {
   async fetch(request, env, ctx) {
@@ -244,6 +249,7 @@ async function handleApi(request, env, url) {
   const method = request.method;
 
   if (path === '/api/login' && method === 'POST') return login(request, env);
+  if (path === '/api/login/2fa' && method === 'POST') return loginSecondStep(request, env);
   if (path === '/api/logout' && method === 'POST') {
     return json({ ok: true }, 200, { 'set-cookie': sessionCookie('', 0) });
   }
@@ -257,6 +263,10 @@ async function handleApi(request, env, url) {
   const mustChange = cred.source === 'default';
   if (path === '/api/me') return json({ ok: true, mustChange });
   if (path === '/api/password' && method === 'POST') return changePassword(request, env, cred);
+  if (path === '/api/2fa' && method === 'GET') return json({ enabled: !!cred.totp, since: cred.totp?.at || null });
+  if (path === '/api/2fa/setup' && method === 'POST') return totpSetup(request, env, cred);
+  if (path === '/api/2fa/enable' && method === 'POST') return totpEnable(request, env, cred);
+  if (path === '/api/2fa/disable' && method === 'POST') return totpDisable(request, env, cred);
   // 仍在使用默认密码时，除修改密码外的接口一律拒绝
   if (mustChange) return json({ error: '请先修改默认密码', mustChange: true }, 403);
   if (path === '/api/overview' && method === 'GET') return overview(env, url);
@@ -301,8 +311,147 @@ async function login(request, env) {
     await new Promise((r) => setTimeout(r, 800));
     return json({ error: '密码错误' }, 401);
   }
+  if (cred.totp) {
+    const exp = Date.now() + MFA_TICKET_MS;
+    return json({ need2fa: true, ticket: `${exp}.${await hmac(secret, `mfa|${exp}|${cred.stamp}`)}` });
+  }
   return json({ ok: true, mustChange: cred.source === 'default' }, 200,
     { 'set-cookie': sessionCookie(await issueToken(secret, cred), SESSION_TTL / 1000) });
+}
+
+// 登录第二步：校验动态码
+async function loginSecondStep(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const secret = await sessionSecret(env);
+  const cred = await credential(env);
+  const [exp, sig] = String(body.ticket || '').split('.');
+  if (!cred.totp || !exp || !sig || Number(exp) < Date.now()
+    || !(await safeEqual(sig, await hmac(secret, `mfa|${exp}|${cred.stamp}`), secret))) {
+    return json({ error: '登录已过期，请重新输入密码', restart: true }, 401);
+  }
+  const locked = await mfaLocked(env);
+  if (locked) return json({ error: locked }, 429);
+  if (!(await useTotpCode(env, cred.totp, String(body.code || '')))) {
+    return json({ error: (await mfaFail(env)) || '动态码不正确' }, 401);
+  }
+  return json({ ok: true, mustChange: false }, 200,
+    { 'set-cookie': sessionCookie(await issueToken(secret, cred), SESSION_TTL / 1000) });
+}
+
+// ---------------------------------------------------------------- 两步验证（TOTP，RFC 6238）
+
+async function totpSetup(request, env, cred) {
+  const body = await request.json().catch(() => ({}));
+  if (cred.totp) return json({ error: '两步验证已开启' }, 400);
+  if (!(await cred.verify(String(body.password || ''), await sessionSecret(env)))) {
+    await new Promise((r) => setTimeout(r, 800));
+    return json({ error: '密码不正确' }, 400);
+  }
+  const key = b32encode(crypto.getRandomValues(new Uint8Array(20)));
+  await setSetting(env, 'totp_pending', key);
+  const host = new URL(request.url).hostname;
+  const uri = `otpauth://totp/${encodeURIComponent(`cligc link:${host}`)}?secret=${key}&issuer=${encodeURIComponent('cligc link')}&algorithm=SHA1&digits=6&period=30`;
+  return json({ secret: key, uri, svg: renderSVG(uri, { border: 1 }) });
+}
+
+async function totpEnable(request, env, cred) {
+  const body = await request.json().catch(() => ({}));
+  if (cred.totp) return json({ error: '两步验证已开启' }, 400);
+  const pending = await getSetting(env, 'totp_pending');
+  if (!pending || Date.now() - pending.updated_at > 15 * 60 * 1000) return json({ error: '设置已过期，请重新开始' }, 400);
+  const step = await checkTotp(pending.value, String(body.code || ''), -1);
+  if (step === null) return json({ error: '动态码不正确，请确认手机时间准确后重试' }, 400);
+  await setSetting(env, 'totp', JSON.stringify({ secret: pending.value, at: Date.now(), last: step }));
+  await env.DB.prepare("DELETE FROM settings WHERE key = 'totp_pending'").run();
+  // 开启后其他会话全部失效，当前浏览器换发新会话
+  const fresh = await credential(env);
+  return json({ ok: true }, 200, { 'set-cookie': sessionCookie(await issueToken(await sessionSecret(env), fresh), SESSION_TTL / 1000) });
+}
+
+async function totpDisable(request, env, cred) {
+  const body = await request.json().catch(() => ({}));
+  if (!cred.totp) return json({ error: '两步验证未开启' }, 400);
+  if (!(await cred.verify(String(body.password || ''), await sessionSecret(env)))) {
+    await new Promise((r) => setTimeout(r, 800));
+    return json({ error: '密码不正确' }, 400);
+  }
+  const locked = await mfaLocked(env);
+  if (locked) return json({ error: locked }, 429);
+  if (!(await useTotpCode(env, cred.totp, String(body.code || '')))) {
+    return json({ error: (await mfaFail(env)) || '动态码不正确' }, 400);
+  }
+  await env.DB.prepare("DELETE FROM settings WHERE key = 'totp'").run();
+  const fresh = await credential(env);
+  return json({ ok: true }, 200, { 'set-cookie': sessionCookie(await issueToken(await sessionSecret(env), fresh), SESSION_TTL / 1000) });
+}
+
+// 校验动态码并记录已用的时间片，同一个码不能重复使用
+async function useTotpCode(env, totp, code) {
+  const step = await checkTotp(totp.secret, code, totp.last ?? -1);
+  if (step === null) return false;
+  await env.DB.prepare(
+    "UPDATE settings SET value = json_set(value, '$.last', ?) WHERE key = 'totp'"
+  ).bind(step).run();
+  await env.DB.prepare("DELETE FROM settings WHERE key = 'mfa_fail'").run();
+  return true;
+}
+
+async function mfaLocked(env) {
+  const row = await getSetting(env, 'mfa_fail');
+  const f = row ? JSON.parse(row.value) : null;
+  if (f && f.until > Date.now()) return `动态码错误次数过多，请 ${Math.ceil((f.until - Date.now()) / 60000)} 分钟后再试`;
+  return null;
+}
+
+async function mfaFail(env) {
+  const row = await getSetting(env, 'mfa_fail');
+  const f = row ? JSON.parse(row.value) : { n: 0, until: 0 };
+  f.n = (f.until && f.until < Date.now() ? 0 : f.n) + 1;
+  if (f.n >= MFA_MAX_FAILS) { f.n = 0; f.until = Date.now() + MFA_LOCK_MS; }
+  await setSetting(env, 'mfa_fail', JSON.stringify(f));
+  await new Promise((r) => setTimeout(r, 600));
+  return f.until > Date.now() ? `动态码错误次数过多，已锁定 ${MFA_LOCK_MS / 60000} 分钟` : `动态码不正确（还可尝试 ${MFA_MAX_FAILS - f.n} 次）`;
+}
+
+const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function b32encode(bytes) {
+  let bits = 0, val = 0, out = '';
+  for (const b of bytes) {
+    val = ((val << 8) | b) & 0xffff; bits += 8;
+    while (bits >= 5) { out += B32[(val >>> (bits - 5)) & 31]; bits -= 5; }
+  }
+  if (bits > 0) out += B32[(val << (5 - bits)) & 31];
+  return out;
+}
+function b32decode(str) {
+  let bits = 0, val = 0;
+  const out = [];
+  for (const c of str.toUpperCase().replace(/[^A-Z2-7]/g, '')) {
+    val = ((val << 5) | B32.indexOf(c)) & 0xffff; bits += 5;
+    if (bits >= 8) { out.push((val >>> (bits - 8)) & 255); bits -= 8; }
+  }
+  return new Uint8Array(out);
+}
+
+async function totpAt(key, step) {
+  const k = await crypto.subtle.importKey('raw', b32decode(key), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const msg = new DataView(new ArrayBuffer(8));
+  msg.setUint32(0, Math.floor(step / 2 ** 32)); msg.setUint32(4, step >>> 0);
+  const h = new Uint8Array(await crypto.subtle.sign('HMAC', k, msg.buffer));
+  const o = h[h.length - 1] & 15;
+  const n = ((h[o] & 127) << 24) | (h[o + 1] << 16) | (h[o + 2] << 8) | h[o + 3];
+  return String(n % 1000000).padStart(6, '0');
+}
+
+// 允许前后各一个 30 秒时间片的误差；返回匹配的时间片，未匹配返回 null
+async function checkTotp(key, code, lastStep, now = Date.now()) {
+  if (!/^\d{6}$/.test(code)) return null;
+  const cur = Math.floor(now / 30000);
+  for (const st of [cur, cur - 1, cur + 1]) {
+    if (st <= lastStep) continue;
+    if ((await totpAt(key, st)) === code) return st;
+  }
+  return null;
 }
 
 async function changePassword(request, env, cred) {
@@ -329,15 +478,19 @@ async function changePassword(request, env, cred) {
  * stamp 参与会话签名：密码一变，旧会话自动失效
  */
 async function credential(env) {
-  const row = await getSetting(env, 'admin_password');
+  const rows = (await env.DB.prepare("SELECT key, value, updated_at FROM settings WHERE key IN ('admin_password', 'totp')").all()).results;
+  const row = rows.find((r) => r.key === 'admin_password');
+  const totpRow = rows.find((r) => r.key === 'totp');
+  const totp = totpRow ? JSON.parse(totpRow.value) : null;
+  const mfa = totp ? `|mfa:${totp.at}` : '';
   if (row) {
     const stored = JSON.parse(row.value);
-    return { source: 'custom', stamp: `custom:${row.updated_at}`, verify: (pw) => verifyPassword(pw, stored) };
+    return { source: 'custom', stamp: `custom:${row.updated_at}${mfa}`, totp, verify: (pw) => verifyPassword(pw, stored) };
   }
   if (env.ADMIN_PASSWORD) {
-    return { source: 'env', stamp: 'env', verify: (pw, secret) => safeEqual(pw, env.ADMIN_PASSWORD, secret) };
+    return { source: 'env', stamp: `env${mfa}`, totp, verify: (pw, secret) => safeEqual(pw, env.ADMIN_PASSWORD, secret) };
   }
-  return { source: 'default', stamp: 'default', verify: (pw, secret) => safeEqual(pw, DEFAULT_PASSWORD, secret) };
+  return { source: 'default', stamp: `default${mfa}`, totp, verify: (pw, secret) => safeEqual(pw, DEFAULT_PASSWORD, secret) };
 }
 
 async function issueToken(secret, cred) {

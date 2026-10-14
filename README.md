@@ -27,7 +27,7 @@
 - **按国家 / 地区分流**：同一个短链接，不同国家的访客跳到不同落地页；未命中规则的走默认地址。香港、澳门、台湾可单独设置。
 - **来源追踪**：自动记录 Referer；为每个投放渠道生成带 `?src=` 的链接，即使对方不发送 Referer 也能分清来源。同时支持 `utm_source` / `utm_campaign`。
 - **访问分析**：访问趋势（含上一周期对比）、独立访客、今日访问、来源、国家 / 城市、设备 / 系统 / 浏览器、星期 × 小时热力图、实时访问流、规则命中统计，支持导出 CSV。
-- **管理后台**：单页应用，支持深色模式和手机访问；签名 Cookie 会话，可选 Cloudflare Turnstile 人机验证防暴力破解；自动识别爬虫。
+- **管理后台**：单页应用，支持深色模式和手机访问；签名 Cookie 会话、TOTP 两步验证，可选 Cloudflare Turnstile 人机验证防暴力破解；自动识别爬虫。
 - **零运维**：无需服务器，表结构在首次请求时自动创建。
 
 ## 快速部署
@@ -104,6 +104,18 @@ routes = [
 1. 在 Cloudflare 控制台 → Turnstile 创建一个组件，域名填你的短链域名。
 2. 把站点密钥填到 `wrangler.toml` 的 `TURNSTILE_SITEKEY`。
 3. `npx wrangler secret put TURNSTILE_SECRET` 填入服务端密钥，然后重新部署。
+
+### 两步验证（推荐开启）
+
+在后台左下角“两步验证”中开启：输入当前密码，用验证器 App（Google Authenticator、Microsoft Authenticator、1Password 等）扫码，再输入一次 6 位动态码确认。开启后登录需要密码 + 动态码，即使密码泄露也无法登录后台、篡改跳转地址。
+
+- 动态码连续输错 5 次锁定 15 分钟；每个动态码只能使用一次。
+- 开启或关闭两步验证后，其他设备上的登录会自动失效。
+- 手机丢失、无法获取动态码时，在你的 Cloudflare 账号下执行以下命令关闭两步验证，然后用密码登录并重新绑定：
+
+  ```bash
+  npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key IN ('totp', 'mfa_fail')"
+  ```
 
 ## 使用说明
 

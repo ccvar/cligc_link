@@ -25,5 +25,8 @@
     "d1",
     "analytics",
     "geo-routing"
-  ]
+  ],
+  "dependencies": {
+    "uqr": "0.1.3"
+  }
 }

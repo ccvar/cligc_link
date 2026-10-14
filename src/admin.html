@@ -584,7 +584,18 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .login p { color: var(--muted); margin: 0 0 24px; }
 .login .ts { margin-top: 16px; min-height: 65px; }
 .login .field + .field, .pw-dialog .field + .field { margin-top: 14px; }
-.pw-dialog { top: 14vh; width: min(420px, calc(100vw - 32px)); }
+.pw-dialog { top: 14vh; width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 28vh); overflow: auto; }
+.mfa-dialog { top: 10vh; max-height: 80vh; }
+.input.otp { font-family: var(--mono); font-size: 22px; letter-spacing: .5em; text-align: center; padding-left: calc(12px + .25em); }
+.input.otp::placeholder { letter-spacing: .5em; }
+.mfa-qr { width: 196px; height: 196px; margin: 4px auto 12px; padding: 10px; border-radius: 14px; background: #fff; border: 1px solid var(--line); }
+.mfa-qr svg { display: block; width: 100%; height: 100%; }
+.mfa-tip { margin-bottom: 8px !important; font-size: 13px; text-align: center; }
+.mfa-key { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-radius: 10px; background: var(--sunken); }
+.mfa-key code { flex: 1; background: none; padding: 0; font-size: 13px; letter-spacing: .04em; word-break: break-all; }
+.mfa-on { display: flex; gap: 12px; padding: 14px; border-radius: 12px; background: var(--good-bg); color: var(--good); }
+.mfa-on b { display: block; font-size: 14px; }
+.mfa-on span { color: var(--text-2); font-size: 13px; }
 .pwm { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
 .pwm i { height: 4px; border-radius: 2px; background: var(--sunken); transition: background .25s; }
 .pwm[data-n="1"] i:nth-child(-n+1) { background: var(--bad); }
@@ -636,6 +647,7 @@ const I = {
   out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
   dl: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
   key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>',
@@ -827,6 +839,7 @@ function shell(active, inner) {
         <a href="#/links" class="${active === 'links' ? 'on' : ''}" title="短链">${ic('link')}<span>短链</span></a>
       </nav>
       <div class="foot">
+        <button class="btn ghost" id="mfa" title="两步验证">${ic('shield', 18)}<span>两步验证</span></button>
         <button class="btn ghost" id="chpw" title="修改密码">${ic('key', 18)}<span>修改密码</span></button>
         <button class="btn ghost" id="logout" title="退出登录">${ic('out', 18)}<span>退出登录</span></button>
         <div class="host" title="服务运行中"><i></i>${esc(HOST)}</div>
@@ -841,6 +854,7 @@ function shell(active, inner) {
     setTimeout(() => document.querySelectorAll('.seg').forEach(segThumb), 50);
   };
   document.getElementById('chpw').onclick = () => openPasswordDialog();
+  document.getElementById('mfa').onclick = () => openMfaDialog();
   document.getElementById('logout').onclick = async () => {
     await api('/logout', { method: 'POST' }).catch(() => {});
     renderLogin();
@@ -1151,6 +1165,119 @@ function renderSetPassword(current = '') {
 }
 
 // 侧栏“修改密码”
+// ---------------------------------------------------------------- 两步验证
+// 6 位动态码输入框：只允许数字，输满 6 位自动提交
+function codeInput(id = 'otp') {
+  return `<input class="input lg otp" id="${id}" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\\d{6}" placeholder="000000" aria-label="6 位动态码" required>`;
+}
+function bindCodeInput(el, onFull) {
+  el.addEventListener('input', () => {
+    el.value = el.value.replace(/\D/g, '').slice(0, 6);
+    if (el.value.length === 6) onFull();
+  });
+}
+
+// 登录第二步
+function renderCodeStep(ticket) {
+  $app.innerHTML = `<div class="login"><form class="card" id="f">
+    <div class="brand">${mark(34)}<span class="wordmark">cligc</span></div>
+    <h1>两步验证</h1>
+    <p>打开手机上的验证器 App，输入 cligc link 当前显示的 6 位动态码。</p>
+    <div class="field"><label for="otp">动态码</label>${codeInput()}</div>
+    <div class="err" id="err" style="margin:8px 0" role="alert"></div>
+    <button class="btn primary" style="width:100%;height:46px;font-size:15px">验证并登录</button>
+    <button type="button" class="btn ghost" id="back2" style="width:100%;margin-top:8px">${ic('back', 14)}返回重新输入密码</button>
+  </form></div>`;
+  const f = document.getElementById('f'), otp = document.getElementById('otp'), err = document.getElementById('err');
+  otp.focus();
+  document.getElementById('back2').onclick = () => renderLogin();
+  const submit = async () => {
+    if (otp.value.length !== 6) { err.textContent = '请输入 6 位动态码'; return; }
+    const btn = f.querySelector('button.primary'); btn.disabled = true; btn.textContent = '验证中…';
+    try {
+      await api('/login/2fa', { method: 'POST', body: { ticket, code: otp.value } });
+      route();
+    } catch (ex) {
+      err.textContent = ex.message; btn.disabled = false; btn.textContent = '验证并登录';
+      otp.value = ''; otp.focus();
+      if (/过期/.test(ex.message)) setTimeout(renderLogin, 1500);
+    }
+  };
+  bindCodeInput(otp, submit);
+  f.onsubmit = (e) => { e.preventDefault(); submit(); };
+}
+
+// 侧栏“两步验证”：开启（验证密码 → 扫码 → 输入动态码确认）/ 关闭
+async function openMfaDialog() {
+  const st = await api('/2fa');
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const d = document.createElement('form'); d.className = 'dialog pw-dialog mfa-dialog'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+  const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  ov.onclick = close;
+  document.addEventListener('keydown', onKey);
+  document.body.append(ov, d);
+  const err = () => d.querySelector('.err');
+
+  if (st.enabled) {
+    d.innerHTML = `<h3>两步验证</h3>
+      <div class="mfa-on">${ic('shield', 18)}<div><b>已开启</b><span>开启于 ${fmtTime(st.since)}。登录时需要密码和验证器 App 上的动态码。</span></div></div>
+      <p style="margin-top:18px">如需关闭，请输入密码和当前动态码：</p>
+      <div class="field"><label for="m-pw">密码</label><input class="input lg" type="password" id="m-pw" autocomplete="current-password" required></div>
+      <div class="field"><label for="otp">动态码</label>${codeInput()}</div>
+      <div class="err" style="margin:4px 0 12px" role="alert"></div>
+      <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary" style="background:var(--bad)">关闭两步验证</button></div>`;
+    d.querySelector('[data-no]').onclick = close;
+    d.querySelector('#m-pw').focus();
+    d.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = d.querySelector('.primary'); btn.disabled = true;
+      try {
+        await api('/2fa/disable', { method: 'POST', body: { password: d.querySelector('#m-pw').value, code: d.querySelector('#otp').value } });
+        close(); toast('两步验证已关闭');
+      } catch (ex) { err().textContent = ex.message; btn.disabled = false; }
+    };
+    return;
+  }
+
+  // 第 1 步：验证密码
+  d.innerHTML = `<h3>开启两步验证</h3>
+    <p>开启后登录需要再输入手机验证器 App 上的 6 位动态码，即使密码泄露，别人也登不进后台。支持 Google Authenticator、Microsoft Authenticator、1Password 等。</p>
+    <div class="field"><label for="m-pw">先输入当前密码</label><input class="input lg" type="password" id="m-pw" autocomplete="current-password" required></div>
+    <div class="err" style="margin:4px 0 12px" role="alert"></div>
+    <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary">下一步</button></div>`;
+  d.querySelector('[data-no]').onclick = close;
+  d.querySelector('#m-pw').focus();
+  d.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = d.querySelector('.primary'); btn.disabled = true;
+    let setup;
+    try { setup = await api('/2fa/setup', { method: 'POST', body: { password: d.querySelector('#m-pw').value } }); }
+    catch (ex) { err().textContent = ex.message; btn.disabled = false; return; }
+
+    // 第 2 步：扫码并输入动态码确认
+    d.innerHTML = `<h3>扫码绑定验证器</h3>
+      <div class="mfa-qr">${setup.svg}</div>
+      <p class="mfa-tip">用验证器 App 扫描二维码。无法扫码时，可手动输入密钥：</p>
+      <div class="mfa-key"><code>${esc(setup.secret.match(/.{1,4}/g).join(' '))}</code>${copyBtn(setup.secret, 'btn sm ghost icon')}</div>
+      <div class="field" style="margin-top:16px"><label for="otp">输入 App 显示的 6 位动态码</label>${codeInput()}</div>
+      <div class="err" style="margin:4px 0 12px" role="alert"></div>
+      <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary">确认开启</button></div>`;
+    d.querySelector('[data-no]').onclick = close;
+    const otp = d.querySelector('#otp');
+    otp.focus();
+    const confirm = async () => {
+      const b = d.querySelector('.primary'); b.disabled = true;
+      try {
+        await api('/2fa/enable', { method: 'POST', body: { code: otp.value } });
+        close(); toast('两步验证已开启，其他设备上的登录已失效');
+      } catch (ex) { err().textContent = ex.message; b.disabled = false; otp.value = ''; otp.focus(); }
+    };
+    bindCodeInput(otp, confirm);
+    d.onsubmit = (ev) => { ev.preventDefault(); confirm(); };
+  };
+}
+
 function openPasswordDialog() {
   const ov = document.createElement('div'); ov.className = 'ov';
   const d = document.createElement('form'); d.className = 'dialog pw-dialog'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
@@ -1223,6 +1350,7 @@ function renderLogin() {
     const btn = e.target.querySelector('button'); btn.disabled = true; btn.textContent = '登录中…';
     try {
       const r = await api('/login', { method: 'POST', body: { password: pw.value, turnstile: token } });
+      if (r.need2fa) return renderCodeStep(r.ticket);
       r.mustChange ? renderSetPassword(pw.value) : route();
     }
     catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = '登录'; pw.select(); resetTs(); }
