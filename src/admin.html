@@ -450,6 +450,16 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .sim .combo { min-width: 200px; }
 .sim .res > span:first-child { white-space: nowrap; }
 
+/* 提示框 */
+.tipbox { display: flex; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--accent-2); color: var(--text-2); font-size: 12.5px; line-height: 1.7; }
+.tipbox > svg { color: var(--accent-ink); margin-top: 2px; }
+.tipbox b { display: block; color: var(--text); font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+.tipbox code { background: color-mix(in srgb, var(--panel) 70%, transparent); }
+.tipbox .snip { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 8px; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; }
+.tipbox svg.i:not(:first-child) { width: 13px; height: 13px; vertical-align: -2px; }
+.tipbox.sm { margin-top: 16px; }
+.tipbox.wide { grid-column: 1 / -1; margin-top: 0; }
+
 /* 可折叠卡片 */
 .fold-h { width: 100%; border: 0; background: none; cursor: pointer; text-align: left; padding-bottom: 16px; border-radius: var(--r-lg); font: inherit; color: inherit; }
 .fold-h:hover h3 { color: var(--accent-ink); }
@@ -618,6 +628,8 @@ const I = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   back: '<path d="m15 18-6-6 6-6"/>',
+  code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
   out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
   dl: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
@@ -1597,7 +1609,10 @@ async function renderLink(token, id) {
       <div class="grid2">
         ${tabCard('t-src', '来源', [
           { label: '来源', html: rankList(s.sources, { head: ['来源站点', '访问'] }) },
-          { label: 'Referer', html: rankList(s.refererHosts, { head: ['Referer 域名', '访问'], fmt: (k) => k || '(无 Referer)' }) },
+          { label: 'Referer', html: rankList(s.refererHosts, { head: ['Referer 域名', '访问'], fmt: (k) => k || '(无 Referer)' })
+            + (s.refererHosts.some((x) => !x.k) ? `<div class="tipbox sm">${ic('info', 15)}<div><b>为什么有“无 Referer”？</b>
+              对方链接加了 <code>rel="noreferrer"</code>、页面设置了不发送来源、从微信等 App 内打开，或从 https 跳到 http 时，浏览器都不会带上来源。
+              投放时用“高级设置”里生成的 <code>?src=</code> 链接，就能准确区分来源。</div></div>` : '') },
           { label: 'Campaign', html: rankList(campaigns, { head: ['utm_campaign', '访问'] }) },
         ], 'rv')}
         ${tabCard('t-geo', '地区', [
@@ -1628,9 +1643,15 @@ async function renderLink(token, id) {
         <div class="fold-b"><div class="card-b builder">
           <div>
             <textarea class="textarea" id="sites" rows="6" placeholder="每行一个站点名，例如：&#10;zhihu&#10;weibo&#10;forum-a" aria-label="站点名"></textarea>
-            <div class="hint" style="margin-top:8px">会生成 <code>?src=站点名</code> 的链接，统计里“来源”会按它归类。很多网站和 App 不发送 Referer，用 src 更可靠。</div>
+            <div class="hint" style="margin-top:8px">会生成 <code>?src=站点名</code> 的链接，统计里“来源”会按它归类，不受对方网站设置影响。</div>
+
           </div>
           <div class="blist" id="blist"></div>
+            <div class="tipbox wide">${ic('info', 16)}<div>
+              <b>放到网页上时，不要给链接加 <code>rel="noreferrer"</code></b>
+              加了之后浏览器不会告诉我们访客从哪个网站来，“Referer”统计会记成直接访问。点右侧的 ${ic('code', 13)} 可以复制写法正确的 HTML：
+              <code class="snip">&lt;a href="…?src=站点名" target="_blank" rel="noopener"&gt;…&lt;/a&gt;</code>
+            </div></div>
         </div></div>
       </section>
 
@@ -1680,7 +1701,12 @@ async function renderLink(token, id) {
     bc.hidden = !names.length; bc.textContent = `${names.length} 个站点`;
     if (!names.length) { blist.innerHTML = `<div class="empty" style="padding:24px;border:1px dashed var(--line);border-radius:12px">在左侧输入站点名，这里会生成对应的投放链接</div>`; return; }
     const urls = names.map((n) => `${url}?src=${encodeURIComponent(n)}`);
-    blist.innerHTML = urls.map((u) => `<div class="b"><code title="${esc(u)}">${esc(u.replace(/^https?:\/\//, ''))}</code>${copyBtn(u, 'btn sm ghost icon')}</div>`).join('')
+    const text = link.title || '点击访问';
+    // noopener 保证安全，但不加 noreferrer，以便统计 Referer
+    const html = (u) => `<a href="${u}" target="_blank" rel="noopener">${text}</a>`;
+    blist.innerHTML = urls.map((u) => `<div class="b"><code title="${esc(u)}">${esc(u.replace(/^https?:\/\//, ''))}</code>
+      <button class="btn sm ghost icon" title="复制 HTML 代码（不含 noreferrer）" data-copy="${esc(html(u))}"><span class="sw"><span class="no">${ic('code', 15)}</span><span class="ok">${ic('check', 15)}</span></span></button>
+      ${copyBtn(u, 'btn sm ghost icon')}</div>`).join('')
       + (urls.length > 1 ? `<div style="margin-top:4px">${copyBtn(urls.join('\n'), 'btn sm', `复制全部 ${urls.length} 条`)}</div>` : '');
   };
   sites.oninput = build;
