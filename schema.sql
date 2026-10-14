@@ -53,3 +53,10 @@ CREATE TABLE IF NOT EXISTS link_targets (
   FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_link_targets_link ON link_targets(link_id);
+
+-- 系统设置：后台修改过的管理员密码（加盐哈希）、自动生成的会话密钥等
+CREATE TABLE IF NOT EXISTS settings (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_at  INTEGER NOT NULL
+);

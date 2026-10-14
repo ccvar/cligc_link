@@ -5,6 +5,9 @@ import SCHEMA_SQL from '../schema.sql';
 const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt']);
 const SLUG_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const SESSION_TTL = 7 * 24 * 3600 * 1000;
+// 未设置任何密码时使用的默认密码；用它登录后必须先修改密码才能使用后台
+const DEFAULT_PASSWORD = 'admin';
+const MIN_PASSWORD_LENGTH = 8;
 
 export default {
   async fetch(request, env, ctx) {
@@ -177,12 +180,17 @@ async function handleApi(request, env, url) {
     return json({ ok: true }, 200, { 'set-cookie': sessionCookie('', 0) });
   }
 
-  if (!(await isAuthed(request, env))) return json({ error: 'unauthorized' }, 401);
+  const cred = await authedCredential(request, env);
+  if (!cred) return json({ error: 'unauthorized' }, 401);
   if (method !== 'GET' && !(request.headers.get('content-type') || '').includes('application/json')) {
     return json({ error: 'content-type must be application/json' }, 415);
   }
 
-  if (path === '/api/me') return json({ ok: true });
+  const mustChange = cred.source === 'default';
+  if (path === '/api/me') return json({ ok: true, mustChange });
+  if (path === '/api/password' && method === 'POST') return changePassword(request, env, cred);
+  // 仍在使用默认密码时，除修改密码外的接口一律拒绝
+  if (mustChange) return json({ error: '请先修改默认密码', mustChange: true }, 403);
   if (path === '/api/overview' && method === 'GET') return overview(env, url);
   if (path === '/api/recent' && method === 'GET') {
     return json({ items: await recentClicks(env, url.searchParams.get('bots') === '1') });
@@ -214,22 +222,122 @@ async function handleApi(request, env, url) {
 }
 
 async function login(request, env) {
-  if (!env.ADMIN_PASSWORD || !env.SESSION_SECRET) {
-    return json({ error: '服务端未配置 ADMIN_PASSWORD / SESSION_SECRET' }, 500);
-  }
   const body = await request.json().catch(() => ({}));
   // 配置了 Turnstile 时，先过人机验证再核对密码，防止暴力破解
   if (env.TURNSTILE_SECRET && !(await verifyTurnstile(env, body.turnstile, request))) {
     return json({ error: '人机验证未通过，请重试', turnstile: true }, 403);
   }
-  const ok = await safeEqual(String(body.password || ''), env.ADMIN_PASSWORD, env.SESSION_SECRET);
-  if (!ok) {
+  const secret = await sessionSecret(env);
+  const cred = await credential(env);
+  if (!(await cred.verify(String(body.password || ''), secret))) {
     await new Promise((r) => setTimeout(r, 800));
     return json({ error: '密码错误' }, 401);
   }
+  return json({ ok: true, mustChange: cred.source === 'default' }, 200,
+    { 'set-cookie': sessionCookie(await issueToken(secret, cred), SESSION_TTL / 1000) });
+}
+
+async function changePassword(request, env, cred) {
+  const body = await request.json().catch(() => ({}));
+  const secret = await sessionSecret(env);
+  const current = String(body.current || '');
+  const next = String(body.next || '');
+  if (!(await cred.verify(current, secret))) {
+    await new Promise((r) => setTimeout(r, 800));
+    return json({ error: '当前密码不正确' }, 400);
+  }
+  if (next.length < MIN_PASSWORD_LENGTH) return json({ error: `新密码至少 ${MIN_PASSWORD_LENGTH} 位` }, 400);
+  if (next.length > 200) return json({ error: '新密码太长' }, 400);
+  if (next === DEFAULT_PASSWORD || next === current) return json({ error: '新密码不能与当前密码或默认密码相同' }, 400);
+
+  await setSetting(env, 'admin_password', JSON.stringify(await hashPassword(next)));
+  // 密码变化后，旧会话全部失效；给当前浏览器换发新会话
+  const fresh = await credential(env);
+  return json({ ok: true }, 200, { 'set-cookie': sessionCookie(await issueToken(secret, fresh), SESSION_TTL / 1000) });
+}
+
+/**
+ * 当前生效的管理员密码，优先级：后台修改过的密码 > ADMIN_PASSWORD > 默认密码
+ * stamp 参与会话签名：密码一变，旧会话自动失效
+ */
+async function credential(env) {
+  const row = await getSetting(env, 'admin_password');
+  if (row) {
+    const stored = JSON.parse(row.value);
+    return { source: 'custom', stamp: `custom:${row.updated_at}`, verify: (pw) => verifyPassword(pw, stored) };
+  }
+  if (env.ADMIN_PASSWORD) {
+    return { source: 'env', stamp: 'env', verify: (pw, secret) => safeEqual(pw, env.ADMIN_PASSWORD, secret) };
+  }
+  return { source: 'default', stamp: 'default', verify: (pw, secret) => safeEqual(pw, DEFAULT_PASSWORD, secret) };
+}
+
+async function issueToken(secret, cred) {
   const exp = Date.now() + SESSION_TTL;
-  const token = `${exp}.${await hmac(env.SESSION_SECRET, String(exp))}`;
-  return json({ ok: true }, 200, { 'set-cookie': sessionCookie(token, SESSION_TTL / 1000) });
+  return `${exp}.${await hmac(secret, `${exp}|${cred.stamp}`)}`;
+}
+
+// 已登录则返回当前密码信息，否则返回 null
+async function authedCredential(request, env) {
+  const cookie = request.headers.get('cookie') || '';
+  const m = cookie.match(/(?:^|;\s*)sl_session=([^;]+)/);
+  if (!m) return null;
+  const [exp, sig] = m[1].split('.');
+  if (!exp || !sig || Number(exp) < Date.now()) return null;
+  const secret = await sessionSecret(env);
+  const cred = await credential(env);
+  return (await safeEqual(sig, await hmac(secret, `${exp}|${cred.stamp}`), secret)) ? cred : null;
+}
+
+// 会话签名密钥：优先用 SESSION_SECRET，未设置时首次运行自动生成并保存
+let cachedSecret = null;
+async function sessionSecret(env) {
+  if (env.SESSION_SECRET) return env.SESSION_SECRET;
+  if (cachedSecret) return cachedSecret;
+  let row = await getSetting(env, 'session_secret');
+  if (!row) {
+    await env.DB.prepare('INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)')
+      .bind('session_secret', toHex(crypto.getRandomValues(new Uint8Array(32))), Date.now()).run();
+    row = await getSetting(env, 'session_secret');
+  }
+  cachedSecret = row.value;
+  return cachedSecret;
+}
+
+async function getSetting(env, key) {
+  return env.DB.prepare('SELECT value, updated_at FROM settings WHERE key = ?').bind(key).first();
+}
+
+async function setSetting(env, key, value) {
+  await env.DB.prepare(
+    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+  ).bind(key, value, Date.now()).run();
+}
+
+// PBKDF2-SHA256 加盐哈希（Workers 上限为 10 万次迭代）
+const PBKDF2_ITERATIONS = 100000;
+async function pbkdf2(password, salt, iterations) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
+  return toHex(new Uint8Array(bits));
+}
+
+async function hashPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return { alg: 'pbkdf2-sha256', iter: PBKDF2_ITERATIONS, salt: toHex(salt), hash: await pbkdf2(password, salt, PBKDF2_ITERATIONS) };
+}
+
+async function verifyPassword(password, stored) {
+  const salt = new Uint8Array(stored.salt.match(/../g).map((h) => parseInt(h, 16)));
+  const hash = await pbkdf2(password, salt, stored.iter);
+  let diff = hash.length ^ stored.hash.length;
+  for (let i = 0; i < hash.length; i++) diff |= hash.charCodeAt(i) ^ stored.hash.charCodeAt(i);
+  return diff === 0;
+}
+
+function toHex(bytes) {
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function verifyTurnstile(env, token, request) {
@@ -247,16 +355,6 @@ async function verifyTurnstile(env, token, request) {
     console.error('turnstile verify failed', err);
     return false;
   }
-}
-
-async function isAuthed(request, env) {
-  if (!env.SESSION_SECRET) return false;
-  const cookie = request.headers.get('cookie') || '';
-  const m = cookie.match(/(?:^|;\s*)sl_session=([^;]+)/);
-  if (!m) return false;
-  const [exp, sig] = m[1].split('.');
-  if (!exp || !sig || Number(exp) < Date.now()) return false;
-  return safeEqual(sig, await hmac(env.SESSION_SECRET, exp), env.SESSION_SECRET);
 }
 
 function sessionCookie(value, maxAge) {

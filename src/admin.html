@@ -563,6 +563,14 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .login h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: -.02em; }
 .login p { color: var(--muted); margin: 0 0 24px; }
 .login .ts { margin-top: 16px; min-height: 65px; }
+.login .field + .field, .pw-dialog .field + .field { margin-top: 14px; }
+.pw-dialog { top: 14vh; width: min(420px, calc(100vw - 32px)); }
+.pwm { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
+.pwm i { height: 4px; border-radius: 2px; background: var(--sunken); transition: background .25s; }
+.pwm[data-n="1"] i:nth-child(-n+1) { background: var(--bad); }
+.pwm[data-n="2"] i:nth-child(-n+2) { background: var(--amber); }
+.pwm[data-n="3"] i:nth-child(-n+3) { background: var(--accent); }
+.pwm[data-n="4"] i { background: var(--good); }
 .login .ts-ph { height: 65px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; }
 
 /* ================================================================ skeleton */
@@ -605,6 +613,7 @@ const I = {
   out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
   dl: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>',
   fold: '<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',
@@ -706,6 +715,7 @@ async function api(path, opts = {}) {
   });
   if (res.status === 401 && path !== '/login') { renderLogin(); throw new Error('unauthorized'); }
   const data = await res.json().catch(() => ({}));
+  if (res.status === 403 && data.mustChange) { renderSetPassword(); throw new Error('unauthorized'); }
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
 }
@@ -794,6 +804,7 @@ function shell(active, inner) {
         <a href="#/links" class="${active === 'links' ? 'on' : ''}" title="短链">${ic('link')}<span>短链</span></a>
       </nav>
       <div class="foot">
+        <button class="btn ghost" id="chpw" title="修改密码">${ic('key', 18)}<span>修改密码</span></button>
         <button class="btn ghost" id="logout" title="退出登录">${ic('out', 18)}<span>退出登录</span></button>
         <div class="host" title="服务运行中"><i></i>${esc(HOST)}</div>
       </div>
@@ -806,6 +817,7 @@ function shell(active, inner) {
     store.set('mini', el.classList.contains('mini'));
     setTimeout(() => document.querySelectorAll('.seg').forEach(segThumb), 50);
   };
+  document.getElementById('chpw').onclick = () => openPasswordDialog();
   document.getElementById('logout').onclick = async () => {
     await api('/logout', { method: 'POST' }).catch(() => {});
     renderLogin();
@@ -1058,6 +1070,81 @@ function weekHeat(cells) {
 const skel = (h, n = 1) => Array.from({ length: n }, () => `<div class="sk" style="height:${h}px"></div>`).join('');
 
 // ---------------------------------------------------------------- login
+// ---------------------------------------------------------------- 密码
+// 新密码表单：新密码 + 确认 + 强度提示；当前密码可预填（刚用默认密码登录时）
+function passwordFields(current) {
+  return `${current ? '' : `<div class="field"><label for="p-cur">当前密码</label><input class="input lg" type="password" id="p-cur" autocomplete="current-password" required></div>`}
+    <div class="field"><label for="p-new">新密码</label><input class="input lg" type="password" id="p-new" autocomplete="new-password" minlength="8" required>
+      <div class="pwm" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="hint" id="p-tip">至少 8 位，建议混合字母、数字和符号</div></div>
+    <div class="field"><label for="p-rep">再次输入新密码</label><input class="input lg" type="password" id="p-rep" autocomplete="new-password" required></div>`;
+}
+
+function strength(pw) {
+  if (pw.length < 8) return 0;
+  let n = 1;
+  if (pw.length >= 12) n++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) n++;
+  if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) n++;
+  return Math.min(4, n);
+}
+
+function bindPasswordForm(root, current, onDone) {
+  const nw = root.querySelector('#p-new'), rp = root.querySelector('#p-rep'), tip = root.querySelector('#p-tip'), err = root.querySelector('.err');
+  const meter = root.querySelector('.pwm');
+  nw.oninput = () => {
+    const n = strength(nw.value);
+    meter.dataset.n = nw.value ? n : '';
+    tip.textContent = !nw.value ? '至少 8 位，建议混合字母、数字和符号'
+      : nw.value.length < 8 ? `还差 ${8 - nw.value.length} 位` : ['', '强度：弱', '强度：一般', '强度：好', '强度：很强'][n];
+  };
+  root.onsubmit = async (e) => {
+    e.preventDefault();
+    const cur = current || root.querySelector('#p-cur').value;
+    if (nw.value.length < 8) { err.textContent = '新密码至少 8 位'; nw.focus(); return; }
+    if (nw.value !== rp.value) { err.textContent = '两次输入的新密码不一致'; rp.select(); return; }
+    const btn = root.querySelector('button.primary'); btn.disabled = true;
+    try {
+      await api('/password', { method: 'POST', body: { current: cur, next: nw.value } });
+      toast('密码已更新，其他设备上的登录已失效');
+      onDone();
+    } catch (ex) { if (ex.message !== 'unauthorized') err.textContent = ex.message; btn.disabled = false; }
+  };
+}
+
+// 仍在使用默认密码：必须先设置新密码
+function renderSetPassword(current = '') {
+  clearInterval(liveTimer);
+  $app.innerHTML = `<div class="login"><form class="card" id="f">
+    <div class="brand">${mark(34)}<span class="wordmark">cligc</span></div>
+    <h1>设置管理员密码</h1>
+    <p>你正在使用默认密码。为了后台安全，请先设置一个只有你知道的新密码，默认密码随即失效。</p>
+    ${passwordFields(current)}
+    <div class="err" style="margin:8px 0" role="alert"></div>
+    <button class="btn primary" style="width:100%;height:46px;font-size:15px">保存并进入后台</button>
+  </form></div>`;
+  const f = document.getElementById('f');
+  (f.querySelector('#p-cur') || f.querySelector('#p-new')).focus();
+  bindPasswordForm(f, current, () => route());
+}
+
+// 侧栏“修改密码”
+function openPasswordDialog() {
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const d = document.createElement('form'); d.className = 'dialog pw-dialog'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+  d.innerHTML = `<h3>修改密码</h3><p>修改后，其他设备上的登录会自动退出。</p>
+    ${passwordFields('')}
+    <div class="err" style="margin:4px 0 12px" role="alert"></div>
+    <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary">保存新密码</button></div>`;
+  const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  ov.onclick = close;
+  d.querySelector('[data-no]').onclick = close;
+  document.addEventListener('keydown', onKey);
+  document.body.append(ov, d);
+  d.querySelector('#p-cur').focus();
+  bindPasswordForm(d, '', close);
+}
+
 // Cloudflare Turnstile 站点密钥，由服务端在返回页面时注入；为空则不启用
 const TS_KEY = '__TURNSTILE_SITEKEY__';
 const TS_ON = TS_KEY && !TS_KEY.startsWith('__');
@@ -1111,7 +1198,10 @@ function renderLogin() {
     e.preventDefault();
     if (TS_ON && !token) { err.textContent = '请先完成下方的人机验证'; return; }
     const btn = e.target.querySelector('button'); btn.disabled = true; btn.textContent = '登录中…';
-    try { await api('/login', { method: 'POST', body: { password: pw.value, turnstile: token } }); route(); }
+    try {
+      const r = await api('/login', { method: 'POST', body: { password: pw.value, turnstile: token } });
+      r.mustChange ? renderSetPassword(pw.value) : route();
+    }
     catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = '登录'; pw.select(); resetTs(); }
   };
 }
@@ -1880,7 +1970,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('hashchange', route);
-api('/me').then(route).catch(() => {});
+api('/me').then((d) => (d.mustChange ? renderSetPassword() : route())).catch(() => {});
 </script>
 </body>
 </html>

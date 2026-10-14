@@ -630,7 +630,7 @@ footer a:hover { color: var(--text); }
         <p class="d">一键部署会自动创建 Worker 和数据库；也可以用命令行手动部署。数据完全保存在你自己的 Cloudflare 账号中。</p>
         <ul class="checks">
           <li><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>不需要服务器，不需要维护数据库</li>
-          <li><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>表结构在首次访问时自动创建</li>
+          <li><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>表结构自动创建，首次登录引导设置密码</li>
           <li><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>绑定自己的域名，例如 go.example.com</li>
         </ul>
         <a class="btn ink lg" href="https://deploy.workers.cloudflare.com/?url=https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">一键部署到 Cloudflare<svg class="i arr" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
@@ -655,7 +655,7 @@ footer a:hover { color: var(--text); }
         <div class="q"><button aria-expanded="false">为什么推荐用 ?src= 区分来源？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>很多网站和 App 不发送 Referer，只看 Referer 会把大量访问记成“直接访问”。为每个投放渠道使用不同的 src 参数，来源统计会准确得多，后台可以一键批量生成。</p></div></div></div>
         <div class="q"><button aria-expanded="false">数据存在哪里？安全吗？<span class="pm" aria-hidden="true"></span></button>
-          <div class="a"><div><p>短链和访问记录都保存在你账号下的 D1 数据库里，可以随时导出 CSV。项目本身不收集、不上报任何数据；后台使用签名会话，并可开启 Turnstile 人机验证。</p></div></div></div>
+          <div class="a"><div><p>短链和访问记录都保存在你账号下的 D1 数据库里，可以随时导出 CSV。项目本身不收集、不上报任何数据。后台首次登录必须修改默认密码，密码加盐哈希存储，并可开启 Turnstile 人机验证。</p></div></div></div>
       </div>
     </div>
 
@@ -799,8 +799,8 @@ footer a:hover { color: var(--text); }
   const CMDS = [
     ['# 1. 获取代码并安装依赖'], ['git clone https://github.com/ccvar/cligc_link.git && cd cligc_link && npm install', 1],
     ['# 2. 创建数据库，把 database_id 填入 wrangler.toml'], ['npx wrangler d1 create cligc-link', 1],
-    ['# 3. 设置后台密码与会话密钥'], ['npx wrangler secret put ADMIN_PASSWORD', 1], ['openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET', 1],
-    ['# 4. 部署 🚀'], ['npx wrangler deploy', 1],
+    ['# 3. 部署 🚀'], ['npx wrangler deploy', 1],
+    ['# 打开 /admin，用默认密码 admin 登录，按提示设置新密码'],
   ];
   const copyIc = '<svg class="i no" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="i ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
   const termb = $('#termb');

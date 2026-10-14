@@ -34,7 +34,7 @@
 
 ### 方式一：一键部署
 
-点击上方 **Deploy to Cloudflare** 按钮，按提示授权即可自动创建 Worker 和 D1 数据库。部署完成后，在 Cloudflare 控制台的 Worker 设置里添加两个密钥（见下方[配置](#配置)），然后访问 `https://你的域名/admin`。
+点击上方 **Deploy to Cloudflare** 按钮，按提示授权即可自动创建 Worker 和 D1 数据库。部署完成后访问 `https://<worker 地址>/admin`，用默认密码 **`admin`** 登录，按提示设置新密码即可。
 
 ### 方式二：命令行部署
 
@@ -51,15 +51,13 @@ npx wrangler login
 # 创建 D1 数据库，把输出的 database_id 填到 wrangler.toml
 npx wrangler d1 create cligc-link
 
-# 设置后台密码和会话密钥
-npx wrangler secret put ADMIN_PASSWORD
-openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET
-
 # 部署
 npx wrangler deploy
 ```
 
-部署后访问 `https://<worker 地址>/admin` 登录后台。
+部署后访问 `https://<worker 地址>/admin`，用默认密码 **`admin`** 登录。首次登录会要求设置新密码，设置前后台其他功能都不可用，设置后默认密码立即失效。
+
+> 部署后请尽快登录并修改密码。也可以在部署前用 `npx wrangler secret put ADMIN_PASSWORD` 直接指定初始密码，这样就不会出现默认密码。
 
 ### 绑定自己的域名
 
@@ -87,9 +85,19 @@ routes = [
 
 | 名称 | 必填 | 说明 |
 | --- | --- | --- |
-| `ADMIN_PASSWORD` | 是 | 后台登录密码 |
-| `SESSION_SECRET` | 是 | 会话签名密钥，任意长随机字符串 |
+| `ADMIN_PASSWORD` | 否 | 初始后台密码。不设置时默认为 `admin`，首次登录强制修改 |
+| `SESSION_SECRET` | 否 | 会话签名密钥。不设置时首次运行自动生成并保存在数据库中 |
 | `TURNSTILE_SECRET` | 否 | Turnstile 服务端密钥，与 `TURNSTILE_SITEKEY` 配套 |
+
+### 管理员密码
+
+- 生效顺序：后台修改过的密码 > `ADMIN_PASSWORD` > 默认密码 `admin`。
+- 在后台左下角“修改密码”可随时修改，新密码以 PBKDF2 加盐哈希保存在 D1 中；修改后其他设备的登录会自动失效。
+- 忘记密码时，删除数据库中保存的密码即可恢复为 `ADMIN_PASSWORD`（未设置则恢复为默认密码 `admin`，登录后需重新设置）：
+
+  ```bash
+  npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key = 'admin_password'"
+  ```
 
 ### 启用 Turnstile（推荐）
 
