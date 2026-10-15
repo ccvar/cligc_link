@@ -1544,14 +1544,26 @@ async function cfUsage(env, force) {
       if (dbId && r.dimensions.databaseId === dbId) myStorage = r.max.databaseSizeBytes || 0;
     }
   }
-  // 套餐：账户订阅里有 Workers 付费相关的计划即视为付费版
-  const subNames = subs ? subs.filter((x) => !/cancel/i.test(x.state || '')).map((x) => x.rate_plan?.public_name || x.rate_plan?.id || x.product?.name || '').filter(Boolean) : null;
-  const detected = subs ? (subs.some((x) => /workers|paid|bundled|unbound|standard/i.test(JSON.stringify([x.rate_plan, x.product]))) ? 'paid' : 'free') : null;
   const all = [...days.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+  // 套餐识别：
+  // 1. 账户订阅里有 Workers 相关计划 → 付费版（订阅接口通常只列出域名套餐，不一定能看到 Workers 付费计划）；
+  // 2. 最近有一天的用量超过免费版上限（免费版超出后请求会直接失败）→ 一定是付费版；
+  // 3. 否则无法确定。
+  const active = subs ? subs.filter((x) => !/cancel/i.test(x.state || '')) : null;
+  const names = new Map();
+  for (const x of active || []) {
+    const n = x.rate_plan?.public_name || x.rate_plan?.id || x.product?.name || '';
+    if (n) names.set(n, (names.get(n) || 0) + 1);
+  }
+  const subNames = active ? [...names].map(([n, c]) => (c > 1 ? `${n} × ${c}` : n)) : null;
+  const overFree = all.some((x) => x.rowsRead > 5e6 || x.rowsWritten > 1e5 || x.requests > 1e5);
+  const workersSub = (active || []).some((x) => /workers/i.test(JSON.stringify([x.rate_plan, x.product])));
+  const detected = workersSub || overFree ? 'paid' : null;
+  const detectedBy = workersSub ? 'subscription' : overFree ? 'usage' : null;
   const sum = (rows, k, mine) => rows.reduce((s, x) => s + (mine ? x.mine[k] : x[k]), 0);
   const month = all.filter((x) => x.date >= monthStart);
   const out = {
-    configured: true, today, monthStart, detected, subscriptions: subNames,
+    configured: true, today, monthStart, detected, detectedBy, subscriptions: subNames,
     hasMine: { d1: !!dbId, worker: !!worker },
     days: all.filter((x) => x.date >= weekStart),
     month: {

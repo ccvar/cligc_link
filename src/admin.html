@@ -692,6 +692,11 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .use-mine { margin-top: 8px; font-size: 12px; color: var(--text-2); }
 .use-mine b { font-variant-numeric: tabular-nums; }
 .use-h { flex-wrap: wrap; }
+.use-why { min-width: 0; }
+.use-why span { cursor: default; border-bottom: 1px dashed var(--line); }
+/* 设置页折叠卡片：键盘聚焦时用卡片描边提示，不再在标题外再套一圈粗框 */
+.acc-i .fold-h:focus-visible { outline: none; }
+.acc-i:has(.fold-h:focus-visible) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: 0 0 0 3px var(--accent-2); }
 @media (max-width: 760px) { .use-g { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .chi.ret { background: color-mix(in srgb, var(--teal) 14%, transparent); color: var(--teal); }
 .acc { display: grid; gap: 12px; max-width: 880px; }
@@ -3172,7 +3177,9 @@ function renderUsage(box, u, onState) {
   const plans = [['auto', '自动识别'], ['free', '免费版'], ['paid', '付费版']];
   box.innerHTML = `
     <div class="use-h"><div class="seg" id="use-plan">${plans.map(([k, l]) => `<button type="button" data-p="${k}" class="${k === (u.planSetting || 'auto') ? 'on' : ''}">${l}</button>`).join('')}</div>
-      <span class="hint">${u.planSetting === 'auto' || !u.planSetting ? `自动识别为${u.detected === 'paid' ? '付费版' : u.detected === 'free' ? '免费版' : '未知'}` : '已手动指定'}${u.subscriptions?.length ? ` · 账户订阅：${esc(u.subscriptions.join('、'))}` : ''}</span>
+      <span class="hint use-why">${u.planSetting === 'auto' || !u.planSetting
+        ? (u.detected === 'paid' ? (u.detectedBy === 'usage' ? '自动识别为付费版：用量已超过免费版上限' : '自动识别为付费版') : '无法自动识别（按免费版额度对比），可手动指定')
+        : '已手动指定'}${u.subscriptions?.length ? `<span data-tipf-always data-tipf="账户订阅（多为域名套餐，通常不包含 Workers 付费计划）：${esc(u.subscriptions.join('、'))}"> · 订阅 ${u.subscriptions.length} 项</span>` : ''}</span>
       <span class="sp"></span><button type="button" class="btn sm" id="use-re">${ic('refresh', 14)}刷新</button></div>
     ${u.errors?.length ? `<div class="bulk-bad">${ic('info', 15)}<div>${u.errors.map(esc).join('<br>')}<br>${u.errors.some((e) => /authentication/i.test(e))
       ? '“Authentication error”表示令牌无效：多半是粘贴的不是令牌值（如 Global API Key 或令牌 ID）、令牌已过期或被轮转，或者设置了客户端 IP 筛选。'
