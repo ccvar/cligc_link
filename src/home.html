@@ -249,6 +249,30 @@ h2 .mute { color: var(--muted); }
 .t-ana, .t-src { grid-column: span 2; }
 .t-sec, .t-free, .t-oss { grid-column: span 2; }
 .t-fb, .t-nt { grid-column: span 3; }
+/* 来源追踪：搜索引擎 → 推广页 → 短链 */
+.t-trk { grid-column: span 6; display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 40px; align-items: center; }
+.t-trk .opt { display: inline-flex; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font: 600 11px/1.6 var(--sans); color: var(--accent-ink); background: var(--accent-2); vertical-align: 3px; letter-spacing: 0; }
+.t-trk .snip { margin-top: 20px; display: inline-flex; align-items: center; max-width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
+  font: 12.5px/1.4 var(--mono); color: var(--text-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.trd { display: grid; grid-template-columns: minmax(0, .8fr) 22px minmax(0, 1fr) 22px minmax(0, 1.5fr); align-items: center; gap: 8px; }
+.trs { padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg); min-width: 0; transition: border-color .4s, background .4s, box-shadow .4s; }
+.trs small { display: block; margin-top: 8px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.trs .eng { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; height: 24px; }
+.trs .eng i { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font: 700 12px/1 var(--sans); font-style: normal; color: #fff; background: var(--c, var(--accent)); transition: background .4s; }
+.trs .eng b { font-weight: 650; animation: trIn .45s var(--ease) both; }
+.trs code { display: block; font: 12.5px/1.5 var(--mono); overflow-wrap: anywhere; }
+.trs.pg code { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trs.pg .js { display: inline-flex; margin-top: 6px; padding: 1px 6px; border-radius: 5px; font: 600 10.5px/1.6 var(--mono); background: var(--sunken); color: var(--muted); }
+.trs.hl { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-2); box-shadow: 0 10px 30px -18px color-mix(in srgb, var(--accent) 70%, transparent); }
+.trs.hl code { color: var(--text); }
+.trs.hl .q2 { color: var(--accent-ink); font-weight: 650; }
+.trs.hl .q2 span { display: inline-block; animation: trIn .45s var(--ease) both .25s; }
+.tra { color: var(--faint); display: grid; place-items: center; }
+.tra svg { width: 18px; height: 18px; }
+.trd.go .tra { animation: trPulse .9s var(--ease) both; }
+.trd.go .tra + .trs.pg + .tra { animation-delay: .2s; }
+@keyframes trIn { from { opacity: 0; transform: translateY(4px); filter: blur(3px); } }
+@keyframes trPulse { 40% { color: var(--accent); transform: translateX(3px); } }
 /* 两步验证动态码 */
 .otp { margin-top: 22px; }
 .otp-d { display: flex; gap: 6px; }
@@ -435,6 +459,7 @@ footer a:hover { color: var(--text); }
   .t-sec, .t-free, .t-oss, .t-ana, .t-src { grid-column: span 3; }
   .t-oss { grid-column: span 6; }
   .t-fb, .t-nt { grid-column: span 6; }
+  .t-trk { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .app { grid-template-columns: 1fr; } .app-side { display: none; }
   .row2 { grid-template-columns: 1fr; }
   .steps { grid-template-columns: 1fr; gap: 40px; }
@@ -457,7 +482,9 @@ footer a:hover { color: var(--text); }
   .route-b { padding: 16px; }
   .kp { grid-template-columns: repeat(2, 1fr); }
   .bento { grid-template-columns: 1fr; }
-  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt { grid-column: auto; }
+  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt, .t-trk { grid-column: auto; }
+  .trd { grid-template-columns: minmax(0, 1fr); }
+  .tra svg { transform: rotate(90deg); }
   .tile { padding: 24px; }
   .rules .rr { grid-template-columns: 24px minmax(0, 1fr) auto; }
   .rules .rr span:nth-child(2) { display: none; }
@@ -677,6 +704,21 @@ footer a:hover { color: var(--text); }
             <div class="tgc"><span>Telegram</span><span>邮件</span><span>日报 / 周报 / 月报</span></div>
           </div>
         </article>
+        <article class="tile t-trk reveal" id="trk">
+          <div>
+            <span class="tag">// search attribution</span>
+            <h3>知道访客从哪个搜索引擎来<span class="opt">可选</span></h3>
+            <p>访客先搜到你的推广页、再点短链时，短链只能看到“来自推广页”。在推广页放一行代码，它会识别 Google、Bing、百度等搜索引擎和广告点击，自动给短链加上 <code class="mono" style="font-size:.9em">utm_source</code>，不改动原有的 <code class="mono" style="font-size:.9em">?src=</code>。</p>
+            <div class="snip">&lt;script src="https://go.example.com/t.js" async&gt;&lt;/script&gt;</div>
+          </div>
+          <div class="trd" aria-hidden="true" id="trd">
+            <div class="trs"><div class="eng" id="tr-eng"><i>G</i><b>Google</b></div><small>搜索结果</small></div>
+            <span class="tra"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+            <div class="trs pg"><code>example.com</code><span class="js">t.js</span><small>你的推广页</small></div>
+            <span class="tra"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+            <div class="trs hl"><code>go.example.com/spring?src=blog<span class="q2" id="tr-q"><span>&amp;utm_source=google</span></span></code><small>短链收到的地址 · 渠道和搜索引擎都保留</small></div>
+          </div>
+        </article>
       </div>
     </div>
   </section>
@@ -728,6 +770,8 @@ footer a:hover { color: var(--text); }
           <div class="a"><div><p>使用 Cloudflare 根据访客 IP 给出的国家 / 地区代码，不需要额外的 IP 库，也不会拖慢跳转。香港、澳门、台湾可以单独设置规则。</p></div></div></div>
         <div class="q"><button aria-expanded="false">为什么推荐用 ?src= 区分来源？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>很多网站和 App 不发送 Referer，只看 Referer 会把大量访问记成“直接访问”。为每个投放渠道使用不同的 src 参数，来源统计会准确得多，后台可以一键批量生成。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">能知道访客是从哪个搜索引擎来的吗？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>可以。访客通常是先搜到你的推广页、再点页面上的短链，这时短链只能看到推广页。在后台“设置 → 来源追踪”开启后，把一行 script 放到推广页上，它会识别 Google、Bing、百度、搜狗、360 等搜索引擎和广告点击，给短链加上 utm_source，原有的 src 不受影响。搜索引擎早已不再传递搜索关键词，所以能知道是哪个搜索引擎，但看不到具体关键词。</p></div></div></div>
         <div class="q"><button aria-expanded="false">地区链接在某些网络打不开怎么办？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>给地区规则打开“打不开时回退到默认地址”。命中规则的访客会先在自己的网络里检测这个地址能否连通，能打开就直接跳过去（通常只多 0.2–1 秒），连不上就改去默认地址；后台会统计每条规则的回退次数。</p></div></div></div>
         <div class="q"><button aria-expanded="false">数据存在哪里？安全吗？<span class="pm" aria-hidden="true"></span></button>
@@ -878,6 +922,20 @@ footer a:hover { color: var(--text); }
     if (REDUCED) { fbd.dataset.phase = '2'; return; }
     setInterval(() => { if (document.hidden) return; phase = (phase + 1) % 3; fbd.dataset.phase = String(phase); }, 1500);
   });
+
+  // 来源追踪演示：轮流展示不同搜索引擎，短链地址同步变化
+  const ENG = [['G', 'Google', 'google', '#4285f4'], ['百', '百度', 'baidu', '#2932e1'], ['B', 'Bing', 'bing', '#008373'], ['3', '360 搜索', '360', '#19b955']];
+  const trd = $('#trd'), trEng = $('#tr-eng'), trQ = $('#tr-q');
+  let ei = 0;
+  const trTick = () => {
+    const [m, name, key, c] = ENG[ei];
+    trEng.style.setProperty('--c', c);
+    trEng.innerHTML = `<i>${m}</i><b>${esc(name)}</b>`;
+    trQ.innerHTML = `<span>&amp;utm_source=${key}</span>`;
+    trd.classList.remove('go'); void trd.offsetWidth; trd.classList.add('go');
+    ei = (ei + 1) % ENG.length;
+  };
+  $('#trk').addEventListener('enter', () => { trTick(); if (!REDUCED) setInterval(() => { if (!document.hidden) trTick(); }, 2600); });
 
   // 两步验证演示：动态码定时翻新
   const otp = document.getElementById('otp');
