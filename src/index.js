@@ -1211,7 +1211,7 @@ async function overview(env, url) {
       all(q(`SELECT device AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY device ORDER BY n DESC`, since)),
       all(q(`SELECT browser AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY browser ORDER BY n DESC`, since)),
       all(q(`SELECT os AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY os ORDER BY n DESC`, since)),
-      all(q(`SELECT country AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY country ORDER BY n DESC LIMIT 8`, since)),
+      all(q(`SELECT country AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY country ORDER BY n DESC LIMIT 20`, since)),
       // 星期 × 小时（0 = 周日）
       all(q(`SELECT CAST(strftime('%w', (ts + ?2 * 60000) / 1000, 'unixepoch') AS INTEGER) AS d,
                     CAST(strftime('%H', (ts + ?2 * 60000) / 1000, 'unixepoch') AS INTEGER) AS h, COUNT(*) AS n
