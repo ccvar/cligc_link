@@ -117,6 +117,30 @@ routes = [
   npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key IN ('totp', 'mfa_fail')"
   ```
 
+### 统计通知（日报 / 周报 / 月报）
+
+在后台“通知”页面设置，支持推送到 **Telegram** 和 **邮件**，每个渠道都可以“发送测试”，也可以直接预览报告内容。
+
+- **日报**：每天发送前一天的数据；**周报**：每周一发送上周（周一至周日）的数据；**月报**：每月 1 号发送上个月的数据。
+- 报告包含访问次数、独立访客、与上一周期对比、新建短链数、热门短链、主要来源和国家 / 地区。
+- 发送时间按后台设置的时区（跟随浏览器）选择整点；由 `wrangler.toml` 中的定时任务每小时检查一次，同一份报告不会重复发送。
+
+**Telegram**：在 Telegram 找 @BotFather 发送 `/newbot` 创建机器人获得 Bot Token；给机器人发一条消息后，访问 `https://api.telegram.org/bot<Token>/getUpdates`，返回中的 `chat.id` 即 Chat ID（群组需先把机器人拉进群并在群里发言）。
+
+**邮件**，二选一：
+
+- **Resend**（推荐）：在 [resend.com](https://resend.com) 验证发件域名并创建 API Key，后台填写 Key、发件人和收件人即可，免费额度每月 3000 封。
+- **Cloudflare 邮件路由**：不依赖第三方。先在域名上开通 Email Routing 并验证收件地址，然后在 `wrangler.toml` 中添加绑定并重新部署：
+
+  ```toml
+  [[send_email]]
+  name = "EMAIL"
+  ```
+
+  发件人必须是已开通邮件路由的域名下的地址，收件人必须是已验证的地址。
+
+Bot Token、API Key 保存在 D1 中，后台只显示末 4 位。
+
 ## 使用说明
 
 ### 跳转规则

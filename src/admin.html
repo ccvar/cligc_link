@@ -95,6 +95,16 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .nav a.on svg.i { color: var(--accent); }
 .nav a.on::after { content: ''; position: absolute; right: 14px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .side .foot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+.side .acct { display: none; }
+.menu { position: fixed; z-index: 60; min-width: 188px; padding: 6px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-3);
+  animation: popin .18s var(--ease-out) both; transform-origin: top right; }
+.menu-h { padding: 6px 10px 8px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.menu button { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 10px; border: 0; border-radius: 9px; background: none; cursor: pointer; font-size: 14px; text-align: left; color: var(--text); }
+.menu button:hover, .menu button:focus-visible { background: var(--sunken); outline: none; }
+.menu button svg { color: var(--muted); }
+.menu button.danger { color: var(--bad); }
+.menu button.danger svg { color: var(--bad); }
+.menu hr { border: 0; border-top: 1px solid var(--line-2); margin: 6px 4px; }
 .side .foot .btn { justify-content: flex-start; height: 38px; padding: 0 12px; gap: 11px; font-size: 13.5px; }
 .side .foot .host { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; padding: 12px 12px 0; border-top: 1px solid var(--line); margin-top: 6px; font-family: var(--mono); overflow: hidden; white-space: nowrap; }
 .side .foot .host i { width: 6px; height: 6px; border-radius: 50%; background: var(--good); flex: none; }
@@ -123,13 +133,17 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
   .nav a svg.i { width: 17px; height: 17px; }
   .nav a.on::after { display: none; }
   .nav span { display: inline !important; }
-  .side .foot { margin: 0; }
-  .side .foot .btn { width: 36px !important; height: 36px; padding: 0 !important; justify-content: center; }
-  .side .foot span { display: none; }
+  .side .foot { display: none; }
+  .side .acct { display: grid; flex: none; width: 38px; height: 38px; border-radius: 11px; }
   .main { box-shadow: none; }
   .wrap, .shell.mini .wrap { max-width: none; padding: 22px 16px 64px; }
 }
-@media (max-width: 520px) { .wordmark { display: none; } }
+@media (max-width: 520px) {
+  .wordmark { display: none; }
+  /* 窄屏：导航只显示图标，当前页面显示文字 */
+  .nav a:not(.on) span { display: none !important; }
+  .nav a:not(.on), .shell.mini .nav a:not(.on) { width: 38px; padding: 0; justify-content: center; }
+}
 
 /* ================================================================ page header */
 .ph { display: flex; align-items: flex-end; gap: 16px 24px; flex-wrap: wrap; margin-bottom: 28px; }
@@ -450,6 +464,40 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .sim .combo { flex: none; }
 .sim .res > span:first-child { white-space: nowrap; }
 
+/* 通知设置 */
+.kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 760px) { .kinds { grid-template-columns: 1fr; } }
+.kind { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .15s, background .15s; }
+.kind:hover { background: var(--panel-2); }
+.kind input { position: absolute; opacity: 0; pointer-events: none; }
+.kind .kb { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--faint); display: grid; place-items: center; flex: none; color: transparent; transition: all .15s; }
+.kind input:checked ~ .kb { background: var(--accent); border-color: var(--accent); color: #fff; }
+.kind input:focus-visible ~ .kb { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kind:has(input:checked) { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-2); }
+.kind b { display: block; font-size: 14px; }
+.kind span { color: var(--muted); font-size: 12.5px; }
+.when { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.when label { font-weight: 550; font-size: 13px; }
+.chi { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; }
+.chi.tg { background: color-mix(in srgb, #229ed9 15%, transparent); color: #229ed9; }
+.chi.mail { background: color-mix(in srgb, var(--violet) 15%, transparent); color: var(--violet); }
+.chan .card-b { transition: opacity .2s; }
+.chan:not(.on) .card-b { opacity: .55; }
+.grid2.tight { gap: 14px; }
+.input.mono { font-family: var(--mono); font-size: 13px; }
+.howto { margin-top: 14px; font-size: 13px; color: var(--text-2); }
+.howto summary { cursor: pointer; color: var(--accent-ink); font-weight: 550; width: fit-content; }
+.howto ol { margin: 10px 0 0; padding-left: 20px; line-height: 1.8; }
+.ctest { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.hint.ok { color: var(--good); } .hint.bad { color: var(--bad); }
+.prov-hint { margin: 12px 0 14px; }
+#prov { margin-top: 2px; }
+.savebar { position: sticky; bottom: 16px; z-index: 4; display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 18px; border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 85%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow-2); backdrop-filter: blur(10px); flex-wrap: wrap; }
+.nstat { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; font-size: 13px; }
+.nstat.ok { background: var(--good-bg); color: var(--good); }
+.nstat.bad { background: var(--bad-bg); color: var(--bad); }
+
 /* 提示框 */
 .tipbox { display: flex; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--accent-2); color: var(--text-2); font-size: 12.5px; line-height: 1.7; }
 .tipbox > svg { color: var(--accent-ink); margin-top: 2px; }
@@ -647,6 +695,10 @@ const I = {
   out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
   dl: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  mail: '<rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m22 7-10 6L2 7"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
   key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
@@ -837,7 +889,9 @@ function shell(active, inner) {
       <nav class="nav">
         <a href="#/" class="${active === 'home' ? 'on' : ''}" title="概览">${ic('home')}<span>概览</span></a>
         <a href="#/links" class="${active === 'links' ? 'on' : ''}" title="短链">${ic('link')}<span>短链</span></a>
+        <a href="#/notify" class="${active === 'notify' ? 'on' : ''}" title="通知">${ic('bell')}<span>通知</span></a>
       </nav>
+      <button class="btn ghost icon acct" id="acct" aria-label="账号菜单" aria-haspopup="menu" aria-expanded="false">${ic('user', 19)}</button>
       <div class="foot">
         <button class="btn ghost" id="mfa" title="两步验证">${ic('shield', 18)}<span>两步验证</span></button>
         <button class="btn ghost" id="chpw" title="修改密码">${ic('key', 18)}<span>修改密码</span></button>
@@ -853,11 +907,37 @@ function shell(active, inner) {
     store.set('mini', el.classList.contains('mini'));
     setTimeout(() => document.querySelectorAll('.seg').forEach(segThumb), 50);
   };
+  const logout = async () => { await api('/logout', { method: 'POST' }).catch(() => {}); renderLogin(); };
   document.getElementById('chpw').onclick = () => openPasswordDialog();
   document.getElementById('mfa').onclick = () => openMfaDialog();
-  document.getElementById('logout').onclick = async () => {
-    await api('/logout', { method: 'POST' }).catch(() => {});
-    renderLogin();
+  document.getElementById('logout').onclick = logout;
+  // 手机端：账号相关操作收进一个菜单
+  const acct = document.getElementById('acct');
+  acct.onclick = (e) => {
+    e.stopPropagation();
+    const open = document.querySelector('.menu');
+    if (open) { open.remove(); acct.setAttribute('aria-expanded', 'false'); return; }
+    const m = document.createElement('div');
+    m.className = 'menu'; m.setAttribute('role', 'menu');
+    m.innerHTML = `<div class="menu-h">${esc(HOST)}</div>
+      <button role="menuitem" data-a="mfa">${ic('shield', 16)}两步验证</button>
+      <button role="menuitem" data-a="chpw">${ic('key', 16)}修改密码</button>
+      <hr><button role="menuitem" data-a="out" class="danger">${ic('out', 16)}退出登录</button>`;
+    const r = acct.getBoundingClientRect();
+    m.style.top = r.bottom + 8 + 'px'; m.style.right = Math.max(8, innerWidth - r.right) + 'px';
+    document.body.appendChild(m);
+    acct.setAttribute('aria-expanded', 'true');
+    m.querySelector('button').focus();
+    const close = () => { m.remove(); acct.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', close); document.removeEventListener('keydown', onKey); };
+    const onKey = (ev) => { if (ev.key === 'Escape') { close(); acct.focus(); } };
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+    m.onclick = (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      close();
+      ({ mfa: openMfaDialog, chpw: openPasswordDialog, out: logout })[b.dataset.a]();
+    };
   };
 }
 
@@ -2125,6 +2205,120 @@ function openRuleDrawer(link, rule) {
   };
 }
 
+// ---------------------------------------------------------------- 通知
+async function renderNotify(token) {
+  shell('notify', `<header class="ph"><div><div class="kicker">设置</div><h1>统计通知</h1><div class="sub">定期把访问统计推送到 Telegram 或邮箱</div></div></header><div class="stack">${skel(160, 3)}</div>`);
+  const c = await api('/notify');
+  if (token !== routeToken) return;
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const tzLabel = (m) => `UTC${m >= 0 ? '+' : '−'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + pad(Math.abs(m) % 60) : ''}`;
+  const status = c.status ? `<div class="nstat ${c.status.ok ? 'ok' : 'bad'}">${ic(c.status.ok ? 'check' : 'alert', 15)}
+      上次推送：${fmtTime(c.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报' }[c.status.kind] || ''}${c.status.ok ? ' · 发送成功' : ` · 失败：${esc(c.status.error)}`}</div>` : '';
+
+  document.getElementById('page').innerHTML = `
+    <header class="ph"><div><div class="kicker">设置</div><h1>统计通知</h1><div class="sub">定期把访问统计推送到 Telegram 或邮箱</div></div></header>
+    <form class="stack" id="nf">
+      ${status}
+      <section class="card rv">
+        <div class="card-h"><h3>推送内容</h3><span class="sub">报告包含访问次数、独立访客、与上一周期对比、热门短链、来源与国家</span></div>
+        <div class="card-b">
+          <div class="kinds">
+            ${[['daily', '日报', '每天发送昨天的数据'], ['weekly', '周报', '每周一发送上周的数据'], ['monthly', '月报', '每月 1 号发送上个月的数据']].map(([k, t, d]) => `
+              <label class="kind"><input type="checkbox" name="r-${k}" ${c.reports[k] ? 'checked' : ''}><span class="kb">${ic('check', 13)}</span><div><b>${t}</b><span>${d}</span></div></label>`).join('')}
+          </div>
+          <div class="when">
+            <label for="n-hour">发送时间</label>
+            <select class="input" id="n-hour" style="width:auto">${hours.map((x) => `<option value="${x}" ${x === c.hour ? 'selected' : ''}>每天 ${pad(x)}:00</option>`).join('')}</select>
+            <span class="hint">时区 ${tzLabel(TZ)}（跟随当前浏览器）</span>
+            <span class="sp" style="flex:1"></span>
+            <span class="hint">预览报告：</span>
+            ${['daily', 'weekly', 'monthly'].map((k, i) => `<a class="btn sm ghost" href="/api/notify/preview?kind=${k}" target="_blank" rel="noopener">${['日报', '周报', '月报'][i]}</a>`).join('')}
+          </div>
+        </div>
+      </section>
+
+      <section class="card rv chan ${c.tg.enabled ? 'on' : ''}" id="ch-tg">
+        <div class="card-h"><span class="chi tg">${ic('send', 17)}</span><h3>Telegram</h3><span class="sp"></span>
+          <label class="switch"><input type="checkbox" name="tg-on" ${c.tg.enabled ? 'checked' : ''}><span class="t"></span>启用</label></div>
+        <div class="card-b">
+          <div class="grid2 tight">
+            <div class="field"><label for="tg-token">Bot Token</label><input class="input mono" id="tg-token" placeholder="123456789:AAH…" value="${esc(c.tg.token)}" autocomplete="off" spellcheck="false"></div>
+            <div class="field"><label for="tg-chat">Chat ID</label><input class="input mono" id="tg-chat" placeholder="例如 123456789 或 -100…" value="${esc(c.tg.chat)}" autocomplete="off"></div>
+          </div>
+          <details class="howto"><summary>如何获取？</summary><ol>
+            <li>在 Telegram 里找 <b>@BotFather</b>，发送 <code>/newbot</code> 按提示创建机器人，得到 Bot Token。</li>
+            <li>给你的机器人发一条任意消息（推送到群组的话，把机器人拉进群并在群里发一条消息）。</li>
+            <li>浏览器打开 <code>https://api.telegram.org/bot&lt;Token&gt;/getUpdates</code>，返回内容里 <code>"chat":{"id":…}</code> 的数字就是 Chat ID。</li>
+          </ol></details>
+          <div class="ctest"><button type="button" class="btn sm" data-test="tg">${ic('send', 14)}保存并发送测试</button><span class="hint" data-res="tg"></span></div>
+        </div>
+      </section>
+
+      <section class="card rv chan ${c.email.enabled ? 'on' : ''}" id="ch-mail">
+        <div class="card-h"><span class="chi mail">${ic('mail', 17)}</span><h3>邮件</h3><span class="sp"></span>
+          <label class="switch"><input type="checkbox" name="mail-on" ${c.email.enabled ? 'checked' : ''}><span class="t"></span>启用</label></div>
+        <div class="card-b">
+          <div class="seg" id="prov">
+            <button type="button" data-p="resend" class="${c.email.provider !== 'cloudflare' ? 'on' : ''}">Resend</button>
+            <button type="button" data-p="cloudflare" class="${c.email.provider === 'cloudflare' ? 'on' : ''}">Cloudflare 邮件路由</button>
+          </div>
+          <p class="hint prov-hint" data-for="resend">在 <a href="https://resend.com" target="_blank" rel="noopener">resend.com</a> 注册并验证发件域名，创建 API Key。免费额度每月 3000 封。</p>
+          <p class="hint prov-hint" data-for="cloudflare">${c.cloudflareEmail
+            ? '使用 Cloudflare Email Routing 发送：发件人需是已开通邮件路由的域名下的地址，收件人需在 Email Routing 中验证过。'
+            : '<span class="warn">当前部署没有配置 <code>send_email</code> 绑定，暂时无法使用。按 README 在 wrangler.toml 中添加绑定并重新部署后即可使用。</span>'}</p>
+          <div class="grid2 tight">
+            <div class="field" data-for="resend"><label for="m-key">API Key</label><input class="input mono" id="m-key" placeholder="re_…" value="${esc(c.email.key)}" autocomplete="off" spellcheck="false"></div>
+            <div class="field"><label for="m-from">发件人</label><input class="input" id="m-from" placeholder="cligc 报告 &lt;report@example.com&gt;" value="${esc(c.email.from)}"></div>
+            <div class="field"><label for="m-to">收件人</label><input class="input" id="m-to" placeholder="you@example.com，多个用逗号分隔" value="${esc(c.email.to)}"></div>
+          </div>
+          <div class="ctest"><button type="button" class="btn sm" data-test="email">${ic('mail', 14)}保存并发送测试</button><span class="hint" data-res="email"></span></div>
+        </div>
+      </section>
+
+      <div class="savebar rv"><span class="hint">推送由 Cloudflare 定时任务每小时检查一次，在设定时间发出。</span><span class="sp"></span><button class="btn primary">${ic('check', 15)}保存设置</button></div>
+    </form>`;
+
+  const page = document.getElementById('page');
+  reveal(page);
+  const f = document.getElementById('nf');
+  let provider = c.email.provider === 'cloudflare' ? 'cloudflare' : 'resend';
+  const prov = document.getElementById('prov');
+  const syncProv = () => {
+    prov.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.p === provider));
+    f.querySelectorAll('[data-for]').forEach((el) => { el.hidden = el.dataset.for !== provider; });
+    segThumb(prov);
+  };
+  prov.querySelectorAll('button').forEach((b) => (b.onclick = () => { provider = b.dataset.p; syncProv(); }));
+  syncProv();
+  f.querySelector('[name=tg-on]').onchange = (e) => document.getElementById('ch-tg').classList.toggle('on', e.target.checked);
+  f.querySelector('[name=mail-on]').onchange = (e) => document.getElementById('ch-mail').classList.toggle('on', e.target.checked);
+
+  const collect = () => ({
+    reports: { daily: f.querySelector('[name=r-daily]').checked, weekly: f.querySelector('[name=r-weekly]').checked, monthly: f.querySelector('[name=r-monthly]').checked },
+    hour: Number(document.getElementById('n-hour').value), tz: TZ,
+    tg: { enabled: f.querySelector('[name=tg-on]').checked, token: document.getElementById('tg-token').value, chat: document.getElementById('tg-chat').value },
+    email: { enabled: f.querySelector('[name=mail-on]').checked, provider, key: document.getElementById('m-key').value, from: document.getElementById('m-from').value, to: document.getElementById('m-to').value },
+  });
+  const save = () => api('/notify', { method: 'PUT', body: collect() });
+
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = f.querySelector('.savebar .primary'); btn.disabled = true;
+    try { await save(); toast('通知设置已保存'); } catch (ex) { toast(ex.message, 'bad'); }
+    btn.disabled = false;
+  };
+  f.querySelectorAll('[data-test]').forEach((b) => (b.onclick = async () => {
+    const ch = b.dataset.test, res = f.querySelector(`[data-res="${ch}"]`);
+    b.disabled = true; res.className = 'hint'; res.textContent = '正在发送…';
+    try {
+      await save();
+      await api('/notify/test', { method: 'POST', body: { channel: ch, kind: 'daily' } });
+      res.className = 'hint ok'; res.textContent = '已发送，请查收一份昨天的日报（标题带“测试”）';
+    } catch (ex) { res.className = 'hint bad'; res.textContent = ex.message; }
+    b.disabled = false;
+  }));
+}
+
 // ---------------------------------------------------------------- router
 let routeToken = 0, lastLinkId = null;
 async function route() {
@@ -2139,6 +2333,7 @@ async function route() {
       return await renderLink(token, m[1]);
     }
     lastLinkId = null;
+    if (h.startsWith('#/notify')) return await renderNotify(token);
     if (h.startsWith('#/links')) {
       const openNew = h.includes('?new');
       if (openNew) history.replaceState(null, '', '#/links');

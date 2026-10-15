@@ -2,6 +2,7 @@ import ADMIN_HTML from './admin.html';
 import HOME_HTML from './home.html';
 import SCHEMA_SQL from '../schema.sql';
 import { renderSVG } from 'uqr';
+import { EmailMessage } from 'cloudflare:email';
 
 const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
 // 回退检测：访客浏览器内探测地区地址的超时时间
@@ -46,6 +47,11 @@ export default {
       console.error(err);
       return json({ error: 'internal error' }, 500);
     }
+  },
+
+  // 定时任务（wrangler.toml 中每小时整点触发）：到了设定时间发送日报 / 周报 / 月报
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runNotifications(env, event.scheduledTime).catch((e) => console.error('notify failed', e)));
   },
 };
 
@@ -263,6 +269,14 @@ async function handleApi(request, env, url) {
   const mustChange = cred.source === 'default';
   if (path === '/api/me') return json({ ok: true, mustChange });
   if (path === '/api/password' && method === 'POST') return changePassword(request, env, cred);
+  if (path === '/api/notify' && method === 'GET') return json(await notifyForClient(env));
+  if (path === '/api/notify' && method === 'PUT') return saveNotify(request, env, url);
+  if (path === '/api/notify/test' && method === 'POST') return testNotify(request, env);
+  if (path === '/api/notify/preview' && method === 'GET') {
+    const kind = KIND_NAME[url.searchParams.get('kind')] ? url.searchParams.get('kind') : 'daily';
+    const report = await buildReport(env, { ...(await getNotify(env)), base: url.origin }, kind, Date.now());
+    return new Response(report.html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  }
   if (path === '/api/2fa' && method === 'GET') return json({ enabled: !!cred.totp, since: cred.totp?.at || null });
   if (path === '/api/2fa/setup' && method === 'POST') return totpSetup(request, env, cred);
   if (path === '/api/2fa/enable' && method === 'POST') return totpEnable(request, env, cred);
@@ -912,6 +926,247 @@ async function recentClicks(env, bots) {
      ${bots ? '' : 'WHERE c.is_bot = 0'} ORDER BY c.ts DESC LIMIT 12`
   ).all();
   return r.results;
+}
+
+// ---------------------------------------------------------------- 统计通知（日报 / 周报 / 月报 → Telegram / 邮件）
+
+const KIND_NAME = { daily: '日报', weekly: '周报', monthly: '月报' };
+const MASK = '••••';
+
+const NOTIFY_DEFAULT = {
+  reports: { daily: true, weekly: true, monthly: false },
+  hour: 9, tz: 480, base: '',
+  tg: { enabled: false, token: '', chat: '' },
+  email: { enabled: false, provider: 'resend', key: '', from: '', to: '' },
+};
+
+async function getNotify(env) {
+  const row = await getSetting(env, 'notify');
+  const v = row ? JSON.parse(row.value) : {};
+  return {
+    ...NOTIFY_DEFAULT, ...v,
+    reports: { ...NOTIFY_DEFAULT.reports, ...(v.reports || {}) },
+    tg: { ...NOTIFY_DEFAULT.tg, ...(v.tg || {}) },
+    email: { ...NOTIFY_DEFAULT.email, ...(v.email || {}) },
+  };
+}
+
+// 返回给后台时隐藏密钥，只露出末 4 位
+const mask = (v) => (v ? MASK + String(v).slice(-4) : '');
+async function notifyForClient(env) {
+  const c = await getNotify(env);
+  const st = await getSetting(env, 'notify_status');
+  return {
+    ...c,
+    tg: { ...c.tg, token: mask(c.tg.token) },
+    email: { ...c.email, key: mask(c.email.key) },
+    status: st ? JSON.parse(st.value) : null,
+    cloudflareEmail: !!env.EMAIL,
+  };
+}
+
+async function saveNotify(request, env, url) {
+  const body = await request.json().catch(() => ({}));
+  const cur = await getNotify(env);
+  const keep = (v, old) => (typeof v === 'string' && v.startsWith(MASK) ? old : cut(String(v ?? '').trim(), 500));
+  const hour = Number(body.hour);
+  const tz = Number(body.tz);
+  const next = {
+    reports: { daily: !!body.reports?.daily, weekly: !!body.reports?.weekly, monthly: !!body.reports?.monthly },
+    hour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : cur.hour,
+    tz: Number.isFinite(tz) && Math.abs(tz) <= 840 ? tz : cur.tz,
+    base: url.origin,
+    tg: { enabled: !!body.tg?.enabled, token: keep(body.tg?.token, cur.tg.token), chat: cut(String(body.tg?.chat ?? '').trim(), 100) },
+    email: {
+      enabled: !!body.email?.enabled,
+      provider: body.email?.provider === 'cloudflare' ? 'cloudflare' : 'resend',
+      key: keep(body.email?.key, cur.email.key),
+      from: cut(String(body.email?.from ?? '').trim(), 200),
+      to: cut(String(body.email?.to ?? '').trim(), 500),
+    },
+  };
+  if (next.tg.enabled && (!next.tg.token || !next.tg.chat)) return json({ error: 'Telegram 需要填写 Bot Token 和 Chat ID' }, 400);
+  if (next.email.enabled) {
+    if (!next.email.from || !next.email.to) return json({ error: '邮件需要填写发件人和收件人' }, 400);
+    if (next.email.provider === 'resend' && !next.email.key) return json({ error: '使用 Resend 需要填写 API Key' }, 400);
+    if (next.email.provider === 'cloudflare' && !env.EMAIL) return json({ error: '当前部署没有配置 send_email 绑定，无法使用 Cloudflare 邮件，见 README' }, 400);
+  }
+  await setSetting(env, 'notify', JSON.stringify(next));
+  return json(await notifyForClient(env));
+}
+
+// 立即发送一份测试报告到指定渠道（使用已保存的配置）
+async function testNotify(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const cfg = await getNotify(env);
+  const kind = KIND_NAME[body.kind] ? body.kind : 'daily';
+  const report = await buildReport(env, cfg, kind, Date.now(), true);
+  try {
+    if (body.channel === 'tg') await sendTelegram(cfg.tg, report.tg);
+    else if (body.channel === 'email') await sendEmail(env, cfg.email, report);
+    else return json({ error: '未知渠道' }, 400);
+  } catch (err) {
+    return json({ error: err.message }, 400);
+  }
+  return json({ ok: true });
+}
+
+async function runNotifications(env, now = Date.now()) {
+  await ensureSchema(env);
+  const cfg = await getNotify(env);
+  if (!cfg.tg.enabled && !cfg.email.enabled) return;
+  const local = new Date(now + cfg.tz * 60000);
+  if (local.getUTCHours() !== cfg.hour) return;
+  const today = local.toISOString().slice(0, 10);
+  const lastRow = await getSetting(env, 'notify_last');
+  const last = lastRow ? JSON.parse(lastRow.value) : {};
+  const kinds = [];
+  if (cfg.reports.daily && last.daily !== today) kinds.push('daily');
+  if (cfg.reports.weekly && local.getUTCDay() === 1 && last.weekly !== today) kinds.push('weekly');
+  if (cfg.reports.monthly && local.getUTCDate() === 1 && last.monthly !== today) kinds.push('monthly');
+  for (const kind of kinds) {
+    const report = await buildReport(env, cfg, kind, now);
+    const errors = [];
+    if (cfg.tg.enabled) await sendTelegram(cfg.tg, report.tg).catch((e) => errors.push(e.message));
+    if (cfg.email.enabled) await sendEmail(env, cfg.email, report).catch((e) => errors.push(e.message));
+    last[kind] = today;
+    await setSetting(env, 'notify_last', JSON.stringify(last));
+    await setSetting(env, 'notify_status', JSON.stringify({ at: Date.now(), kind, ok: !errors.length, error: errors.join('；') }));
+  }
+}
+
+// 计算报告的时间范围（按设定时区的自然日 / 自然周（周一开始）/ 自然月），返回 UTC 毫秒
+function reportRange(kind, now, tz) {
+  const off = tz * 60000, DAY = 86400000;
+  const local = now + off;
+  const todayStart = Math.floor(local / DAY) * DAY;
+  let start, end, prev;
+  if (kind === 'weekly') {
+    const dow = new Date(todayStart).getUTCDay();
+    end = todayStart - ((dow + 6) % 7) * DAY; start = end - 7 * DAY; prev = start - 7 * DAY;
+  } else if (kind === 'monthly') {
+    const d = new Date(todayStart);
+    end = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+    start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1);
+    prev = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 2, 1);
+  } else {
+    end = todayStart; start = end - DAY; prev = start - DAY;
+  }
+  return { start: start - off, end: end - off, prev: prev - off, label: rangeLabelText(kind, start, end) };
+}
+
+function rangeLabelText(kind, start, end) {
+  const f = (ms) => { const d = new Date(ms); return `${d.getUTCMonth() + 1} 月 ${d.getUTCDate()} 日`; };
+  if (kind === 'monthly') { const d = new Date(start); return `${d.getUTCFullYear()} 年 ${d.getUTCMonth() + 1} 月`; }
+  if (kind === 'weekly') return `${f(start)} – ${f(end - 86400000)}`;
+  return f(start);
+}
+
+async function buildReport(env, cfg, kind, now, test = false) {
+  const { start, end, prev, label } = reportRange(kind, now, cfg.tz);
+  const q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
+  const all = (st) => st.all().then((r) => r.results);
+  const [cur, before, created, links, sources, countries] = await Promise.all([
+    q('SELECT COUNT(*) AS n, COUNT(DISTINCT ip) AS u FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0', start, end).first(),
+    q('SELECT COUNT(*) AS n, COUNT(DISTINCT ip) AS u FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0', prev, start).first(),
+    q('SELECT COUNT(*) AS n FROM links WHERE created_at >= ? AND created_at < ?', start, end).first('n'),
+    all(q(`SELECT l.slug, l.title, COUNT(*) AS n FROM clicks c JOIN links l ON l.id = c.link_id
+           WHERE c.ts >= ? AND c.ts < ? AND c.is_bot = 0 GROUP BY l.id ORDER BY n DESC LIMIT 5`, start, end)),
+    all(q('SELECT source AS k, COUNT(*) AS n FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0 GROUP BY source ORDER BY n DESC LIMIT 5', start, end)),
+    all(q('SELECT country AS k, COUNT(*) AS n FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0 GROUP BY country ORDER BY n DESC LIMIT 5', start, end)),
+  ]);
+  const nf = new Intl.NumberFormat('en-US');
+  const n = (v) => nf.format(v || 0);
+  const chg = (a, b) => (!b ? (a ? '新增' : '持平') : a === b ? '持平' : `${a > b ? '↑' : '↓'} ${Math.abs(Math.round(((a - b) / b) * 100))}%`);
+  const h = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const host = cfg.base ? new URL(cfg.base).host : '';
+  const title = `${test ? '【测试】' : ''}cligc link ${KIND_NAME[kind]} · ${label}`;
+  const admin = cfg.base ? `${cfg.base}/admin` : '';
+
+  // Telegram（HTML 格式）
+  const tgLines = [
+    `📊 <b>${h(title)}</b>`, '',
+    `访问 <b>${n(cur.n)}</b>（${chg(cur.n, before.n)}）  独立访客 <b>${n(cur.u)}</b>（${chg(cur.u, before.u)}）`,
+    created ? `新建短链 ${n(created)} 条` : '',
+    links.length ? `\n<b>热门短链</b>\n${links.map((l, i) => `${i + 1}. <code>/${h(l.slug)}</code>${l.title ? ` ${h(l.title)}` : ''} — ${n(l.n)}`).join('\n')}` : '\n这段时间没有访问。',
+    sources.length ? `\n<b>来源</b>\n${sources.map((x) => `${h(x.k)} ${n(x.n)}`).join(' · ')}` : '',
+    countries.length ? `\n<b>国家 / 地区</b>\n${countries.map((x) => `${countryLabel(x.k)} ${n(x.n)}`).join(' · ')}` : '',
+    admin ? `\n<a href="${h(admin)}">打开后台 →</a>` : '',
+  ].filter((x) => x !== '');
+
+  // 邮件（内联样式，兼容各邮件客户端）
+  const row = (k, v) => `<tr><td style="padding:6px 0;color:#454d5e">${k}</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#0b1020">${v}</td></tr>`;
+  const list = (t, items) => items.length ? `<h3 style="margin:24px 0 8px;font-size:14px;color:#0b1020">${t}</h3><table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px">${items.join('')}</table>` : '';
+  const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e3e6ec;border-radius:16px"><tr><td style="padding:28px">
+<div style="font-size:13px;color:#868e9e">cligc link · ${KIND_NAME[kind]}${test ? '（测试）' : ''}</div>
+<h1 style="margin:6px 0 20px;font-size:22px;color:#0b1020">${h(label)}</h1>
+<table width="100%" cellpadding="0" cellspacing="0"><tr>
+  <td style="padding:16px;border-radius:12px;background:#ecf1ff;width:50%"><div style="font-size:12px;color:#454d5e">访问次数</div><div style="font-size:26px;font-weight:700;color:#0b1020">${n(cur.n)}</div><div style="font-size:12px;color:#1d4fd8">${chg(cur.n, before.n)}</div></td>
+  <td style="width:12px"></td>
+  <td style="padding:16px;border-radius:12px;background:#f1edff;width:50%"><div style="font-size:12px;color:#454d5e">独立访客</div><div style="font-size:26px;font-weight:700;color:#0b1020">${n(cur.u)}</div><div style="font-size:12px;color:#5b3fd9">${chg(cur.u, before.u)}</div></td>
+</tr></table>
+${created ? `<p style="margin:16px 0 0;font-size:14px;color:#454d5e">新建短链 ${n(created)} 条</p>` : ''}
+${links.length ? list('热门短链', links.map((l, i) => row(`${i + 1}. <span style="font-family:ui-monospace,Menlo,monospace">/${h(l.slug)}</span> ${h(l.title)}`, n(l.n)))) : '<p style="margin:20px 0 0;color:#868e9e">这段时间没有访问。</p>'}
+${list('来源', sources.map((x) => row(h(x.k), n(x.n))))}
+${list('国家 / 地区', countries.map((x) => row(countryLabel(x.k), n(x.n))))}
+${admin ? `<p style="margin:28px 0 0"><a href="${h(admin)}" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#0b1020;color:#fff;text-decoration:none;font-size:14px">打开后台</a></p>` : ''}
+</td></tr></table>
+<p style="text-align:center;font-size:12px;color:#868e9e;margin:16px 0 0">${h(host)} · 在后台“通知”中可修改或关闭推送</p>
+</body></html>`;
+  const text = tgLines.join('\n').replace(/<[^>]+>/g, '');
+  return { title, tg: tgLines.join('\n'), html, text };
+}
+
+function countryLabel(code) {
+  if (!code || code.length !== 2) return code || '未知';
+  let name = code;
+  try { name = new Intl.DisplayNames(['zh-CN'], { type: 'region' }).of(code) || code; } catch {}
+  const flag = code === 'TW' ? '' : String.fromCodePoint(...[...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
+  return `${flag} ${name}`.trim();
+}
+
+async function sendTelegram(tg, text) {
+  if (!tg.token || !tg.chat) throw new Error('Telegram 未配置 Bot Token 或 Chat ID');
+  const res = await fetch(`https://api.telegram.org/bot${tg.token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: tg.chat, text, parse_mode: 'HTML', disable_web_page_preview: true }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!data.ok) throw new Error(`Telegram 发送失败：${data.description || res.status}`);
+}
+
+async function sendEmail(env, mail, report) {
+  const to = mail.to.split(/[\s,，;；]+/).filter(Boolean);
+  if (!mail.from || !to.length) throw new Error('邮件未配置发件人或收件人');
+  if (mail.provider === 'cloudflare') {
+    if (!env.EMAIL) throw new Error('当前部署没有配置 send_email 绑定');
+    for (const addr of to) await env.EMAIL.send(new EmailMessage(bareAddress(mail.from), addr, mime(mail.from, addr, report)));
+    return;
+  }
+  if (!mail.key) throw new Error('未配置 Resend API Key');
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${mail.key}` },
+    body: JSON.stringify({ from: mail.from, to, subject: report.title, html: report.html, text: report.text }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(`邮件发送失败：${data.message || res.status}`);
+  }
+}
+
+const bareAddress = (v) => (v.match(/<([^>]+)>/) || [, v])[1].trim();
+const b64 = (str) => { const bytes = new TextEncoder().encode(str); let bin = ''; for (const b of bytes) bin += String.fromCharCode(b); return btoa(bin); };
+function mime(from, to, report) {
+  const domain = bareAddress(from).split('@')[1] || 'localhost';
+  return [
+    `From: ${from}`, `To: ${to}`, `Subject: =?UTF-8?B?${b64(report.title)}?=`,
+    `Date: ${new Date().toUTCString()}`, `Message-ID: <${crypto.randomUUID()}@${domain}>`,
+    'MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '',
+    b64(report.html).replace(/.{1,76}/g, '$&\r\n'),
+  ].join('\r\n');
 }
 
 // ---------------------------------------------------------------- 工具

@@ -7,6 +7,14 @@ compatibility_date = "2026-07-01"
 #   { pattern = "go.example.com", custom_domain = true },
 # ]
 
+# 定时任务：每小时整点检查一次，到了后台“通知”里设定的时间就发送统计报告
+[triggers]
+crons = ["0 * * * *"]
+
+# 可选：使用 Cloudflare 邮件路由发送报告邮件（需先在域名上开通 Email Routing 并验证收件地址）
+# [[send_email]]
+# name = "EMAIL"
+
 [vars]
 # 访问根路径 / 时跳转到的地址；留空则显示内置的产品首页
 HOME_URL = ""
