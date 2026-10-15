@@ -529,7 +529,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .sec-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 4px 0 -6px; }
 .sec-t { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
 .chcard { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; transition: border-color .2s, box-shadow .2s; }
-.chcard.live { border-color: color-mix(in srgb, var(--good) 35%, var(--line)); }
+.chcard.is-on { border-color: color-mix(in srgb, var(--good) 35%, var(--line)); }
 .chtop { display: flex; align-items: center; gap: 12px; }
 .chtop .chi { width: 38px; height: 38px; border-radius: 11px; }
 .chname { flex: 1; display: flex; align-items: center; gap: 10px; }
@@ -2390,7 +2390,7 @@ async function renderNotify(token) {
         ? (ok ? `<span>Bot Token ${esc(st.tg.token)}</span><span>Chat ID <code>${esc(st.tg.chat)}</code></span>` : '<span>填写 Bot Token 和 Chat ID 后即可推送到个人或群组</span>')
         : (ok ? `<span>发送到 ${esc(maskMail(st.email.to))}</span><span>${st.email.provider === 'cloudflare' ? 'Cloudflare 邮件路由' : 'Resend'} · ${esc(st.email.from)}</span>`
           : '<span>通过 Resend 或 Cloudflare 邮件路由发送 HTML 报告</span>');
-      return `<section class="card chcard ${on && ok ? 'live' : ''}">
+      return `<section class="card chcard ${on && ok ? 'is-on' : ''}">
         <div class="chtop"><span class="chi ${k === 'tg' ? 'tg' : 'mail'}">${ic(k === 'tg' ? 'send' : 'mail', 18)}</span>
           <div class="chname"><b>${k === 'tg' ? 'Telegram' : '邮件'}</b>${pill}</div>
           <label class="switch" title="${ok ? '启用 / 停用推送' : '先完成配置'}"><input type="checkbox" data-on="${k}" ${on && ok ? 'checked' : ''}><span class="t"></span></label></div>
