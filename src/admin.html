@@ -577,9 +577,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 /* 访问明细：宽屏下固定列宽，不出现横向滚动，长内容省略，悬停看全文 */
 @media (min-width: 901px) {
   .tbl.vt { table-layout: fixed; }
-  .tbl.vt th:nth-child(1) { width: 11%; } .tbl.vt th:nth-child(2) { width: 12%; } .tbl.vt th:nth-child(3) { width: 12%; }
-  .tbl.vt th:nth-child(4) { width: 17%; } .tbl.vt th:nth-child(5) { width: 20%; } .tbl.vt th:nth-child(6) { width: 15%; }
-  .tbl.vt th:nth-child(7) { width: 13%; }
+  .tbl.vt th:nth-child(1) { width: 17%; } .tbl.vt th:nth-child(2) { width: 12%; } .tbl.vt th:nth-child(3) { width: 18%; }
+  .tbl.vt th:nth-child(4) { width: 21%; } .tbl.vt th:nth-child(5) { width: 16%; } .tbl.vt th:nth-child(6) { width: 16%; }
   .tbl.vt td { overflow: hidden; text-overflow: ellipsis; }
   .tbl.vt td > div, .tbl.vt td > span { display: block; max-width: none !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tbl.vt td.ell { max-width: none; }
@@ -2605,10 +2604,10 @@ async function renderLink(token, id) {
       <section class="card rv">
         <div class="card-h"><h3>访问明细</h3><span class="sp"></span><span class="sub">共 ${num(c.total)} 条</span></div>
         ${c.items.length ? `<div class="scroll tbl-wrap"><table class="tbl vt">
-          <thead><tr><th>时间</th><th>来源</th><th>地区</th><th>跳转到</th><th>设备</th><th>IP</th><th>Referer</th></tr></thead>
+          <thead><tr><th>来源 / 时间</th><th>地区</th><th>跳转到</th><th>设备</th><th>IP</th><th>Referer</th></tr></thead>
           <tbody>${c.items.map((r) => `<tr>
-            <td><div>${ago(r.ts)}</div><div class="sm">${fmtTime(r.ts)}</div></td>
-            <td><div data-tipf="${esc(r.source)}">${esc(r.source)}</div>${r.utm_campaign ? `<div class="sm" data-tipf="${esc(r.utm_campaign)}">${esc(r.utm_campaign)}</div>` : ''}</td>
+            <td><div data-tipf="${esc(r.source + (r.utm_campaign ? ' · ' + r.utm_campaign : ''))}">${esc(r.source)}${r.utm_campaign ? `<span class="sm"> · ${esc(r.utm_campaign)}</span>` : ''}</div>
+              <div class="sm" data-tipf="${esc(fmtTime(r.ts))}">${ago(r.ts)} · ${fmtTime(r.ts)}</div></td>
             <td><div>${esc(country(r.country))}</div><div class="sm" data-tipf="${esc([r.region, r.city].filter(Boolean).join(' · '))}">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
             <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (link.target_url || '—'))}</div>`; })()}</td>
             <td data-tipf="${esc(r.ua)}" data-tipf-always><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r, false)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div>${(r.kind && r.kind !== 'human') || r.proxy ? (r.reason ? `<div class="kr ${r.kind === 'human' ? 'proxy' : r.kind} ell" data-tipf="${esc(r.reason)}">${esc(r.reason)}</div>` : '') : ''}</td>
