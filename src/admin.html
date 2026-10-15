@@ -668,6 +668,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .chi.pw { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .chi.mfa { background: var(--good-bg); color: var(--good); }
 .chi.trk { background: var(--accent-2); color: var(--accent); }
+.chi.ret { background: color-mix(in srgb, var(--teal) 14%, transparent); color: var(--teal); }
 .acc { display: grid; gap: 12px; max-width: 880px; }
 .acc-i .fold-h { gap: 14px; padding-top: 18px; padding-bottom: 18px; }
 .acc-i.open .fold-h { padding-bottom: 6px; }
@@ -1989,13 +1990,12 @@ function machinesCard(d) {
   return `<section class="card rv">
     <div class="card-h"><h3>机器访问来源</h3><span class="sub">最近 ${rangeLabel()} · 按运营商汇总，仅供查看，不影响跳转</span></div>
     <div class="scroll"><table class="tbl mtbl">
-      <thead><tr><th>运营商</th><th>类型</th><th style="text-align:right">访问</th><th style="text-align:right">IP 数</th><th style="text-align:right">短链数</th><th>最近</th><th>主要原因</th></tr></thead>
+      <thead><tr><th>运营商</th><th>ASN</th><th>类型</th><th style="text-align:right">访问</th><th style="text-align:right">占机器访问</th></tr></thead>
       <tbody>${rows.map((m) => `<tr>
-        <td><div class="ell" style="max-width:260px" title="${esc(m.asn_org || '')}">${esc(m.asn_org || '未知')}</div><div class="sm">${m.asn ? 'AS' + m.asn : '—'}</div></td>
+        <td><div class="ell" style="max-width:340px" data-tipf="${esc(m.asn_org || '')}">${esc(m.asn_org || '未知')}</div></td>
+        <td class="sm">${m.asn ? 'AS' + m.asn : '—'}</td>
         <td>${kindTag({ kind: m.kind }, false)}</td>
-        <td class="num">${num(m.n)}</td><td class="num">${num(m.ips)}</td><td class="num">${num(m.links)}</td>
-        <td><time data-ts="${m.last}">${ago(m.last)}</time></td>
-        <td><div class="sm ell" style="max-width:300px" title="${esc(m.reason || '')}">${esc(m.reason || '—')}</div></td>
+        <td class="num">${num(m.n)}</td><td class="num">${Math.round((m.n / Math.max(1, rows.reduce((a, b) => a + b.n, 0))) * 100)}%</td>
       </tr>`).join('')}</tbody></table></div>
   </section>`;
 }
@@ -3032,7 +3032,7 @@ function openRuleDrawer(link, rule) {
 async function renderSettings(token) {
   const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证和来源追踪</div></div></header>`;
   shell('settings', `${head}<div class="acc">${skel(76, 3)}</div>`);
-  const [mfa, trk] = await Promise.all([api('/2fa'), api('/tracking')]);
+  const [mfa, trk, ret] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention')]);
   if (token !== routeToken) return;
   const item = (id, icon, cls, title, sub, status, body) => `
     <section class="card rv fold acc-i" data-acc="${id}">
@@ -3062,6 +3062,7 @@ async function renderSettings(token) {
         </ul>
         <button class="btn ${mfa.enabled ? 'danger' : 'primary'}" id="mfa-btn">${ic('shield', 15)}${mfa.enabled ? '关闭两步验证' : '开启两步验证'}</button>`)}
       ${item('trk', 'search', 'trk', '来源追踪', '识别访客从哪个搜索引擎进入推广页', pill(trk.enabled), '')}
+      ${item('ret', 'inbox', 'ret', '数据保留', '访问明细保存多久；统计数据长期保留', `<span class="pill on">${ret.days ? ret.days + ' 天' : '永久'}</span>`, '')}
     </div>`;
   const page = document.getElementById('page');
   reveal(page);
@@ -3084,6 +3085,34 @@ async function renderSettings(token) {
   bindPasswordForm(pwf, '', () => { pwf.reset(); pwf.querySelector('.pwm').dataset.n = ''; pwf.querySelector('#p-tip').textContent = '至少 8 位，建议混合字母、数字和符号'; pwf.querySelector('button.primary').disabled = false; });
   document.getElementById('mfa-btn').onclick = () => openMfaDialog(() => route());
   renderTracking(document.getElementById('acc-trk'), trk, (on) => { page.querySelector('[data-st="trk"]').innerHTML = pill(on); });
+  renderRetention(document.getElementById('acc-ret'), ret, (days) => { page.querySelector('[data-st="ret"]').innerHTML = `<span class="pill on">${days ? days + ' 天' : '永久'}</span>`; });
+}
+
+// 数据保留：访问明细超过期限自动删除；统计读汇总数据，不受影响
+function renderRetention(box, r, onState) {
+  const opts = [[0, '永久'], [365, '365 天'], [180, '180 天'], [90, '90 天'], [60, '60 天']];
+  box.innerHTML = `
+    <p class="set-p">每次访问都会记录一条明细（IP、来源、设备……），用于“访问明细”列表、导出 CSV 和定时报告。
+      统计页面读的是按小时 / 按天汇总的数据，明细删除后，趋势、来源、地区等统计照常显示。</p>
+    <div class="seg" id="ret-seg">${opts.map(([d, l]) => `<button type="button" data-d="${d}" class="${d === r.days ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <ul class="set-list" style="margin-top:16px">
+      <li>${ic('check', 14)}当前保存了 <b>${num(r.count)}</b> 条访问明细${r.first ? `，最早一条是 ${fmtTime(r.first)}` : ''}</li>
+      <li>${ic('check', 14)}统计数据已汇总到 ${r.aggregated ? fmtTime(r.aggregated) : '—'}，之后的访问实时读取</li>
+      <li>${ic('check', 14)}超过期限的明细由定时任务每小时清理一次；最短 60 天，保证月报有完整数据</li>
+    </ul>`;
+  segThumb(box.querySelector('#ret-seg'));
+  box.querySelectorAll('#ret-seg button').forEach((b) => (b.onclick = async () => {
+    const days = Number(b.dataset.d);
+    if (days && (!r.days || days < r.days)) {
+      const ok = await confirmDialog({ title: `只保留最近 ${days} 天的访问明细？`, text: `超过 ${days} 天的访问明细会在下一个整点删除，无法恢复。趋势、来源、地区等统计不受影响。`, ok: '确认' });
+      if (!ok) return;
+    }
+    try {
+      const d = await api('/retention', { method: 'PUT', body: { days } });
+      toast(days ? `访问明细保留 ${days} 天` : '访问明细永久保留');
+      onState(d.days); renderRetention(box, d, onState);
+    } catch (err) { toast(err.message, 'bad'); }
+  }));
 }
 
 // 来源追踪：推广页上放一段代码，把访客来自的搜索引擎带到短链的 utm_source 上

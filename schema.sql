@@ -68,3 +68,28 @@ CREATE TABLE IF NOT EXISTS settings (
   value       TEXT NOT NULL,
   updated_at  INTEGER NOT NULL
 );
+
+-- 访问汇总：统计页面读这些表，避免每次扫描全部访问明细（见 src/agg.js）
+CREATE TABLE IF NOT EXISTS agg_h (
+  hour     INTEGER NOT NULL,            -- UTC 小时序号（ts / 3600000）
+  link_id  INTEGER NOT NULL,
+  machine  INTEGER NOT NULL,            -- 1 = 机器访问（爬虫 / 可疑）
+  n        INTEGER NOT NULL,
+  PRIMARY KEY (hour, link_id, machine)
+);
+CREATE TABLE IF NOT EXISTS agg_d (
+  dim      TEXT NOT NULL,               -- 维度：'' 为总数，source / country / device / kind / asn ……
+  day      TEXT NOT NULL,               -- 日期（按 settings.agg_tz）
+  link_id  INTEGER NOT NULL,
+  machine  INTEGER NOT NULL,
+  k        TEXT NOT NULL,
+  n        INTEGER NOT NULL,
+  PRIMARY KEY (dim, day, link_id, machine, k)
+);
+CREATE TABLE IF NOT EXISTS agg_uv (
+  day      TEXT NOT NULL,
+  link_id  INTEGER NOT NULL,            -- 0 = 全部短链
+  machine  INTEGER NOT NULL,
+  hll      TEXT NOT NULL,               -- 独立访客 HyperLogLog 寄存器（base64）
+  PRIMARY KEY (day, link_id, machine)
+);

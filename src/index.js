@@ -3,6 +3,7 @@ import HOME_HTML from './home.html';
 import SCHEMA_SQL from '../schema.sql';
 import { renderSVG } from 'uqr';
 import { EmailMessage } from 'cloudflare:email';
+import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
 const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
 // 回退检测：访客浏览器内探测地区地址的超时时间
@@ -53,6 +54,11 @@ export default {
   // 定时任务（wrangler.toml 中每小时整点触发）：到了设定时间发送日报 / 周报 / 月报
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runNotifications(env, event.scheduledTime).catch((e) => console.error('notify failed', e)));
+    ctx.waitUntil((async () => {
+      await ensureSchema(env);
+      await aggregate(env);
+      await pruneClicks(env);
+    })().catch((e) => console.error('aggregate / prune failed', e)));
   },
 };
 
@@ -129,6 +135,7 @@ async function backfillKinds(env) {
   }
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
   if (rows.length < 20000) await setSetting(env, 'kind_backfilled', KIND_VER);
+  if (rows.length) await rebuildAgg(env);
 }
 
 // ---------------------------------------------------------------- 跳转
@@ -418,6 +425,14 @@ async function handleApi(request, env, url) {
   // 仍在使用默认密码时，除修改密码外的接口一律拒绝
   if (mustChange) return json({ error: '请先修改默认密码', mustChange: true }, 403);
   if (path === '/api/overview' && method === 'GET') return overview(env, url);
+  if (path === '/api/retention' && method === 'GET') return json(await retentionInfo(env));
+  if (path === '/api/retention' && method === 'PUT') {
+    const body = await request.json().catch(() => ({}));
+    const days = Number(body.days) || 0;
+    if (![0, 60, 90, 180, 365].includes(days)) return json({ error: '保留天数只能是 60、90、180、365 或永久' }, 400);
+    await setSetting(env, 'retention_days', String(days));
+    return json(await retentionInfo(env));
+  }
   if (path === '/api/recent' && method === 'GET') {
     const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
     return json({ items: await recentClicks(env, url.searchParams.get('bots') === '1', linkId) });
@@ -955,6 +970,7 @@ async function updateLink(request, env, id) {
 }
 
 async function deleteLink(env, id) {
+  await dropLinkAgg(env, id);
   await env.DB.batch([
     env.DB.prepare('DELETE FROM clicks WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM link_targets WHERE link_id = ?').bind(id),
@@ -1047,17 +1063,25 @@ async function listLinks(env, url) {
   // 每个短链最近 14 天的每日访问（用于列表里的迷你趋势图）
   if (items.length) {
     const ids = items.map((l) => l.id);
-    const spark = await env.DB.prepare(
-      `SELECT link_id, date((ts + ? * 60000) / 1000, 'unixepoch') AS k, COUNT(*) AS n FROM clicks
-       WHERE link_id IN (${ids.map(() => '?').join(',')}) AND ts >= ? AND is_bot = 0
-       GROUP BY link_id, k`
-    ).bind(tz, ...ids, Date.now() - 15 * 86400000).all();
+    const st = await aggregate(env, tz).catch(() => aggState(env));
+    const since = Date.now() - 15 * DAY, atz = st.tz ?? tz;
+    const [agg, tail] = await Promise.all([
+      env.DB.prepare(
+        `SELECT link_id, day AS k, SUM(n) AS n FROM agg_d WHERE dim = '' AND day >= ? AND machine = 0
+         AND link_id IN (${ids.map(() => '?').join(',')}) GROUP BY link_id, day`
+      ).bind(dayKey(since, atz), ...ids).all(),
+      env.DB.prepare(
+        `SELECT link_id, ts FROM clicks WHERE ts >= ? AND is_bot = 0 AND link_id IN (${ids.map(() => '?').join(',')})`
+      ).bind(Math.max(st.mark, since), ...ids).all(),
+    ]);
     const byId = new Map();
-    for (const r of spark.results) {
-      if (!byId.has(r.link_id)) byId.set(r.link_id, []);
-      byId.get(r.link_id).push({ k: r.k, n: r.n });
-    }
-    for (const l of items) l.spark = byId.get(l.id) || [];
+    const add = (lid, k, n) => {
+      if (!byId.has(lid)) byId.set(lid, new Map());
+      byId.get(lid).set(k, (byId.get(lid).get(k) || 0) + n);
+    };
+    for (const r of agg.results) add(r.link_id, r.k, r.n);
+    for (const r of tail.results) add(r.link_id, dayKey(r.ts, tz), 1);
+    for (const l of items) l.spark = [...(byId.get(l.id) || [])].map(([k, n]) => ({ k, n }));
 
     // 地区规则摘要（列表里鼠标悬停显示）
     const rules = await env.DB.prepare(
@@ -1101,6 +1125,11 @@ function rangeParams(url) {
 }
 
 async function linkStats(env, id, url) {
+  const p = rangeParams(url);
+  return p.days <= 1 || url.searchParams.get('raw') === '1' ? linkStatsRaw(env, id, url) : linkStatsAgg(env, id, p);
+}
+
+async function linkStatsRaw(env, id, url) {
   const { tz, bots, since, prevSince, bucket, span } = rangeParams(url);
   const botFilter = bots ? '' : 'AND is_bot = 0';
   const base = `FROM clicks WHERE link_id = ?1 AND ts >= ?2 ${botFilter}`;
@@ -1181,6 +1210,12 @@ async function exportClicks(env, id) {
 }
 
 async function overview(env, url) {
+  const p = rangeParams(url);
+  // raw=1：强制读原始明细（用于核对汇总结果）
+  return p.days <= 1 || url.searchParams.get('raw') === '1' ? overviewRaw(env, url) : overviewAgg(env, url, p);
+}
+
+async function overviewRaw(env, url) {
   const { tz, bots, since, prevSince, bucket, span } = rangeParams(url);
   // 可按单个短链筛选（link 为短链 id，校验为正整数后拼进 SQL）
   const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
@@ -1244,6 +1279,168 @@ async function overview(env, url) {
     ];
   }
   return json(out);
+}
+
+// ---------------------------------------------------------------- 统计（7 天及以上：读汇总表）
+
+// 星期 × 小时、小时分布：把按小时的访问次数换算到浏览器时区
+function localHourParts(ts, tz) {
+  const d = new Date(ts + tz * 60000);
+  return { d: d.getUTCDay(), h: d.getUTCHours() };
+}
+
+// 机器访问按运营商：k = 类型 \t ASN \t 运营商
+const machineRows = (rows) => rows.map((r) => {
+  const [kind, asn, org] = r.k.split('\t');
+  return { kind, asn: Number(asn) || 0, asn_org: org || '', n: r.n };
+});
+
+async function overviewAgg(env, url, { days, tz, bots }) {
+  const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
+  const q = await aggQuery(env, { days, tz, bots, linkId });
+  const { now, dayStart, start, prevStart, firstDay, today, prevFirst, prevLast } = q;
+
+  const [links, activeRows, totals, prev, todayHours, ydayHours, daily, prevDaily, uvDays, heatHours, topRows,
+    sources, devices, browsers, oses, countries, recent, kinds, machines] = await Promise.all([
+    env.DB.prepare('SELECT COUNT(*) AS n FROM links').first('n'),
+    q.all(`SELECT DISTINCT link_id FROM agg_d WHERE dim = '' AND day >= ? AND day <= ? ${bots ? '' : 'AND machine = 0'}`, firstDay, today),
+    q.total(firstDay, today, start, now),
+    q.total(prevFirst, prevLast, prevStart, start),
+    q.hours(dayStart, now),
+    q.hours(dayStart - DAY, now - DAY),
+    q.daily(firstDay, today, start, now),
+    q.daily(prevFirst, prevLast, prevStart, start, days),
+    q.uvByDay(firstDay, today),
+    q.hours(start, now),
+    q.all(
+      `SELECT link_id AS k, SUM(n) AS n FROM agg_d WHERE dim = '' AND day >= ? AND day <= ? ${bots ? '' : 'AND machine = 0'}
+       ${linkId ? 'AND link_id = ?' : ''} GROUP BY link_id ORDER BY n DESC LIMIT 30`,
+      firstDay, today, ...(linkId ? [linkId] : []),
+    ),
+    q.top('source', 20), q.top('device', 20), q.top('browser', 20), q.top('os', 20), q.top('country', 20),
+    recentClicks(env, bots, linkId),
+    q.kinds(),
+    q.top('asn', 10, { who: 'machine', key: (r) => `${r.kind || ''}\t${r.asn || 0}\t${r.asn_org || ''}` }),
+  ]);
+
+  // 今日 / 昨日同时段
+  const todayN = todayHours.reduce((a, b) => a + b.n, 0);
+  const ydayN = ydayHours.filter((h) => h.ts < now - DAY).reduce((a, b) => a + b.n, 0);
+
+  // 每日访客
+  const tailUv = new Map();
+  for (const r of q.tailIn(start, now)) {
+    const k = dayKey(r.ts, tz);
+    if (!tailUv.has(k)) tailUv.set(k, hllNew());
+    hllAdd(tailUv.get(k), r.ip || '');
+  }
+  const uvOf = (day) => {
+    const reg = hllNew();
+    if (uvDays.has(`${linkId}|${day}`)) hllMerge(reg, uvDays.get(`${linkId}|${day}`));
+    if (tailUv.has(day)) hllMerge(reg, tailUv.get(day));
+    return hllCount(reg);
+  };
+  const dailyU = daily.map((r) => ({ ...r, u: uvOf(r.k) }));
+
+  // 活跃时段
+  const heat = new Map();
+  for (const h of heatHours) {
+    const { d, h: hr } = localHourParts(h.ts, tz);
+    heat.set(`${d}-${hr}`, (heat.get(`${d}-${hr}`) || 0) + h.n);
+  }
+
+  // 热门短链：合并原始尾巴后取前 8，独立访客按短链合并估算
+  const counts = new Map(topRows.map((r) => [r.k, r.n]));
+  for (const r of q.tailIn(start, now)) counts.set(r.link_id, (counts.get(r.link_id) || 0) + 1);
+  const topIds = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id]) => id);
+  let topLinks = [];
+  if (topIds.length) {
+    const [meta, uvs] = await Promise.all([
+      env.DB.prepare(`SELECT id, slug, title, target_url, last_click FROM links WHERE id IN (${topIds.map(() => '?').join(',')})`).bind(...topIds).all(),
+      q.uvByDay(firstDay, today, topIds),
+    ]);
+    const byId = new Map(meta.results.map((l) => [l.id, l]));
+    topLinks = topIds.filter((id) => byId.has(id)).map((id) => {
+      const reg = hllNew();
+      for (const [key, r] of uvs) if (key.startsWith(id + '|')) hllMerge(reg, r);
+      q.addTailIps(reg, start, now, id);
+      const l = byId.get(id);
+      return { id, slug: l.slug, title: l.title, target_url: l.target_url, n: counts.get(id), u: hllCount(reg), last: l.last_click };
+    });
+  }
+
+  const active = new Set(activeRows.map((r) => r.link_id));
+  for (const r of q.tailIn(start, now)) active.add(r.link_id);
+
+  const out = {
+    links, activeLinks: active.size, totals, prev, today: todayN, yesterday: ydayN,
+    daily: dailyU, prevDaily, topLinks, sources, devices, browsers, oses, countries,
+    heat: [...heat].map(([k, n]) => { const [d, h] = k.split('-').map(Number); return { d, h, n }; }),
+    recent, kinds, machines: machineRows(machines),
+  };
+  if (linkId) {
+    const [link, hits, refererHosts, utmSources, campaigns] = await Promise.all([
+      env.DB.prepare('SELECT id, slug, title, target_url, last_click, enabled, expires_at FROM links WHERE id = ?').bind(linkId).first(),
+      q.top('rule', 100), q.top('referer_host', 20), q.top('utm_source', 20), q.top('utm_campaign', 20),
+    ]);
+    if (!link) return json({ error: '短链不存在' }, 404);
+    const targets = await loadTargets(env, linkId);
+    const n = new Map(hits.map((h) => [String(h.k), h.n]));
+    Object.assign(out, { refererHosts, utmSources, campaigns, link });
+    out.routes = [
+      ...targets.map((t) => ({ countries: t.countries, url: t.url, n: n.get(String(t.id)) || 0 })),
+      { countries: [], url: link.target_url, n: n.get('0') || 0, def: true },
+    ];
+  }
+  return json(out);
+}
+
+async function linkStatsAgg(env, id, { days, tz, bots }) {
+  const q = await aggQuery(env, { days, tz, bots, linkId: id });
+  const { now, start, prevStart, firstDay, today, prevFirst, prevLast } = q;
+  const [summary, prev, daily, prevDaily, uvDays, hourRows, sources, refererHosts, countries, cities, devices, browsers, oses,
+    campaigns, targets, utmSources, kinds, reasons] = await Promise.all([
+    q.total(firstDay, today, start, now),
+    q.total(prevFirst, prevLast, prevStart, start),
+    q.daily(firstDay, today, start, now),
+    q.daily(prevFirst, prevLast, prevStart, start, days),
+    q.uvByDay(firstDay, today),
+    q.hours(start, now),
+    q.top('source', 20), q.top('referer_host', 20), q.top('country'), q.top('city'),
+    q.top('device'), q.top('browser'), q.top('os'), q.top('utm_campaign'), q.top('rule', 50), q.top('utm_source', 20),
+    q.kinds(),
+    q.top('reason', 200, { who: 'machine', key: (r) => (r.reason ? r.reason : null) }),
+  ]);
+  const tailUv = new Map();
+  for (const r of q.tailIn(start, now)) {
+    const k = dayKey(r.ts, tz);
+    if (!tailUv.has(k)) tailUv.set(k, hllNew());
+    hllAdd(tailUv.get(k), r.ip || '');
+  }
+  const dailyU = daily.map((r) => {
+    const reg = hllNew();
+    if (uvDays.has(`${id}|${r.k}`)) hllMerge(reg, uvDays.get(`${id}|${r.k}`));
+    if (tailUv.has(r.k)) hllMerge(reg, tailUv.get(r.k));
+    return { ...r, u: hllCount(reg) };
+  });
+  const hm = new Map();
+  for (const h of hourRows) { const { h: hr } = localHourParts(h.ts, tz); hm.set(hr, (hm.get(hr) || 0) + h.n); }
+  return json({
+    summary, prev, daily: dailyU, prevDaily,
+    hourly: [...hm].map(([k, n]) => ({ k, n })).sort((a, b) => a.k - b.k),
+    targets: targets.map((t) => ({ k: Number(t.k), n: t.n })),
+    sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, utmSources, kinds,
+    reasons: reasonTop(reasons),
+  });
+}
+
+async function retentionInfo(env) {
+  const [days, st, raw] = await Promise.all([
+    getSetting(env, 'retention_days'),
+    aggState(env),
+    env.DB.prepare('SELECT COUNT(*) AS n, MIN(ts) AS first FROM clicks').first(),
+  ]);
+  return { days: Number(days?.value) || 0, count: raw.n || 0, first: raw.first || null, aggregated: st.mark || null };
 }
 
 async function recentClicks(env, bots, linkId = 0) {
