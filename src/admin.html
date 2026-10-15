@@ -3144,12 +3144,15 @@ function renderUsage(box, u, onState) {
   box.innerHTML = `
     <div class="use-h"><span class="hint">按 UTC 日期统计，额度每天 UTC 0 点（北京时间 8 点）重置${u.updatedAt ? ` · 更新于 ${fmtTime(u.updatedAt)}` : ''}</span><span class="sp"></span>
       <button type="button" class="btn sm" id="use-re">${ic('refresh', 14)}刷新</button></div>
-    ${u.errors?.length ? `<div class="bulk-bad">${ic('info', 15)}<div>${u.errors.map(esc).join('<br>')}<br>请检查 API 令牌是否有 Account Analytics 读取权限。</div></div>` : ''}
+    ${u.errors?.length ? `<div class="bulk-bad">${ic('info', 15)}<div>${u.errors.map(esc).join('<br>')}<br>${u.errors.some((e) => /authentication/i.test(e))
+      ? '“Authentication error”表示令牌无效：多半是粘贴的不是令牌值（如 Global API Key 或令牌 ID）、令牌已过期或被轮转，或者设置了客户端 IP 筛选。'
+      : '请检查 API 令牌是否有“帐户分析（Account Analytics）· 读取”权限。'}</div></div>` : ''}
     <div class="use-g">
       ${meter('D1 读取行数（今天）', t.rowsRead, FREE_LIMITS.rowsRead)}
       ${meter('D1 写入行数（今天）', t.rowsWritten, FREE_LIMITS.rowsWritten)}
       ${meter('Worker 请求（今天）', t.requests, FREE_LIMITS.requests)}
-      ${meter('D1 存储', u.storageBytes || 0, FREE_LIMITS.storage, bytes, '总共')}
+      ${u.storageBytes == null ? `<div class="use-m"><div class="use-l">D1 存储</div><div class="use-v">—</div><div class="use-s">暂无数据</div></div>`
+        : meter('D1 存储', u.storageBytes, FREE_LIMITS.storage, bytes, '总共')}
     </div>
     ${u.plan === null ? '<div class="hint" style="margin-top:10px">无法读取套餐（令牌没有账单读取权限），按免费版额度对比。</div>' : ''}
     <table class="tbl use-t"><thead><tr><th>日期（UTC）</th><th>D1 读取</th><th></th><th style="text-align:right">D1 写入</th><th style="text-align:right">Worker 请求</th></tr></thead>

@@ -1476,7 +1476,8 @@ async function cfUsage(env, force) {
     const c = await getSetting(env, 'usage_cache');
     if (c && c.updated_at > Date.now() - 5 * 60000) return { ...JSON.parse(c.value), cached: true };
   }
-  const headers = { authorization: `Bearer ${env.CF_API_TOKEN}`, 'content-type': 'application/json' };
+  // 粘贴令牌时容易带上空格或换行
+  const headers = { authorization: `Bearer ${String(env.CF_API_TOKEN).trim()}`, 'content-type': 'application/json' };
   const today = new Date().toISOString().slice(0, 10);
   const start = new Date(Date.now() - 6 * DAY).toISOString().slice(0, 10);
   const gql = async (field, body) => {
@@ -1486,7 +1487,7 @@ async function cfUsage(env, force) {
         body: JSON.stringify({
           query: `query($a: string!, $s: Date!, $e: Date!) { viewer { accounts(filter: { accountTag: $a }) {
             ${field}(limit: 1000, filter: { date_geq: $s, date_leq: $e }) { ${body} } } } }`,
-          variables: { a: env.CF_ACCOUNT_ID, s: start, e: today },
+          variables: { a: String(env.CF_ACCOUNT_ID).trim(), s: start, e: today },
         }),
       });
       const d = await res.json().catch(() => ({}));
