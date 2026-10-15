@@ -248,6 +248,56 @@ h2 .mute { color: var(--muted); }
 .t-geo { grid-column: span 4; grid-row: span 2; display: flex; flex-direction: column; }
 .t-ana, .t-src { grid-column: span 2; }
 .t-sec, .t-free, .t-oss { grid-column: span 2; }
+.t-fb, .t-nt { grid-column: span 3; }
+/* 两步验证动态码 */
+.otp { margin-top: 22px; }
+.otp-d { display: flex; gap: 6px; }
+.otp-d span { flex: 1; max-width: 38px; height: 46px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
+  font: 700 20px/1 var(--mono); font-variant-numeric: tabular-nums; transition: transform .35s var(--ease), color .35s; }
+.otp-d span:nth-child(3) { margin-right: 8px; }
+.otp-d.flip span { transform: rotateX(90deg); color: transparent; }
+.otp-bar { height: 3px; border-radius: 2px; background: var(--sunken); margin-top: 12px; overflow: hidden; }
+.otp-bar i { display: block; height: 100%; background: var(--good); transform-origin: left; animation: otp 6s linear infinite; }
+@keyframes otp { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.otp small { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); }
+/* 自动回退演示 */
+.fbd { margin-top: 24px; display: grid; gap: 8px; }
+.fbr { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg);
+  font-size: 13.5px; transition: border-color .4s, background .4s, opacity .4s; }
+.fbr .f { font-size: 17px; text-align: center; }
+.fbr code { font-family: var(--mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fbr em { font-style: normal; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; }
+.fbr em b { font-weight: 600; display: none; }
+.fbr .spin { width: 11px; height: 11px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.fbx { display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 12.5px; color: var(--muted); opacity: .35; transition: opacity .4s, color .4s; }
+.fbx svg { width: 15px; height: 15px; }
+.fbr.b { opacity: .45; }
+.fbd[data-phase="0"] .fbr.a { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-2); }
+.fbd[data-phase="0"] .fbr.a .p0 { display: inline; color: var(--accent-ink); }
+.fbd[data-phase="0"] .fbr.a em { color: var(--accent-ink); }
+.fbd:not([data-phase="0"]) .fbr.a .spin { display: none; }
+.fbd:not([data-phase="0"]) .fbr.a { border-color: color-mix(in srgb, #e5484d 40%, transparent); background: color-mix(in srgb, #e5484d 7%, transparent); }
+.fbd:not([data-phase="0"]) .fbr.a .p1 { display: inline; color: #e5484d; }
+.fbd:not([data-phase="0"]) .fbr.a code { text-decoration: line-through; text-decoration-color: color-mix(in srgb, #e5484d 60%, transparent); }
+.fbd[data-phase="2"] .fbx { opacity: 1; color: var(--teal); }
+.fbd[data-phase="2"] .fbr.b { opacity: 1; border-color: color-mix(in srgb, var(--good) 45%, transparent); background: var(--good-bg); }
+.fbd[data-phase="2"] .fbr.b em b { display: inline; color: var(--good); }
+/* Telegram 报告预览 */
+.tgd { margin-top: 24px; }
+.tgb { padding: 14px 16px; border-radius: 16px 16px 16px 4px; background: var(--bg); border: 1px solid var(--line); font-size: 13px; line-height: 1.75; max-width: 400px;
+  transform-origin: 0 100%; }
+.in .tgb { animation: bubble .7s var(--ease) both .3s; }
+@keyframes bubble { from { opacity: 0; transform: translateY(10px) scale(.96); } }
+.tgh { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.tga { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #229ed9; color: #fff; }
+.tga svg { width: 13px; height: 13px; }
+.tgh b { font-size: 13px; }
+.tgh small { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+.tgm code { font-family: var(--mono); font-size: 12px; background: var(--sunken); padding: 0 4px; border-radius: 4px; }
+.tgs { display: block; margin-top: 6px; font-weight: 600; }
+.tgc { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+.tgc span { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--text-2); background: var(--bg); }
 /* 地区规则可视化 */
 .rules { margin-top: auto; padding-top: 32px; display: grid; gap: 10px; }
 .rules .src { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--ink); color: var(--ink-text); font-family: var(--mono); font-size: 14px; font-weight: 600; }
@@ -384,6 +434,7 @@ footer a:hover { color: var(--text); }
   .stat:nth-child(n+3) { border-top: 1px solid var(--line); }
   .t-sec, .t-free, .t-oss, .t-ana, .t-src { grid-column: span 3; }
   .t-oss { grid-column: span 6; }
+  .t-fb, .t-nt { grid-column: span 6; }
   .app { grid-template-columns: 1fr; } .app-side { display: none; }
   .row2 { grid-template-columns: 1fr; }
   .steps { grid-template-columns: 1fr; gap: 40px; }
@@ -406,7 +457,7 @@ footer a:hover { color: var(--text); }
   .route-b { padding: 16px; }
   .kp { grid-template-columns: repeat(2, 1fr); }
   .bento { grid-template-columns: 1fr; }
-  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss { grid-column: auto; }
+  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt { grid-column: auto; }
   .tile { padding: 24px; }
   .rules .rr { grid-template-columns: 24px minmax(0, 1fr) auto; }
   .rules .rr span:nth-child(2) { display: none; }
@@ -589,7 +640,8 @@ footer a:hover { color: var(--text); }
           <span class="tag">// security</span>
           <h3>安全的后台</h3>
           <p>两步验证 + Turnstile 人机验证，密码泄露也登不进后台；自动识别爬虫。</p>
-          <div class="ts" aria-hidden="true"><span class="cb"><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>验证通过<small>TURNSTILE</small></div>
+          <div class="otp" aria-hidden="true"><div class="otp-d" id="otp"><span>4</span><span>8</span><span>2</span><span>9</span><span>1</span><span>3</span></div>
+            <div class="otp-bar"><i></i></div><small>两步验证 · 动态码每 30 秒更新</small></div>
         </article>
         <article class="tile t-free reveal" style="--d:1">
           <span class="tag">// cost</span>
@@ -602,6 +654,28 @@ footer a:hover { color: var(--text); }
           <h3>完全开源</h3>
           <p>代码透明，数据留在你自己的 Cloudflare 账号里，不收集、不上报。</p>
           <div class="oss"><span>MIT</span><span>Workers</span><span>D1</span><span>无构建步骤</span></div>
+        </article>
+        <article class="tile t-fb reveal" id="fbt">
+          <span class="tag">// fallback</span>
+          <h3>打不开？自动回退</h3>
+          <p>地区落地页被拦截或连不上时，在访客自己的网络里检测出来，自动改去默认地址，不白白流失一次点击。</p>
+          <div class="fbd" aria-hidden="true" data-phase="0">
+            <div class="fbr a"><span class="f">🇨🇳</span><code>example.cn/spring</code><em><i class="spin"></i><b class="p0">检测中</b><b class="p1">连接超时</b></em></div>
+            <div class="fbx"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>自动回退到默认地址</div>
+            <div class="fbr b"><span class="f">🌐</span><code>example.com/spring</code><em><b>已跳转</b></em></div>
+          </div>
+        </article>
+        <article class="tile t-nt reveal" style="--d:1" id="ntt">
+          <span class="tag">// reports</span>
+          <h3>定时报告，推送到手边</h3>
+          <p>日报、周报、月报按你的时间自动发到 Telegram 或邮箱，和上一周期对比，不用天天登录后台。</p>
+          <div class="tgd" aria-hidden="true">
+            <div class="tgb">
+              <div class="tgh"><span class="tga"><svg class="i" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span><b>cligc link</b><small>09:00</small></div>
+              <div class="tgm">📊 <b>cligc link 日报 · 10 月 14 日</b><br>访问 <b>1,284</b>（↑ 12%）　独立访客 <b>963</b><br><span class="tgs">热门短链</span>1. <code>/spring</code> — 512<br>2. <code>/app</code> — 301</div>
+            </div>
+            <div class="tgc"><span>Telegram</span><span>邮件</span><span>日报 / 周报 / 月报</span></div>
+          </div>
         </article>
       </div>
     </div>
@@ -654,6 +728,8 @@ footer a:hover { color: var(--text); }
           <div class="a"><div><p>使用 Cloudflare 根据访客 IP 给出的国家 / 地区代码，不需要额外的 IP 库，也不会拖慢跳转。香港、澳门、台湾可以单独设置规则。</p></div></div></div>
         <div class="q"><button aria-expanded="false">为什么推荐用 ?src= 区分来源？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>很多网站和 App 不发送 Referer，只看 Referer 会把大量访问记成“直接访问”。为每个投放渠道使用不同的 src 参数，来源统计会准确得多，后台可以一键批量生成。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">地区链接在某些网络打不开怎么办？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>给地区规则打开“打不开时回退到默认地址”。命中规则的访客会先在自己的网络里检测这个地址能否连通，能打开就直接跳过去（通常只多 0.2–1 秒），连不上就改去默认地址；后台会统计每条规则的回退次数。</p></div></div></div>
         <div class="q"><button aria-expanded="false">数据存在哪里？安全吗？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>短链和访问记录都保存在你账号下的 D1 数据库里，可以随时导出 CSV。项目本身不收集、不上报任何数据。后台首次登录必须修改默认密码，密码加盐哈希存储，并可开启 Turnstile 人机验证。</p></div></div></div>
       </div>
@@ -794,6 +870,25 @@ footer a:hover { color: var(--text); }
   let gi = 0;
   const geoTick = () => { rr.forEach((el, i) => el.classList.toggle('on', i === gi)); gi = (gi + 1) % rr.length; };
   $('#geo').addEventListener('enter', () => { geoTick(); if (!REDUCED) setInterval(() => { if (!document.hidden) geoTick(); }, 2200); });
+
+  // 自动回退演示：检测中 → 连接超时 → 回退成功，循环
+  const fbd = document.querySelector('#fbt .fbd');
+  let phase = 0;
+  $('#fbt').addEventListener('enter', () => {
+    if (REDUCED) { fbd.dataset.phase = '2'; return; }
+    setInterval(() => { if (document.hidden) return; phase = (phase + 1) % 3; fbd.dataset.phase = String(phase); }, 1500);
+  });
+
+  // 两步验证演示：动态码定时翻新
+  const otp = document.getElementById('otp');
+  if (!REDUCED) setInterval(() => {
+    if (document.hidden) return;
+    otp.classList.add('flip');
+    setTimeout(() => {
+      otp.querySelectorAll('span').forEach((s) => { s.textContent = String(Math.floor(Math.random() * 10)); });
+      otp.classList.remove('flip');
+    }, 350);
+  }, 6000);
 
   /* ---------------------------------------------------------------- 终端逐字输入 */
   const CMDS = [
