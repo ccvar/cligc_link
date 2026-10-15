@@ -432,7 +432,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 
 .lh { padding: 14px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .lh .sp { flex: 1; }
-.lrow { display: grid; grid-template-columns: minmax(0, 1fr) 100px 76px 96px 72px 108px; gap: 16px; align-items: center;
+.lrow { display: grid; grid-template-columns: minmax(0, 1fr) 100px 76px 96px 72px 144px; gap: 16px; align-items: center;
   padding: 14px 20px; border-top: 1px solid var(--line-2); cursor: pointer; transition: background .15s; }
 .lrow:hover { background: var(--panel-2); }
 .lrow.hd { cursor: default; color: var(--muted); font-size: 12px; padding-top: 10px; padding-bottom: 10px; background: none; }
@@ -707,6 +707,11 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 @keyframes pop { from { transform: translateX(-50%) scale(.95); opacity: 0; } }
 .dialog h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -.01em; }
 .dialog p { margin: 0 0 22px; color: var(--text-2); }
+.dialog.dup p { margin-bottom: 18px; }
+.dialog.dup .field { margin-bottom: 22px; }
+.dialog.dup p b { font-family: var(--mono); font-weight: 600; color: var(--text); }
+.dialog.dup .input.bad { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-bg); }
+.dialog.dup .err { margin-top: 6px; font-size: 12.5px; color: var(--bad); }
 .dialog .row { display: flex; justify-content: flex-end; gap: 8px; }
 .toasts { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 .toast { background: var(--text); color: var(--panel); padding: 10px 16px; border-radius: 12px; box-shadow: var(--shadow-3); font-size: 13px;
@@ -776,6 +781,7 @@ let liveTimer = null;
 const I = {
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   home: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  dup: '<rect x="8" y="8" width="14" height="14" rx="2.5"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/><path d="M15 12v6M12 15h6"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   ext: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
@@ -936,6 +942,40 @@ function confirmDialog({ title, text, ok = '确定', danger = false }) {
     document.body.append(ov, d);
     d.querySelector('[data-ok]').focus();
   });
+}
+
+// 复制短链：输入新后缀，其余配置和地区规则原样复制
+function duplicateDialog(src, onDone) {
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const d = document.createElement('form'); d.className = 'dialog dup'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+  const what = ['标题', src.target_url && '推广地址', src.rules && `${src.rules} 条地区规则`, '有效期等设置'].filter(Boolean).join('、');
+  d.innerHTML = `<h3>复制短链</h3>
+    <p>复制 <b class="mono">/${esc(src.slug)}</b> 的${esc(what)}，生成一个新短链。访问记录不会复制。</p>
+    <div class="field"><label for="dup-s">新短链后缀</label>
+      <div class="pre"><span>${esc(HOST)}/</span><input class="input" id="dup-s" name="slug" placeholder="留空自动生成" autocomplete="off" spellcheck="false"></div>
+      <div class="err" id="dup-e" hidden></div></div>
+    <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary" data-ok>${ic('dup', 15)}复制</button></div>`;
+  const inp = d.querySelector('#dup-s'), err = d.querySelector('#dup-e'), ok = d.querySelector('[data-ok]');
+  const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  ov.onclick = close;
+  d.querySelector('[data-no]').onclick = close;
+  inp.oninput = () => { err.hidden = true; inp.classList.remove('bad'); };
+  d.onsubmit = async (e) => {
+    e.preventDefault();
+    ok.disabled = true;
+    try {
+      const link = await api(`/links/${src.id}/duplicate`, { method: 'POST', body: { slug: inp.value.trim() } });
+      close();
+      toast(`已复制为 /${link.slug}`);
+      onDone(link);
+    } catch (e2) {
+      err.textContent = e2.message; err.hidden = false; inp.classList.add('bad'); inp.focus();
+    } finally { ok.disabled = false; }
+  };
+  document.addEventListener('keydown', onKey);
+  document.body.append(ov, d);
+  inp.value = src.slug + '-2'; inp.focus(); inp.select();
 }
 
 // 在任意元素上用 data-copy 即可复制
@@ -1725,6 +1765,7 @@ async function renderLinks(token, opts = {}) {
       <div class="c-status">${statusPill(l)}</div>
       <div class="acts">
         ${copyBtn(shortUrl(l.slug))}
+        <button class="btn ghost icon" title="复制短链" data-dup="${l.id}">${ic('dup')}</button>
         <button class="btn ghost icon" title="编辑" data-edit="${l.id}">${ic('edit')}</button>
         <a class="btn ghost icon" title="访问统计" href="#/link/${l.id}">${ic('chart')}</a>
       </div>
@@ -1743,6 +1784,13 @@ async function renderLinks(token, opts = {}) {
   body.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = (e) => {
     e.stopPropagation();
     openDrawer(d.items.find((l) => l.id == b.dataset.edit), () => renderLinks(routeToken));
+  }));
+  body.querySelectorAll('[data-dup]').forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    duplicateDialog(d.items.find((l) => l.id == b.dataset.dup), (link) => {
+      listState.flash = link.id; listState.page = 1;
+      renderLinks(routeToken);
+    });
   }));
   const prev = document.getElementById('prev'), next = document.getElementById('next');
   if (prev) prev.onclick = () => { listState.page--; renderLinks(routeToken); };

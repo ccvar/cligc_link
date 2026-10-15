@@ -299,6 +299,9 @@ async function handleApi(request, env, url) {
     if (tid && method === 'DELETE') return deleteTarget(env, linkId, tid);
   }
 
+  const dup = path.match(/^\/api\/links\/(\d+)\/duplicate$/);
+  if (dup && method === 'POST') return duplicateLink(request, env, Number(dup[1]));
+
   const m = path.match(/^\/api\/links\/(\d+)(?:\/(stats|clicks|export))?$/);
   if (m) {
     const id = Number(m[1]);
@@ -663,6 +666,27 @@ async function createLink(request, env) {
     data.slug, data.target_url || '', data.title || '', data.note || '',
     data.enabled ?? 1, data.pass_query ?? 0, data.expires_at ?? null, now, now
   ).first();
+  return json(row, 201);
+}
+
+// 复制短链：标题、推广地址、设置和地区规则都带过去，访问记录不复制
+async function duplicateLink(request, env, id) {
+  const src = await env.DB.prepare('SELECT * FROM links WHERE id = ?').bind(id).first();
+  if (!src) return json({ error: '短链不存在' }, 404);
+  const body = await request.json().catch(() => ({}));
+  const slug = String(body.slug || '').trim() || await uniqueSlug(env);
+  const { error, data } = await validateLinkInput({ slug }, env);
+  if (error) return json({ error }, 400);
+
+  const now = Date.now();
+  const row = await env.DB.prepare(
+    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, expires_at, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?) RETURNING *`
+  ).bind(data.slug, src.target_url, src.title, src.note, src.enabled, src.pass_query, src.expires_at, now, now).first();
+  await env.DB.prepare(
+    `INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at)
+     SELECT ?, countries, url, note, fallback, ?, ? FROM link_targets WHERE link_id = ? ORDER BY id`
+  ).bind(row.id, now, now, id).run();
   return json(row, 201);
 }
 
