@@ -1137,10 +1137,14 @@ async function overview(env, url) {
   const out = { links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds };
   if (linkId) {
     // 单个短链：附带短链信息和各跳转去向（地区规则 / 默认地址）的命中数
-    const [link, hits] = await Promise.all([
+    const top = (col) => all(q(`SELECT ${col} AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY ${col} ORDER BY n DESC LIMIT 20`, since));
+    const [link, hits, srcAll, refererHosts, utmSources, campaigns] = await Promise.all([
       env.DB.prepare('SELECT id, slug, title, target_url, last_click, enabled, expires_at FROM links WHERE id = ?').bind(linkId).first(),
       all(q(`SELECT rule_id AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY rule_id`, since)),
+      top('source'), top('referer_host'), top('utm_source'), top('utm_campaign'),
     ]);
+    // 单个短链：来源的完整统计（与详情页一致）
+    Object.assign(out, { sources: srcAll, refererHosts, utmSources, campaigns });
     if (!link) return json({ error: '短链不存在' }, 404);
     const targets = await loadTargets(env, linkId);
     const n = new Map(hits.map((h) => [h.k, h.n]));
