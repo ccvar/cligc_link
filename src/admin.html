@@ -694,6 +694,19 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .use-h { flex-wrap: wrap; }
 .use-why { min-width: 0; }
 .use-lv { font-weight: 650; }
+.use-sum { display: inline-flex; align-items: center; gap: 14px; white-space: nowrap; }
+.us-i { display: inline-flex; align-items: center; gap: 6px; }
+.us-i em { font-style: normal; color: var(--muted); font-size: 12px; }
+.us-i .us-p { color: var(--text-2); font-variant-numeric: tabular-nums; min-width: 28px; }
+.us-b { position: relative; width: 64px; height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
+.us-b s, .us-b u { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; text-decoration: none; }
+.us-b.ok s { background: color-mix(in srgb, var(--good) 28%, transparent); } .us-b.ok u { background: var(--good); }
+.us-b.warn s { background: color-mix(in srgb, var(--amber) 30%, transparent); } .us-b.warn u { background: var(--amber); }
+.us-b.bad s { background: color-mix(in srgb, var(--bad) 28%, transparent); } .us-b.bad u { background: var(--bad); }
+@media (max-width: 640px) {
+  .acc-t .sub[data-sub="use"] { display: block; }
+  .use-sum { gap: 7px; } .us-b { width: 24px; } .us-i { gap: 3px; } .us-i .us-p { min-width: 0; }
+}
 .use-lv.ok { color: var(--good); } .use-lv.warn { color: var(--warn); } .use-lv.bad { color: var(--bad); }
 .use-why span { cursor: default; border-bottom: 1px dashed var(--line); }
 /* 设置页折叠卡片：键盘聚焦时用卡片描边提示，不再在标题外再套一圈粗框 */
@@ -3165,8 +3178,14 @@ function usageSummary(u) {
   if (!h) return '暂无数据';
   const label = { ok: '充足', warn: '偏紧', bad: '将超出' }[h.level];
   const tip = h.level === 'bad' ? (h.paid ? '，超出部分按量计费' : '，超出后当天请求会失败') : '';
-  return `<b class="use-lv ${h.level}">${label}</b> · ${h.paid ? '本月' : '今天'}已用 ${h.items.map((x) => `${x.name} ${pctText(x.used)}`).join('、')}`
-    + ` · 按目前速度${h.paid ? '月底' : '今天结束时'}最高约 ${pctText(h.worst.proj)}（${h.worst.name}）${tip}`;
+  const sentence = `${label}：${h.paid ? '本月' : '今天'}已用 ${h.items.map((x) => `${x.name} ${pctText(x.used)}`).join('、')}，`
+    + `按目前速度${h.paid ? '月底' : '今天结束时'}${h.items.map((x) => `${x.name}约 ${pctText(x.proj)}`).join('、')}${tip}`;
+  // 每项一个小进度条：实色为已用，浅色为按目前速度推算到期末
+  const bar = (x) => {
+    const lv = x.proj >= 1 ? 'bad' : x.proj >= 0.8 ? 'warn' : 'ok';
+    return `<span class="us-i"><em>${x.name}</em><i class="us-b ${lv}"><s style="width:${Math.min(100, x.proj * 100)}%"></s><u style="width:${Math.max(x.used ? 2 : 0, Math.min(100, x.used * 100))}%"></u></i><em class="us-p">${pctText(x.used)}</em></span>`;
+  };
+  return `<span class="use-sum" data-tipf-always data-tipf="${esc(sentence)}"><b class="use-lv ${h.level}">${label}</b>${h.items.map(bar).join('')}</span>`;
 }
 
 function renderUsage(box, u, onState) {
