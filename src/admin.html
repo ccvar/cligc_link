@@ -480,6 +480,17 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .tl .bar { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
 .tl .bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); transform-origin: left; animation: grow .9s var(--ease-out) both; animation-delay: calc(var(--j, 0) * 50ms + 150ms); }
 .tl .pc { color: var(--muted); font-size: 11.5px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+/* 概览热门短链：单行紧凑排版（后缀 + 标题、进度条 + 占比各占一行内） */
+#home .tl a.tr { padding-top: 9px; padding-bottom: 9px; }
+#home .tl a.tr > div:nth-child(2) { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+#home .tl a.tr .sl { flex: none; max-width: 55%; }
+#home .tl a.tr .st { flex: 1; min-width: 0; }
+#home .tl .c-bar { display: flex; align-items: center; gap: 8px; }
+#home .tl .c-bar .bar { flex: 1; }
+#home .tl .c-bar .pc { margin-top: 0; width: 30px; text-align: right; flex: none; }
+#home .tl .tr.th .c-bar { display: block; }
+/* 来源表头与左侧热门短链表头对齐 */
+#c-src .card-b { padding-top: 12px; }
 .tl .n { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
 .tl .u { text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .tl .t { text-align: right; color: var(--muted); font-size: 12px; white-space: nowrap; }
