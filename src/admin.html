@@ -248,6 +248,48 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .kpi .meter { height: 6px; border-radius: 3px; background: var(--sunken); margin-top: auto; overflow: hidden; }
 .kpi .meter i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--violet)); transform-origin: left; animation: grow 1s var(--ease-out) both .2s; }
 @media (max-width: 480px) { .kpi { padding: 14px 14px 12px; } .kpi .v { font-size: 26px; } .kpi .ks { margin: auto -14px -12px; } }
+/* 概览：紧凑数据条 */
+#home { gap: 16px; }
+#home .g-main, #home .g3 { gap: 16px; }
+.kstrip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); overflow: hidden; }
+.kc { padding: 14px 18px 13px; min-width: 0; }
+.kc + .kc { border-left: 1px solid var(--line-2); }
+.kc-h { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 22px; }
+.kc-h .l { color: var(--text-2); font-size: 12.5px; font-weight: 500; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.kc-h .l .dot { width: 7px; height: 7px; border-radius: 2px; }
+.kc-h .delta { height: 20px; padding: 0 6px; font-size: 11.5px; }
+.kc-v { display: flex; align-items: flex-end; gap: 6px; margin-top: 6px; min-height: 32px; }
+.kc-v b { font-size: 26px; line-height: 1.1; font-weight: 680; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kc-v small { font-size: 12.5px; color: var(--muted); font-weight: 500; white-space: nowrap; padding-bottom: 3px; }
+.kc-sp { flex: 1; min-width: 36px; height: 30px; margin-left: 8px; }
+.kc-sp svg { display: block; width: 100%; height: 100%; }
+.kc-d { margin-top: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kc-a { font-size: 12px; color: var(--accent-ink); font-weight: 550; white-space: nowrap; }
+.kc-m { height: 4px; border-radius: 2px; background: var(--sunken); margin-top: 12px; overflow: hidden; }
+.kc-m i { display: block; height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--violet)); transform-origin: left; animation: grow 1s var(--ease-out) both .2s; }
+@media (max-width: 1280px) {
+  .kstrip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kc:nth-child(3n+1) { border-left: 0; }
+  .kc:nth-child(n+4) { border-top: 1px solid var(--line-2); }
+}
+@media (max-width: 640px) {
+  .kstrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kc + .kc { border-left: 0; }
+  .kc:nth-child(even) { border-left: 1px solid var(--line-2); }
+  .kc:nth-child(n+3) { border-top: 1px solid var(--line-2); }
+  .kc { padding: 12px 14px; }
+  .kc-v b { font-size: 22px; }
+}
+.chart.sm { height: 228px; }
+#home .g-main.top > .card:first-child { display: flex; flex-direction: column; }
+#home .g-main.top > .card:first-child .card-b { flex: 1; display: flex; flex-direction: column; }
+#home .g-main.top .chart.sm { flex: 1; max-height: 300px; }
+.home-feed .feed { max-height: none; -webkit-mask-image: none; mask-image: none; padding-bottom: 6px; overflow: visible; }
+.feed-more { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 0 20px 14px; height: 32px; border: 0; border-radius: 9px; background: var(--sunken);
+  color: var(--text-2); font-size: 12.5px; cursor: pointer; transition: background .15s, color .15s; }
+.feed-more:hover { color: var(--text); background: color-mix(in srgb, var(--sunken) 70%, var(--line)); }
+.feed-more svg { transition: transform .25s var(--ease-out); }
+.feed-more.open svg { transform: rotate(180deg); }
 .delta { display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 7px; border-radius: 999px; font-weight: 600; font-size: 12px; background: var(--sunken); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .delta svg { width: 12px; height: 12px; stroke-width: 2.4; }
 .delta.up { color: var(--good); background: var(--good-bg); }
@@ -1487,14 +1529,15 @@ function feedItems(items, newIds = new Set()) {
       <time datetime="${new Date(r.ts).toISOString()}" data-ts="${r.ts}">${ago(r.ts)}</time></a>`).join('');
 }
 
+const FEED_N = 4;
 async function renderHome(token) {
   const now = new Date();
   shell('home', `<header class="ph">
       <div><h1 class="h1-meta">概览<span>${now.getMonth() + 1} 月 ${now.getDate()} 日 ${WEEK[now.getDay()]} · ${greet()}</span></h1></div>
       <span class="sp"></span>${rangeBar()}</header>
     <div class="stack" id="home">
-      <div class="kpis">${skel(168, 4)}</div>
-      <div class="g-main">${skel(380, 2)}</div>
+      ${skel(112)}
+      <div class="g-main">${skel(316, 2)}</div>
     </div>`);
   bindRange(route);
   const d = await api('/overview?' + rangeQs());
@@ -1516,45 +1559,48 @@ async function renderHome(token) {
   const prevAvg = d.prev.total / state.days;
   const topSum = d.topLinks.reduce((a, b) => a + b.n, 0) || 1;
   root.innerHTML = `
-    <div class="kpis">
-      <section class="card kpi rv">
-        <div class="kh"><span class="l"><i class="dot" style="background:var(--accent)"></i>访问次数</span>${delta(d.totals.total, d.prev.total)}</div>
-        <div class="v" data-count="${d.totals.total}">0</div>
-        <div class="d">上一个 ${rangeLabel()}：${num(d.prev.total)}</div>
-        <div class="ks">${kpiSpark(series.map((x) => x.n), 'var(--accent)')}</div>
-      </section>
-      <section class="card kpi rv">
-        <div class="kh"><span class="l"><i class="dot" style="background:var(--violet)"></i>独立访客</span>${delta(d.totals.unique_ips, d.prev.unique_ips)}</div>
-        <div class="v" data-count="${d.totals.unique_ips}">0</div>
-        <div class="d">按 IP 去重 · 人均 ${(d.totals.total / Math.max(1, d.totals.unique_ips)).toFixed(1)} 次</div>
-        <div class="ks">${kpiSpark(series.map((x) => x.u), 'var(--violet)')}</div>
-      </section>
-      <section class="card kpi rv">
-        <div class="kh"><span class="l">今日访问</span>${delta(d.today, d.yesterday)}</div>
-        <div class="v" data-count="${d.today}">0</div>
-        <div class="d">昨日同时段：${num(d.yesterday)}</div>
-        <div class="sep"></div>
-        <div class="kh"><span class="l">日均访问</span>${delta(avg, prevAvg)}</div>
-        <div class="v sm" style="margin-top:6px">${num(avg)}<small>次 / 天</small></div>
-      </section>
-      <section class="card kpi rv">
-        <div class="kh"><span class="l">活跃短链</span></div>
-        <div class="v"><span data-count="${d.activeLinks}">0</span><small>/ ${num(d.links)}</small></div>
-        <div class="d">最近 ${rangeLabel()} 内有访问</div>
-        <div style="height:18px"></div>
-        <div class="meter"><i style="width:${Math.round((d.activeLinks / Math.max(1, d.links)) * 100)}%"></i></div>
-        <div class="d" style="margin-top:12px;display:flex;justify-content:space-between"><span>${Math.round((d.activeLinks / Math.max(1, d.links)) * 100)}% 活跃</span><a href="#/links" style="color:var(--accent-ink);font-weight:550">管理短链 →</a></div>
-      </section>
-    </div>
+    <section class="card kstrip rv">
+      <div class="kc">
+        <div class="kc-h"><span class="l"><i class="dot" style="background:var(--accent)"></i>访问次数</span>${delta(d.totals.total, d.prev.total)}</div>
+        <div class="kc-v"><b data-count="${d.totals.total}">0</b><span class="kc-sp">${kpiSpark(series.map((x) => x.n), 'var(--accent)')}</span></div>
+        <div class="kc-d">上一个 ${rangeLabel()}：${num(d.prev.total)}</div>
+      </div>
+      <div class="kc">
+        <div class="kc-h"><span class="l"><i class="dot" style="background:var(--violet)"></i>独立访客</span>${delta(d.totals.unique_ips, d.prev.unique_ips)}</div>
+        <div class="kc-v"><b data-count="${d.totals.unique_ips}">0</b><span class="kc-sp">${kpiSpark(series.map((x) => x.u), 'var(--violet)')}</span></div>
+        <div class="kc-d">按 IP 去重</div>
+      </div>
+      <div class="kc">
+        <div class="kc-h"><span class="l">今日访问</span>${delta(d.today, d.yesterday)}</div>
+        <div class="kc-v"><b data-count="${d.today}">0</b></div>
+        <div class="kc-d">昨日同时段：${num(d.yesterday)}</div>
+      </div>
+      <div class="kc">
+        <div class="kc-h"><span class="l">日均访问</span>${delta(avg, prevAvg)}</div>
+        <div class="kc-v"><b>${num(avg)}</b><small>次 / 天</small></div>
+        <div class="kc-d">最近 ${rangeLabel()}</div>
+      </div>
+      <div class="kc">
+        <div class="kc-h"><span class="l">人均访问</span></div>
+        <div class="kc-v"><b>${(d.totals.total / Math.max(1, d.totals.unique_ips)).toFixed(1)}</b><small>次 / 访客</small></div>
+        <div class="kc-d">访问次数 ÷ 独立访客</div>
+      </div>
+      <div class="kc">
+        <div class="kc-h"><span class="l">活跃短链</span><a href="#/links" class="kc-a">管理 →</a></div>
+        <div class="kc-v"><b data-count="${d.activeLinks}">0</b><small>/ ${num(d.links)}</small></div>
+        <div class="kc-m"><i style="width:${Math.round((d.activeLinks / Math.max(1, d.links)) * 100)}%"></i></div>
+      </div>
+    </section>
 
-    <div class="g-main">
+    <div class="g-main top">
       <section class="card rv">
         <div class="card-h"><h3>访问趋势</h3><span class="sp"></span><div class="legend" id="lg"></div></div>
-        <div class="card-b"><div class="chart" id="ch-home"></div></div>
+        <div class="card-b"><div class="chart sm" id="ch-home"></div></div>
       </section>
-      <section class="card rv feed-card">
+      <section class="card rv home-feed">
         <div class="card-h"><h3>实时访问</h3><span class="sp"></span><span class="live">实时</span></div>
-        <div class="feed" id="feed">${feedItems(d.recent)}</div>
+        <div class="feed" id="feed">${feedItems(d.recent.slice(0, FEED_N))}</div>
+        ${d.recent.length > FEED_N ? `<button type="button" class="feed-more" id="feed-more">查看更多 ${ic('chev', 14)}</button>` : ''}
       </section>
     </div>
 
@@ -1570,7 +1616,7 @@ async function renderHome(token) {
               <span class="n">${num(l.n)}</span><span class="u">${num(l.u)}</span><span class="t">${ago(l.last)}</span></a>`).join('')}</div>`
           : `<div class="empty">${ic('inbox')}该时间段内暂无访问</div>`}
       </section>
-      ${tabCard('c-src', '来源站点', [{ label: '来源', html: rankList(d.sources, { head: ['来源', '访问'] }) }], 'rv')}
+      ${tabCard('c-src', '来源 Top 6', [{ label: '来源', html: rankList(d.sources.slice(0, 6), { head: ['来源', '访问'] }) }], 'rv')}
     </div>
 
     <div class="g3">
@@ -1586,7 +1632,15 @@ async function renderHome(token) {
     { id: 'p', key: 'p', label: `上一个 ${rangeLabel()}`, type: 'dash' },
   ], document.getElementById('lg'));
 
-  // 实时访问：每 30 秒刷新，新出现的记录高亮
+  // 实时访问：默认显示 5 条，可展开；每 30 秒刷新，新出现的记录高亮
+  let feedAll = false, latest = d.recent;
+  const more = document.getElementById('feed-more');
+  if (more) more.onclick = () => {
+    feedAll = !feedAll;
+    document.getElementById('feed').innerHTML = feedItems(latest.slice(0, feedAll ? latest.length : FEED_N));
+    more.classList.toggle('open', feedAll);
+    more.firstChild.textContent = feedAll ? '收起 ' : '查看更多 ';
+  };
   let seen = new Set(d.recent.map((r) => r.id));
   clearInterval(liveTimer);
   liveTimer = setInterval(async () => {
@@ -1596,7 +1650,8 @@ async function renderHome(token) {
       const { items } = await api('/recent?bots=' + (state.bots ? 1 : 0));
       const fresh = new Set(items.filter((r) => !seen.has(r.id)).map((r) => r.id));
       seen = new Set(items.map((r) => r.id));
-      feed.innerHTML = feedItems(items, fresh);
+      latest = items;
+      feed.innerHTML = feedItems(items.slice(0, feedAll ? items.length : FEED_N), fresh);
     } catch {}
   }, 30000);
 }
