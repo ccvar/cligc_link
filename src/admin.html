@@ -565,6 +565,20 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .set-list svg { color: var(--good); }
 .chi.pw { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .chi.mfa { background: var(--good-bg); color: var(--good); }
+.chi.trk { background: var(--accent-2); color: var(--accent); }
+.g-set > .wide { grid-column: 1 / -1; }
+.trk-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; font-size: 12.5px; color: var(--muted); }
+.trk-flow > span { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 8px; background: var(--sunken); color: var(--text-2); white-space: nowrap; }
+.trk-flow > span.hl { font-family: var(--mono); background: var(--accent-2); color: var(--accent-ink); }
+.trk-flow > span.hl b { font-weight: 650; }
+.trk .set-list code, .trk-off code { font-family: var(--mono); font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--sunken); }
+.trk-code { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--panel-2); }
+.trk-h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.trk-h .sp { flex: 1; }
+pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--sunken); font: 12px/1.6 var(--mono); color: var(--text); white-space: pre; overflow: auto; max-height: 300px; }
+.trk-code .hint { margin-top: 8px; }
+.trk-off { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 10px; background: var(--sunken); color: var(--text-2); font-size: 13px; }
+@media (max-width: 1100px) { .trk-flow > span.hl { white-space: normal; height: auto; padding: 6px 11px; word-break: break-all; } }
 
 /* 通知设置 */
 .kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -2084,6 +2098,7 @@ async function renderLink(token, id) {
             + (s.refererHosts.some((x) => !x.k) ? `<div class="tipbox sm">${ic('info', 15)}<div><b>为什么有“无 Referer”？</b>
               对方链接加了 <code>rel="noreferrer"</code>、页面设置了不发送来源、从微信等 App 内打开，或从 https 跳到 http 时，浏览器都不会带上来源。
               投放时用“高级设置”里生成的 <code>?src=</code> 链接，就能准确区分来源。</div></div>` : '') },
+          { label: 'utm_source', html: rankList((s.utmSources || []).filter((x) => x.k), { head: ['utm_source', '访问'] }) },
           { label: 'Campaign', html: rankList(campaigns, { head: ['utm_campaign', '访问'] }) },
         ], 'rv')}
         ${tabCard('t-geo', '地区', [
@@ -2470,9 +2485,9 @@ function openRuleDrawer(link, rule) {
 
 // ---------------------------------------------------------------- 设置（修改密码 / 两步验证）
 async function renderSettings(token) {
-  const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码和两步验证</div></div></header>`;
+  const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证和来源追踪</div></div></header>`;
   shell('settings', `${head}<div class="stack">${skel(220, 2)}</div>`);
-  const mfa = await api('/2fa');
+  const [mfa, trk] = await Promise.all([api('/2fa'), api('/tracking')]);
   if (token !== routeToken) return;
   document.getElementById('page').innerHTML = `${head}
     <div class="g-set">
@@ -2499,12 +2514,47 @@ async function renderSettings(token) {
           <button class="btn ${mfa.enabled ? 'danger' : 'primary'}" id="mfa-btn">${ic('shield', 15)}${mfa.enabled ? '关闭两步验证' : '开启两步验证'}</button>
         </div>
       </section>
+      <section class="card rv wide" id="trk"></section>
     </div>`;
   const page = document.getElementById('page');
   reveal(page);
   const pwf = document.getElementById('pwf');
   bindPasswordForm(pwf, '', () => { pwf.reset(); pwf.querySelector('.pwm').dataset.n = ''; pwf.querySelector('#p-tip').textContent = '至少 8 位，建议混合字母、数字和符号'; pwf.querySelector('button.primary').disabled = false; });
   document.getElementById('mfa-btn').onclick = () => openMfaDialog(() => route());
+  renderTracking(document.getElementById('trk'), trk);
+}
+
+// 来源追踪：推广页上放一段代码，把访客来自的搜索引擎带到短链的 utm_source 上
+function renderTracking(card, t) {
+  const tab = store.get('trk:tab', 0);
+  const snippet = [t.script, t.code];
+  card.innerHTML = `
+    <div class="card-h"><span class="chi trk">${ic('search', 17)}</span><h3>来源追踪</h3><span class="sub hide-m">访客从搜索引擎进入你的推广页，再点短链时，也能知道是哪个搜索引擎</span>
+      <span class="sp"></span><label class="switch" aria-label="开启来源追踪"><input type="checkbox" id="trk-on" ${t.enabled ? 'checked' : ''}><span class="t"></span></label></div>
+    <div class="card-b trk">
+      <div class="trk-flow"><span>${ic('search', 14)}Google / 百度…</span>${ic('arrow', 14)}<span>${ic('globe', 14)}你的推广页</span>${ic('arrow', 14)}<span class="hl">${ic('link', 14)}${esc(HOST)}/xxx<b>?utm_source=google</b></span></div>
+      <ul class="set-list">
+        <li>${ic('check', 14)}识别 Google、Bing、百度、搜狗、360、神马等搜索引擎，以及 Google / Bing 广告点击</li>
+        <li>${ic('check', 14)}只给指向 ${esc(HOST)} 的链接加 <code>utm_source</code>，不改动已有的 <code>src</code> 和 <code>utm_source</code></li>
+        <li>${ic('check', 14)}记住访客的首次来源，在站内翻几页后再点短链也不会丢</li>
+        <li>${ic('check', 14)}短链详情页“来源 · utm_source”里查看；链接没有 <code>src</code> 时也会直接计入“来源”</li>
+      </ul>
+      ${t.enabled ? `
+      <div class="trk-code">
+        <div class="trk-h"><div class="tabs" id="trk-tabs">${['Script 链接（推荐）', '完整代码'].map((l, i) => `<button type="button" class="${i === tab ? 'on' : ''}">${l}</button>`).join('')}</div>
+          <span class="sp"></span>${copyBtn(snippet[tab], 'btn sm', '复制代码')}</div>
+        <pre class="code" id="trk-pre">${esc(snippet[tab])}</pre>
+        <div class="hint" id="trk-hint">${tab === 0 ? '放到推广页的 &lt;head&gt; 或 &lt;/body&gt; 前。以后升级识别规则，页面不用改。' : '直接粘贴到推广页里，不依赖短链服务加载脚本。关闭本开关不影响已粘贴的代码。'}</div>
+      </div>` : `<div class="trk-off">${ic('info', 15)}开启后显示安装代码。关闭时，Script 链接不再生效。</div>`}
+    </div>`;
+  card.querySelector('#trk-on').onchange = async (e) => {
+    try {
+      const d = await api('/tracking', { method: 'PUT', body: { enabled: e.target.checked } });
+      toast(d.enabled ? '来源追踪已开启' : '来源追踪已关闭');
+      renderTracking(card, d);
+    } catch (err) { e.target.checked = !e.target.checked; toast(err.message, 'bad'); }
+  };
+  card.querySelectorAll('#trk-tabs button').forEach((b, i) => (b.onclick = () => { store.set('trk:tab', i); renderTracking(card, t); }));
 }
 
 // ---------------------------------------------------------------- 通知

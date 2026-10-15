@@ -33,6 +33,7 @@ export default {
         });
       }
       if (path === '/_fb' && request.method === 'POST') return await recordFallback(request, env);
+      if (path === '/t.js') return await trackerScript(env, url);
       if (path === '/robots.txt') {
         return new Response('User-agent: *\nDisallow: /\n', { headers: { 'content-type': 'text/plain' } });
       }
@@ -276,6 +277,12 @@ async function handleApi(request, env, url) {
     const kind = KIND_NAME[url.searchParams.get('kind')] ? url.searchParams.get('kind') : 'daily';
     const report = await buildReport(env, { ...(await getNotify(env)), base: url.origin }, kind, Date.now());
     return new Response(report.html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  }
+  if (path === '/api/tracking' && method === 'GET') return json(await trackingInfo(env, url));
+  if (path === '/api/tracking' && method === 'PUT') {
+    const body = await request.json().catch(() => ({}));
+    await setSetting(env, 'tracking', body.enabled ? '1' : '0');
+    return json(await trackingInfo(env, url));
   }
   if (path === '/api/2fa' && method === 'GET') return json({ enabled: !!cred.totp, since: cred.totp?.at || null });
   if (path === '/api/2fa/setup' && method === 'POST') return totpSetup(request, env, cred);
@@ -551,6 +558,69 @@ async function setSetting(env, key, value) {
     `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
   ).bind(key, value, Date.now()).run();
+}
+
+// ---------------------------------------------------------------- 来源追踪代码
+// 放在推广页面上：识别访客从哪个搜索引擎 / 广告进来，给指向短链的链接加上 utm_source。
+// 不改动链接上已有的 src 和 utm_source。
+
+function trackerCode(host) {
+  return `(function () {
+  var HOST = ${JSON.stringify(host)}, KEY = 'cligc_utm';
+  // 搜索引擎域名关键字 → 来源名
+  var ENGINES = [['google', 'google'], ['bing', 'bing'], ['baidu', 'baidu'], ['sogou', 'sogou'], ['so.com', '360'], ['sm.cn', 'shenma'],
+    ['yahoo', 'yahoo'], ['duckduckgo', 'duckduckgo'], ['yandex', 'yandex'], ['naver', 'naver'], ['ecosia', 'ecosia'], ['brave', 'brave']];
+  var src = '';
+  try {
+    var q = new URLSearchParams(location.search);
+    src = q.get('utm_source') || (q.get('gclid') ? 'google-ads' : q.get('msclkid') ? 'bing-ads' : '');
+    if (!src && document.referrer) {
+      var h = '.' + new URL(document.referrer).hostname + '.';
+      for (var i = 0; i < ENGINES.length; i++) if (h.indexOf('.' + ENGINES[i][0] + '.') > -1) { src = ENGINES[i][1]; break; }
+    }
+    // 记住首次来源，访客在站内翻页后再点短链也不会丢
+    if (src) sessionStorage.setItem(KEY, src); else src = sessionStorage.getItem(KEY) || '';
+  } catch (e) {}
+  if (!src) return;
+  function tag(a) {
+    try {
+      var u = new URL(a.href);
+      if (u.hostname !== HOST || u.searchParams.has('utm_source')) return;
+      u.searchParams.set('utm_source', src);
+      a.href = u.toString();
+    } catch (e) {}
+  }
+  function all() { var l = document.querySelectorAll('a[href]'); for (var i = 0; i < l.length; i++) tag(l[i]); }
+  // 页面加载后处理一遍；之后动态插入的链接在点击时处理
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all); else all();
+  ['mousedown', 'touchstart', 'click', 'auxclick'].forEach(function (t) {
+    document.addEventListener(t, function (e) { var a = e.target.closest && e.target.closest('a[href]'); if (a) tag(a); }, true);
+  });
+})();`;
+}
+
+async function trackingEnabled(env) {
+  return (await getSetting(env, 'tracking'))?.value === '1';
+}
+
+async function trackingInfo(env, url) {
+  const host = url.hostname;
+  return {
+    enabled: await trackingEnabled(env),
+    script: `<script src="${url.origin}/t.js" async></script>`,
+    code: `<script>\n${trackerCode(host)}\n</script>`,
+  };
+}
+
+async function trackerScript(env, url) {
+  const on = await trackingEnabled(env);
+  return new Response(on ? trackerCode(url.hostname) : '/* cligc link: 来源追踪未开启 */', {
+    headers: {
+      'content-type': 'application/javascript; charset=utf-8',
+      'cache-control': on ? 'public, max-age=3600' : 'public, max-age=300',
+      'access-control-allow-origin': '*',
+    },
+  });
 }
 
 // PBKDF2-SHA256 加盐哈希（Workers 上限为 10 万次迭代）
@@ -860,7 +930,7 @@ async function linkStats(env, id, url) {
     env.DB.prepare(`SELECT ${col} AS k, COUNT(*) AS n ${base} GROUP BY ${col} ORDER BY n DESC LIMIT ${limit}`)
       .bind(id, since).all().then((r) => r.results);
 
-  const [summary, prev, daily, prevDaily, hourly, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, targets] =
+  const [summary, prev, daily, prevDaily, hourly, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, targets, utmSources] =
     await Promise.all([
       env.DB.prepare(`SELECT COUNT(*) AS total, COUNT(DISTINCT ip) AS unique_ips ${base}`).bind(id, since).first(),
       env.DB.prepare(
@@ -879,10 +949,10 @@ async function linkStats(env, id, url) {
          ${base} GROUP BY k ORDER BY k`
       ).bind(id, since, tz).all().then((r) => r.results),
       top('source', 20), top('referer_host', 20), top('country'), top('city'),
-      top('device'), top('browser'), top('os'), top('utm_campaign'), top('rule_id', 50),
+      top('device'), top('browser'), top('os'), top('utm_campaign'), top('rule_id', 50), top('utm_source', 20),
     ]);
 
-  return json({ summary, prev, daily, prevDaily, hourly, targets, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns });
+  return json({ summary, prev, daily, prevDaily, hourly, targets, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, utmSources });
 }
 
 async function linkClicks(env, id, url) {
