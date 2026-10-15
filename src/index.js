@@ -95,7 +95,7 @@ async function migrate(env) {
 }
 
 // 按已有的 IP、运营商、User-Agent、语言补算旧访问记录的访客类型（每次最多处理 2 万条，下次启动继续）
-const KIND_VER = '2';
+const KIND_VER = '3';
 async function backfillKinds(env) {
   // 已判为爬虫 / 可疑的不再改动（新规则只会多识别，不会少识别）
   const rows = (await env.DB.prepare(
@@ -308,6 +308,11 @@ function classifyVisit({ ua, hasLang, asnOrg, asn, recent, secFetch, tls, http }
     if ((chrome && +chrome[1] >= 80 && !/crios/.test(s)) || (ff && +ff[1] >= 90 && !/fxios/.test(s))) weak.push('自称新版浏览器，却缺少浏览器请求头');
   }
   if (/^HTTP\/1/.test(http || '')) weak.push(`使用 ${http}`);
+  // 自称很旧的系统 / 浏览器版本：真实设备很少停留在这些版本，脚本却常拿来伪装
+  const ios = /iphone os (\d+)[_.](\d+)(?:[_.](\d+))?/.exec(s);
+  const cr = !/edg|opr|samsung/.test(s) && /chrome\/(\d+)/.exec(s);
+  if (ios && +ios[1] < 15) weak.push(`自称旧版系统 iOS ${ios.slice(1).filter(Boolean).join('.')}`);
+  else if (cr && +cr[1] < 100) weak.push(`自称旧版浏览器 Chrome ${cr[1]}`);
   if (strong.length || weak.length >= 2) return { kind: 'suspect', reason: [...strong, ...weak].join('；') };
   return { kind: 'human', reason: weak.join('；') };
 }

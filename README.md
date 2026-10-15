@@ -195,7 +195,7 @@ Bot Token、API Key 保存在 D1 中，后台只显示末 4 位。
 每次访问都会被标记为 **真人**、**爬虫** 或 **可疑**，并记录判定原因：
 
 - **爬虫**：User-Agent 自报身份，如 Googlebot、百度蜘蛛、微信 / Telegram 链接预览、curl、Python 脚本。
-- **可疑**：命中任一强信号——机房 IP（按 ASN 和运营商名称识别 AWS、Google Cloud、Azure、阿里云、腾讯云、华为云、火山引擎、DigitalOcean、Hetzner 等云厂商；微信等 App 的链接安全检测通常来自这些机房）、没有 Accept-Language、同一 IP 1 分钟内访问同一短链 5 次以上、TLS 1.0/1.1；或同时命中两个弱信号——自称新版 Chrome / Firefox 却缺少 `Sec-Fetch-*` 请求头、使用 HTTP/1.x。
+- **可疑**：命中任一强信号——机房 IP（按 ASN 和运营商名称识别 AWS、Google Cloud、Azure、阿里云、腾讯云、华为云、火山引擎、DigitalOcean、Hetzner 等云厂商；微信等 App 的链接安全检测通常来自这些机房）、没有 Accept-Language、同一 IP 1 分钟内访问同一短链 5 次以上、TLS 1.0/1.1；或同时命中两个弱信号——自称新版 Chrome / Firefox 却缺少 `Sec-Fetch-*` 请求头、使用 HTTP/1.x、自称很旧的系统或浏览器版本（如 iOS 13、Chrome 100 以下）。
 - Cloudflare 和 Akamai 的 IP 不算机房：iCloud 私密中继和 WARP 的真人用户也走它们。
 
 后台顶部“含机器访问”关闭时，统计和报告只算真人；概览显示真人占比，短链详情页“设备 · 访客类型”显示构成和原因，访问明细里爬虫 / 可疑访问带标签（鼠标停留查看原因）。升级后会按已有的 IP、运营商、User-Agent 自动补算旧记录。
