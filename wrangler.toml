@@ -22,6 +22,8 @@ HOME_URL = ""
 ADMIN_HOST = ""
 # 后台登录页的 Cloudflare Turnstile 站点密钥（公开值）；留空则不启用人机验证
 TURNSTILE_SITEKEY = ""
+# Cloudflare 账号 ID（后台“设置 → Cloudflare 用量”使用）；还需用 `wrangler secret put CF_API_TOKEN` 设置只读 API 令牌
+CF_ACCOUNT_ID = ""
 
 # D1 数据库：执行 `npx wrangler d1 create cligc-link`，把输出的 database_id 填到下面
 # 表结构会在首次请求时自动创建，无需手动初始化

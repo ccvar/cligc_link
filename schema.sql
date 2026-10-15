@@ -93,3 +93,12 @@ CREATE TABLE IF NOT EXISTS agg_uv (
   hll      TEXT NOT NULL,               -- 独立访客 HyperLogLog 寄存器（base64）
   PRIMARY KEY (day, link_id, machine)
 );
+
+-- 登录防暴力破解：按 IP 记录连续失败次数和锁定时间
+CREATE TABLE IF NOT EXISTS login_guard (
+  ip     TEXT PRIMARY KEY,
+  n      INTEGER NOT NULL DEFAULT 0,    -- 当前连续失败次数
+  locks  INTEGER NOT NULL DEFAULT 0,    -- 已被锁定的次数（锁定时长逐次加倍）
+  until  INTEGER NOT NULL DEFAULT 0,    -- 锁定到期时间
+  at     INTEGER NOT NULL DEFAULT 0     -- 最近一次失败时间
+);

@@ -668,6 +668,26 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .chi.pw { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .chi.mfa { background: var(--good-bg); color: var(--good); }
 .chi.trk { background: var(--accent-2); color: var(--accent); }
+.chi.use { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
+.use-steps { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 13px; color: var(--text-2); line-height: 1.7; }
+.use-steps code { font-family: var(--mono); font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--sunken); }
+.use-cmd { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 6px 6px 12px; border-radius: 9px; background: var(--sunken); max-width: 420px; }
+.use-cmd code { background: none; padding: 0; flex: 1; }
+.use-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.use-h .sp { flex: 1; }
+.use-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.use-m { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.use-l { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.use-v { font-size: 22px; font-weight: 680; letter-spacing: -.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.use-s { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.use-bar { height: 5px; border-radius: 3px; background: var(--sunken); margin-top: 8px; overflow: hidden; }
+.use-bar i { display: block; height: 100%; border-radius: 3px; background: var(--good); }
+.use-bar.warn i { background: var(--amber); } .use-bar.bad i { background: var(--bad); }
+.use-t { margin-top: 14px; }
+.use-t td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.use-mini { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
+.use-mini i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+@media (max-width: 760px) { .use-g { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .chi.ret { background: color-mix(in srgb, var(--teal) 14%, transparent); color: var(--teal); }
 .acc { display: grid; gap: 12px; max-width: 880px; }
 .acc-i .fold-h { gap: 14px; padding-top: 18px; padding-bottom: 18px; }
@@ -1102,6 +1122,7 @@ const I = {
   tab: '<rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M11 18h2"/>',
   bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 13h.01M15 13h.01"/>',
   pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   swap: '<path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   route: '<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/>',
@@ -3032,7 +3053,7 @@ function openRuleDrawer(link, rule) {
 async function renderSettings(token) {
   const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证和来源追踪</div></div></header>`;
   shell('settings', `${head}<div class="acc">${skel(76, 3)}</div>`);
-  const [mfa, trk, ret] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention')]);
+  const [mfa, trk, ret, use] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'), api('/usage').catch((e) => ({ configured: true, errors: [e.message], days: [] }))]);
   if (token !== routeToken) return;
   const item = (id, icon, cls, title, sub, status, body) => `
     <section class="card rv fold acc-i" data-acc="${id}">
@@ -3062,6 +3083,7 @@ async function renderSettings(token) {
         </ul>
         <button class="btn ${mfa.enabled ? 'danger' : 'primary'}" id="mfa-btn">${ic('shield', 15)}${mfa.enabled ? '关闭两步验证' : '开启两步验证'}</button>`)}
       ${item('trk', 'search', 'trk', '来源追踪', '识别访客从哪个搜索引擎进入推广页', pill(trk.enabled), '')}
+      ${item('use', 'pulse', 'use', 'Cloudflare 用量', '今天和最近 7 天的 D1 读写、Worker 请求，对比免费额度', usagePill(use), '')}
       ${item('ret', 'inbox', 'ret', '数据保留', '访问明细保存多久；统计数据长期保留', `<span class="pill on">${ret.days ? ret.days + ' 天' : '永久'}</span>`, '')}
     </div>`;
   const page = document.getElementById('page');
@@ -3085,7 +3107,62 @@ async function renderSettings(token) {
   bindPasswordForm(pwf, '', () => { pwf.reset(); pwf.querySelector('.pwm').dataset.n = ''; pwf.querySelector('#p-tip').textContent = '至少 8 位，建议混合字母、数字和符号'; pwf.querySelector('button.primary').disabled = false; });
   document.getElementById('mfa-btn').onclick = () => openMfaDialog(() => route());
   renderTracking(document.getElementById('acc-trk'), trk, (on) => { page.querySelector('[data-st="trk"]').innerHTML = pill(on); });
+  renderUsage(document.getElementById('acc-use'), use, (u) => { page.querySelector('[data-st="use"]').innerHTML = usagePill(u); });
   renderRetention(document.getElementById('acc-ret'), ret, (days) => { page.querySelector('[data-st="ret"]').innerHTML = `<span class="pill on">${days ? days + ' 天' : '永久'}</span>`; });
+}
+
+// ---------------------------------------------------------------- Cloudflare 用量
+const FREE_LIMITS = { rowsRead: 5e6, rowsWritten: 1e5, requests: 1e5, storage: 5e9 };
+const wan = (n) => (n >= 1e8 ? `${+(n / 1e8).toFixed(2)} 亿` : n >= 1e4 ? `${+(n / 1e4).toFixed(1)} 万` : num(n));
+const bytes = (b) => (b >= 1e9 ? `${+(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${+(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
+const usagePill = (u) => !u.configured ? '<span class="pill off">未配置</span>'
+  : u.plan === 'paid' ? '<span class="pill on">付费版</span>' : u.plan === 'free' ? '<span class="pill on">免费版</span>' : '<span class="pill off">套餐未知</span>';
+
+function renderUsage(box, u, onState) {
+  if (!u.configured) {
+    const cmd = 'npx wrangler secret put CF_API_TOKEN';
+    box.innerHTML = `
+      <p class="set-p">在后台查看 Cloudflare 账号的用量，需要一个只读的 API 令牌：</p>
+      <ol class="use-steps">
+        <li>打开 Cloudflare 控制台 → 右上角头像 → <b>我的个人资料 → API 令牌 → 创建令牌 → 创建自定义令牌</b>。</li>
+        <li>权限添加 <b>账户 · Account Analytics · 读取</b>；想显示套餐的话再加 <b>账户 · 账单 · 读取</b>。账户资源选你的账户。</li>
+        <li>在项目目录执行下面的命令，粘贴生成的令牌：<div class="use-cmd"><code>${cmd}</code>${copyBtn(cmd, 'btn sm ghost icon')}</div></li>
+        <li>${u.accountId ? `账号 ID 已配置（<code>${esc(u.accountId)}</code>）` : '在 wrangler.toml 的 <code>[vars]</code> 里填写 <code>CF_ACCOUNT_ID</code>（控制台首页右侧可以找到账户 ID）'}，然后重新部署。</li>
+      </ol>`;
+    return;
+  }
+  const t = (u.days || []).find((d) => d.date === u.today) || { rowsRead: 0, rowsWritten: 0, requests: 0 };
+  const paid = u.plan === 'paid';
+  const meter = (label, v, limit, fmt = wan, unit = '每天') => {
+    const pct = limit ? Math.min(100, (v / limit) * 100) : 0;
+    const lv = pct >= 85 ? 'bad' : pct >= 60 ? 'warn' : 'ok';
+    return `<div class="use-m"><div class="use-l">${label}</div><div class="use-v">${fmt(v)}</div>
+      ${paid ? '<div class="use-s">付费版按月计费，额度很高</div>' : `<div class="use-s">免费版${unit} ${fmt(limit)} · 已用 ${pct < 1 && v ? '<1' : Math.round(pct)}%</div>
+      <div class="use-bar ${lv}"><i style="width:${Math.max(pct, v ? 1 : 0)}%"></i></div>`}</div>`;
+  };
+  const maxDay = Math.max(1, ...(u.days || []).map((d) => d.rowsRead));
+  box.innerHTML = `
+    <div class="use-h"><span class="hint">按 UTC 日期统计，额度每天 UTC 0 点（北京时间 8 点）重置${u.updatedAt ? ` · 更新于 ${fmtTime(u.updatedAt)}` : ''}</span><span class="sp"></span>
+      <button type="button" class="btn sm" id="use-re">${ic('refresh', 14)}刷新</button></div>
+    ${u.errors?.length ? `<div class="bulk-bad">${ic('info', 15)}<div>${u.errors.map(esc).join('<br>')}<br>请检查 API 令牌是否有 Account Analytics 读取权限。</div></div>` : ''}
+    <div class="use-g">
+      ${meter('D1 读取行数（今天）', t.rowsRead, FREE_LIMITS.rowsRead)}
+      ${meter('D1 写入行数（今天）', t.rowsWritten, FREE_LIMITS.rowsWritten)}
+      ${meter('Worker 请求（今天）', t.requests, FREE_LIMITS.requests)}
+      ${meter('D1 存储', u.storageBytes || 0, FREE_LIMITS.storage, bytes, '总共')}
+    </div>
+    ${u.plan === null ? '<div class="hint" style="margin-top:10px">无法读取套餐（令牌没有账单读取权限），按免费版额度对比。</div>' : ''}
+    <table class="tbl use-t"><thead><tr><th>日期（UTC）</th><th>D1 读取</th><th></th><th style="text-align:right">D1 写入</th><th style="text-align:right">Worker 请求</th></tr></thead>
+      <tbody>${(u.days || []).slice().reverse().map((d) => `<tr>
+        <td>${d.date.slice(5)}${d.date === u.today ? ' <span class="sm">今天</span>' : ''}</td>
+        <td class="num">${wan(d.rowsRead)}</td>
+        <td style="width:40%"><div class="use-mini"><i style="width:${(d.rowsRead / maxDay) * 100}%"></i></div></td>
+        <td class="num">${wan(d.rowsWritten)}</td><td class="num">${wan(d.requests)}</td></tr>`).join('')}</tbody></table>`;
+  box.querySelector('#use-re').onclick = async (e) => {
+    e.currentTarget.disabled = true;
+    try { const d = await api('/usage?force=1'); onState(d); renderUsage(box, d, onState); }
+    catch (err) { toast(err.message, 'bad'); e.currentTarget.disabled = false; }
+  };
 }
 
 // 数据保留：访问明细超过期限自动删除；统计读汇总数据，不受影响

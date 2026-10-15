@@ -82,6 +82,7 @@ routes = [
 | `HOME_URL` | 访问根路径 `/` 时跳转到的地址；留空则显示内置的产品首页 |
 | `ADMIN_HOST` | 后台只允许通过这个域名访问；留空则任意域名的 `/admin` 都可访问 |
 | `TURNSTILE_SITEKEY` | Cloudflare Turnstile 站点密钥；留空则登录不做人机验证 |
+| `CF_ACCOUNT_ID` | Cloudflare 账号 ID，用于后台“Cloudflare 用量”；需配合 `CF_API_TOKEN` |
 
 **密钥**（用 `npx wrangler secret put <名称>` 设置）：
 
@@ -90,6 +91,7 @@ routes = [
 | `ADMIN_PASSWORD` | 否 | 初始后台密码。不设置时默认为 `admin`，首次登录强制修改 |
 | `SESSION_SECRET` | 否 | 会话签名密钥。不设置时首次运行自动生成并保存在数据库中 |
 | `TURNSTILE_SECRET` | 否 | Turnstile 服务端密钥，与 `TURNSTILE_SITEKEY` 配套 |
+| `CF_API_TOKEN` | 否 | 只读 API 令牌（Account Analytics: Read），用于后台“Cloudflare 用量” |
 
 ### 管理员密码
 
@@ -100,6 +102,14 @@ routes = [
   ```bash
   npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key = 'admin_password'"
   ```
+
+### 登录防暴力破解
+
+- 同一 IP 连续输错 5 次密码会被锁定，锁定时长从 15 分钟起逐次加倍，最长 24 小时；登录成功后清零。
+- 密码以 PBKDF2（10 万次迭代）加盐哈希保存，每次输错还会延迟 0.8 秒响应。
+- 配置 Turnstile 后，人机验证在核对密码之前进行，自动化脚本无法批量尝试。
+- 开启两步验证后，即使密码泄露也无法登录；动态码连续输错 5 次锁定 15 分钟。
+- 自己被锁定时，可以等待解锁，或执行 `npx wrangler d1 execute cligc-link --remote --command "DELETE FROM login_guard"` 立即解除。
 
 ### 启用 Turnstile（推荐）
 
@@ -243,6 +253,15 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 - 汇总表：`agg_h`（每小时访问次数）、`agg_d`（每天各维度的访问次数：来源、国家、城市、设备、浏览器、系统、规则命中、访客类型等）、`agg_uv`（每天的独立访客，用 HyperLogLog 估算，误差约 4%）。
 - 汇总在统计请求和每小时的定时任务里增量进行，无需手动操作；访客类型规则调整后会自动按保留的明细重建。
 - 在后台“设置 → 数据保留”可以选择访问明细保留 60 / 90 / 180 / 365 天或永久（默认永久）。超过期限的明细由定时任务每小时清理；趋势、来源、地区等统计读汇总数据，不受影响。访问明细列表、导出 CSV 和定时报告只包含仍保留的明细。
+
+### Cloudflare 用量
+
+后台“设置 → Cloudflare 用量”显示今天和最近 7 天的 D1 读写行数、Worker 请求数和 D1 存储，并与免费版额度对比（免费版按账号计算，每天 UTC 0 点重置）。需要：
+
+1. 在 Cloudflare 控制台创建自定义 API 令牌，权限 **账户 · Account Analytics · 读取**（可选 **账户 · 账单 · 读取**，用于显示是否为付费版）。
+2. `npx wrangler secret put CF_API_TOKEN` 填入令牌；在 `wrangler.toml` 的 `[vars]` 里填写 `CF_ACCOUNT_ID`，重新部署。
+
+结果缓存 5 分钟，可手动刷新。
 
 ## 本地开发
 

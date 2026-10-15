@@ -58,6 +58,7 @@ export default {
       await ensureSchema(env);
       await aggregate(env);
       await pruneClicks(env);
+      await env.DB.prepare('DELETE FROM login_guard WHERE at < ? AND until < ?').bind(Date.now() - 7 * DAY, Date.now()).run();
     })().catch((e) => console.error('aggregate / prune failed', e)));
   },
 };
@@ -426,6 +427,7 @@ async function handleApi(request, env, url) {
   if (mustChange) return json({ error: '请先修改默认密码', mustChange: true }, 403);
   if (path === '/api/overview' && method === 'GET') return overview(env, url);
   if (path === '/api/retention' && method === 'GET') return json(await retentionInfo(env));
+  if (path === '/api/usage' && method === 'GET') return json(await cfUsage(env, url.searchParams.get('force') === '1'));
   if (path === '/api/retention' && method === 'PUT') {
     const body = await request.json().catch(() => ({}));
     const days = Number(body.days) || 0;
@@ -467,8 +469,37 @@ async function handleApi(request, env, url) {
   return json({ error: 'not found' }, 404);
 }
 
+// 登录防暴力破解：同一 IP 连续输错 LOGIN_MAX_FAILS 次密码锁定，锁定时长从 15 分钟起逐次加倍（最长 24 小时）
+const LOGIN_MAX_FAILS = 5, LOGIN_LOCK_MS = 15 * 60000, LOGIN_LOCK_MAX = DAY;
+const loginIp = (request) => request.headers.get('cf-connecting-ip') || 'unknown';
+const lockText = (ms) => (ms >= 3600000 ? `${Math.ceil(ms / 3600000)} 小时` : `${Math.ceil(ms / 60000)} 分钟`);
+
+async function loginGuard(env, ip) {
+  const g = await env.DB.prepare('SELECT * FROM login_guard WHERE ip = ?').bind(ip).first();
+  return g && g.until > Date.now() ? g.until - Date.now() : 0;
+}
+
+async function loginFailed(env, ip) {
+  const now = Date.now();
+  const g = (await env.DB.prepare('SELECT * FROM login_guard WHERE ip = ?').bind(ip).first()) || { n: 0, locks: 0, until: 0, at: 0 };
+  // 一小时内没有再输错就重新计数；锁定次数一天后清零
+  let n = now - g.at > 3600000 ? 1 : g.n + 1, locks = now - g.at > DAY ? 0 : g.locks, until = 0;
+  if (n >= LOGIN_MAX_FAILS) {
+    until = now + Math.min(LOGIN_LOCK_MAX, LOGIN_LOCK_MS * 2 ** locks);
+    locks += 1; n = 0;
+  }
+  await env.DB.prepare(
+    `INSERT INTO login_guard (ip, n, locks, until, at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(ip) DO UPDATE SET n = excluded.n, locks = excluded.locks, until = excluded.until, at = excluded.at`
+  ).bind(ip, n, locks, until, now).run();
+  return until ? { locked: until - now } : { left: LOGIN_MAX_FAILS - n };
+}
+
 async function login(request, env) {
   const body = await request.json().catch(() => ({}));
+  const ip = loginIp(request);
+  const locked = await loginGuard(env, ip);
+  if (locked) return json({ error: `密码错误次数过多，请 ${lockText(locked)}后再试` }, 429);
   // 配置了 Turnstile 时，先过人机验证再核对密码，防止暴力破解
   if (env.TURNSTILE_SECRET && !(await verifyTurnstile(env, body.turnstile, request))) {
     return json({ error: '人机验证未通过，请重试', turnstile: true }, 403);
@@ -477,8 +508,10 @@ async function login(request, env) {
   const cred = await credential(env);
   if (!(await cred.verify(String(body.password || ''), secret))) {
     await new Promise((r) => setTimeout(r, 800));
-    return json({ error: '密码错误' }, 401);
+    const f = await loginFailed(env, ip);
+    return json({ error: f.locked ? `密码错误次数过多，已锁定 ${lockText(f.locked)}` : `密码错误（还可尝试 ${f.left} 次）` }, f.locked ? 429 : 401);
   }
+  await env.DB.prepare('DELETE FROM login_guard WHERE ip = ?').bind(ip).run();
   if (cred.totp) {
     const exp = Date.now() + MFA_TICKET_MS;
     return json({ need2fa: true, ticket: `${exp}.${await hmac(secret, `mfa|${exp}|${cred.stamp}`)}` });
@@ -1432,6 +1465,68 @@ async function linkStatsAgg(env, id, { days, tz, bots }) {
     sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, utmSources, kinds,
     reasons: reasonTop(reasons),
   });
+}
+
+// ---------------------------------------------------------------- Cloudflare 用量
+// 需要 CF_ACCOUNT_ID（变量）和 CF_API_TOKEN（密钥，权限 Account Analytics: Read；可选 Billing: Read 用于显示套餐）。
+// 免费版额度按账号计算、每天 UTC 0 点重置；结果缓存 5 分钟。
+async function cfUsage(env, force) {
+  if (!env.CF_API_TOKEN || !env.CF_ACCOUNT_ID) return { configured: false, accountId: env.CF_ACCOUNT_ID || '' };
+  if (!force) {
+    const c = await getSetting(env, 'usage_cache');
+    if (c && c.updated_at > Date.now() - 5 * 60000) return { ...JSON.parse(c.value), cached: true };
+  }
+  const headers = { authorization: `Bearer ${env.CF_API_TOKEN}`, 'content-type': 'application/json' };
+  const today = new Date().toISOString().slice(0, 10);
+  const start = new Date(Date.now() - 6 * DAY).toISOString().slice(0, 10);
+  const gql = async (field, body) => {
+    try {
+      const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          query: `query($a: string!, $s: Date!, $e: Date!) { viewer { accounts(filter: { accountTag: $a }) {
+            ${field}(limit: 1000, filter: { date_geq: $s, date_leq: $e }) { ${body} } } } }`,
+          variables: { a: env.CF_ACCOUNT_ID, s: start, e: today },
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.errors?.length) return { error: d.errors?.[0]?.message || `HTTP ${res.status}` };
+      return { rows: d.data?.viewer?.accounts?.[0]?.[field] || [] };
+    } catch (err) { return { error: String(err.message || err) }; }
+  };
+  const [d1, storage, workers, plan] = await Promise.all([
+    gql('d1AnalyticsAdaptiveGroups', 'sum { readQueries writeQueries rowsRead rowsWritten } dimensions { date }'),
+    gql('d1StorageAdaptiveGroups', 'max { databaseSizeBytes } dimensions { date databaseId }'),
+    gql('workersInvocationsAdaptive', 'sum { requests errors } dimensions { date }'),
+    // 套餐：需要 Billing: Read 权限，没有则显示“未知”
+    fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/subscriptions`, { headers })
+      .then((r) => r.json()).then((d) => {
+        if (!d.success) return null;
+        const subs = d.result || [];
+        return subs.some((x) => /workers/i.test(`${x.rate_plan?.id || ''} ${x.rate_plan?.public_name || ''}`) && x.state !== 'Cancelled') ? 'paid' : 'free';
+      }).catch(() => null),
+  ]);
+  const days = new Map();
+  const day = (date) => {
+    if (!days.has(date)) days.set(date, { date, rowsRead: 0, rowsWritten: 0, readQueries: 0, writeQueries: 0, requests: 0, errors: 0 });
+    return days.get(date);
+  };
+  for (let i = 6; i >= 0; i--) day(new Date(Date.now() - i * DAY).toISOString().slice(0, 10));
+  for (const r of d1.rows || []) Object.entries(r.sum).forEach(([k, v]) => { day(r.dimensions.date)[k] += v || 0; });
+  for (const r of workers.rows || []) { const x = day(r.dimensions.date); x.requests += r.sum.requests || 0; x.errors += r.sum.errors || 0; }
+  // 存储：取最近一天各数据库大小之和
+  const byDate = new Map();
+  for (const r of storage.rows || []) byDate.set(r.dimensions.date, (byDate.get(r.dimensions.date) || 0) + (r.max.databaseSizeBytes || 0));
+  const lastDate = [...byDate.keys()].sort().pop();
+  const out = {
+    configured: true, plan, today,
+    days: [...days.values()].filter((x) => x.date >= start && x.date <= today).sort((a, b) => (a.date < b.date ? -1 : 1)),
+    storageBytes: lastDate ? byDate.get(lastDate) : null,
+    errors: [d1.error && `D1：${d1.error}`, workers.error && `Workers：${workers.error}`, storage.error && `存储：${storage.error}`].filter(Boolean),
+    updatedAt: Date.now(),
+  };
+  if (!out.errors.length) await setSetting(env, 'usage_cache', JSON.stringify(out));
+  return out;
 }
 
 async function retentionInfo(env) {
