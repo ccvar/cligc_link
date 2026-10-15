@@ -633,6 +633,15 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .chan .card-b { transition: opacity .2s; }
 .chan:not(.on) .card-b { opacity: .55; }
 .grid2.tight { gap: 14px; }
+.kc-v b.sm { font-size: 20px; padding-bottom: 3px; }
+/* 详情页：来源卡跟右侧“地区”卡等高，列表在卡内滚动 */
+#t-src { display: flex; flex-direction: column; }
+#t-src .card-b { overflow: auto; overscroll-behavior: contain; }
+@media (min-width: 961px) {
+  #t-src { height: 0; min-height: 100%; }
+  #t-src .card-b { flex: 1; min-height: 0; }
+}
+@media (max-width: 960px) { #t-src .card-b { max-height: 460px; } }
 .input.mono { font-family: var(--mono); font-size: 13px; }
 .howto { margin-top: 14px; font-size: 13px; color: var(--text-2); }
 .howto summary { cursor: pointer; color: var(--accent-ink); font-weight: 550; width: fit-content; }
@@ -2147,22 +2156,38 @@ async function renderLink(token, id) {
 
       <div class="toolbar rv" style="justify-content:flex-end">${rangeBar()}</div>
 
-      <div class="kpis">
-        <section class="card kpi rv"><div class="kh"><span class="l"><i class="dot" style="background:var(--accent)"></i>访问次数</span>${delta(s.summary.total, s.prev.total)}</div>
-          <div class="v" data-count="${s.summary.total}">0</div><div class="d">上一个 ${rangeLabel()}：${num(s.prev.total)}</div>
-          <div class="ks">${kpiSpark(series.map((x) => x.n), 'var(--accent)')}</div></section>
-        <section class="card kpi rv"><div class="kh"><span class="l"><i class="dot" style="background:var(--violet)"></i>独立访客</span>${delta(s.summary.unique_ips, s.prev.unique_ips)}</div>
-          <div class="v" data-count="${s.summary.unique_ips}">0</div><div class="d">按 IP 去重</div>
-          <div class="ks">${kpiSpark(series.map((x) => x.u), 'var(--violet)')}</div></section>
-        <section class="card kpi rv"><div class="kh"><span class="l"><i class="dot" style="background:var(--teal)"></i>累计访问</span></div>
-          <div class="v" data-count="${link.clicks}">0</div><div class="d">自创建以来，含机器访问</div>
-          <div class="ks">${kpiSpark(series.reduce((a, x) => (a.push((a.at(-1) || 0) + x.n), a), []), 'var(--teal)')}</div></section>
-        <section class="card kpi rv"><div class="kh"><span class="l">最后访问</span>${link.last_click && Date.now() - link.last_click < 3600000 ? '<span class="live">活跃</span>' : ''}</div>
-          <div class="v sm">${ago(link.last_click)}</div><div class="d">${fmtTime(link.last_click)}</div>
-          <div class="sep"></div>
-          <div class="kh"><span class="l">已运行</span></div>
-          <div class="v sm" style="margin-top:6px">${num(Math.max(1, Math.ceil((Date.now() - link.created_at) / 86400000)))}<small>天 · 日均 ${num(link.clicks / Math.max(1, Math.ceil((Date.now() - link.created_at) / 86400000)))} 次</small></div></section>
-      </div>
+      <section class="card kstrip rv">
+        <div class="kc">
+          <div class="kc-h"><span class="l"><i class="dot" style="background:var(--accent)"></i>访问次数</span>${delta(s.summary.total, s.prev.total)}</div>
+          <div class="kc-v"><b data-count="${s.summary.total}">0</b><span class="kc-sp">${kpiSpark(series.map((x) => x.n), 'var(--accent)')}</span></div>
+          <div class="kc-d">上一个 ${rangeLabel()}：${num(s.prev.total)}</div>
+        </div>
+        <div class="kc">
+          <div class="kc-h"><span class="l"><i class="dot" style="background:var(--violet)"></i>独立访客</span>${delta(s.summary.unique_ips, s.prev.unique_ips)}</div>
+          <div class="kc-v"><b data-count="${s.summary.unique_ips}">0</b><span class="kc-sp">${kpiSpark(series.map((x) => x.u), 'var(--violet)')}</span></div>
+          <div class="kc-d">按 IP 去重</div>
+        </div>
+        <div class="kc">
+          <div class="kc-h"><span class="l"><i class="dot" style="background:var(--teal)"></i>累计访问</span></div>
+          <div class="kc-v"><b data-count="${link.clicks}">0</b><span class="kc-sp">${kpiSpark(series.reduce((a, x) => (a.push((a.at(-1) || 0) + x.n), a), []), 'var(--teal)')}</span></div>
+          <div class="kc-d">自创建以来，含机器访问</div>
+        </div>
+        <div class="kc">
+          <div class="kc-h"><span class="l">日均访问</span></div>
+          <div class="kc-v"><b>${num(link.clicks / Math.max(1, Math.ceil((Date.now() - link.created_at) / 86400000)))}</b><small>次 / 天</small></div>
+          <div class="kc-d">已运行 ${num(Math.max(1, Math.ceil((Date.now() - link.created_at) / 86400000)))} 天</div>
+        </div>
+        <div class="kc">
+          <div class="kc-h"><span class="l">最后访问</span>${link.last_click && Date.now() - link.last_click < 3600000 ? '<span class="live">活跃</span>' : ''}</div>
+          <div class="kc-v"><b class="sm">${ago(link.last_click)}</b></div>
+          <div class="kc-d">${link.last_click ? fmtTime(link.last_click) : '还没有访问'}</div>
+        </div>
+        <div class="kc">
+          <div class="kc-h"><span class="l">真人占比</span></div>
+          <div class="kc-v"><b>${humanPct(s.kinds)}</b><small>%</small></div>
+          ${kindBar(s.kinds)}
+        </div>
+      </section>
 
       <section class="card rv">
         <div class="card-h"><h3>访问趋势</h3><span class="sp"></span><div class="legend" id="lg"></div></div>
