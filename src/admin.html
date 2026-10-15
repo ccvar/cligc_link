@@ -106,7 +106,16 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .menu button.danger svg { color: var(--bad); }
 .menu hr { border: 0; border-top: 1px solid var(--line-2); margin: 6px 4px; }
 .side .foot .btn { justify-content: flex-start; height: 38px; padding: 0 12px; gap: 11px; font-size: 13.5px; }
-.side .foot .host { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; padding: 12px 12px 0; border-top: 1px solid var(--line); margin-top: 6px; font-family: var(--mono); overflow: hidden; white-space: nowrap; }
+.side .foot .btn.on { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(13,19,33,.06), 0 6px 16px -8px rgba(13,19,33,.12); }
+.side .foot .btn.on svg.i { color: var(--accent); }
+.side .foot .host { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; padding: 10px 4px 0 12px; border-top: 1px solid var(--line); margin-top: 6px; font-family: var(--mono); white-space: nowrap; }
+.side .foot .host .hn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.side .foot .host .out { position: relative; flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; display: grid; place-items: center;
+  transition: color .15s, background .15s; }
+.side .foot .host .out:hover, .side .foot .host .out:focus-visible { color: var(--bad); background: var(--bad-bg); }
+[data-tip]::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translate(-50%, 4px); padding: 5px 9px; border-radius: 7px;
+  background: var(--text); color: var(--panel); font: 500 12px/1.4 var(--sans); white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s, transform .2s var(--ease-out); box-shadow: var(--shadow-3); }
+[data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
 .side .foot .host i { width: 6px; height: 6px; border-radius: 50%; background: var(--good); flex: none; }
 .main { min-width: 0; background: var(--main); min-height: 100vh; box-shadow: -1px 0 0 var(--line); }
 .wrap { max-width: calc(var(--app-max) - var(--side-w)); padding: 36px 44px 96px; }
@@ -114,7 +123,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .shell.mini { grid-template-columns: max(72px, calc((100% - var(--app-max)) / 2 + 72px)) minmax(0, 1fr); }
 .shell.mini .side { padding-left: calc(100% - 58px); padding-right: 14px; align-items: center; }
 .shell.mini .wrap { max-width: calc(var(--app-max) - 72px); }
-.shell.mini .wordmark, .shell.mini .product, .shell.mini .nav span, .shell.mini .foot span, .shell.mini .host, .shell.mini .nav-label { display: none; }
+.shell.mini .wordmark, .shell.mini .product, .shell.mini .nav span, .shell.mini .foot .btn span, .shell.mini .nav-label { display: none; }
+.shell.mini .side .foot .host { justify-content: center; padding: 10px 0 0; }
+.shell.mini .side .foot .host i, .shell.mini .side .foot .host .hn { display: none; }
 .shell.mini .side-head { flex-direction: column; gap: 14px; padding: 0; }
 .shell.mini .collapse { margin: 0; transform: rotate(180deg); }
 .shell.mini .nav { margin-top: 28px; }
@@ -131,7 +142,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
   .nav, .shell.mini .nav { flex-direction: row; margin: 0 0 0 auto; gap: 2px; }
   .nav a, .shell.mini .nav a { height: 36px; padding: 0 12px; width: auto; gap: 7px; font-size: 14px; }
   .nav a svg.i { width: 17px; height: 17px; }
-  .nav span { display: inline !important; }
+  /* 手机端导航只显示图标，当前页用蓝色 + 底部短横线表示 */
+  .nav span { display: none !important; }
+  .nav a, .shell.mini .nav a { width: 42px; padding: 0; justify-content: center; }
   .nav a.on, .shell.mini .nav a.on { background: none; box-shadow: none; color: var(--accent-ink); }
   .nav a.on::after { display: block; top: auto; bottom: 2px; right: auto; left: 50%; width: 16px; height: 2.5px; border-radius: 2px; transform: translateX(-50%); }
   .side, .shell.mini .side { transition: transform .35s var(--ease-out), box-shadow .3s; will-change: transform; }
@@ -144,9 +157,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 }
 @media (max-width: 520px) {
   .wordmark { display: none; }
-  /* 窄屏：导航只显示图标，当前页面显示文字 */
-  .nav a:not(.on) span { display: none !important; }
-  .nav a:not(.on), .shell.mini .nav a:not(.on) { width: 38px; padding: 0; justify-content: center; }
 }
 
 /* ================================================================ page header */
@@ -468,6 +478,17 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .sim .combo { flex: none; }
 .sim .res > span:first-child { white-space: nowrap; }
 
+/* 设置页 */
+.g-set { display: grid; gap: 20px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+@media (max-width: 960px) { .g-set { grid-template-columns: 1fr; } }
+.set-form .field + .field { margin-top: 14px; }
+.set-p { margin: 0 0 14px; color: var(--text-2); font-size: 14px; line-height: 1.7; }
+.set-list { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 8px; font-size: 13px; color: var(--text-2); }
+.set-list li { display: flex; gap: 8px; align-items: center; }
+.set-list svg { color: var(--good); }
+.chi.pw { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
+.chi.mfa { background: var(--good-bg); color: var(--good); }
+
 /* 通知设置 */
 .kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 760px) { .kinds { grid-template-columns: 1fr; } }
@@ -550,7 +571,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .pop .oi { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 7px; cursor: pointer; font-size: 13px; }
 .pop .oi .f { width: 18px; font-size: 14px; }
 .pop .oi > svg { width: 13px; height: 13px; }
-.pop .oi span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop .oi .ot { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop .opts:focus { outline: none; }
+.pop.plain .opts { padding-top: 4px; max-height: 280px; }
 .pop .oi.act { background: var(--sunken); }
 .pop .oi.sel { color: var(--accent-ink); font-weight: 600; }
 .pop .oi > svg { color: var(--accent); }
@@ -699,6 +722,7 @@ const I = {
   out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
   dl: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
@@ -897,10 +921,9 @@ function shell(active, inner) {
       </nav>
       <button class="btn ghost icon acct" id="acct" aria-label="账号菜单" aria-haspopup="menu" aria-expanded="false">${ic('user', 19)}</button>
       <div class="foot">
-        <button class="btn ghost" id="mfa" title="两步验证">${ic('shield', 18)}<span>两步验证</span></button>
-        <button class="btn ghost" id="chpw" title="修改密码">${ic('key', 18)}<span>修改密码</span></button>
-        <button class="btn ghost" id="logout" title="退出登录">${ic('out', 18)}<span>退出登录</span></button>
-        <div class="host" title="服务运行中"><i></i>${esc(HOST)}</div>
+        <a class="btn ghost ${active === 'settings' ? 'on' : ''}" href="#/settings" title="设置">${ic('gear', 18)}<span>设置</span></a>
+        <div class="host"><i title="服务运行中"></i><span class="hn">${esc(HOST)}</span>
+          <button class="out" id="logout" data-tip="退出登录" aria-label="退出登录">${ic('out', 15)}</button></div>
       </div>
     </aside>
     <main class="main"><div class="wrap" id="page">${inner}</div></main>
@@ -912,8 +935,6 @@ function shell(active, inner) {
     setTimeout(() => document.querySelectorAll('.seg').forEach(segThumb), 50);
   };
   const logout = async () => { await api('/logout', { method: 'POST' }).catch(() => {}); renderLogin(); };
-  document.getElementById('chpw').onclick = () => openPasswordDialog();
-  document.getElementById('mfa').onclick = () => openMfaDialog();
   document.getElementById('logout').onclick = logout;
   // 手机端：账号相关操作收进一个菜单
   const acct = document.getElementById('acct');
@@ -924,8 +945,7 @@ function shell(active, inner) {
     const m = document.createElement('div');
     m.className = 'menu'; m.setAttribute('role', 'menu');
     m.innerHTML = `<div class="menu-h">${esc(HOST)}</div>
-      <button role="menuitem" data-a="mfa">${ic('shield', 16)}两步验证</button>
-      <button role="menuitem" data-a="chpw">${ic('key', 16)}修改密码</button>
+      <button role="menuitem" data-a="settings">${ic('gear', 16)}设置</button>
       <hr><button role="menuitem" data-a="out" class="danger">${ic('out', 16)}退出登录</button>`;
     const r = acct.getBoundingClientRect();
     m.style.top = r.bottom + 8 + 'px'; m.style.right = Math.max(8, innerWidth - r.right) + 'px';
@@ -940,7 +960,7 @@ function shell(active, inner) {
       const b = ev.target.closest('button');
       if (!b) return;
       close();
-      ({ mfa: openMfaDialog, chpw: openPasswordDialog, out: logout })[b.dataset.a]();
+      ({ settings: () => { location.hash = '#/settings'; }, out: logout })[b.dataset.a]();
     };
   };
 }
@@ -1292,7 +1312,7 @@ function renderCodeStep(ticket) {
 }
 
 // 侧栏“两步验证”：开启（验证密码 → 扫码 → 输入动态码确认）/ 关闭
-async function openMfaDialog() {
+async function openMfaDialog(onDone = () => {}) {
   const st = await api('/2fa');
   const ov = document.createElement('div'); ov.className = 'ov';
   const d = document.createElement('form'); d.className = 'dialog pw-dialog mfa-dialog'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
@@ -1318,7 +1338,7 @@ async function openMfaDialog() {
       const btn = d.querySelector('.primary'); btn.disabled = true;
       try {
         await api('/2fa/disable', { method: 'POST', body: { password: d.querySelector('#m-pw').value, code: d.querySelector('#otp').value } });
-        close(); toast('两步验证已关闭');
+        close(); toast('两步验证已关闭'); onDone();
       } catch (ex) { err().textContent = ex.message; btn.disabled = false; }
     };
     return;
@@ -1354,7 +1374,7 @@ async function openMfaDialog() {
       const b = d.querySelector('.primary'); b.disabled = true;
       try {
         await api('/2fa/enable', { method: 'POST', body: { code: otp.value } });
-        close(); toast('两步验证已开启，其他设备上的登录已失效');
+        close(); toast('两步验证已开启，其他设备上的登录已失效'); onDone();
       } catch (ex) { err().textContent = ex.message; b.disabled = false; otp.value = ''; otp.focus(); }
     };
     bindCodeInput(otp, confirm);
@@ -1958,24 +1978,33 @@ async function renderLink(token, id) {
 }
 
 // ---------------------------------------------------------------- 跳转规则
+// 搜索关键字高亮
+function hl(text, q) {
+  const i = q ? text.toLowerCase().indexOf(q) : -1;
+  return i < 0 ? esc(text) : esc(text.slice(0, i)) + `<mark>${esc(text.slice(i, i + q.length))}</mark>` + esc(text.slice(i + q.length));
+}
+
 /**
- * 可搜索的国家 / 地区下拉框
- * 键盘：↑ ↓ 移动，Enter 选择，Esc 关闭；支持按中文名或代码搜索
+ * 通用下拉框（替代原生 select）
+ * o.value       当前值
+ * o.groups(q)   返回 [[分组标题, 值数组], ...]；q 为搜索词（无搜索框时为空）
+ * o.button(v)   按钮里显示的内容（HTML）
+ * o.option(v,q) 选项内容（HTML）
+ * o.search      搜索框占位文字；不传则不显示搜索框
+ * o.onChange(v) 选中后回调
+ * 键盘：↑ ↓ 移动，Enter 选择，Esc 关闭
  */
-function countryCombo(root, value, onChange) {
-  const rest = ISO.filter((c) => !COMMON.includes(c)).sort((a, b) => cname(a).localeCompare(cname(b), 'zh'));
-  const hl = (text, q) => {
-    const i = q ? text.toLowerCase().indexOf(q) : -1;
-    return i < 0 ? esc(text) : esc(text.slice(0, i)) + `<mark>${esc(text.slice(i, i + q.length))}</mark>` + esc(text.slice(i + q.length));
-  };
-  root.innerHTML = `<button type="button" class="combo-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="选择国家或地区"></button>`;
+function dropdown(root, o) {
+  let value = o.value;
+  root.innerHTML = `<button type="button" class="combo-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(o.aria || '')}"></button>`;
   const btn = root.firstElementChild;
-  const paint = () => { btn.innerHTML = `<span class="f">${flag(value)}</span><span class="nm">${esc(cname(value))}</span><code>${value}</code>${ic('chev', 14)}`; };
+  const paint = () => { btn.innerHTML = o.button(value) + ic('chev', 14); };
   paint();
 
-  let pop = null, input, opts, items = [], act = 0;
+  let pop = null, input = null, opts, items = [], act = 0;
   const place = () => {
-    const r = btn.getBoundingClientRect(), w = Math.min(260, Math.max(r.width, 220), innerWidth - 16), h = pop.offsetHeight;
+    const r = btn.getBoundingClientRect(), h = pop.offsetHeight;
+    const w = Math.min(o.maxWidth || 260, Math.max(r.width, o.minWidth || 220), innerWidth - 16);
     pop.style.width = w + 'px';
     pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
     const up = innerHeight - r.bottom < h + 12 && r.top > innerHeight - r.bottom;
@@ -1984,69 +2013,85 @@ function countryCombo(root, value, onChange) {
   };
   const mark = (scroll) => {
     const els = opts.querySelectorAll('.oi');
-    els.forEach((el, i) => el.classList.toggle('act', i === act));
+    els.forEach((el, i) => { el.classList.toggle('act', i === act); if (i === act) opts.setAttribute('aria-activedescendant', el.id); });
     if (scroll && els[act]) els[act].scrollIntoView({ block: 'nearest' });
   };
   const render = () => {
-    const q = input.value.trim().toLowerCase();
-    const groups = q ? [['', ISO.filter((c) => c.toLowerCase().includes(q) || cname(c).toLowerCase().includes(q))]]
-      : [['常用', COMMON], ['全部', rest]];
+    const q = input ? input.value.trim().toLowerCase() : '';
+    const groups = o.groups(q);
     items = groups.flatMap((g) => g[1]);
     act = q ? 0 : Math.max(0, items.indexOf(value));
+    let n = 0;
     opts.innerHTML = items.length
-      ? groups.map(([t, cs]) => (t ? `<div class="og">${t}</div>` : '') + cs.map((c) =>
-        `<div class="oi ${c === value ? 'sel' : ''}" role="option" aria-selected="${c === value}" data-c="${c}">
-          <span class="f">${flag(c)}</span><span>${hl(cname(c), q)}</span><code>${hl(c, q)}</code>${c === value ? ic('check', 14) : ''}</div>`).join('')).join('')
-      : '<div class="empty" style="padding:24px 12px">没有匹配的国家 / 地区</div>';
+      ? groups.map(([t, vs]) => (t ? `<div class="og">${t}</div>` : '') + vs.map((v) => {
+        const i = n++;
+        return `<div class="oi ${v === value ? 'sel' : ''}" id="oi-${i}" role="option" aria-selected="${v === value}" data-i="${i}">${o.option(v, q)}${v === value ? ic('check', 14) : ''}</div>`;
+      }).join('')).join('')
+      : `<div class="empty" style="padding:24px 12px">${o.empty || '没有匹配的选项'}</div>`;
     mark(true);
   };
-  const choose = (c) => {
+  const choose = (v) => {
     close();
     btn.focus();
-    if (c === value) return;
-    value = c; paint(); onChange(c);
+    if (v === value) return;
+    value = v; paint(); o.onChange && o.onChange(v);
+  };
+  const onKey = (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (items.length) { act = (act + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; mark(true); }
+    } else if (e.key === 'Enter' || (!input && e.key === ' ')) { e.preventDefault(); if (items.length) choose(items[act]); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); btn.focus(); }
+    else if (e.key === 'Tab') close();
   };
   const outside = (e) => { if (pop && !pop.contains(e.target) && !root.contains(e.target)) close(); };
   const onScroll = (e) => { if (pop && !pop.contains(e.target)) place(); };
   function close() {
     if (!pop) return;
-    pop.remove(); pop = null;
+    pop.remove(); pop = null; input = null;
     btn.setAttribute('aria-expanded', 'false');
     document.removeEventListener('mousedown', outside, true);
     document.removeEventListener('scroll', onScroll, true);
     removeEventListener('resize', close);
   }
   const open = () => {
+    document.querySelectorAll('.pop').forEach((x) => x.remove());
     pop = document.createElement('div');
-    pop.className = 'pop';
-    pop.innerHTML = `<div class="ps">${ic('search', 15)}<input placeholder="搜索国家或代码" autocomplete="off" aria-label="搜索国家或地区"></div><div class="opts" role="listbox"></div>`;
+    pop.className = 'pop' + (o.search ? '' : ' plain');
+    pop.innerHTML = (o.search ? `<div class="ps">${ic('search', 15)}<input placeholder="${esc(o.search)}" autocomplete="off" aria-label="${esc(o.search)}"></div>` : '')
+      + '<div class="opts" role="listbox" tabindex="-1"></div>';
     document.body.appendChild(pop);
     input = pop.querySelector('input'); opts = pop.querySelector('.opts');
     btn.setAttribute('aria-expanded', 'true');
     render(); place();
-    input.focus();
-    input.oninput = () => { render(); place(); };
-    input.onkeydown = (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (items.length) { act = (act + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; mark(true); }
-      } else if (e.key === 'Enter') { e.preventDefault(); if (items[act]) choose(items[act]); }
-      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); btn.focus(); }
-      else if (e.key === 'Tab') close();
-    };
+    (input || opts).focus();
+    if (input) input.oninput = () => { render(); place(); };
+    (input || opts).onkeydown = onKey;
     opts.onmousemove = (e) => {
       const el = e.target.closest('.oi');
       if (!el) return;
-      const i = items.indexOf(el.dataset.c);
+      const i = Number(el.dataset.i);
       if (i !== act) { act = i; mark(false); }
     };
-    opts.onclick = (e) => { const el = e.target.closest('.oi'); if (el) choose(el.dataset.c); };
+    opts.onclick = (e) => { const el = e.target.closest('.oi'); if (el) choose(items[Number(el.dataset.i)]); };
     document.addEventListener('mousedown', outside, true);
     document.addEventListener('scroll', onScroll, true);
     addEventListener('resize', close);
   };
   btn.onclick = () => (pop ? close() : open());
   btn.onkeydown = (e) => { if ((e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') && !pop) { e.preventDefault(); open(); } };
+  return { get value() { return value; } };
+}
+
+// 国家 / 地区下拉框（可搜索中文名或代码）
+function countryCombo(root, value, onChange) {
+  const rest = ISO.filter((c) => !COMMON.includes(c)).sort((a, b) => cname(a).localeCompare(cname(b), 'zh'));
+  return dropdown(root, {
+    value, onChange, aria: '选择国家或地区', search: '搜索国家或代码', empty: '没有匹配的国家 / 地区',
+    groups: (q) => (q ? [['', ISO.filter((c) => c.toLowerCase().includes(q) || cname(c).toLowerCase().includes(q))]] : [['常用', COMMON], ['全部', rest]]),
+    button: (c) => `<span class="f">${flag(c)}</span><span class="nm">${esc(cname(c))}</span><code>${c}</code>`,
+    option: (c, q) => `<span class="f">${flag(c)}</span><span class="ot">${hl(cname(c), q)}</span><code>${hl(c, q)}</code>`,
+  });
 }
 
 function rulesCard(link, s) {
@@ -2209,6 +2254,45 @@ function openRuleDrawer(link, rule) {
   };
 }
 
+// ---------------------------------------------------------------- 设置（修改密码 / 两步验证）
+async function renderSettings(token) {
+  const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码和两步验证</div></div></header>`;
+  shell('settings', `${head}<div class="stack">${skel(220, 2)}</div>`);
+  const mfa = await api('/2fa');
+  if (token !== routeToken) return;
+  document.getElementById('page').innerHTML = `${head}
+    <div class="g-set">
+      <section class="card rv">
+        <div class="card-h"><span class="chi pw">${ic('key', 17)}</span><h3>修改密码</h3><span class="sub">修改后，其他设备上的登录会自动退出</span></div>
+        <form class="card-b set-form" id="pwf">
+          ${passwordFields('')}
+          <div class="err" style="margin:4px 0 12px" role="alert"></div>
+          <button class="btn primary">保存新密码</button>
+        </form>
+      </section>
+      <section class="card rv">
+        <div class="card-h"><span class="chi mfa">${ic('shield', 17)}</span><h3>两步验证</h3>
+          <span class="sp"></span><span class="pill ${mfa.enabled ? 'on' : 'off'}">${mfa.enabled ? '已开启' : '未开启'}</span></div>
+        <div class="card-b">
+          <p class="set-p">${mfa.enabled
+            ? `开启于 ${fmtTime(mfa.since)}。登录时除了密码，还需要输入手机验证器 App 上的 6 位动态码。`
+            : '开启后，登录时除了密码，还需要输入手机验证器 App 上的 6 位动态码。即使密码泄露，别人也登不进后台、改不了跳转地址。'}</p>
+          <ul class="set-list">
+            <li>${ic('check', 14)}支持 Google Authenticator、Microsoft Authenticator、1Password 等</li>
+            <li>${ic('check', 14)}动态码连续输错 5 次锁定 15 分钟</li>
+            <li>${ic('check', 14)}手机丢失可在 Cloudflare 账号下用命令关闭（见 README）</li>
+          </ul>
+          <button class="btn ${mfa.enabled ? 'danger' : 'primary'}" id="mfa-btn">${ic('shield', 15)}${mfa.enabled ? '关闭两步验证' : '开启两步验证'}</button>
+        </div>
+      </section>
+    </div>`;
+  const page = document.getElementById('page');
+  reveal(page);
+  const pwf = document.getElementById('pwf');
+  bindPasswordForm(pwf, '', () => { pwf.reset(); pwf.querySelector('.pwm').dataset.n = ''; pwf.querySelector('#p-tip').textContent = '至少 8 位，建议混合字母、数字和符号'; pwf.querySelector('button.primary').disabled = false; });
+  document.getElementById('mfa-btn').onclick = () => openMfaDialog(() => route());
+}
+
 // ---------------------------------------------------------------- 通知
 async function renderNotify(token) {
   shell('notify', `<header class="ph"><div><div class="kicker">设置</div><h1>统计通知</h1><div class="sub">定期把访问统计推送到 Telegram 或邮箱</div></div></header><div class="stack">${skel(160, 3)}</div>`);
@@ -2232,7 +2316,7 @@ async function renderNotify(token) {
           </div>
           <div class="when">
             <label for="n-hour">发送时间</label>
-            <select class="input" id="n-hour" style="width:auto">${hours.map((x) => `<option value="${x}" ${x === c.hour ? 'selected' : ''}>每天 ${pad(x)}:00</option>`).join('')}</select>
+            <div class="combo" id="n-hour"></div>
             <span class="hint">时区 ${tzLabel(TZ)}（跟随当前浏览器）</span>
             <span class="sp" style="flex:1"></span>
             <span class="hint">预览报告：</span>
@@ -2285,6 +2369,13 @@ async function renderNotify(token) {
   const page = document.getElementById('page');
   reveal(page);
   const f = document.getElementById('nf');
+  const hourLabel = (x) => `每天 ${pad(x)}:00`;
+  const hourBox = dropdown(document.getElementById('n-hour'), {
+    value: c.hour, aria: '发送时间', minWidth: 188, maxWidth: 220,
+    groups: () => [['', hours]],
+    button: (x) => `<span class="nm">${hourLabel(x)}</span>`,
+    option: (x) => `<span class="ot">${hourLabel(x)}</span><span class="hint">${x < 6 ? '凌晨' : x < 12 ? '上午' : x < 13 ? '中午' : x < 18 ? '下午' : '晚上'}</span>`,
+  });
   let provider = c.email.provider === 'cloudflare' ? 'cloudflare' : 'resend';
   const prov = document.getElementById('prov');
   const syncProv = () => {
@@ -2299,7 +2390,7 @@ async function renderNotify(token) {
 
   const collect = () => ({
     reports: { daily: f.querySelector('[name=r-daily]').checked, weekly: f.querySelector('[name=r-weekly]').checked, monthly: f.querySelector('[name=r-monthly]').checked },
-    hour: Number(document.getElementById('n-hour').value), tz: TZ,
+    hour: hourBox.value, tz: TZ,
     tg: { enabled: f.querySelector('[name=tg-on]').checked, token: document.getElementById('tg-token').value, chat: document.getElementById('tg-chat').value },
     email: { enabled: f.querySelector('[name=mail-on]').checked, provider, key: document.getElementById('m-key').value, from: document.getElementById('m-from').value, to: document.getElementById('m-to').value },
   });
@@ -2338,6 +2429,7 @@ async function route() {
     }
     lastLinkId = null;
     if (h.startsWith('#/notify')) return await renderNotify(token);
+    if (h.startsWith('#/settings')) return await renderSettings(token);
     if (h.startsWith('#/links')) {
       const openNew = h.includes('?new');
       if (openNew) history.replaceState(null, '', '#/links');
