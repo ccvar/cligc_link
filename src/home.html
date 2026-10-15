@@ -276,6 +276,7 @@ h2 .mute { color: var(--muted); }
 /* 真人识别：访问流 + 真人占比 */
 .t-bot { grid-column: span 6; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); gap: 40px; align-items: center; }
 .t-bot .why { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 6px; }
+.t-bot .why span.px { color: var(--accent-ink); background: var(--accent-2); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 .t-bot .why span { font-size: 12px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--text-2); white-space: nowrap; }
 .bvd { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 14px; align-items: stretch; }
 .bvl { display: grid; gap: 6px; align-content: start; height: 212px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 75%, transparent); mask-image: linear-gradient(#000 75%, transparent); }
@@ -285,6 +286,7 @@ h2 .mute { color: var(--muted); }
 .bvr .k.h { color: var(--good); background: color-mix(in srgb, var(--good) 13%, transparent); }
 .bvr .k.s { color: #b7791f; background: color-mix(in srgb, #f2a93b 16%, transparent); }
 .bvr .k.b { color: var(--muted); background: var(--sunken); }
+.bvr .k.p { color: var(--accent-ink); background: var(--accent-2); }
 .bvr .m { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); }
 .bvr .m b { color: var(--text); font-weight: 600; }
 .bvr code { font: 11.5px var(--mono); color: var(--muted); white-space: nowrap; }
@@ -294,6 +296,8 @@ h2 .mute { color: var(--muted); }
 .bvp .n i { font-style: normal; font-size: 18px; color: var(--muted); margin-left: 2px; }
 .bvp .bar { display: flex; gap: 3px; height: 8px; margin-top: auto; }
 .bvp .bar i { border-radius: 3px; transition: flex .8s var(--ease); }
+.bvp .bvx { margin-top: 2px; color: var(--accent-ink); }
+.bvp .bvx b { font-variant-numeric: tabular-nums; }
 .bvp .lg { display: grid; gap: 4px; margin-top: 10px; font-size: 11.5px; color: var(--text-2); }
 .bvp .lg span::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 6px; background: var(--c); }
 @keyframes bvIn { from { opacity: 0; transform: translateY(-8px); } }
@@ -753,15 +757,17 @@ footer a:hover { color: var(--text); }
         <article class="tile t-bot reveal" id="bot">
           <div class="bvd" aria-hidden="true">
             <div class="bvl" id="bv-l"></div>
-            <div class="bvp"><small>真人占比</small><div class="n"><span id="bv-n">86</span><i>%</i></div>
-              <div class="bar"><i id="bv-h" style="flex:86;background:var(--good)"></i><i id="bv-s" style="flex:9;background:#f2a93b"></i><i id="bv-b" style="flex:5;background:var(--faint)"></i></div>
-              <div class="lg"><span style="--c:var(--good)">真人</span><span style="--c:#f2a93b">可疑</span><span style="--c:var(--faint)">爬虫</span></div></div>
+            <div class="bvp"><small>真人占比</small><div class="n"><span id="bv-n">88</span><i>%</i></div>
+              <small class="bvx">其中经代理 <b id="bv-pn">6</b></small>
+              <div class="bar"><i id="bv-h" style="flex:43;background:var(--good)"></i><i id="bv-p" style="flex:6;background:var(--accent)"></i><i id="bv-s" style="flex:4;background:#f2a93b"></i><i id="bv-b" style="flex:3;background:var(--faint)"></i></div>
+              <div class="lg"><span style="--c:var(--good)">真人</span><span style="--c:var(--accent)">经代理</span><span style="--c:#f2a93b">可疑</span><span style="--c:var(--faint)">爬虫</span></div></div>
           </div>
           <div>
             <span class="tag">// bot detection</span>
             <h3>分清真人和机器</h3>
             <p>每次访问都会标记为真人、爬虫或可疑，并写明原因。统计和报告默认只算真人，刷量、爬虫、链接预览不会把数字撑大。</p>
-            <div class="why"><span>机房 IP</span><span>缺少浏览器特征</span><span>高频访问</span><span>过旧的 TLS</span><span>爬虫 / 链接预览</span></div>
+            <p>用 VPN 的真人也不会被误判：来自机房 IP、但浏览器特征完整的访问，仍算真人并标记“经代理”，还能看到有多少真人是翻墙来的。</p>
+            <div class="why"><span>机房 IP</span><span>缺少浏览器特征</span><span>高频访问</span><span>过旧的系统版本</span><span>爬虫 / 链接预览</span><span class="px">VPN / 代理识别</span></div>
           </div>
         </article>
       </div>
@@ -819,6 +825,8 @@ footer a:hover { color: var(--text); }
           <div class="a"><div><p>可以。访客通常是先搜到你的推广页、再点页面上的短链，这时短链只能看到推广页。在后台“设置 → 来源追踪”开启后，把一行 script 放到推广页上，它会识别 Google、Bing、百度、搜狗、360 等搜索引擎和广告点击，给短链加上 utm_source，原有的 src 不受影响。搜索引擎早已不再传递搜索关键词，所以能知道是哪个搜索引擎，但看不到具体关键词。</p></div></div></div>
         <div class="q"><button aria-expanded="false">能区分真人访问和机器访问吗？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>可以。每次访问都会被标记为真人、爬虫或可疑：自报身份的爬虫和链接预览（如 Googlebot、微信 / Telegram 预览）算爬虫；来自 AWS、阿里云、腾讯云等机房 IP，缺少浏览器应有的请求头，或同一 IP 短时间内反复访问的，算可疑。后台统计和定时报告默认只算真人，每条访问都能看到判定原因。这是基于网络特征的推断，经过住宅代理运行的脚本仍可能被当作真人。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">用 VPN 访问的用户会被当成机器吗？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>不会。VPN 和代理节点大多架在机房里，但只有“机房 IP + 机器特征”（如缺少浏览器请求头、过旧的系统版本、HTTP/1.1）才会被判为可疑；浏览器特征完整的访问仍算真人，并标记为“经代理”。中文访客出现在非中文地区时也会提示“可能经代理”。后台能看到真人里有多少是经代理来的。住宅代理和手机热点无法识别，会被当作普通访问。</p></div></div></div>
         <div class="q"><button aria-expanded="false">地区链接在某些网络打不开怎么办？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>给地区规则打开“打不开时回退到默认地址”。命中规则的访客会先在自己的网络里检测这个地址能否连通，能打开就直接跳过去（通常只多 0.2–1 秒），连不上就改去默认地址；后台会统计每条规则的回退次数。</p></div></div></div>
         <div class="q"><button aria-expanded="false">数据存在哪里？安全吗？<span class="pm" aria-hidden="true"></span></button>
@@ -987,26 +995,29 @@ footer a:hover { color: var(--text); }
   // 真人识别演示：访问记录不断滚入，真人占比随之变化
   const BV = [
     ['h', '真人', '🇨🇳 上海 · <b>iPhone</b> Safari', '/spring'],
+    ['p', '代理', '🇫🇷 Paris · <b>中文</b>访客 · 经 VPN', '/spring'],
     ['s', '可疑', '机房 IP · <b>Amazon AWS</b>', '/spring'],
     ['h', '真人', '🇺🇸 Seattle · <b>Mac</b> Chrome', '/app'],
     ['b', '爬虫', '<b>Googlebot</b>', '/spring'],
     ['h', '真人', '🇯🇵 東京 · <b>Android</b> Chrome', '/spring'],
     ['s', '可疑', '同一 IP 1 分钟内第 <b>7</b> 次访问', '/app'],
     ['h', '真人', '🇭🇰 香港 · <b>微信</b>内打开', '/spring'],
+    ['p', '代理', '🇺🇸 Los Angeles · <b>Mac</b> Chrome · 经 VPN', '/app'],
     ['b', '爬虫', '<b>Telegram</b> 链接预览', '/app'],
     ['h', '真人', '🇸🇬 Singapore · <b>Windows</b> Edge', '/spring'],
   ];
   const bvl = $('#bv-l');
-  let bi = 0, cnt = { h: 43, s: 4, b: 3 };
+  let bi = 0, cnt = { h: 43, p: 6, s: 4, b: 3 };
   const bvRow = ([k, label, m, path]) => `<div class="bvr"><span class="k ${k}">${label}</span><span class="m">${m}</span><code>${path}</code></div>`;
   const bvTick = () => {
     const r = BV[bi]; bi = (bi + 1) % BV.length;
     cnt[r[0]]++;
     bvl.insertAdjacentHTML('afterbegin', bvRow(r));
     while (bvl.children.length > 6) bvl.lastElementChild.remove();
-    const sum = cnt.h + cnt.s + cnt.b;
-    $('#bv-n').textContent = Math.round((cnt.h / sum) * 100);
-    $('#bv-h').style.flex = cnt.h; $('#bv-s').style.flex = cnt.s; $('#bv-b').style.flex = cnt.b;
+    const sum = cnt.h + cnt.p + cnt.s + cnt.b;
+    $('#bv-n').textContent = Math.round(((cnt.h + cnt.p) / sum) * 100);
+    $('#bv-h').style.flex = cnt.h; $('#bv-p').style.flex = cnt.p; $('#bv-s').style.flex = cnt.s; $('#bv-b').style.flex = cnt.b;
+    $('#bv-pn').textContent = cnt.p;
   };
   bvl.innerHTML = BV.slice(0, 5).reverse().map(bvRow).join(''); bi = 5;
   $('#bot').addEventListener('enter', () => { if (!REDUCED) setInterval(() => { if (!document.hidden) bvTick(); }, 1800); });

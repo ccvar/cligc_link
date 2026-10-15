@@ -407,10 +407,12 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .kmix-l .x em { font-style: normal; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .kmix-r { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); }
 .kc-k { display: flex; gap: 10px; margin-top: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.kc-k span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.kc-k span:last-child { flex: 0 1 auto; }
+.kc-px { display: inline-flex; align-items: center; height: 18px; margin-left: 8px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 600;
+  color: var(--accent-ink); background: var(--accent-2); white-space: nowrap; vertical-align: 2px; }
 .kc-k span::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; background: var(--amber); }
 .kc-k span + span::before { background: var(--faint); }
-.kc-k span.px::before { background: var(--accent); }
-.kc-k span.px + span::before { background: var(--amber); }
 .bmix { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); }
 .bmix-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
 .bmix-h span:first-child { color: var(--text-2); font-weight: 600; }
@@ -1878,8 +1880,10 @@ const humanPct = (kinds) => {
   const sum = (kinds || []).reduce((a, b) => a + b.n, 0);
   return sum ? Math.round((kindCount(kinds, 'human') / sum) * 100) : '—';
 };
+// 真人占比：经代理的数量跟在百分比后面；下一行只放可疑 / 爬虫，过长时省略
+const kindValue = (kinds) => `<b>${humanPct(kinds)}</b><small>%${proxyCount(kinds) ? `<span class="kc-px" title="真人中经 VPN / 代理访问的次数">经代理 ${num(proxyCount(kinds))}</span>` : ''}</small>`;
 const kindBar = (kinds) => `<div class="kc-k" title="真人 ${num(kindCount(kinds, 'human'))}（经代理 ${num(proxyCount(kinds))}）· 可疑 ${num(kindCount(kinds, 'suspect'))} · 爬虫 ${num(kindCount(kinds, 'bot'))}">
-  ${proxyCount(kinds) ? `<span class="px">经代理 ${num(proxyCount(kinds))}</span>` : ''}<span>可疑 ${num(kindCount(kinds, 'suspect'))}</span><span>爬虫 ${num(kindCount(kinds, 'bot'))}</span></div>`;
+  <span>可疑 ${num(kindCount(kinds, 'suspect'))}</span><span>爬虫 ${num(kindCount(kinds, 'bot'))}</span></div>`;
 async function renderHome(token) {
   const now = new Date();
   shell('home', `<header class="ph">
@@ -1942,7 +1946,7 @@ async function renderHome(token) {
       </div>
       <div class="kc">
         <div class="kc-h"><span class="l">真人占比</span></div>
-        <div class="kc-v"><b>${humanPct(d.kinds)}</b><small>%</small></div>
+        <div class="kc-v">${kindValue(d.kinds)}</div>
         ${kindBar(d.kinds)}
       </div>
       ${d.link ? `<div class="kc">
@@ -2323,7 +2327,7 @@ async function renderLink(token, id) {
         </div>
         <div class="kc">
           <div class="kc-h"><span class="l">真人占比</span></div>
-          <div class="kc-v"><b>${humanPct(s.kinds)}</b><small>%</small></div>
+          <div class="kc-v">${kindValue(s.kinds)}</div>
           ${kindBar(s.kinds)}
         </div>
       </section>
