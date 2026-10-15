@@ -766,8 +766,8 @@ footer a:hover { color: var(--text); }
             <span class="tag">// bot detection</span>
             <h3>分清真人和机器</h3>
             <p>每次访问都会标记为真人、爬虫或可疑，并写明原因。统计和报告默认只算真人，刷量、爬虫、链接预览不会把数字撑大。</p>
-            <p>用 VPN 的真人也不会被误判：来自机房 IP、但浏览器特征完整的访问，仍算真人并标记“经代理”，还能看到有多少真人是翻墙来的。</p>
-            <div class="why"><span>机房 IP</span><span>缺少浏览器特征</span><span>高频访问</span><span>过旧的系统版本</span><span>爬虫 / 链接预览</span><span class="px">VPN / 代理识别</span></div>
+            <p>用 VPN 的真人也不会被误判：机房 IP 只有再带上机器特征才算可疑，浏览器特征完整的仍算真人并标记“经代理”，还能看到有多少真人是翻墙来的。</p>
+            <div class="why"><span>机房 IP + 机器特征</span><span>缺少浏览器特征</span><span>高频访问</span><span>过旧的系统版本</span><span>爬虫 / 链接预览</span><span class="px">VPN / 代理识别</span></div>
           </div>
         </article>
       </div>
@@ -824,7 +824,7 @@ footer a:hover { color: var(--text); }
         <div class="q"><button aria-expanded="false">能知道访客是从哪个搜索引擎来的吗？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>可以。访客通常是先搜到你的推广页、再点页面上的短链，这时短链只能看到推广页。在后台“设置 → 来源追踪”开启后，把一行 script 放到推广页上，它会识别 Google、Bing、百度、搜狗、360 等搜索引擎和广告点击，给短链加上 utm_source，原有的 src 不受影响。搜索引擎早已不再传递搜索关键词，所以能知道是哪个搜索引擎，但看不到具体关键词。</p></div></div></div>
         <div class="q"><button aria-expanded="false">能区分真人访问和机器访问吗？<span class="pm" aria-hidden="true"></span></button>
-          <div class="a"><div><p>可以。每次访问都会被标记为真人、爬虫或可疑：自报身份的爬虫和链接预览（如 Googlebot、微信 / Telegram 预览）算爬虫；来自 AWS、阿里云、腾讯云等机房 IP，缺少浏览器应有的请求头，或同一 IP 短时间内反复访问的，算可疑。后台统计和定时报告默认只算真人，每条访问都能看到判定原因。这是基于网络特征的推断，经过住宅代理运行的脚本仍可能被当作真人。</p></div></div></div>
+          <div class="a"><div><p>可以。每次访问都会被标记为真人、爬虫或可疑：自报身份的爬虫和链接预览（如 Googlebot、微信 / Telegram 预览）算爬虫；没有语言信息、同一 IP 短时间内反复访问，或同时带有多个机器特征（缺少浏览器请求头、HTTP/1.1、iOS 13 之类的旧版本）的，算可疑。来自腾讯云、阿里云、AWS 等机房 IP 的访问，带有任一机器特征就算可疑，浏览器特征完整的则算经代理的真人。后台统计和定时报告默认只算真人，每条访问都能看到判定原因。这是基于网络特征的推断，经过住宅代理运行的脚本仍可能被当作真人；识别结果只用于统计，不影响跳转。</p></div></div></div>
         <div class="q"><button aria-expanded="false">用 VPN 访问的用户会被当成机器吗？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>不会。VPN 和代理节点大多架在机房里，但只有“机房 IP + 机器特征”（如缺少浏览器请求头、过旧的系统版本、HTTP/1.1）才会被判为可疑；浏览器特征完整的访问仍算真人，并标记为“经代理”。中文访客出现在非中文地区时也会提示“可能经代理”。后台能看到真人里有多少是经代理来的。住宅代理和手机热点无法识别，会被当作普通访问。</p></div></div></div>
         <div class="q"><button aria-expanded="false">地区链接在某些网络打不开怎么办？<span class="pm" aria-hidden="true"></span></button>
@@ -996,10 +996,11 @@ footer a:hover { color: var(--text); }
   const BV = [
     ['h', '真人', '🇨🇳 上海 · <b>iPhone</b> Safari', '/spring'],
     ['p', '代理', '🇫🇷 Paris · <b>中文</b>访客 · 经 VPN', '/spring'],
-    ['s', '可疑', '机房 IP · <b>Amazon AWS</b>', '/spring'],
+    ['s', '可疑', '机房 IP · <b>腾讯云</b> · 旧版 iOS 13', '/spring'],
     ['h', '真人', '🇺🇸 Seattle · <b>Mac</b> Chrome', '/app'],
     ['b', '爬虫', '<b>Googlebot</b>', '/spring'],
     ['h', '真人', '🇯🇵 東京 · <b>Android</b> Chrome', '/spring'],
+    ['s', '可疑', '机房 IP · <b>AWS</b> · HTTP/1.1', '/app'],
     ['s', '可疑', '同一 IP 1 分钟内第 <b>7</b> 次访问', '/app'],
     ['h', '真人', '🇭🇰 香港 · <b>微信</b>内打开', '/spring'],
     ['p', '代理', '🇺🇸 Los Angeles · <b>Mac</b> Chrome · 经 VPN', '/app'],
