@@ -164,6 +164,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .ph .kicker { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
 .ph h1 { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 680; letter-spacing: -.025em; }
 .ph .sub { color: var(--muted); margin-top: 6px; }
+.ph h1.h1-meta { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; }
+.ph h1.h1-meta span { font-size: 14px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
 .ph .sp { flex: 1; }
 .back { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; margin-bottom: 14px; transition: color .15s, transform .2s var(--ease); }
 .back:hover { color: var(--text); transform: translateX(-2px); }
@@ -1474,7 +1476,7 @@ function feedItems(items, newIds = new Set()) {
 async function renderHome(token) {
   const now = new Date();
   shell('home', `<header class="ph">
-      <div><div class="kicker">${now.getMonth() + 1} 月 ${now.getDate()} 日 ${WEEK[now.getDay()]} · ${greet()}</div><h1>概览</h1></div>
+      <div><h1 class="h1-meta">概览<span>${now.getMonth() + 1} 月 ${now.getDate()} 日 ${WEEK[now.getDay()]} · ${greet()}</span></h1></div>
       <span class="sp"></span>${rangeBar()}</header>
     <div class="stack" id="home">
       <div class="kpis">${skel(168, 4)}</div>
