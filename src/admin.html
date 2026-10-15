@@ -387,10 +387,15 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .dlg .x em { font-style: normal; color: var(--muted); width: 38px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; }
 .kt { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; margin-left: 6px; border-radius: 5px; font-size: 11px; font-weight: 600; vertical-align: 1px; cursor: help; white-space: nowrap; font-family: var(--sans); }
 .kt.suspect { color: var(--warn); background: var(--warn-bg); }
+.kt.proxy { color: var(--accent-ink); background: var(--accent-2); }
 .kt[data-tip] { cursor: default; }
 .kt[data-tip]::after { white-space: normal; width: max-content; max-width: 280px; text-align: left; line-height: 1.5; font-weight: 500; }
 .tbl .kr { max-width: 240px; margin-top: 3px; font-size: 11.5px; color: var(--warn); }
 .tbl .kr.bot { color: var(--muted); }
+.tbl .kr.proxy { color: var(--accent-ink); }
+.kmix-p { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 12.5px; color: var(--text-2); }
+.kmix-p svg { color: var(--accent); flex: none; }
+.kmix-p b { font-variant-numeric: tabular-nums; }
 .mtbl td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .mtbl .kt { margin-left: 0; }
 .kt.bot { color: var(--muted); background: var(--sunken); }
@@ -404,6 +409,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .kc-k { display: flex; gap: 10px; margin-top: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; }
 .kc-k span::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; background: var(--amber); }
 .kc-k span + span::before { background: var(--faint); }
+.kc-k span.px::before { background: var(--accent); }
+.kc-k span.px + span::before { background: var(--amber); }
 .bmix { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); }
 .bmix-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
 .bmix-h span:first-child { color: var(--text-2); font-weight: 600; }
@@ -1774,16 +1781,23 @@ function renderLogin() {
 
 // ---------------------------------------------------------------- overview
 const KIND = { human: ['真人', 'var(--good)'], bot: ['爬虫', 'var(--faint)'], suspect: ['可疑', 'var(--amber)'] };
-const kindTag = (r, tip = true) => r.kind && r.kind !== 'human'
-  ? `<span class="kt ${r.kind}" ${tip && r.reason ? `data-tip="${esc(r.reason)}" tabindex="0"` : ''}>${KIND[r.kind][0]}</span>` : '';
+const kindTag = (r, tip = true) => {
+  // 真人只在经代理时打标签；爬虫 / 可疑总是打标签
+  const k = r.kind === 'human' ? (r.proxy ? 'proxy' : '') : r.kind;
+  if (!k) return '';
+  return `<span class="kt ${k}" ${tip && r.reason ? `data-tip="${esc(r.reason)}" tabindex="0"` : ''}>${k === 'proxy' ? '代理' : KIND[k][0]}</span>`;
+};
 // 访客类型占比：分段条 + 图例
+const proxyCount = (kinds) => (kinds || []).filter((x) => (x.k || 'human') === 'human' && x.p).reduce((a, b) => a + b.n, 0);
 function kindMix(items) {
-  const m = new Map((items || []).map((x) => [x.k || 'human', x.n]));
+  const m = new Map();
+  for (const x of items || []) m.set(x.k || 'human', (m.get(x.k || 'human') || 0) + x.n);
   const sum = [...m.values()].reduce((a, b) => a + b, 0);
   if (!sum) return '';
   const rows = ['human', 'suspect', 'bot'].map((k) => ({ k, n: m.get(k) || 0 }));
   return `<div class="kmix"><div class="bmix-bar">${rows.filter((r) => r.n).map((r, i) => `<i style="flex:${r.n};background:${KIND[r.k][1]};--j:${i}" title="${KIND[r.k][0]} · ${num(r.n)} 次"></i>`).join('')}</div>
-    <div class="kmix-l">${rows.map((r) => `<div class="x"><i style="background:${KIND[r.k][1]}"></i><span>${KIND[r.k][0]}</span><b>${num(r.n)}</b><em>${Math.round((r.n / sum) * 100)}%</em></div>`).join('')}</div></div>`;
+    <div class="kmix-l">${rows.map((r) => `<div class="x"><i style="background:${KIND[r.k][1]}"></i><span>${KIND[r.k][0]}</span><b>${num(r.n)}</b><em>${Math.round((r.n / sum) * 100)}%</em></div>`).join('')}</div>
+    ${proxyCount(items) ? `<div class="kmix-p">${ic('globe', 13)}其中 <b>${num(proxyCount(items))}</b> 次真人访问经 VPN / 代理（占真人 ${Math.round((proxyCount(items) / Math.max(1, m.get('human') || 0)) * 100)}%）</div>` : ''}</div>`;
 }
 
 function feedItems(items, newIds = new Set()) {
@@ -1864,8 +1878,8 @@ const humanPct = (kinds) => {
   const sum = (kinds || []).reduce((a, b) => a + b.n, 0);
   return sum ? Math.round((kindCount(kinds, 'human') / sum) * 100) : '—';
 };
-const kindBar = (kinds) => `<div class="kc-k" title="真人 ${num(kindCount(kinds, 'human'))} · 可疑 ${num(kindCount(kinds, 'suspect'))} · 爬虫 ${num(kindCount(kinds, 'bot'))}">
-  <span>可疑 ${num(kindCount(kinds, 'suspect'))}</span><span>爬虫 ${num(kindCount(kinds, 'bot'))}</span></div>`;
+const kindBar = (kinds) => `<div class="kc-k" title="真人 ${num(kindCount(kinds, 'human'))}（经代理 ${num(proxyCount(kinds))}）· 可疑 ${num(kindCount(kinds, 'suspect'))} · 爬虫 ${num(kindCount(kinds, 'bot'))}">
+  ${proxyCount(kinds) ? `<span class="px">经代理 ${num(proxyCount(kinds))}</span>` : ''}<span>可疑 ${num(kindCount(kinds, 'suspect'))}</span><span>爬虫 ${num(kindCount(kinds, 'bot'))}</span></div>`;
 async function renderHome(token) {
   const now = new Date();
   shell('home', `<header class="ph">
@@ -2366,7 +2380,7 @@ async function renderLink(token, id) {
             <td><div>${esc(r.source)}</div>${r.utm_campaign ? `<div class="sm">${esc(r.utm_campaign)}</div>` : ''}</td>
             <td><div>${esc(country(r.country))}</div><div class="sm">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
             <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" title="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (link.target_url || '—'))}</div>`; })()}</td>
-            <td title="${esc(r.ua)}"><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r, false)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div>${r.kind && r.kind !== 'human' && r.reason ? `<div class="kr ${r.kind} ell" title="${esc(r.reason)}">${esc(r.reason)}</div>` : ''}</td>
+            <td title="${esc(r.ua)}"><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r, false)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div>${(r.kind && r.kind !== 'human') || r.proxy ? (r.reason ? `<div class="kr ${r.kind === 'human' ? 'proxy' : r.kind} ell" title="${esc(r.reason)}">${esc(r.reason)}</div>` : '') : ''}</td>
             <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:200px" title="${esc([r.asn ? 'AS' + r.asn : '', r.asn_org].filter(Boolean).join(' · '))}">${esc(r.asn_org || '—')}</div></td>
             <td class="ell" title="${esc(r.referer)}">${r.referer ? esc(r.referer) : '<span class="sm">—</span>'}</td>
           </tr>`).join('')}</tbody></table></div>

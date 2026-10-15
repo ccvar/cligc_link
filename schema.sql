@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS clicks (
   asn          INTEGER NOT NULL DEFAULT 0,
   tls          TEXT NOT NULL DEFAULT '',  -- TLS 版本，如 TLSv1.3
   http         TEXT NOT NULL DEFAULT '',  -- HTTP 协议，如 HTTP/2
+  proxy        INTEGER NOT NULL DEFAULT 0, -- 1 = 真人经 VPN / 代理访问（机房 IP 但浏览器特征完整，或中文访客出现在非中文地区）
   FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE
 );
 

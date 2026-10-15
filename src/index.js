@@ -87,7 +87,8 @@ async function migrate(env) {
     await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN fallbacks INTEGER NOT NULL DEFAULT 0').run();
   }
   for (const [c, def] of [['kind', "TEXT NOT NULL DEFAULT ''"], ['reason', "TEXT NOT NULL DEFAULT ''"],
-    ['asn', 'INTEGER NOT NULL DEFAULT 0'], ['tls', "TEXT NOT NULL DEFAULT ''"], ['http', "TEXT NOT NULL DEFAULT ''"]]) {
+    ['asn', 'INTEGER NOT NULL DEFAULT 0'], ['tls', "TEXT NOT NULL DEFAULT ''"], ['http', "TEXT NOT NULL DEFAULT ''"],
+    ['proxy', 'INTEGER NOT NULL DEFAULT 0']]) {
     if (!cols.includes(c)) await env.DB.prepare(`ALTER TABLE clicks ADD COLUMN ${c} ${def}`).run();
   }
   // 判定规则更新时提高版本号，旧记录重新检查一次；平时不扫描整张表
@@ -95,11 +96,11 @@ async function migrate(env) {
 }
 
 // 按已有的 IP、运营商、User-Agent、语言补算旧访问记录的访客类型（每次最多处理 2 万条，下次启动继续）
-const KIND_VER = '3';
+const KIND_VER = '4';
 async function backfillKinds(env) {
-  // 已判为爬虫 / 可疑的不再改动（新规则只会多识别，不会少识别）
+  // 爬虫只由 User-Agent 决定，不受规则调整影响，不再重算
   const rows = (await env.DB.prepare(
-    "SELECT id, link_id, ts, ip, ua, asn, asn_org, lang FROM clicks WHERE kind IN ('', 'human') ORDER BY ts LIMIT 20000"
+    "SELECT id, link_id, ts, ip, ua, asn, asn_org, lang, country, tls, http FROM clicks WHERE kind IN ('', 'human', 'suspect') ORDER BY ts LIMIT 20000"
   ).all()).results;
   // 同一 IP 访问同一短链：统计 60 秒内的次数
   const recent = new Map(), hist = new Map();
@@ -110,8 +111,11 @@ async function backfillKinds(env) {
   }
   const groups = new Map();
   for (const r of rows) {
-    const v = classifyVisit({ ua: r.ua, hasLang: !!r.lang, asnOrg: r.asn_org, asn: r.asn, recent: recent.get(r.id) });
-    const k = v.kind + '\u0000' + v.reason;
+    const v = classifyVisit({
+      ua: r.ua, hasLang: !!r.lang, lang: r.lang, country: r.country, asnOrg: r.asn_org, asn: r.asn,
+      recent: recent.get(r.id), tls: r.tls, http: r.http,
+    });
+    const k = v.kind + '\u0000' + v.reason + '\u0000' + v.proxy;
     if (!groups.has(k)) groups.set(k, { ...v, ids: [] });
     groups.get(k).ids.push(r.id);
   }
@@ -119,8 +123,8 @@ async function backfillKinds(env) {
   for (const g of groups.values()) {
     for (let i = 0; i < g.ids.length; i += 90) {
       const ids = g.ids.slice(i, i + 90);
-      stmts.push(env.DB.prepare(`UPDATE clicks SET kind = ?, reason = ?, is_bot = ? WHERE id IN (${ids.map(() => '?').join(',')})`)
-        .bind(g.kind, g.reason, g.kind === 'human' ? 0 : 1, ...ids));
+      stmts.push(env.DB.prepare(`UPDATE clicks SET kind = ?, reason = ?, is_bot = ?, proxy = ? WHERE id IN (${ids.map(() => '?').join(',')})`)
+        .bind(g.kind, g.reason, g.kind === 'human' ? 0 : 1, g.proxy, ...ids));
     }
   }
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
@@ -244,15 +248,16 @@ async function logClick(request, env, linkId, url, ruleId) {
   const recent = 1 + (await env.DB.prepare('SELECT COUNT(*) AS n FROM clicks WHERE link_id = ? AND ts > ? AND ip = ?')
     .bind(linkId, now - 60000, ip).first('n'));
   const visit = classifyVisit({
-    ua, hasLang: h.has('accept-language'), asnOrg: cf.asOrganization || '', asn: Number(cf.asn) || 0, recent,
+    ua, hasLang: h.has('accept-language'), lang: h.get('accept-language') || '', country: cf.country || '',
+    asnOrg: cf.asOrganization || '', asn: Number(cf.asn) || 0, recent,
     secFetch: h.has('sec-fetch-mode'), tls: cf.tlsVersion || '', http: cf.httpProtocol || '',
   });
 
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO clicks (link_id, ts, source, referer, referer_host, utm_source, utm_medium, utm_campaign,
-         ip, country, region, city, asn_org, ua, browser, os, device, is_bot, lang, rule_id, kind, reason, asn, tls, http)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         ip, country, region, city, asn_org, ua, browser, os, device, is_bot, lang, rule_id, kind, reason, asn, tls, http, proxy)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       linkId, now, cut(source, 200), cut(referer, 1000), cut(refererHost, 200),
       cut(utmSource, 200), cut(qs.get('utm_medium') || '', 200), cut(qs.get('utm_campaign') || '', 200),
@@ -260,7 +265,7 @@ async function logClick(request, env, linkId, url, ruleId) {
       cut(cf.asOrganization || '', 200), cut(ua, 500),
       parsed.browser, parsed.os, parsed.device, visit.kind === 'human' ? 0 : 1,
       cut((h.get('accept-language') || '').split(',')[0], 32),
-      ruleId, visit.kind, cut(visit.reason, 300), Number(cf.asn) || 0, cut(cf.tlsVersion || '', 16), cut(cf.httpProtocol || '', 16)
+      ruleId, visit.kind, cut(visit.reason, 300), Number(cf.asn) || 0, cut(cf.tlsVersion || '', 16), cut(cf.httpProtocol || '', 16), visit.proxy
     ),
     env.DB.prepare('UPDATE links SET clicks = clicks + 1, last_click = ? WHERE id = ?').bind(now, linkId),
   ]);
@@ -288,17 +293,29 @@ const DC_ASN = new Map([
   [9009, 'M247'], [21859, 'Zenlayer'], [212238, 'Datacamp'], [36352, 'ColoCrossing'], [62904, 'Eonix'],
 ]);
 
-// 强信号命中一条即为“可疑”；弱信号要两条以上
-function classifyVisit({ ua, hasLang, asnOrg, asn, recent, secFetch, tls, http }) {
+// 说中文的国家 / 地区；中文访客出现在其他地区，多半是经 VPN / 代理访问
+const ZH_REGIONS = new Set(['CN', 'HK', 'MO', 'TW', 'SG', 'MY']);
+
+/**
+ * 访客类型：
+ * - bot：User-Agent 自报为爬虫 / 工具
+ * - suspect：强信号（缺语言信息、高频、过旧 TLS）命中一条；或弱信号两条以上；
+ *   或机房 IP 再加任一机器特征
+ * - human：其余。机房 IP 但浏览器特征完整的，算“真人 · 经代理”（proxy = 1），
+ *   VPN、机场节点大多架在机房里
+ */
+function classifyVisit({ ua, hasLang, lang, country, asnOrg, asn, recent, secFetch, tls, http }) {
   const s = (ua || '').toLowerCase();
-  if (!s) return { kind: 'bot', reason: '没有 User-Agent' };
+  if (!s) return { kind: 'bot', reason: '没有 User-Agent', proxy: 0 };
   if (parseUA(ua).bot) {
     const hit = BOT_NAMES.find(([k]) => s.includes(k));
-    return { kind: 'bot', reason: hit ? hit[1] : '自报为爬虫 / 工具' };
+    return { kind: 'bot', reason: hit ? hit[1] : '自报为爬虫 / 工具', proxy: 0 };
   }
+  let dc = '';
+  if (DC_ASN.has(asn)) dc = `${DC_ASN.get(asn)}（AS${asn}）`;
+  else if (asnOrg && DC_RE.test(asnOrg) && !/cloudflare|akamai/i.test(asnOrg)) dc = asnOrg;
+
   const strong = [], weak = [];
-  if (DC_ASN.has(asn)) strong.push(`机房 IP · ${DC_ASN.get(asn)}（AS${asn}）`);
-  else if (asnOrg && DC_RE.test(asnOrg) && !/cloudflare|akamai/i.test(asnOrg)) strong.push(`机房 IP · ${asnOrg}`);
   if (!hasLang) strong.push('没有语言信息（Accept-Language）');
   if (recent >= 5) strong.push(`同一 IP 1 分钟内第 ${recent} 次访问`);
   if (/^TLSv1(\.[01])?$/.test(tls || '')) strong.push(`过旧的 ${tls}`);
@@ -313,8 +330,21 @@ function classifyVisit({ ua, hasLang, asnOrg, asn, recent, secFetch, tls, http }
   const cr = !/edg|opr|samsung/.test(s) && /chrome\/(\d+)/.exec(s);
   if (ios && +ios[1] < 15) weak.push(`自称旧版系统 iOS ${ios.slice(1).filter(Boolean).join('.')}`);
   else if (cr && +cr[1] < 100) weak.push(`自称旧版浏览器 Chrome ${cr[1]}`);
-  if (strong.length || weak.length >= 2) return { kind: 'suspect', reason: [...strong, ...weak].join('；') };
-  return { kind: 'human', reason: weak.join('；') };
+
+  if (dc) {
+    // 机房 IP：有任一机器特征算可疑；浏览器特征完整（HTTP/2 或 3）算经代理的真人；
+    // 旧记录没有协议信息，无法区分，仍按可疑处理
+    if (strong.length || weak.length || !/^HTTP\/[23]/.test(http || '')) {
+      return { kind: 'suspect', reason: [`机房 IP · ${dc}`, ...strong, ...weak].join('；'), proxy: 0 };
+    }
+    return { kind: 'human', reason: `经 VPN / 代理 · ${dc}`, proxy: 1 };
+  }
+  if (strong.length || weak.length >= 2) return { kind: 'suspect', reason: [...strong, ...weak].join('；'), proxy: 0 };
+  // 中文访客出现在非中文地区：多半经 VPN / 代理（只作提示，不影响真人判定）
+  if (/^zh\b/i.test(lang || '') && country && !ZH_REGIONS.has(country)) {
+    return { kind: 'human', reason: [`可能经 VPN / 代理 · 中文访客，IP 在 ${country}`, ...weak].join('；'), proxy: 1 };
+  }
+  return { kind: 'human', reason: weak.join('；'), proxy: 0 };
 }
 
 function parseUA(ua) {
@@ -1049,7 +1079,7 @@ async function linkStats(env, id, url) {
       top('source', 20), top('referer_host', 20), top('country'), top('city'),
       top('device'), top('browser'), top('os'), top('utm_campaign'), top('rule_id', 50), top('utm_source', 20),
       // 访客类型（不受“含机器访问”开关影响）
-      env.DB.prepare('SELECT kind AS k, COUNT(*) AS n FROM clicks WHERE link_id = ?1 AND ts >= ?2 GROUP BY kind').bind(id, since).all().then((r) => r.results),
+      env.DB.prepare('SELECT kind AS k, proxy AS p, COUNT(*) AS n FROM clicks WHERE link_id = ?1 AND ts >= ?2 GROUP BY kind, proxy').bind(id, since).all().then((r) => r.results),
       env.DB.prepare("SELECT reason AS k, COUNT(*) AS n FROM clicks WHERE link_id = ?1 AND ts >= ?2 AND kind != 'human' AND reason != '' GROUP BY reason ORDER BY n DESC LIMIT 200")
         .bind(id, since).all().then((r) => r.results),
     ]);
@@ -1086,7 +1116,7 @@ async function exportClicks(env, id) {
   const rows = (await env.DB.prepare('SELECT * FROM clicks WHERE link_id = ? ORDER BY id DESC LIMIT 100000')
     .bind(id).all()).results;
   const cols = ['ts', 'source', 'referer', 'utm_source', 'utm_medium', 'utm_campaign', 'ip', 'country',
-    'region', 'city', 'asn_org', 'device', 'os', 'browser', 'is_bot', 'kind', 'reason', 'asn', 'tls', 'http', 'lang', 'rule_id', 'ua'];
+    'region', 'city', 'asn_org', 'device', 'os', 'browser', 'is_bot', 'kind', 'reason', 'proxy', 'asn', 'tls', 'http', 'lang', 'rule_id', 'ua'];
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [cols.join(',')];
   for (const r of rows) {
@@ -1137,7 +1167,7 @@ async function overview(env, url) {
                     CAST(strftime('%H', (ts + ?2 * 60000) / 1000, 'unixepoch') AS INTEGER) AS h, COUNT(*) AS n
              FROM clicks c WHERE ts >= ?1 ${botFilter} GROUP BY d, h`, since, tz)),
       recentClicks(env, bots, linkId),
-      all(q(`SELECT kind AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${linkFilter} GROUP BY kind`, since)),
+      all(q(`SELECT kind AS k, proxy AS p, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${linkFilter} GROUP BY kind, proxy`, since)),
       // 机器访问按运营商汇总（只用于查看，不影响跳转）
       all(q(`SELECT asn, asn_org, kind, COUNT(*) AS n, COUNT(DISTINCT link_id) AS links, COUNT(DISTINCT ip) AS ips, MAX(ts) AS last, MAX(reason) AS reason
              FROM clicks c WHERE ts >= ? AND kind IN ('bot', 'suspect') ${linkFilter}
@@ -1169,7 +1199,7 @@ async function overview(env, url) {
 async function recentClicks(env, bots, linkId = 0) {
   const where = [bots ? '' : 'c.is_bot = 0', linkId ? 'c.link_id = ?' : ''].filter(Boolean);
   const r = await env.DB.prepare(
-    `SELECT c.id, c.ts, c.source, c.country, c.city, c.device, c.os, c.browser, c.kind, c.reason, l.id AS link_id, l.slug
+    `SELECT c.id, c.ts, c.source, c.country, c.city, c.device, c.os, c.browser, c.kind, c.reason, c.proxy, l.id AS link_id, l.slug
      FROM clicks c JOIN links l ON l.id = c.link_id
      ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY c.ts DESC LIMIT 12`
   ).bind(...(linkId ? [linkId] : [])).all();
