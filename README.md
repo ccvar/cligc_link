@@ -256,7 +256,7 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 
 ### Cloudflare 用量
 
-后台“设置 → Cloudflare 用量”显示今天和最近 7 天的 D1 读写行数、Worker 请求数和 D1 存储，并与免费版额度对比（免费版按账号计算，每天 UTC 0 点重置）。需要：
+后台“设置 → Cloudflare 用量”显示整个账户的 D1 读写行数、Worker 请求数和 D1 存储，并单独列出本项目的用量（`D1_DATABASE_ID`、`WORKER_NAME`）。免费版对比每天的额度（UTC 0 点重置），付费版对比本月累计与每月包含额度；套餐可自动识别，也可在面板里手动指定。需要：
 
 1. 在 Cloudflare 控制台创建自定义 API 令牌，权限 **账户 · Account Analytics · 读取**（可选 **账户 · 账单 · 读取**，用于显示是否为付费版）。
 2. `npx wrangler secret put CF_API_TOKEN` 填入令牌；在 `wrangler.toml` 的 `[vars]` 里填写 `CF_ACCOUNT_ID`，重新部署。

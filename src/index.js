@@ -428,6 +428,12 @@ async function handleApi(request, env, url) {
   if (path === '/api/overview' && method === 'GET') return overview(env, url);
   if (path === '/api/retention' && method === 'GET') return json(await retentionInfo(env));
   if (path === '/api/usage' && method === 'GET') return json(await cfUsage(env, url.searchParams.get('force') === '1'));
+  if (path === '/api/usage/plan' && method === 'PUT') {
+    const body = await request.json().catch(() => ({}));
+    if (!['auto', 'free', 'paid'].includes(body.plan)) return json({ error: '套餐只能是 auto、free 或 paid' }, 400);
+    await setSetting(env, 'cf_plan', body.plan);
+    return json(await cfUsage(env, false));
+  }
   if (path === '/api/retention' && method === 'PUT') {
     const body = await request.json().catch(() => ({}));
     const days = Number(body.days) || 0;
@@ -1468,26 +1474,34 @@ async function linkStatsAgg(env, id, { days, tz, bots }) {
 }
 
 // ---------------------------------------------------------------- Cloudflare 用量
-// 需要 CF_ACCOUNT_ID（变量）和 CF_API_TOKEN（密钥，权限 Account Analytics: Read；可选 Billing: Read 用于显示套餐）。
-// 免费版额度按账号计算、每天 UTC 0 点重置；结果缓存 5 分钟。
+// 需要 CF_ACCOUNT_ID（变量）和 CF_API_TOKEN（密钥，权限 帐户分析 · 读取；可选 账单 · 读取 用于识别套餐）。
+// 额度按整个账户计算：免费版每天 UTC 0 点重置，付费版按自然月计。D1_DATABASE_ID / WORKER_NAME 用于单独统计本项目。
+// 结果缓存 5 分钟。
 async function cfUsage(env, force) {
   if (!env.CF_API_TOKEN || !env.CF_ACCOUNT_ID) return { configured: false, accountId: env.CF_ACCOUNT_ID || '' };
+  const planSetting = (await getSetting(env, 'cf_plan'))?.value || 'auto';
   if (!force) {
     const c = await getSetting(env, 'usage_cache');
-    if (c && c.updated_at > Date.now() - 5 * 60000) return { ...JSON.parse(c.value), cached: true };
+    if (c && c.updated_at > Date.now() - 5 * 60000) {
+      const d = JSON.parse(c.value);
+      return { ...d, planSetting, plan: planSetting === 'auto' ? d.detected : planSetting, cached: true };
+    }
   }
-  // 粘贴令牌时容易带上空格或换行
   const headers = { authorization: `Bearer ${String(env.CF_API_TOKEN).trim()}`, 'content-type': 'application/json' };
-  const today = new Date().toISOString().slice(0, 10);
-  const start = new Date(Date.now() - 6 * DAY).toISOString().slice(0, 10);
+  const account = String(env.CF_ACCOUNT_ID).trim();
+  const dbId = String(env.D1_DATABASE_ID || '').trim(), worker = String(env.WORKER_NAME || '').trim();
+  const now = new Date(), today = now.toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 8) + '01';
+  const weekStart = new Date(Date.now() - 6 * DAY).toISOString().slice(0, 10);
+  const start = monthStart < weekStart ? monthStart : weekStart;
   const gql = async (field, body) => {
     try {
       const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
         method: 'POST', headers,
         body: JSON.stringify({
           query: `query($a: string!, $s: Date!, $e: Date!) { viewer { accounts(filter: { accountTag: $a }) {
-            ${field}(limit: 1000, filter: { date_geq: $s, date_leq: $e }) { ${body} } } } }`,
-          variables: { a: String(env.CF_ACCOUNT_ID).trim(), s: start, e: today },
+            ${field}(limit: 10000, filter: { date_geq: $s, date_leq: $e }) { ${body} } } } }`,
+          variables: { a: account, s: start, e: today },
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -1495,39 +1509,61 @@ async function cfUsage(env, force) {
       return { rows: d.data?.viewer?.accounts?.[0]?.[field] || [] };
     } catch (err) { return { error: String(err.message || err) }; }
   };
-  const [d1, storage, workers, plan] = await Promise.all([
-    gql('d1AnalyticsAdaptiveGroups', 'sum { readQueries writeQueries rowsRead rowsWritten } dimensions { date }'),
+  const [d1, storage, workers, subs] = await Promise.all([
+    gql('d1AnalyticsAdaptiveGroups', 'sum { readQueries writeQueries rowsRead rowsWritten } dimensions { date databaseId }'),
     gql('d1StorageAdaptiveGroups', 'max { databaseSizeBytes } dimensions { date databaseId }'),
-    gql('workersInvocationsAdaptive', 'sum { requests errors } dimensions { date }'),
-    // 套餐：需要 Billing: Read 权限，没有则显示“未知”
-    fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/subscriptions`, { headers })
-      .then((r) => r.json()).then((d) => {
-        if (!d.success) return null;
-        const subs = d.result || [];
-        return subs.some((x) => /workers/i.test(`${x.rate_plan?.id || ''} ${x.rate_plan?.public_name || ''}`) && x.state !== 'Cancelled') ? 'paid' : 'free';
-      }).catch(() => null),
+    gql('workersInvocationsAdaptive', 'sum { requests errors } dimensions { date scriptName }'),
+    fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/subscriptions`, { headers })
+      .then((r) => r.json()).then((d) => (d.success ? (d.result || []) : null)).catch(() => null),
   ]);
+
+  // 每天：账户合计 + 本项目
   const days = new Map();
   const day = (date) => {
-    if (!days.has(date)) days.set(date, { date, rowsRead: 0, rowsWritten: 0, readQueries: 0, writeQueries: 0, requests: 0, errors: 0 });
+    if (!days.has(date)) days.set(date, { date, rowsRead: 0, rowsWritten: 0, requests: 0, mine: { rowsRead: 0, rowsWritten: 0, requests: 0 } });
     return days.get(date);
   };
-  for (let i = 6; i >= 0; i--) day(new Date(Date.now() - i * DAY).toISOString().slice(0, 10));
-  for (const r of d1.rows || []) Object.entries(r.sum).forEach(([k, v]) => { day(r.dimensions.date)[k] += v || 0; });
-  for (const r of workers.rows || []) { const x = day(r.dimensions.date); x.requests += r.sum.requests || 0; x.errors += r.sum.errors || 0; }
-  // 存储：取最近一天各数据库大小之和
-  const byDate = new Map();
-  for (const r of storage.rows || []) byDate.set(r.dimensions.date, (byDate.get(r.dimensions.date) || 0) + (r.max.databaseSizeBytes || 0));
-  const lastDate = [...byDate.keys()].sort().pop();
+  for (let t = Date.parse(start + 'T00:00:00Z'); t <= Date.parse(today + 'T00:00:00Z'); t += DAY) day(new Date(t).toISOString().slice(0, 10));
+  for (const r of d1.rows || []) {
+    const x = day(r.dimensions.date);
+    x.rowsRead += r.sum.rowsRead || 0; x.rowsWritten += r.sum.rowsWritten || 0;
+    if (dbId && r.dimensions.databaseId === dbId) { x.mine.rowsRead += r.sum.rowsRead || 0; x.mine.rowsWritten += r.sum.rowsWritten || 0; }
+  }
+  for (const r of workers.rows || []) {
+    const x = day(r.dimensions.date);
+    x.requests += r.sum.requests || 0;
+    if (worker && r.dimensions.scriptName === worker) x.mine.requests += r.sum.requests || 0;
+  }
+  // 存储：最近一天各数据库大小
+  const lastDate = (storage.rows || []).map((r) => r.dimensions.date).sort().pop();
+  let storageBytes = null, myStorage = null;
+  if (lastDate) {
+    storageBytes = 0;
+    for (const r of storage.rows) if (r.dimensions.date === lastDate) {
+      storageBytes += r.max.databaseSizeBytes || 0;
+      if (dbId && r.dimensions.databaseId === dbId) myStorage = r.max.databaseSizeBytes || 0;
+    }
+  }
+  // 套餐：账户订阅里有 Workers 付费相关的计划即视为付费版
+  const subNames = subs ? subs.filter((x) => !/cancel/i.test(x.state || '')).map((x) => x.rate_plan?.public_name || x.rate_plan?.id || x.product?.name || '').filter(Boolean) : null;
+  const detected = subs ? (subs.some((x) => /workers|paid|bundled|unbound|standard/i.test(JSON.stringify([x.rate_plan, x.product]))) ? 'paid' : 'free') : null;
+  const all = [...days.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const sum = (rows, k, mine) => rows.reduce((s, x) => s + (mine ? x.mine[k] : x[k]), 0);
+  const month = all.filter((x) => x.date >= monthStart);
   const out = {
-    configured: true, plan, today,
-    days: [...days.values()].filter((x) => x.date >= start && x.date <= today).sort((a, b) => (a.date < b.date ? -1 : 1)),
-    storageBytes: lastDate ? byDate.get(lastDate) : null,
+    configured: true, today, monthStart, detected, subscriptions: subNames,
+    hasMine: { d1: !!dbId, worker: !!worker },
+    days: all.filter((x) => x.date >= weekStart),
+    month: {
+      rowsRead: sum(month, 'rowsRead'), rowsWritten: sum(month, 'rowsWritten'), requests: sum(month, 'requests'),
+      mine: { rowsRead: sum(month, 'rowsRead', 1), rowsWritten: sum(month, 'rowsWritten', 1), requests: sum(month, 'requests', 1) },
+    },
+    storageBytes, myStorage,
     errors: [d1.error && `D1：${d1.error}`, workers.error && `Workers：${workers.error}`, storage.error && `存储：${storage.error}`].filter(Boolean),
     updatedAt: Date.now(),
   };
   if (!out.errors.length) await setSetting(env, 'usage_cache', JSON.stringify(out));
-  return out;
+  return { ...out, planSetting, plan: planSetting === 'auto' ? detected : planSetting };
 }
 
 async function retentionInfo(env) {

@@ -24,6 +24,9 @@ ADMIN_HOST = ""
 TURNSTILE_SITEKEY = ""
 # Cloudflare 账号 ID（后台“设置 → Cloudflare 用量”使用）；还需用 `wrangler secret put CF_API_TOKEN` 设置只读 API 令牌
 CF_ACCOUNT_ID = ""
+# 本项目的 D1 数据库 ID 和 Worker 名称：用量面板据此单独统计本项目（留空则只显示整个账户）
+D1_DATABASE_ID = ""
+WORKER_NAME = ""
 
 # D1 数据库：执行 `npx wrangler d1 create cligc-link`，把输出的 database_id 填到下面
 # 表结构会在首次请求时自动创建，无需手动初始化
