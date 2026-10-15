@@ -8,6 +8,7 @@ const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
 // 回退检测：访客浏览器内探测地区地址的超时时间
 const PROBE_TIMEOUT = 2500;
 const SLUG_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const SUB_SLUG_RE = /^[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,64}$/; // 二级短链 a/b
 const SESSION_TTL = 7 * 24 * 3600 * 1000;
 // 未设置任何密码时使用的默认密码；用它登录后必须先修改密码才能使用后台
 const DEFAULT_PASSWORD = 'admin';
@@ -85,30 +86,55 @@ async function migrate(env) {
   if (!tcols.includes('fallbacks')) {
     await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN fallbacks INTEGER NOT NULL DEFAULT 0').run();
   }
+  if (!cols.includes('sub')) {
+    await env.DB.prepare("ALTER TABLE clicks ADD COLUMN sub TEXT NOT NULL DEFAULT ''").run();
+  }
+  const lcols = (await env.DB.prepare('PRAGMA table_info(links)').all()).results.map((c) => c.name);
+  if (!lcols.includes('parent_id')) {
+    await env.DB.prepare('ALTER TABLE links ADD COLUMN parent_id INTEGER NOT NULL DEFAULT 0').run();
+  }
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_links_parent ON links(parent_id)').run();
 }
 
 // ---------------------------------------------------------------- 跳转
 
 async function handleRedirect(request, env, ctx, url) {
-  const slug = decodeURIComponent(url.pathname.slice(1)).replace(/\/$/, '');
-  if (!SLUG_RE.test(slug)) return notFound();
+  let path;
+  try { path = decodeURIComponent(url.pathname.slice(1)).replace(/\/+$/, ''); } catch { return notFound(); }
+  const first = path.split('/')[0];
+  if (!SLUG_RE.test(first) || path.length > 300) return notFound();
 
-  const link = await env.DB.prepare(
-    'SELECT id, target_url, enabled, pass_query, expires_at FROM links WHERE slug = ?'
-  ).bind(slug).first();
+  const LINK_COLS = 'id, target_url, enabled, pass_query, expires_at, parent_id';
+  // 先精确匹配（一级或已创建的二级短链），找不到再按一级短链跳转并记下二级路径
+  let link = await env.DB.prepare(`SELECT ${LINK_COLS} FROM links WHERE slug = ?`).bind(path).first();
+  let sub = '';
+  if (!link && path !== first) {
+    link = await env.DB.prepare(`SELECT ${LINK_COLS} FROM links WHERE slug = ?`).bind(first).first();
+    sub = path.slice(first.length + 1);
+  }
   if (!link || !link.enabled) return notFound();
-  if (link.expires_at && link.expires_at < Date.now()) return new Response('Link expired', { status: 410 });
+  const parent = link.parent_id
+    ? await env.DB.prepare(`SELECT ${LINK_COLS} FROM links WHERE id = ?`).bind(link.parent_id).first()
+    : null;
+  if (parent && !parent.enabled) return notFound();
+  const now = Date.now();
+  if ((link.expires_at && link.expires_at < now) || (parent?.expires_at && parent.expires_at < now)) {
+    return new Response('Link expired', { status: 410 });
+  }
 
-  // 按访问者所在国家 / 地区匹配跳转规则，未命中则用默认地址
+  // 按访问者所在国家 / 地区匹配跳转规则：二级短链先看自己的规则，再看一级短链的；都未命中用默认地址
   const country = request.cf?.country || '';
   let rule = null;
   if (country) {
-    rule = await env.DB.prepare(
+    const findRule = (id) => env.DB.prepare(
       `SELECT id, url, fallback FROM link_targets WHERE link_id = ? AND (',' || countries || ',') LIKE ?`
-    ).bind(link.id, `%,${country},%`).first();
+    ).bind(id, `%,${country},%`).first();
+    rule = await findRule(link.id);
+    if (!rule && parent) rule = await findRule(parent.id);
   }
   const ruleId = rule ? rule.id : 0;
-  const raw = rule ? rule.url : link.target_url;
+  const fallbackUrl = link.target_url || parent?.target_url || '';
+  const raw = rule ? rule.url : fallbackUrl;
   if (!raw) return notConfigured();
 
   const withQuery = (u) => {
@@ -122,16 +148,16 @@ async function handleRedirect(request, env, ctx, url) {
   const target = withQuery(raw);
 
   if (request.method === 'GET') {
-    ctx.waitUntil(logClick(request, env, link.id, url, ruleId).catch((e) => console.error('log failed', e)));
+    ctx.waitUntil(logClick(request, env, link.id, url, ruleId, sub).catch((e) => console.error('log failed', e)));
   }
 
   // 规则开启了“打不开时回退”：先在访客浏览器里探测地区地址，连不上再改去默认地址。
   // 爬虫 / 链接预览不执行脚本，直接跳转；http 地址在 https 页面里无法探测，也直接跳转。
-  if (rule && rule.fallback && link.target_url && request.method === 'GET'
+  if (rule && rule.fallback && fallbackUrl && request.method === 'GET'
     && target.startsWith('https:') && !parseUA(request.headers.get('user-agent') || '').bot) {
     const exp = Date.now() + 10 * 60 * 1000;
     const sig = await hmac(await sessionSecret(env), `fb|${rule.id}|${exp}`);
-    return probePage(target, withQuery(link.target_url), { r: rule.id, e: exp, s: sig });
+    return probePage(target, withQuery(fallbackUrl), { r: rule.id, e: exp, s: sig });
   }
 
   return new Response(null, {
@@ -187,7 +213,7 @@ async function recordFallback(request, env) {
   return new Response(null, { status: 204 });
 }
 
-async function logClick(request, env, linkId, url, ruleId) {
+async function logClick(request, env, linkId, url, ruleId, sub = '') {
   const h = request.headers;
   const cf = request.cf || {};
   const referer = h.get('referer') || '';
@@ -204,8 +230,8 @@ async function logClick(request, env, linkId, url, ruleId) {
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO clicks (link_id, ts, source, referer, referer_host, utm_source, utm_medium, utm_campaign,
-         ip, country, region, city, asn_org, ua, browser, os, device, is_bot, lang, rule_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         ip, country, region, city, asn_org, ua, browser, os, device, is_bot, lang, rule_id, sub)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       linkId, now, cut(source, 200), cut(referer, 1000), cut(refererHost, 200),
       cut(utmSource, 200), cut(qs.get('utm_medium') || '', 200), cut(qs.get('utm_campaign') || '', 200),
@@ -213,7 +239,7 @@ async function logClick(request, env, linkId, url, ruleId) {
       cut(cf.asOrganization || '', 200), cut(ua, 500),
       parsed.browser, parsed.os, parsed.device, parsed.bot ? 1 : 0,
       cut((h.get('accept-language') || '').split(',')[0], 32),
-      ruleId
+      ruleId, cut(sub, 200)
     ),
     env.DB.prepare('UPDATE links SET clicks = clicks + 1, last_click = ? WHERE id = ?').bind(now, linkId),
   ]);
@@ -620,11 +646,24 @@ async function safeEqual(a, b, secret) {
 async function validateLinkInput(body, env, currentId) {
   const out = {};
   if (body.slug !== undefined) {
-    const slug = String(body.slug).trim();
-    if (!SLUG_RE.test(slug)) return { error: '短链后缀只能包含字母、数字、- 和 _，长度 1-64' };
-    if (RESERVED.has(slug.toLowerCase())) return { error: `"${slug}" 是保留字` };
+    const slug = String(body.slug).trim().replace(/^\/+/, '');
+    const isSub = SUB_SLUG_RE.test(slug);
+    if (!isSub && !SLUG_RE.test(slug)) return { error: '短链后缀只能包含字母、数字、- 和 _，二级短链写成 a/b' };
+    const head = slug.split('/')[0];
+    if (RESERVED.has(head.toLowerCase())) return { error: `"${head}" 是保留字` };
     const exists = await env.DB.prepare('SELECT id FROM links WHERE slug = ?').bind(slug).first();
     if (exists && exists.id !== currentId) return { error: `短链 "${slug}" 已存在` };
+    out.parent_id = 0;
+    if (isSub) {
+      const parent = await env.DB.prepare('SELECT id FROM links WHERE slug = ?').bind(head).first();
+      if (!parent) return { error: `一级短链 "/${head}" 不存在，请先创建它` };
+      if (parent.id === currentId) return { error: '不能把短链设为自己的二级短链' };
+      if (currentId) {
+        const kids = await env.DB.prepare('SELECT COUNT(*) AS n FROM links WHERE parent_id = ?').bind(currentId).first('n');
+        if (kids) return { error: '该短链下还有二级短链，不能改成二级短链' };
+      }
+      out.parent_id = parent.id;
+    }
     out.slug = slug;
   }
   if (body.target_url !== undefined) {
@@ -660,10 +699,10 @@ async function createLink(request, env) {
 
   const now = Date.now();
   const row = await env.DB.prepare(
-    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, expires_at, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?) RETURNING *`
+    `INSERT INTO links (slug, parent_id, target_url, title, note, enabled, pass_query, expires_at, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *`
   ).bind(
-    data.slug, data.target_url || '', data.title || '', data.note || '',
+    data.slug, data.parent_id || 0, data.target_url || '', data.title || '', data.note || '',
     data.enabled ?? 1, data.pass_query ?? 0, data.expires_at ?? null, now, now
   ).first();
   return json(row, 201);
@@ -682,9 +721,9 @@ async function duplicateLink(request, env, id) {
 
   const now = Date.now();
   const row = await env.DB.prepare(
-    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, expires_at, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?) RETURNING *`
-  ).bind(data.slug, src.target_url, data.title, src.note, src.enabled, src.pass_query, src.expires_at, now, now).first();
+    `INSERT INTO links (slug, parent_id, target_url, title, note, enabled, pass_query, expires_at, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *`
+  ).bind(data.slug, data.parent_id, src.target_url, data.title, src.note, src.enabled, src.pass_query, src.expires_at, now, now).first();
   await env.DB.prepare(
     `INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at)
      SELECT ?, countries, url, note, fallback, ?, ? FROM link_targets WHERE link_id = ? ORDER BY id`
@@ -703,11 +742,24 @@ async function updateLink(request, env, id) {
   const row = await env.DB.prepare(
     `UPDATE links SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ? RETURNING *`
   ).bind(...cols.map((c) => data[c]), id).first();
-  return row ? json(row) : json({ error: 'not found' }, 404);
+  if (!row) return json({ error: 'not found' }, 404);
+  // 一级短链改了后缀，二级短链的前缀跟着改
+  if (data.slug && !row.parent_id) {
+    await env.DB.prepare(`UPDATE links SET slug = ? || substr(slug, instr(slug, '/')), updated_at = ? WHERE parent_id = ?`)
+      .bind(row.slug, data.updated_at, id).run();
+  }
+  return json(row);
 }
 
 async function deleteLink(env, id) {
+  // 连同二级短链一起删除
+  const kids = (await env.DB.prepare('SELECT id FROM links WHERE parent_id = ?').bind(id).all()).results.map((r) => r.id);
   await env.DB.batch([
+    ...kids.flatMap((k) => [
+      env.DB.prepare('DELETE FROM clicks WHERE link_id = ?').bind(k),
+      env.DB.prepare('DELETE FROM link_targets WHERE link_id = ?').bind(k),
+    ]),
+    env.DB.prepare('DELETE FROM links WHERE parent_id = ? AND parent_id != 0').bind(id),
     env.DB.prepare('DELETE FROM clicks WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM link_targets WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM links WHERE id = ?').bind(id),
@@ -719,6 +771,17 @@ async function getLink(env, id) {
   const row = await env.DB.prepare('SELECT * FROM links WHERE id = ?').bind(id).first();
   if (!row) return json({ error: 'not found' }, 404);
   row.targets = await loadTargets(env, id);
+  if (row.parent_id) {
+    // 二级短链：带上一级短链的默认地址和规则，用于展示继承关系
+    const p = await env.DB.prepare('SELECT id, slug, title, target_url, enabled, expires_at FROM links WHERE id = ?').bind(row.parent_id).first();
+    if (p) row.parent = { ...p, targets: await loadTargets(env, p.id) };
+  } else {
+    row.children = (await env.DB.prepare(
+      `SELECT id, slug, title, target_url, enabled, expires_at, clicks, last_click,
+         (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id) AS rules
+       FROM links WHERE parent_id = ? ORDER BY slug`
+    ).bind(id).all()).results;
+  }
   return json(row);
 }
 
@@ -790,7 +853,9 @@ async function listLinks(env, url) {
   const params = q ? [`%${q}%`] : [];
   const [total, rows] = await Promise.all([
     env.DB.prepare(`SELECT COUNT(*) AS n FROM links ${where}`).bind(...params).first('n'),
-    env.DB.prepare(`SELECT *, (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id) AS rules
+    env.DB.prepare(`SELECT *, (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id) AS rules,
+        (SELECT COUNT(*) FROM links k WHERE k.parent_id = links.id) AS subs,
+        (SELECT p.target_url FROM links p WHERE p.id = links.parent_id) AS parent_url
       FROM links ${where} ORDER BY ${order} LIMIT ${size} OFFSET ${(page - 1) * size}`)
       .bind(...params).all(),
   ]);
@@ -851,7 +916,7 @@ async function linkStats(env, id, url) {
     env.DB.prepare(`SELECT ${col} AS k, COUNT(*) AS n ${base} GROUP BY ${col} ORDER BY n DESC LIMIT ${limit}`)
       .bind(id, since).all().then((r) => r.results);
 
-  const [summary, prev, daily, prevDaily, hourly, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, targets] =
+  const [summary, prev, daily, prevDaily, hourly, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, targets, subs] =
     await Promise.all([
       env.DB.prepare(`SELECT COUNT(*) AS total, COUNT(DISTINCT ip) AS unique_ips ${base}`).bind(id, since).first(),
       env.DB.prepare(
@@ -871,9 +936,12 @@ async function linkStats(env, id, url) {
       ).bind(id, since, tz).all().then((r) => r.results),
       top('source', 20), top('referer_host', 20), top('country'), top('city'),
       top('device'), top('browser'), top('os'), top('utm_campaign'), top('rule_id', 50),
+      // 访问了未创建的二级路径（按本短链跳转）
+      env.DB.prepare(`SELECT sub AS k, COUNT(*) AS n ${base} AND sub != '' GROUP BY sub ORDER BY n DESC LIMIT 20`)
+        .bind(id, since).all().then((r) => r.results),
     ]);
 
-  return json({ summary, prev, daily, prevDaily, hourly, targets, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns });
+  return json({ summary, prev, daily, prevDaily, hourly, targets, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, subs });
 }
 
 async function linkClicks(env, id, url) {
@@ -895,7 +963,7 @@ async function exportClicks(env, id) {
   const rows = (await env.DB.prepare('SELECT * FROM clicks WHERE link_id = ? ORDER BY id DESC LIMIT 100000')
     .bind(id).all()).results;
   const cols = ['ts', 'source', 'referer', 'utm_source', 'utm_medium', 'utm_campaign', 'ip', 'country',
-    'region', 'city', 'asn_org', 'device', 'os', 'browser', 'is_bot', 'lang', 'rule_id', 'ua'];
+    'region', 'city', 'asn_org', 'device', 'os', 'browser', 'is_bot', 'lang', 'rule_id', 'sub', 'ua'];
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [cols.join(',')];
   for (const r of rows) {
@@ -904,7 +972,7 @@ async function exportClicks(env, id) {
   return new Response('﻿' + lines.join('\n'), {
     headers: {
       'content-type': 'text/csv; charset=utf-8',
-      'content-disposition': `attachment; filename="clicks-${link.slug}.csv"`,
+      'content-disposition': `attachment; filename="clicks-${link.slug.replace('/', '-')}.csv"`,
     },
   });
 }

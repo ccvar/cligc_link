@@ -44,6 +44,20 @@
 /* ================================================================ base */
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
+/* 首次加载：稍后才出现，网络快时不闪 */
+.boot { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 18px; background: var(--main); animation: fade .3s ease both .25s; }
+.boot-m svg { width: 44px; height: 44px; display: block; border-radius: 12px; animation: bootPulse 1.6s var(--ease-out) infinite; }
+.boot-b { width: 120px; height: 3px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
+.boot-b i { display: block; width: 40%; height: 100%; border-radius: 3px; background: var(--accent); animation: bootBar 1.1s ease-in-out infinite; }
+.boot-t { font-size: 12.5px; color: var(--muted); }
+@keyframes fade { from { opacity: 0; } }
+@keyframes bootPulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent); } 50% { transform: scale(.94); box-shadow: 0 0 0 10px transparent; } }
+@keyframes bootBar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+/* 页面内请求较慢时，顶部细进度条 */
+.topbar { position: fixed; z-index: 60; top: 0; left: 0; right: 0; height: 2px; pointer-events: none; opacity: 0; transition: opacity .3s; overflow: hidden; }
+.topbar::before { content: ""; position: absolute; inset: 0; width: 35%; background: linear-gradient(90deg, transparent, var(--accent), var(--violet)); animation: bootBar 1s ease-in-out infinite; }
+.topbar.on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .boot-m svg, .boot-b i, .topbar::before { animation-duration: 3s; } }
 body { font: 14px/1.55 var(--sans); background: var(--side); color: var(--text);
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
 a { color: inherit; text-decoration: none; }
@@ -716,6 +730,33 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 @keyframes pop { from { transform: translateX(-50%) scale(.95); opacity: 0; } }
 .dialog h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -.01em; }
 .dialog p { margin: 0 0 22px; color: var(--text-2); }
+/* 二级短链 */
+.inh { color: var(--muted); }
+.rb.sub { color: var(--violet); background: color-mix(in srgb, var(--violet) 12%, transparent); }
+.parent-of { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin: 2px 0 6px; }
+.parent-of a { color: var(--accent-ink); font-family: var(--mono); font-weight: 600; }
+.tag-inh { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 11.5px; font-weight: 550; white-space: nowrap; flex: none;
+  color: var(--violet); background: color-mix(in srgb, var(--violet) 11%, transparent); margin-right: 6px; }
+.rule.inh-rule { background: color-mix(in srgb, var(--sunken) 55%, transparent); }
+.rule.inh-rule .ru a { color: var(--text-2); }
+.sub-list { padding: 4px 8px 8px; }
+.sub-row { display: grid; grid-template-columns: minmax(80px, auto) minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 11px 12px; border-radius: 10px; transition: background .15s; }
+.sub-row:hover { background: var(--sunken); }
+.sub-row .sl { font-family: var(--mono); font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+.sub-row .st { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub-row .n { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sub-row .n small { font-weight: 500; color: var(--muted); font-size: 12px; margin-left: 2px; }
+@media (max-width: 640px) { .sub-row { grid-template-columns: minmax(0, 1fr) auto; } .sub-row .st { grid-column: 1 / -1; grid-row: 2; } .sub-row .pill { display: none; } }
+.sub-paths { margin: 0 20px 18px; padding: 14px 16px; border-radius: 12px; border: 1px dashed var(--line); }
+.sp-h { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); margin-bottom: 10px; }
+.sp-l { display: flex; flex-wrap: wrap; gap: 8px; }
+.sp-i { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; font-size: 12.5px; transition: border-color .15s, background .15s; }
+.sp-i:hover { border-color: var(--accent); background: var(--accent-2); }
+.sp-i code { font-family: var(--mono); }
+.sp-i b { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
+.sp-i svg { color: var(--accent); }
+#subs .none { padding: 16px 20px 20px; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
+#subs .none svg { flex: none; }
 .dialog.dup p { margin-bottom: 18px; }
 .dialog.dup .field { margin-bottom: 16px; }
 .dialog.dup .row { margin-top: 22px; }
@@ -770,7 +811,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app"><div class="boot" role="status" aria-label="加载中">
+  <div class="boot-m"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#2f6bff"/><path d="M10.5 21.5 21.5 10.5M13.5 10.5h8v8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div class="boot-b"><i></i></div><div class="boot-t">正在加载…</div></div></div>
+<div class="topbar" id="topbar" aria-hidden="true"></div>
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 <script>
 const $app = document.getElementById('app');
@@ -824,6 +868,7 @@ const I = {
   tab: '<rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M11 18h2"/>',
   bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 13h.01M15 13h.01"/>',
   pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  tree: '<path d="M6 4v9a3 3 0 0 0 3 3h10"/><path d="m15 12 4 4-4 4"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   route: '<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/>',
   chev: '<path d="m6 9 6 6 6-6"/>',
@@ -906,13 +951,28 @@ function greet() {
 }
 const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
+// 进行中的请求超过 300ms 时显示顶部进度条（后台轮询不计入）
+let pending = 0, barTimer;
+function busy(d) {
+  pending += d;
+  const bar = document.getElementById('topbar');
+  clearTimeout(barTimer);
+  if (pending > 0) barTimer = setTimeout(() => bar.classList.add('on'), 300);
+  else bar.classList.remove('on');
+}
+
 async function api(path, opts = {}) {
-  const res = await fetch('/api' + path, {
-    ...opts,
-    headers: { 'content-type': 'application/json', ...(opts.headers || {}) },
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-    credentials: 'same-origin',
-  });
+  const quiet = path.startsWith('/recent');
+  if (!quiet) busy(1);
+  let res;
+  try {
+    res = await fetch('/api' + path, {
+      ...opts,
+      headers: { 'content-type': 'application/json', ...(opts.headers || {}) },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      credentials: 'same-origin',
+    });
+  } finally { if (!quiet) busy(-1); }
   if (res.status === 401 && path !== '/login') { renderLogin(); throw new Error('unauthorized'); }
   const data = await res.json().catch(() => ({}));
   if (res.status === 403 && data.mustChange) { renderSetPassword(); throw new Error('unauthorized'); }
@@ -1775,7 +1835,10 @@ async function renderLinks(token, opts = {}) {
     <div class="lrow ${listState.flash === l.id ? 'flash' : ''}" data-go="${l.id}" tabindex="0">
       <div style="min-width:0">
         <div class="su">${esc(shortDisp(l.slug))}${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}</div>
-        <div class="tg">${l.rules ? `<span class="rb">${ic('globe')}${l.rules} 条地区规则</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
+        <div class="tg">${l.subs ? `<span class="rb sub">${ic('tree')}${l.subs} 个二级</span>` : ''}${l.rules ? `<span class="rb">${ic('globe')}${l.rules} 条地区规则</span>` : ''}<span>${l.target_url ? esc(l.target_url)
+          : l.parent_id && l.parent_url ? `<span class="inh">沿用 /${esc(l.slug.split('/')[0])}：</span>${esc(l.parent_url)}`
+          : l.parent_id ? `<span class="inh">沿用 /${esc(l.slug.split('/')[0])} 的配置</span>`
+          : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
       </div>
       <div class="c-spark">${sparkline(l.spark)}</div>
       <div class="num c-clicks">${num(l.clicks)}</div>
@@ -1882,9 +1945,10 @@ function toLocalInput(ts) {
   return `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function openDrawer(link, onDone) {
+function openDrawer(link, onDone, preset) {
   const isNew = !link;
-  link = link || { slug: '', target_url: '', title: '', note: '', enabled: 1, pass_query: 0, expires_at: null };
+  link = link || { slug: '', target_url: '', title: '', note: '', enabled: 1, pass_query: 0, expires_at: null, ...preset };
+  const parentSlug = link.slug.includes('/') ? link.slug.split('/')[0] : '';
   const ov = document.createElement('div'); ov.className = 'ov';
   const dr = document.createElement('form'); dr.className = 'drawer'; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-modal', 'true');
   dr.innerHTML = `
@@ -1892,8 +1956,8 @@ function openDrawer(link, onDone) {
     <div class="db">
       <div class="field"><label for="f-s">短链后缀</label>
         <div class="pre"><span>${esc(HOST)}/</span><input class="input" id="f-s" name="slug" placeholder="${isNew ? '留空自动生成' : ''}" value="${esc(link.slug)}"></div>
-        <div class="hint">字母、数字、- 或 _${isNew ? '' : '。修改后旧短链会失效'}</div></div>
-      <div class="field"><label for="f-t">默认推广地址 <span class="hint" style="font-weight:400">可选</span></label>
+        <div class="hint">字母、数字、- 或 _；写成 a/b 就是 /a 的二级短链，会继承 /a 的推广地址和地区规则${isNew ? '' : '。修改后旧短链会失效'}</div></div>
+      <div class="field"><label for="f-t">默认推广地址 <span class="hint" style="font-weight:400">${parentSlug ? `可选，留空则沿用 /${esc(parentSlug)} 的地址` : '可选'}</span></label>
         <input class="input" id="f-t" name="target_url" placeholder="https://b.com/promo?id=123" value="${esc(link.target_url)}">
         <div class="hint">没有命中任何地区规则的访问会跳到这里；留空则这些访问显示“链接暂不可用”</div></div>
       <div class="field"><label for="f-ti">标题</label><input class="input" id="f-ti" name="title" placeholder="方便自己辨认，例如：B 站双十一推广" value="${esc(link.title)}"></div>
@@ -1934,7 +1998,8 @@ function openDrawer(link, onDone) {
 
   const del = dr.querySelector('[data-del]');
   if (del) del.onclick = async () => {
-    const ok = await confirmDialog({ title: `删除 /${link.slug}？`, text: '短链和它的全部访问记录都会被删除，无法恢复。', ok: '删除', danger: true });
+    const kids = link.subs ?? link.children?.length ?? 0;
+    const ok = await confirmDialog({ title: `删除 /${link.slug}？`, text: `短链和它的全部访问记录都会被删除${kids ? `，它的 ${kids} 个二级短链也会一起删除` : ''}，无法恢复。`, ok: '删除', danger: true });
     if (!ok) return;
     await api('/links/' + link.id, { method: 'DELETE' });
     close(); toast('已删除');
@@ -1988,7 +2053,10 @@ async function renderLink(token, id) {
           <div class="short">${esc(shortDisp(link.slug))}
             ${copyBtn(url, 'btn sm', '复制')}
             <a class="btn sm ghost icon" href="${esc(url)}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 15)}</a></div>
-          <div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}${link.targets.length ? `<span class="rb" style="margin-left:4px">${ic('globe')}${link.targets.length} 条地区规则</span>` : ''}</div>
+          ${link.parent ? `<div class="parent-of">${ic('tree', 14)}<a href="#/link/${link.parent.id}">/${esc(link.parent.slug)}</a> 的二级短链 · 未单独设置的地址和地区规则沿用 /${esc(link.parent.slug)}</div>` : ''}
+          <div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>`
+            : link.parent?.target_url ? `<span class="inh">沿用 /${esc(link.parent.slug)}：</span><a href="${esc(link.parent.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.parent.target_url)}</a>`
+            : '<span class="warn">未设置默认推广地址</span>'}${link.targets.length ? `<span class="rb" style="margin-left:4px">${ic('globe')}${link.targets.length} 条地区规则</span>` : ''}</div>
           <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.note ? ` · ${esc(link.note)}` : ''}</div>
         </div>
         <div class="acts">
@@ -1998,6 +2066,7 @@ async function renderLink(token, id) {
       </section>
 
       ${rulesCard(link, s)}
+      ${link.parent ? '' : subsCard(link, s)}
 
       <div class="toolbar rv" style="justify-content:flex-end">${rangeBar()}</div>
 
@@ -2103,6 +2172,7 @@ async function renderLink(token, id) {
   ], document.getElementById('lg'));
   document.getElementById('edit').onclick = () => openDrawer(link, (saved) => saved ? route() : null);
   bindRules(link);
+  bindSubs(link);
   const prev = document.getElementById('prev'), next = document.getElementById('next');
   if (prev) prev.onclick = () => { clickState.page--; route(); };
   if (next) next.onclick = () => { clickState.page++; route(); };
@@ -2263,6 +2333,11 @@ function rulesCard(link, s) {
     return `<div class="rh"><b>${num(n)}</b>次 · ${Math.round((n / total) * 100)}%<div class="bar"><i style="width:${(n / max) * 100}%"></i></div>${
       fallbacks != null ? `<div class="fbn ${fallbacks ? 'has' : ''}" title="累计回退到默认地址的次数">已回退 ${num(fallbacks)} 次</div>` : ''}</div>`;
   };
+  const P = link.parent;
+  const own = new Set(link.targets.flatMap((t) => t.countries));
+  // 一级短链的规则里，没被本短链覆盖的国家继续生效
+  const inherited = P ? P.targets.map((t) => ({ ...t, countries: t.countries.filter((c) => !own.has(c)) })).filter((t) => t.countries.length) : [];
+  const defUrl = link.target_url || P?.target_url || '';
   const rows = link.targets.map((t) => `
     <div class="rule">
       <span class="ri">${(t.countries.length === 1 && flag(t.countries[0])) || ic('globe', 18)}</span>
@@ -2274,21 +2349,32 @@ function rulesCard(link, s) {
       ${hitCell(t.id, t.fallback ? t.fallbacks : null)}
       <div class="acts"><button class="btn ghost icon" data-tip="编辑规则" aria-label="编辑规则" data-rule="${t.id}">${ic('edit')}</button>
         <button class="btn ghost icon" data-tip="删除规则" aria-label="删除规则" data-rdel="${t.id}">${ic('trash')}</button></div>
+    </div>`).join('') + inherited.map((t) => `
+    <div class="rule inh-rule">
+      <span class="ri">${(t.countries.length === 1 && flag(t.countries[0])) || ic('globe', 18)}</span>
+      <div style="min-width:0">
+        <div class="rc">${countryChips(t.countries)}<span class="tag-inh">沿用 /${esc(P.slug)}</span>${t.fallback
+          ? `<span class="tag-fb" title="访客打不开这个地址时，自动改去默认地址">${ic('undo', 12)}打不开时回退</span>` : ''}</div>
+        <div class="ru">${ic('arrow', 13)}<a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.url)}">${esc(t.url)}</a></div>
+      </div>
+      ${hitCell(t.id)}
+      <div class="acts"><a class="btn ghost icon" href="#/link/${P.id}" data-tip="去 /${esc(P.slug)} 修改" aria-label="去一级短链修改">${ic('ext')}</a></div>
     </div>`).join('');
   const def = `
     <div class="rule def">
       <span class="ri">${ic('globe', 18)}</span>
       <div style="min-width:0">
-        <div class="rc"><span class="chip def">${link.targets.length ? '其他所有地区' : '所有地区'}</span><span class="tag-def">默认</span></div>
+        <div class="rc"><span class="chip def">${link.targets.length || inherited.length ? '其他所有地区' : '所有地区'}</span><span class="tag-def">默认</span></div>
         <div class="ru">${ic('arrow', 13)}${link.target_url
           ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer" title="${esc(link.target_url)}">${esc(link.target_url)}</a>`
-          : `<span class="warn">未设置，${link.targets.length ? '未命中规则的' : '所有'}访问会显示“链接暂不可用”</span>`}</div>
+          : P?.target_url ? `<span class="tag-inh">沿用 /${esc(P.slug)}</span><a href="${esc(P.target_url)}" target="_blank" rel="noopener noreferrer" title="${esc(P.target_url)}">${esc(P.target_url)}</a>`
+          : `<span class="warn">未设置，${link.targets.length || inherited.length ? '未命中规则的' : '所有'}访问会显示“链接暂不可用”</span>`}</div>
       </div>
       ${hitCell(0)}
-      <div class="acts"><button class="btn ${link.target_url ? 'ghost icon' : 'sm'}" ${link.target_url ? 'data-tip="设置默认地址" aria-label="设置默认地址"' : ''} data-rdef>${link.target_url ? ic('edit') : `${ic('plus', 14)}设置`}</button></div>
+      <div class="acts"><button class="btn ${defUrl ? 'ghost icon' : 'sm'}" ${defUrl ? `data-tip="${link.target_url || !P ? '设置默认地址' : '单独设置默认地址'}" aria-label="设置默认地址"` : ''} data-rdef>${defUrl ? ic('edit') : `${ic('plus', 14)}设置`}</button></div>
     </div>`;
   return `<section class="card rv" id="rules">
-    <div class="card-h"><h3>跳转规则</h3><span class="sub">按访问者所在国家 / 地区跳到不同地址 · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
+    <div class="card-h"><h3>跳转规则</h3><span class="sub">${P ? `本短链的规则优先，其余沿用 /${esc(P.slug)}` : '按访问者所在国家 / 地区跳到不同地址'} · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
       <button class="btn sm primary" id="radd">${ic('plus', 14)}添加地区规则</button></div>
     <div class="rules">${rows || `<div class="none">${ic('route', 18)}还没有地区规则，所有访问都会跳到默认地址。可以为中国、港澳台、北美等地区分别设置推广地址。</div>`}${def}</div>
     <div class="sim"><span>如果访客来自</span>
@@ -2297,15 +2383,44 @@ function rulesCard(link, s) {
   </section>`;
 }
 
+// 一级短链详情页：二级短链列表 + 访问过但还没创建的二级路径
+function subsCard(link, s) {
+  const kids = link.children || [];
+  const made = new Set(kids.map((k) => k.slug.split('/')[1]));
+  const paths = (s.subs || []).filter((x) => !made.has(x.k) && /^[A-Za-z0-9_-]{1,64}$/.test(x.k));
+  const rows = kids.map((k) => `<a class="sub-row" href="#/link/${k.id}">
+      <span class="sl">/${esc(k.slug)}</span>
+      <span class="st">${esc(k.title || '')}${k.title ? ' · ' : ''}${k.target_url ? esc(k.target_url) : `沿用 /${esc(link.slug)} 的地址`}${k.rules ? ` · ${k.rules} 条自己的规则` : ''}</span>
+      <span class="n">${num(k.clicks)}<small>次</small></span>${statusPill(k)}</a>`).join('');
+  return `<section class="card rv" id="subs">
+    <div class="card-h"><h3>二级短链</h3><span class="sub hide-m">/${esc(link.slug)}/xxx 继承本短链的地址和地区规则，可单独覆盖</span><span class="sp"></span>
+      <button class="btn sm" id="sub-add">${ic('plus', 14)}新建二级短链</button></div>
+    ${rows ? `<div class="sub-list">${rows}</div>` : `<div class="none">${ic('tree', 18)}还没有二级短链。比如为每个渠道建 /${esc(link.slug)}/zhihu、/${esc(link.slug)}/weibo，各自统计，也可以单独设置地址。</div>`}
+    ${paths.length ? `<div class="sub-paths"><div class="sp-h">${ic('info', 14)}最近 ${rangeLabel()} 有人访问了这些未创建的二级路径，已按 /${esc(link.slug)} 跳转：</div>
+      <div class="sp-l">${paths.map((x) => `<button type="button" class="sp-i" data-mk="${esc(x.k)}" data-tip="创建 /${esc(link.slug)}/${esc(x.k)}"><code>/${esc(x.k)}</code><b>${num(x.n)}</b>${ic('plus', 12)}</button>`).join('')}</div></div>` : ''}
+  </section>`;
+}
+
+function bindSubs(link) {
+  const card = document.getElementById('subs');
+  if (!card) return;
+  const make = (sub) => openDrawer(null, (saved) => (saved ? (location.hash = '#/link/' + saved.id) : null), { slug: `${link.slug}/${sub}` });
+  card.querySelector('#sub-add').onclick = () => make('');
+  card.querySelectorAll('[data-mk]').forEach((b) => (b.onclick = () => make(b.dataset.mk)));
+}
+
 function bindRules(link) {
   const card = document.getElementById('rules');
   if (!card) return;
   const res = card.querySelector('#simres');
   const simulate = (c) => {
-    const t = link.targets.find((x) => x.countries.includes(c));
-    const url = t ? t.url : link.target_url;
+    const P = link.parent;
+    const t = link.targets.find((x) => x.countries.includes(c)) || P?.targets.find((x) => x.countries.includes(c));
+    const def = link.target_url || P?.target_url || '';
+    const from = t && P && P.targets.includes(t) ? `沿用 /${P.slug} 的` : '';
+    const url = t ? t.url : def;
     res.innerHTML = url
-      ? `<span>会跳到</span><b title="${esc(url)}">${esc(url)}</b><span class="tag">${!t ? '（默认地址）' : t.fallback && link.target_url ? '（命中地区规则，打不开时回退到默认地址）' : '（命中地区规则）'}</span>`
+      ? `<span>会跳到</span><b title="${esc(url)}">${esc(url)}</b><span class="tag">${!t ? `（${!link.target_url && P ? `沿用 /${esc(P.slug)} 的` : ''}默认地址）` : t.fallback && def ? `（命中${esc(from)}地区规则，打不开时回退到默认地址）` : `（命中${esc(from)}地区规则）`}</span>`
       : '<span>会看到</span><b class="warn">“链接暂不可用”</b><span class="tag">（未设置默认地址）</span>';
   };
   const start = store.get('sim', 'CN');
