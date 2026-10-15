@@ -131,8 +131,12 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
   .nav, .shell.mini .nav { flex-direction: row; margin: 0 0 0 auto; gap: 2px; }
   .nav a, .shell.mini .nav a { height: 36px; padding: 0 12px; width: auto; gap: 7px; font-size: 14px; }
   .nav a svg.i { width: 17px; height: 17px; }
-  .nav a.on::after { display: none; }
   .nav span { display: inline !important; }
+  .nav a.on, .shell.mini .nav a.on { background: none; box-shadow: none; color: var(--accent-ink); }
+  .nav a.on::after { display: block; top: auto; bottom: 2px; right: auto; left: 50%; width: 16px; height: 2.5px; border-radius: 2px; transform: translateX(-50%); }
+  .side, .shell.mini .side { transition: transform .35s var(--ease-out), box-shadow .3s; will-change: transform; }
+  .side.hide { transform: translateY(-100%); }
+  .side.stuck { box-shadow: 0 6px 20px -12px rgba(13,19,33,.18); }
   .side .foot { display: none; }
   .side .acct { display: grid; flex: none; width: 38px; height: 38px; border-radius: 11px; }
   .main { box-shadow: none; }
@@ -2349,6 +2353,26 @@ async function route() {
 setInterval(() => document.querySelectorAll('time[data-ts]').forEach((t) => { t.textContent = ago(Number(t.dataset.ts)); }), 60000);
 // 窗口尺寸变化时，分段控件滑块重新定位
 addEventListener('resize', () => document.querySelectorAll('.seg').forEach(segThumb));
+
+// 手机端：向下滚动隐藏顶栏，向上滚动出现
+{
+  let lastY = scrollY, ticking = false;
+  addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      ticking = false;
+      const side = document.querySelector('.side');
+      if (!side || innerWidth > 900) return;
+      const y = Math.max(0, scrollY), dy = y - lastY;
+      if (y < 64 || document.querySelector('.menu, .drawer, .dialog')) side.classList.remove('hide');
+      else if (dy > 6) side.classList.add('hide');
+      else if (dy < -6) side.classList.remove('hide');
+      side.classList.toggle('stuck', y > 4);
+      if (Math.abs(dy) > 6 || y < 64) lastY = y;
+    });
+  }, { passive: true });
+}
 
 // 列表页的 "/" 快捷键聚焦搜索
 document.addEventListener('keydown', (e) => {
