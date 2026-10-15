@@ -566,7 +566,18 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .chi.pw { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .chi.mfa { background: var(--good-bg); color: var(--good); }
 .chi.trk { background: var(--accent-2); color: var(--accent); }
-.g-set > .wide { grid-column: 1 / -1; }
+.acc { display: grid; gap: 12px; max-width: 880px; }
+.acc-i .fold-h { gap: 14px; padding-top: 18px; padding-bottom: 18px; }
+.acc-i.open .fold-h { padding-bottom: 6px; }
+.acc-t { min-width: 0; display: grid; gap: 2px; }
+.acc-t h3 { margin: 0; }
+.acc-t .sub { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acc-s { flex: none; }
+.acc-i .card-b { padding-top: 14px; }
+.acc-i:not(.open):hover { border-color: color-mix(in srgb, var(--line) 60%, var(--accent) 25%); }
+.acc .set-form { max-width: 420px; }
+.trk-sw { margin-bottom: 18px; }
+@media (max-width: 640px) { .acc-t .sub { display: none; } }
 .trk-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; font-size: 12.5px; color: var(--muted); }
 .trk-flow > span { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 8px; background: var(--sunken); color: var(--text-2); white-space: nowrap; }
 .trk-flow > span.hl { font-family: var(--mono); background: var(--accent-2); color: var(--accent-ink); }
@@ -2486,75 +2497,94 @@ function openRuleDrawer(link, rule) {
 // ---------------------------------------------------------------- 设置（修改密码 / 两步验证）
 async function renderSettings(token) {
   const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证和来源追踪</div></div></header>`;
-  shell('settings', `${head}<div class="stack">${skel(220, 2)}</div>`);
+  shell('settings', `${head}<div class="acc">${skel(76, 3)}</div>`);
   const [mfa, trk] = await Promise.all([api('/2fa'), api('/tracking')]);
   if (token !== routeToken) return;
+  const item = (id, icon, cls, title, sub, status, body) => `
+    <section class="card rv fold acc-i" data-acc="${id}">
+      <button type="button" class="card-h fold-h" aria-expanded="false">
+        <span class="chi ${cls}">${ic(icon, 17)}</span>
+        <div class="acc-t"><h3>${title}</h3><span class="sub">${sub}</span></div>
+        <span class="sp"></span><span class="acc-s" data-st="${id}">${status}</span>${ic('chev', 16)}</button>
+      <div class="fold-b"><div class="card-b" id="acc-${id}">${body}</div></div>
+    </section>`;
+  const pill = (on) => `<span class="pill ${on ? 'on' : 'off'}">${on ? '已开启' : '未开启'}</span>`;
   document.getElementById('page').innerHTML = `${head}
-    <div class="g-set">
-      <section class="card rv">
-        <div class="card-h"><span class="chi pw">${ic('key', 17)}</span><h3>修改密码</h3><span class="sub">修改后，其他设备上的登录会自动退出</span></div>
-        <form class="card-b set-form" id="pwf">
+    <div class="acc">
+      ${item('pw', 'key', 'pw', '修改密码', '修改后，其他设备上的登录会自动退出', '', `
+        <form class="set-form" id="pwf">
           ${passwordFields('')}
           <div class="err" style="margin:4px 0 12px" role="alert"></div>
           <button class="btn primary">保存新密码</button>
-        </form>
-      </section>
-      <section class="card rv">
-        <div class="card-h"><span class="chi mfa">${ic('shield', 17)}</span><h3>两步验证</h3>
-          <span class="sp"></span><span class="pill ${mfa.enabled ? 'on' : 'off'}">${mfa.enabled ? '已开启' : '未开启'}</span></div>
-        <div class="card-b">
-          <p class="set-p">${mfa.enabled
-            ? `开启于 ${fmtTime(mfa.since)}。登录时除了密码，还需要输入手机验证器 App 上的 6 位动态码。`
-            : '开启后，登录时除了密码，还需要输入手机验证器 App 上的 6 位动态码。即使密码泄露，别人也登不进后台、改不了跳转地址。'}</p>
-          <ul class="set-list">
-            <li>${ic('check', 14)}支持 Google Authenticator、Microsoft Authenticator、1Password 等</li>
-            <li>${ic('check', 14)}动态码连续输错 5 次锁定 15 分钟</li>
-            <li>${ic('check', 14)}手机丢失可在 Cloudflare 账号下用命令关闭（见 README）</li>
-          </ul>
-          <button class="btn ${mfa.enabled ? 'danger' : 'primary'}" id="mfa-btn">${ic('shield', 15)}${mfa.enabled ? '关闭两步验证' : '开启两步验证'}</button>
-        </div>
-      </section>
-      <section class="card rv wide" id="trk"></section>
+        </form>`)}
+      ${item('mfa', 'shield', 'mfa', '两步验证', '登录时还需要输入手机验证器上的 6 位动态码', pill(mfa.enabled), `
+        <p class="set-p">${mfa.enabled
+          ? `开启于 ${fmtTime(mfa.since)}。登录时除了密码，还需要输入手机验证器 App 上的 6 位动态码。`
+          : '开启后，登录时除了密码，还需要输入手机验证器 App 上的 6 位动态码。即使密码泄露，别人也登不进后台、改不了跳转地址。'}</p>
+        <ul class="set-list">
+          <li>${ic('check', 14)}支持 Google Authenticator、Microsoft Authenticator、1Password 等</li>
+          <li>${ic('check', 14)}动态码连续输错 5 次锁定 15 分钟</li>
+          <li>${ic('check', 14)}手机丢失可在 Cloudflare 账号下用命令关闭（见 README）</li>
+        </ul>
+        <button class="btn ${mfa.enabled ? 'danger' : 'primary'}" id="mfa-btn">${ic('shield', 15)}${mfa.enabled ? '关闭两步验证' : '开启两步验证'}</button>`)}
+      ${item('trk', 'search', 'trk', '来源追踪', '识别访客从哪个搜索引擎进入推广页', pill(trk.enabled), '')}
     </div>`;
   const page = document.getElementById('page');
   reveal(page);
+
+  // 风琴：同一时间只展开一项，记住上次展开的
+  const items = [...page.querySelectorAll('.acc-i')];
+  const open = (id) => {
+    items.forEach((el) => {
+      const on = el.dataset.acc === id && !el.classList.contains('open');
+      el.classList.toggle('open', on);
+      el.querySelector('.fold-h').setAttribute('aria-expanded', on);
+    });
+    store.set('set:open', page.querySelector('.acc-i.open')?.dataset.acc || '');
+  };
+  items.forEach((el) => (el.querySelector('.fold-h').onclick = () => open(el.dataset.acc)));
+  const last = store.get('set:open', '');
+  if (last) open(last);
+
   const pwf = document.getElementById('pwf');
   bindPasswordForm(pwf, '', () => { pwf.reset(); pwf.querySelector('.pwm').dataset.n = ''; pwf.querySelector('#p-tip').textContent = '至少 8 位，建议混合字母、数字和符号'; pwf.querySelector('button.primary').disabled = false; });
   document.getElementById('mfa-btn').onclick = () => openMfaDialog(() => route());
-  renderTracking(document.getElementById('trk'), trk);
+  renderTracking(document.getElementById('acc-trk'), trk, (on) => { page.querySelector('[data-st="trk"]').innerHTML = pill(on); });
 }
 
 // 来源追踪：推广页上放一段代码，把访客来自的搜索引擎带到短链的 utm_source 上
-function renderTracking(card, t) {
+function renderTracking(box, t, onState) {
   const tab = store.get('trk:tab', 0);
   const snippet = [t.script, t.code];
-  card.innerHTML = `
-    <div class="card-h"><span class="chi trk">${ic('search', 17)}</span><h3>来源追踪</h3><span class="sub hide-m">访客从搜索引擎进入你的推广页，再点短链时，也能知道是哪个搜索引擎</span>
-      <span class="sp"></span><label class="switch" aria-label="开启来源追踪"><input type="checkbox" id="trk-on" ${t.enabled ? 'checked' : ''}><span class="t"></span></label></div>
-    <div class="card-b trk">
+  box.innerHTML = `
+    <div class="trk">
+      <label class="opt trk-sw"><div class="tx"><b>开启来源追踪</b>
+        <span class="hint">关闭后，Script 链接不再生效；已粘贴到页面的完整代码不受影响。</span></div>
+        <span class="switch"><input type="checkbox" id="trk-on" ${t.enabled ? 'checked' : ''}><span class="t"></span></span></label>
       <div class="trk-flow"><span>${ic('search', 14)}Google / 百度…</span>${ic('arrow', 14)}<span>${ic('globe', 14)}你的推广页</span>${ic('arrow', 14)}<span class="hl">${ic('link', 14)}${esc(HOST)}/xxx<b>?utm_source=google</b></span></div>
       <ul class="set-list">
         <li>${ic('check', 14)}识别 Google、Bing、百度、搜狗、360、神马等搜索引擎，以及 Google / Bing 广告点击</li>
         <li>${ic('check', 14)}只给指向 ${esc(HOST)} 的链接加 <code>utm_source</code>，不改动已有的 <code>src</code> 和 <code>utm_source</code></li>
         <li>${ic('check', 14)}记住访客的首次来源，在站内翻几页后再点短链也不会丢</li>
-        <li>${ic('check', 14)}短链详情页“来源 · utm_source”里查看；链接没有 <code>src</code> 时也会直接计入“来源”</li>
+        <li>${ic('check', 14)}在短链详情页“来源 · utm_source”查看；链接没有 <code>src</code> 时也会直接计入“来源”</li>
       </ul>
       ${t.enabled ? `
       <div class="trk-code">
         <div class="trk-h"><div class="tabs" id="trk-tabs">${['Script 链接（推荐）', '完整代码'].map((l, i) => `<button type="button" class="${i === tab ? 'on' : ''}">${l}</button>`).join('')}</div>
           <span class="sp"></span>${copyBtn(snippet[tab], 'btn sm', '复制代码')}</div>
-        <pre class="code" id="trk-pre">${esc(snippet[tab])}</pre>
-        <div class="hint" id="trk-hint">${tab === 0 ? '放到推广页的 &lt;head&gt; 或 &lt;/body&gt; 前。以后升级识别规则，页面不用改。' : '直接粘贴到推广页里，不依赖短链服务加载脚本。关闭本开关不影响已粘贴的代码。'}</div>
-      </div>` : `<div class="trk-off">${ic('info', 15)}开启后显示安装代码。关闭时，Script 链接不再生效。</div>`}
+        <pre class="code">${esc(snippet[tab])}</pre>
+        <div class="hint">${tab === 0 ? '放到推广页的 &lt;head&gt; 或 &lt;/body&gt; 前。以后升级识别规则，页面不用改。' : '直接粘贴到推广页里，不依赖短链服务加载脚本。'}</div>
+      </div>` : `<div class="trk-off">${ic('info', 15)}开启后显示安装代码。</div>`}
     </div>`;
-  card.querySelector('#trk-on').onchange = async (e) => {
+  box.querySelector('#trk-on').onchange = async (e) => {
     try {
       const d = await api('/tracking', { method: 'PUT', body: { enabled: e.target.checked } });
       toast(d.enabled ? '来源追踪已开启' : '来源追踪已关闭');
-      renderTracking(card, d);
+      onState?.(d.enabled);
+      renderTracking(box, d, onState);
     } catch (err) { e.target.checked = !e.target.checked; toast(err.message, 'bad'); }
   };
-  card.querySelectorAll('#trk-tabs button').forEach((b, i) => (b.onclick = () => { store.set('trk:tab', i); renderTracking(card, t); }));
+  box.querySelectorAll('#trk-tabs button').forEach((b, i) => (b.onclick = () => { store.set('trk:tab', i); renderTracking(box, t, onState); }));
 }
 
 // ---------------------------------------------------------------- 通知
