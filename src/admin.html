@@ -357,9 +357,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .tabs button { border: 0; background: none; height: 26px; padding: 0 10px; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 12.5px; font-weight: 500; transition: color .15s, background .15s; }
 .tabs button:hover { color: var(--text); }
 .tabs button.on { color: var(--text); background: var(--panel); box-shadow: 0 1px 2px rgba(13,19,33,.08); }
-.rank { display: flex; flex-direction: column; gap: 3px; }
+.rank { display: flex; flex-direction: column; gap: 6px; }
 .rank .hd { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; padding: 0 10px 6px; }
-.rank .r { position: relative; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; font-size: 13px; }
+.rank .r { position: relative; display: flex; align-items: center; gap: 10px; height: 30px; flex: none; padding: 0 10px; border-radius: 8px; font-size: 13px; }
 .rank .r .bg { position: absolute; inset: 0; right: auto; background: var(--accent-2); border-radius: 8px; z-index: 0; transform-origin: left; animation: grow .8s var(--ease-out) both; animation-delay: calc(var(--j, 0) * 40ms + 100ms); }
 .rank .r > *:not(.bg) { position: relative; z-index: 1; }
 .rank .r .k { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
