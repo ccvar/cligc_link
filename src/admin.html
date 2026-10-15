@@ -717,7 +717,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .dialog h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -.01em; }
 .dialog p { margin: 0 0 22px; color: var(--text-2); }
 .dialog.dup p { margin-bottom: 18px; }
-.dialog.dup .field { margin-bottom: 22px; }
+.dialog.dup .field { margin-bottom: 16px; }
+.dialog.dup .row { margin-top: 22px; }
+.dialog.dup .field:has(+ .row) { margin-bottom: 0; }
 .dialog.dup p b { font-family: var(--mono); font-weight: 600; color: var(--text); }
 .dialog.dup .input.bad { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-bg); }
 .dialog.dup .err { margin-top: 6px; font-size: 12.5px; color: var(--bad); }
@@ -962,12 +964,14 @@ function confirmDialog({ title, text, ok = '确定', danger = false }) {
 function duplicateDialog(src, onDone) {
   const ov = document.createElement('div'); ov.className = 'ov';
   const d = document.createElement('form'); d.className = 'dialog dup'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
-  const what = ['标题', src.target_url && '推广地址', src.rules && `${src.rules} 条地区规则`, '有效期等设置'].filter(Boolean).join('、');
+  const what = [src.target_url && '推广地址', src.rules && `${src.rules} 条地区规则`, '有效期等设置'].filter(Boolean).join('、');
   d.innerHTML = `<h3>复制短链</h3>
     <p>复制 <b class="mono">/${esc(src.slug)}</b> 的${esc(what)}，生成一个新短链。访问记录不会复制。</p>
     <div class="field"><label for="dup-s">新短链后缀</label>
       <div class="pre"><span>${esc(HOST)}/</span><input class="input" id="dup-s" name="slug" placeholder="留空自动生成" autocomplete="off" spellcheck="false"></div>
       <div class="err" id="dup-e" hidden></div></div>
+    <div class="field"><label for="dup-t">标题 <span class="hint" style="font-weight:400">可选</span></label>
+      <input class="input" id="dup-t" name="title" maxlength="200" placeholder="方便自己识别，如：春季活动 · 知乎" value="${esc(src.title || '')}" autocomplete="off"></div>
     <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary" data-ok>${ic('dup', 15)}复制</button></div>`;
   const inp = d.querySelector('#dup-s'), err = d.querySelector('#dup-e'), ok = d.querySelector('[data-ok]');
   const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
@@ -979,7 +983,7 @@ function duplicateDialog(src, onDone) {
     e.preventDefault();
     ok.disabled = true;
     try {
-      const link = await api(`/links/${src.id}/duplicate`, { method: 'POST', body: { slug: inp.value.trim() } });
+      const link = await api(`/links/${src.id}/duplicate`, { method: 'POST', body: { slug: inp.value.trim(), title: d.querySelector('#dup-t').value.trim() } });
       close();
       toast(`已复制为 /${link.slug}`);
       onDone(link);

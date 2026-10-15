@@ -675,14 +675,16 @@ async function duplicateLink(request, env, id) {
   if (!src) return json({ error: '短链不存在' }, 404);
   const body = await request.json().catch(() => ({}));
   const slug = String(body.slug || '').trim() || await uniqueSlug(env);
-  const { error, data } = await validateLinkInput({ slug }, env);
+  // 不传 title 时沿用原标题
+  const input = { slug, title: body.title === undefined ? src.title : body.title };
+  const { error, data } = await validateLinkInput(input, env);
   if (error) return json({ error }, 400);
 
   const now = Date.now();
   const row = await env.DB.prepare(
     `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, expires_at, created_at, updated_at)
      VALUES (?,?,?,?,?,?,?,?,?) RETURNING *`
-  ).bind(data.slug, src.target_url, src.title, src.note, src.enabled, src.pass_query, src.expires_at, now, now).first();
+  ).bind(data.slug, src.target_url, data.title, src.note, src.enabled, src.pass_query, src.expires_at, now, now).first();
   await env.DB.prepare(
     `INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at)
      SELECT ?, countries, url, note, fallback, ?, ? FROM link_targets WHERE link_id = ? ORDER BY id`
