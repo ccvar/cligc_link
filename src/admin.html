@@ -685,6 +685,24 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 #rules.open .rsum { visibility: hidden; }
 .rules-bar { display: flex; align-items: center; gap: 12px; padding: 12px 20px 14px; }
 .rules-bar .sub { margin: 0; }
+.drawer.panel { width: min(760px, calc(100vw - 16px)); }
+.drawer.panel .db { padding: 0; gap: 0; }
+.drawer.panel .dh .hint { margin-top: 2px; }
+.drawer.panel .rules-bar .sub { display: none; }
+.drawer.panel .rules-bar { justify-content: flex-end; }
+.drawer.panel .sim { border-radius: 0; }
+.drawer.panel .builder { display: grid; gap: 18px; padding: 22px 24px; grid-template-columns: minmax(0, 1fr); }
+.hero .acts .cnt { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent-2); color: var(--accent-ink); font-size: 11px; font-weight: 650; margin-left: 2px; }
+@media (max-width: 640px) {
+  .hero .acts { flex-wrap: wrap; }
+  .hero .acts .btn:not(.icon) { flex: 1 1 auto; justify-content: center; }
+  .toolbar { flex-wrap: wrap; }
+}
+#range button { white-space: nowrap; }
+.hr-u { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hr-u a { min-width: 0; }
+.hr-u .hr-more, .hero .target .hr-more { flex: none; }
+.hero .target .hr-more { margin-left: 6px; }
 .rules-bar .sp { flex: 1; }
 @media (max-width: 640px) { .rules-bar { flex-wrap: wrap; } }
 .fold-b .card-b { transition: padding .35s var(--ease-out); }
@@ -2116,34 +2134,15 @@ async function renderLink(token, id) {
           <div class="short">${esc(shortDisp(link.slug))}
             ${copyBtn(url, 'btn sm', '复制')}
             <a class="btn sm ghost icon" href="${esc(url)}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 15)}</a></div>
-          ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}</div>`}
+          ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}<button type="button" class="hr-more" data-panel-open="rules">按地区分流 ${ic('chev', 12)}</button></div>`}
           <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.note ? ` · ${esc(link.note)}` : ''}</div>
         </div>
         <div class="acts">
+          <button class="btn" data-panel-open="rules">${ic('route')}跳转规则${link.targets.length ? `<span class="cnt">${link.targets.length}</span>` : ''}</button>
+          <button class="btn" data-panel-open="builder">${ic('link')}投放链接</button>
           <button class="btn" id="edit">${ic('edit')}编辑</button>
-          <a class="btn" href="/api/links/${link.id}/export">${ic('dl')}导出 CSV</a>
+          <a class="btn icon" href="/api/links/${link.id}/export" data-tip="导出 CSV" aria-label="导出 CSV">${ic('dl')}</a>
         </div>
-      </section>
-
-      ${rulesCard(link, s)}
-
-      <section class="card rv fold ${store.get('fold:builder', false) ? 'open settled' : ''}" id="builder">
-        <button type="button" class="card-h fold-h" aria-expanded="${store.get('fold:builder', false)}">
-          <span class="fold-ic">${ic('route', 15)}</span><h3>高级设置 · 按站点生成投放链接</h3><span class="sub hide-m">每个站点用不同链接，来源统计更准</span>
-          <span class="sp"></span><span class="rb" id="bcount" hidden></span>${ic('chev', 16)}</button>
-        <div class="fold-b"><div class="card-b builder">
-          <div>
-            <textarea class="textarea" id="sites" rows="6" placeholder="每行一个站点名，例如：&#10;zhihu&#10;weibo&#10;forum-a" aria-label="站点名"></textarea>
-            <div class="hint" style="margin-top:8px">会生成 <code>?src=站点名</code> 的链接，统计里“来源”会按它归类，不受对方网站设置影响。</div>
-
-          </div>
-          <div class="blist" id="blist"></div>
-            <div class="tipbox wide">${ic('info', 16)}<div>
-              <b>放到网页上时，不要给链接加 <code>rel="noreferrer"</code></b>
-              加了之后浏览器不会告诉我们访客从哪个网站来，“Referer”统计会记成直接访问。点右侧的 ${ic('code', 13)} 可以复制写法正确的 HTML：
-              <code class="snip">&lt;a href="…?src=站点名" target="_blank" rel="noopener"&gt;…&lt;/a&gt;</code>
-            </div></div>
-        </div></div>
       </section>
 
       <div class="toolbar rv" style="justify-content:flex-end">${rangeBar()}</div>
@@ -2239,6 +2238,48 @@ async function renderLink(token, id) {
   if (prev) prev.onclick = () => { clickState.page--; route(); };
   if (next) next.onclick = () => { clickState.page++; route(); };
 
+  // 顶部按钮打开侧边面板；面板已打开时（如刚保存了规则）用新数据刷新
+  document.querySelectorAll('[data-panel-open]').forEach((b) => (b.onclick = () => openLinkPanel(b.dataset.panelOpen, link, s)));
+  const cur = document.querySelector('.drawer[data-panel]');
+  if (cur) fillLinkPanel(cur, cur.dataset.panel, link, s);
+}
+
+// ---------------------------------------------------------------- 详情页侧边面板：跳转规则 / 投放链接
+function openLinkPanel(kind, link, s) {
+  document.querySelectorAll('.drawer[data-panel]').forEach((d) => d._close());
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const dr = document.createElement('div'); dr.className = 'drawer panel'; dr.dataset.panel = kind;
+  dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-modal', 'true');
+  const close = () => { ov.remove(); dr.remove(); document.removeEventListener('keydown', onKey); };
+  // 规则编辑抽屉、确认框叠在上面时，Esc 先关上层
+  const onKey = (e) => { if (e.key === 'Escape' && [...document.querySelectorAll('.drawer')].pop() === dr && !document.querySelector('.dialog')) close(); };
+  dr._close = close;
+  document.addEventListener('keydown', onKey);
+  ov.onclick = close;
+  document.body.append(ov, dr);
+  fillLinkPanel(dr, kind, link, s);
+}
+
+function fillLinkPanel(dr, kind, link, s) {
+  const isRules = kind === 'rules';
+  dr.innerHTML = `
+    <div class="dh"><div style="flex:1;min-width:0"><h2>${isRules ? '跳转规则' : '按站点生成投放链接'}</h2>
+      <div class="hint">${isRules ? `按访问者所在国家 / 地区跳到不同地址 · 命中数为最近 ${rangeLabel()}` : '每个站点用不同链接，来源统计更准'}</div></div>
+      <button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
+    <div class="db">${isRules ? rulesCard(link, s) : `<div class="builder">
+      <div>
+        <textarea class="textarea" id="sites" rows="5" placeholder="每行一个站点名，例如：&#10;zhihu&#10;weibo&#10;forum-a" aria-label="站点名"></textarea>
+        <div class="hint" style="margin-top:8px">会生成 <code>?src=站点名</code> 的链接，统计里“来源”会按它归类，不受对方网站设置影响。</div>
+      </div>
+      <div class="blist" id="blist"></div>
+      <div class="tipbox wide">${ic('info', 16)}<div>
+        <b>放到网页上时，不要给链接加 <code>rel="noreferrer"</code></b>
+        加了之后浏览器不会告诉我们访客从哪个网站来，“Referer”统计会记成直接访问。点 ${ic('code', 13)} 可以复制写法正确的 HTML：
+        <code class="snip">&lt;a href="…?src=站点名" target="_blank" rel="noopener"&gt;…&lt;/a&gt;</code>
+      </div></div></div>`}</div>`;
+  dr.querySelector('[data-close]').onclick = dr._close;
+  if (isRules) { bindRules(link); return; }
+  const url = shortUrl(link.slug);
   // 投放链接生成
   const sites = document.getElementById('sites'), blist = document.getElementById('blist');
   const key = 'sites:' + link.id;
@@ -2246,9 +2287,7 @@ async function renderLink(token, id) {
   const build = () => {
     store.set(key, sites.value);
     const names = [...new Set(sites.value.split(/[\n,，]/).map((s) => s.trim()).filter(Boolean))];
-    const bc = document.getElementById('bcount');
-    bc.hidden = !names.length; bc.textContent = `${names.length} 个站点`;
-    if (!names.length) { blist.innerHTML = `<div class="empty" style="padding:24px;border:1px dashed var(--line);border-radius:12px">在左侧输入站点名，这里会生成对应的投放链接</div>`; return; }
+    if (!names.length) { blist.innerHTML = `<div class="empty" style="padding:24px;border:1px dashed var(--line);border-radius:12px">在上方输入站点名，这里会生成对应的投放链接</div>`; return; }
     const urls = names.map((n) => `${url}?src=${encodeURIComponent(n)}`);
     const text = link.title || '点击访问';
     // noopener 保证安全，但不加 noreferrer，以便统计 Referer
@@ -2260,8 +2299,9 @@ async function renderLink(token, id) {
   };
   sites.oninput = build;
   build();
-  bindFold(document.getElementById('builder'), 'fold:builder', () => setTimeout(() => sites.focus(), 200));
+  setTimeout(() => sites.focus(), 250);
 }
+
 
 // ---------------------------------------------------------------- 跳转规则
 // 搜索关键字高亮
@@ -2413,24 +2453,14 @@ function rulesCard(link, s) {
       ${hitCell(0)}
       <div class="acts"><button class="btn ${link.target_url ? 'ghost icon' : 'sm'}" ${link.target_url ? 'data-tip="设置默认地址" aria-label="设置默认地址"' : ''} data-rdef>${link.target_url ? ic('edit') : `${ic('plus', 14)}设置`}</button></div>
     </div>`;
-  // 收起时标题旁显示的一句话摘要
-  const sum = link.targets.length
-    ? `${link.targets.length} 条地区规则 · 其他地区 → ${link.target_url ? esc(link.target_url.replace(/^https?:\/\//, '')) : '未设置'}`
-    : link.target_url ? `所有访问 → ${esc(link.target_url.replace(/^https?:\/\//, ''))}` : '还没有设置推广地址';
-  const open = store.get('fold:rules', false);
-  return `<section class="card rv fold ${open ? 'open settled' : ''}" id="rules">
-    <button type="button" class="card-h fold-h" aria-expanded="${open}">
-      <span class="fold-ic">${ic('route', 15)}</span><h3>跳转规则</h3><span class="sub rsum">${sum}</span>
-      <span class="sp"></span>${ic('chev', 16)}</button>
-    <div class="fold-b"><div>
+  return `<div id="rules">
     <div class="rules-bar"><span class="sub">按访问者所在国家 / 地区跳到不同地址 · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
       <button class="btn sm primary" id="radd">${ic('plus', 14)}添加地区规则</button></div>
     <div class="rules">${rows || `<div class="none">${ic('route', 18)}还没有地区规则，所有访问都会跳到默认地址。可以为中国、港澳台、北美等地区分别设置推广地址。</div>`}${def}</div>
     <div class="sim"><span>如果访客来自</span>
       <div class="combo" id="sim"></div>
       <span class="res" id="simres"></span></div>
-    </div></div>
-  </section>`;
+  </div>`;
 }
 
 // 折叠卡片：展开动画结束后取消裁剪，让悬停提示和浮层能超出卡片
@@ -2451,19 +2481,14 @@ function heroRoutes(link) {
   const MAX = 4;
   const url = (u) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u)}</a>` : '<span class="warn">未设置，会显示“链接暂不可用”</span>';
   const rows = link.targets.slice(0, MAX).map((t) => `<div class="hr-r"><span class="hr-c" title="${esc(t.countries.map(cname).join("、"))}">${esc(ruleText(t))}</span>${ic('arrow', 13)}${url(t.url)}</div>`).join('');
-  const more = link.targets.length > MAX ? `<button type="button" class="hr-more" data-goto-rules>还有 ${link.targets.length - MAX} 条规则 ${ic('chev', 12)}</button>` : '';
-  return `<div class="hroutes">${rows}${more}<div class="hr-r def"><span class="hr-c">其他地区</span>${ic('arrow', 13)}${url(link.target_url)}</div></div>`;
+  const more = link.targets.length > MAX ? `<button type="button" class="hr-more" data-panel-open="rules">还有 ${link.targets.length - MAX} 条规则 ${ic('chev', 12)}</button>` : '';
+  return `<div class="hroutes">${rows}${more}<div class="hr-r def"><span class="hr-c">其他地区</span>${ic('arrow', 13)}<span class="hr-u">${url(link.target_url)}<button type="button" class="hr-more" data-panel-open="rules">管理规则 ${ic('chev', 12)}</button></span></div></div>`;
 }
 
 function bindRules(link) {
   const card = document.getElementById('rules');
   if (!card) return;
-  bindFold(card, 'fold:rules');
-  // 顶部“还有 N 条规则”：展开规则卡并滚过去
-  document.querySelector('[data-goto-rules]')?.addEventListener('click', () => {
-    if (!card.classList.contains('open')) card.querySelector('.fold-h').click();
-    card.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
-  });
+
   const res = card.querySelector('#simres');
   const simulate = (c) => {
     const t = link.targets.find((x) => x.countries.includes(c));
