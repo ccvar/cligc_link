@@ -574,14 +574,30 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .hero-note { margin-top: 4px; max-width: 760px; color: var(--text-2); font-size: 12.5px; line-height: 1.6;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 /* 访问明细：表格限高，表头固定 */
-/* 访问明细：宽屏下固定列宽，不出现横向滚动，长内容省略，悬停看全文 */
+/* 访问明细：不出现横向滚动。
+   宽屏：来源 / 时间、地区、IP 按内容宽度（设上限），跳转到、设备、Referer 分剩余宽度，放不下才省略；
+   中等宽度：按固定比例分配 */
 @media (min-width: 901px) {
-  .tbl.vt { table-layout: fixed; }
-  .tbl.vt th:nth-child(1) { width: 15%; } .tbl.vt th:nth-child(2) { width: 12%; } .tbl.vt th:nth-child(3) { width: 18%; }
-  .tbl.vt th:nth-child(4) { width: 22%; } .tbl.vt th:nth-child(5) { width: 16%; } .tbl.vt th:nth-child(6) { width: 17%; }
-  .tbl.vt td { overflow: hidden; text-overflow: ellipsis; }
+  .tbl.vt td { overflow: hidden; }
   .tbl.vt td > div, .tbl.vt td > span { display: block; max-width: none !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tbl.vt td.ell { max-width: none; }
+}
+@media (min-width: 1201px) {
+  .tbl.vt { table-layout: auto; }
+  .tbl.vt th, .tbl.vt td { padding-left: 10px; padding-right: 10px; }
+  .tbl.vt th:first-child, .tbl.vt td:first-child { padding-left: 20px; }
+  .tbl.vt th:last-child, .tbl.vt td:last-child { padding-right: 20px; }
+  .tbl.vt th:nth-child(1), .tbl.vt th:nth-child(2), .tbl.vt th:nth-child(5) { width: 1%; }
+  .tbl.vt td:nth-child(1) > div { max-width: 190px !important; }
+  .tbl.vt td:nth-child(2) > div { max-width: 210px !important; }
+  .tbl.vt td:nth-child(5) > div { max-width: 190px !important; }
+  .tbl.vt td:nth-child(3), .tbl.vt td:nth-child(4), .tbl.vt td:nth-child(6) { max-width: 0; }
+  .tbl.vt th:nth-child(3) { width: 30%; } .tbl.vt th:nth-child(4) { width: 40%; } .tbl.vt th:nth-child(6) { width: 30%; }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  .tbl.vt { table-layout: fixed; }
+  .tbl.vt th:nth-child(1) { width: 15%; } .tbl.vt th:nth-child(2) { width: 14%; } .tbl.vt th:nth-child(3) { width: 18%; }
+  .tbl.vt th:nth-child(4) { width: 22%; } .tbl.vt th:nth-child(5) { width: 15%; } .tbl.vt th:nth-child(6) { width: 16%; }
 }
 .tbl-wrap { max-height: 640px; overflow: auto; overscroll-behavior: contain; }
 .tbl-wrap thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line); border-bottom: 0; }
@@ -1115,6 +1131,8 @@ const fmtTime = (ts) => {
   const d = new Date(ts);
   return `${ymd(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
+// 列表里显示网址时去掉协议和 www.，完整地址放在提示里
+const bareUrl = (u) => (u || '').replace(/^https?:\/\/(www\.)?/i, '');
 // 短时间：今天只显示时分，今年显示月日时分，往年显示日期
 const shortTime = (ts) => {
   if (!ts) return '—';
@@ -2618,10 +2636,10 @@ async function renderLink(token, id) {
             <td><div data-tipf="${esc(r.source + (r.utm_campaign ? ' · ' + r.utm_campaign : ''))}">${esc(r.source)}${r.utm_campaign ? `<span class="sm"> · ${esc(r.utm_campaign)}</span>` : ''}</div>
               <div class="sm"><span data-tipf="${esc(fmtTime(r.ts))}" data-tipf-always>${ago(r.ts)} · ${shortTime(r.ts)}</span></div></td>
             <td><div>${esc(country(r.country))}</div><div class="sm" data-tipf="${esc([r.region, r.city].filter(Boolean).join(' · '))}">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
-            <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (link.target_url || '—'))}</div>`; })()}</td>
+            <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (bareUrl(link.target_url) || '—'))}</div>`; })()}</td>
             <td data-tipf="${esc(r.ua)}" data-tipf-always><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r, false)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div>${(r.kind && r.kind !== 'human') || r.proxy ? (r.reason ? `<div class="kr ${r.kind === 'human' ? 'proxy' : r.kind} ell" data-tipf="${esc(r.reason)}">${esc(r.reason)}</div>` : '') : ''}</td>
             <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:200px" data-tipf-always data-tipf="${esc([r.asn ? 'AS' + r.asn : '', r.asn_org].filter(Boolean).join(' · '))}">${esc(r.asn_org || '—')}</div></td>
-            <td class="ell" data-tipf="${esc(r.referer)}">${r.referer ? esc(r.referer) : '<span class="sm">—</span>'}</td>
+            <td class="ell" data-tipf="${esc(r.referer)}">${r.referer ? esc(bareUrl(r.referer)) : '<span class="sm">—</span>'}</td>
           </tr>`).join('')}</tbody></table></div>
           ${pages > 1 ? `<div class="pager"><span class="tnum">第 ${clickState.page} / ${pages} 页</span><div class="g">
             <button class="btn sm" id="prev" ${clickState.page <= 1 ? 'disabled' : ''}>上一页</button>
