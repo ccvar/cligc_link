@@ -274,7 +274,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 /* 概览：紧凑数据条 */
 #home { gap: 16px; }
 #home .g-main, #home .g3 { gap: 16px; }
-.kstrip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); overflow: hidden; }
+.kstrip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.kc-kw { display: block; }
+.kc-kw[data-tip]::after { left: 0; transform: translate(0, 4px); }
+.kc-kw[data-tip]:hover::after { transform: none; }
 .kc { padding: 14px 18px 13px; min-width: 0; }
 .kc + .kc { border-left: 1px solid var(--line-2); }
 .kc-h { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 22px; }
@@ -1881,9 +1884,10 @@ const humanPct = (kinds) => {
   return sum ? Math.round((kindCount(kinds, 'human') / sum) * 100) : '—';
 };
 // 真人占比：经代理的数量跟在百分比后面；下一行只放可疑 / 爬虫，过长时省略
-const kindValue = (kinds) => `<b>${humanPct(kinds)}</b><small>%${proxyCount(kinds) ? `<span class="kc-px" title="真人中经 VPN / 代理访问的次数">经代理 ${num(proxyCount(kinds))}</span>` : ''}</small>`;
-const kindBar = (kinds) => `<div class="kc-k" title="真人 ${num(kindCount(kinds, 'human'))}（经代理 ${num(proxyCount(kinds))}）· 可疑 ${num(kindCount(kinds, 'suspect'))} · 爬虫 ${num(kindCount(kinds, 'bot'))}">
-  <span>可疑 ${num(kindCount(kinds, 'suspect'))}</span><span>爬虫 ${num(kindCount(kinds, 'bot'))}</span></div>`;
+const kindValue = (kinds) => `<b>${humanPct(kinds)}</b><small>%${proxyCount(kinds) ? `<span class="kc-px" data-tip="真人中经 VPN / 代理访问的次数">经代理 ${num(proxyCount(kinds))}</span>` : ''}</small>`;
+// 提示挂在外层：.kc-k 自身裁剪溢出（用于省略号），挂在它上面会被裁掉
+const kindBar = (kinds) => `<div class="kc-kw" data-tip="真人 ${num(kindCount(kinds, 'human'))}（经代理 ${num(proxyCount(kinds))}）· 可疑 ${num(kindCount(kinds, 'suspect'))} · 爬虫 ${num(kindCount(kinds, 'bot'))}"><div class="kc-k">
+  <span>可疑 ${num(kindCount(kinds, 'suspect'))}</span><span>爬虫 ${num(kindCount(kinds, 'bot'))}</span></div></div>`;
 async function renderHome(token) {
   const now = new Date();
   shell('home', `<header class="ph">
