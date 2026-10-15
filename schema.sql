@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS links (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  slug        TEXT NOT NULL UNIQUE,         -- 二级短链形如 "a/b"
-  parent_id   INTEGER NOT NULL DEFAULT 0,  -- 二级短链所属的一级短链，0 = 一级短链
+  slug        TEXT NOT NULL UNIQUE,
   target_url  TEXT NOT NULL DEFAULT '',   -- 默认目标地址；为空时未命中地区规则的访问返回"未配置"
   title       TEXT NOT NULL DEFAULT '',
   note        TEXT NOT NULL DEFAULT '',
@@ -36,7 +35,7 @@ CREATE TABLE IF NOT EXISTS clicks (
   is_bot       INTEGER NOT NULL DEFAULT 0,
   lang         TEXT NOT NULL DEFAULT '',
   rule_id      INTEGER NOT NULL DEFAULT 0, -- 命中的跳转规则，0 = 默认地址
-  sub          TEXT NOT NULL DEFAULT '',  -- 访问了未创建的二级路径时记录该路径（如 /a/xyz 记为 "xyz"）
+  sub          TEXT NOT NULL DEFAULT '',  -- 访问的二级路径，如 /a/b 记为 "b"
   FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE
 );
 
@@ -47,7 +46,8 @@ CREATE INDEX IF NOT EXISTS idx_clicks_ts ON clicks(ts);
 CREATE TABLE IF NOT EXISTS link_targets (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   link_id     INTEGER NOT NULL,
-  countries   TEXT NOT NULL,              -- 逗号分隔的 ISO 国家代码，如 "HK,MO,TW"
+  path        TEXT NOT NULL DEFAULT '',   -- 二级路径，如 "b" 表示 /a/b；空 = 地区规则
+  countries   TEXT NOT NULL,              -- 逗号分隔的 ISO 国家代码，如 "HK,MO,TW"；二级路径规则可为空，表示所有地区
   url         TEXT NOT NULL,
   note        TEXT NOT NULL DEFAULT '',
   fallback    INTEGER NOT NULL DEFAULT 0, -- 1 = 访客打不开该地址时回退到默认地址
