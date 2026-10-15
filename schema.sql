@@ -35,6 +35,11 @@ CREATE TABLE IF NOT EXISTS clicks (
   is_bot       INTEGER NOT NULL DEFAULT 0,
   lang         TEXT NOT NULL DEFAULT '',
   rule_id      INTEGER NOT NULL DEFAULT 0, -- 命中的跳转规则，0 = 默认地址
+  kind         TEXT NOT NULL DEFAULT '',  -- 访客类型：human 真人 / bot 爬虫 / suspect 可疑（bot 和 suspect 的 is_bot 都为 1）
+  reason       TEXT NOT NULL DEFAULT '',  -- 判定原因，多条用“；”分隔
+  asn          INTEGER NOT NULL DEFAULT 0,
+  tls          TEXT NOT NULL DEFAULT '',  -- TLS 版本，如 TLSv1.3
+  http         TEXT NOT NULL DEFAULT '',  -- HTTP 协议，如 HTTP/2
   FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE
 );
 

@@ -86,6 +86,43 @@ async function migrate(env) {
   if (!tcols.includes('fallbacks')) {
     await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN fallbacks INTEGER NOT NULL DEFAULT 0').run();
   }
+  for (const [c, def] of [['kind', "TEXT NOT NULL DEFAULT ''"], ['reason', "TEXT NOT NULL DEFAULT ''"],
+    ['asn', 'INTEGER NOT NULL DEFAULT 0'], ['tls', "TEXT NOT NULL DEFAULT ''"], ['http', "TEXT NOT NULL DEFAULT ''"]]) {
+    if (!cols.includes(c)) await env.DB.prepare(`ALTER TABLE clicks ADD COLUMN ${c} ${def}`).run();
+  }
+  // 只补算一次，避免每次冷启动都扫描整张表
+  if (!(await getSetting(env, 'kind_backfilled'))) await backfillKinds(env);
+}
+
+// 按已有的 IP、运营商、User-Agent、语言补算旧访问记录的访客类型（每次最多处理 2 万条，下次启动继续）
+async function backfillKinds(env) {
+  const rows = (await env.DB.prepare(
+    "SELECT id, link_id, ts, ip, ua, asn_org, lang FROM clicks WHERE kind = '' ORDER BY ts LIMIT 20000"
+  ).all()).results;
+  // 同一 IP 访问同一短链：统计 60 秒内的次数
+  const recent = new Map(), hist = new Map();
+  for (const r of rows) {
+    const key = r.ip + '|' + r.link_id;
+    const list = (hist.get(key) || []).filter((t) => r.ts - t < 60000);
+    list.push(r.ts); hist.set(key, list); recent.set(r.id, list.length);
+  }
+  const groups = new Map();
+  for (const r of rows) {
+    const v = classifyVisit({ ua: r.ua, hasLang: !!r.lang, asnOrg: r.asn_org, recent: recent.get(r.id) });
+    const k = v.kind + '\u0000' + v.reason;
+    if (!groups.has(k)) groups.set(k, { ...v, ids: [] });
+    groups.get(k).ids.push(r.id);
+  }
+  const stmts = [];
+  for (const g of groups.values()) {
+    for (let i = 0; i < g.ids.length; i += 90) {
+      const ids = g.ids.slice(i, i + 90);
+      stmts.push(env.DB.prepare(`UPDATE clicks SET kind = ?, reason = ?, is_bot = ? WHERE id IN (${ids.map(() => '?').join(',')})`)
+        .bind(g.kind, g.reason, g.kind === 'human' ? 0 : 1, ...ids));
+    }
+  }
+  for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
+  if (rows.length < 20000) await setSetting(env, 'kind_backfilled', '1');
 }
 
 // ---------------------------------------------------------------- 跳转
@@ -201,28 +238,70 @@ async function logClick(request, env, linkId, url, ruleId) {
   const ua = h.get('user-agent') || '';
   const parsed = parseUA(ua);
   const now = Date.now();
+  const ip = h.get('cf-connecting-ip') || '';
+  const recent = 1 + (await env.DB.prepare('SELECT COUNT(*) AS n FROM clicks WHERE link_id = ? AND ts > ? AND ip = ?')
+    .bind(linkId, now - 60000, ip).first('n'));
+  const visit = classifyVisit({
+    ua, hasLang: h.has('accept-language'), asnOrg: cf.asOrganization || '', recent,
+    secFetch: h.has('sec-fetch-mode'), tls: cf.tlsVersion || '', http: cf.httpProtocol || '',
+  });
 
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO clicks (link_id, ts, source, referer, referer_host, utm_source, utm_medium, utm_campaign,
-         ip, country, region, city, asn_org, ua, browser, os, device, is_bot, lang, rule_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         ip, country, region, city, asn_org, ua, browser, os, device, is_bot, lang, rule_id, kind, reason, asn, tls, http)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       linkId, now, cut(source, 200), cut(referer, 1000), cut(refererHost, 200),
       cut(utmSource, 200), cut(qs.get('utm_medium') || '', 200), cut(qs.get('utm_campaign') || '', 200),
-      h.get('cf-connecting-ip') || '', cf.country || '', cf.region || '', cf.city || '',
+      ip, cf.country || '', cf.region || '', cf.city || '',
       cut(cf.asOrganization || '', 200), cut(ua, 500),
-      parsed.browser, parsed.os, parsed.device, parsed.bot ? 1 : 0,
+      parsed.browser, parsed.os, parsed.device, visit.kind === 'human' ? 0 : 1,
       cut((h.get('accept-language') || '').split(',')[0], 32),
-      ruleId
+      ruleId, visit.kind, cut(visit.reason, 300), Number(cf.asn) || 0, cut(cf.tlsVersion || '', 16), cut(cf.httpProtocol || '', 16)
     ),
     env.DB.prepare('UPDATE links SET clicks = clicks + 1, last_click = ? WHERE id = ?').bind(now, linkId),
   ]);
 }
 
+// ---------------------------------------------------------------- 访客类型：真人 / 爬虫 / 可疑
+
+// 云服务商 / 机房的运营商名称。Cloudflare、Akamai 不算：iCloud 私密中继、WARP 的真人用户也走它们
+const DC_RE = /amazon|aws|google llc|google cloud|microsoft|azure|digitalocean|linode|hetzner|ovh|vultr|choopa|alibaba|aliyun|tencent|huawei cloud|oracle|scaleway|contabo|leaseweb|m247|datacamp|zenlayer|ucloud|kingsoft cloud|hostinger|ionos|g-core|gcore|psychz|quadranet|colocrossing|hostwinds|kamatera|upcloud|netcup|racknerd|dmit|it7 networks|frantech|buyvm|clouvider|servers\.com|hosting|data ?cent(er|re)|dedicated server|vps/i;
+const BOT_NAMES = [
+  ['googlebot', 'Googlebot'], ['bingbot', 'Bingbot'], ['baiduspider', '百度蜘蛛'], ['yandex', 'Yandex'], ['bytespider', '字节跳动'],
+  ['sogou', '搜狗蜘蛛'], ['360spider', '360 蜘蛛'], ['petalbot', '华为 Petal'], ['applebot', 'Applebot'], ['gptbot', 'GPTBot'],
+  ['facebookexternalhit', 'Facebook 预览'], ['twitterbot', 'X 预览'], ['telegrambot', 'Telegram 预览'], ['whatsapp', 'WhatsApp 预览'],
+  ['slackbot', 'Slack 预览'], ['discordbot', 'Discord 预览'], ['linkedinbot', 'LinkedIn 预览'], ['semrush', 'Semrush'], ['ahrefs', 'Ahrefs'],
+  ['curl', 'curl'], ['wget', 'wget'], ['python', 'Python 脚本'], ['go-http', 'Go 脚本'], ['headless', '无头浏览器'], ['node-fetch', 'Node 脚本'],
+];
+
+// 强信号命中一条即为“可疑”；弱信号要两条以上
+function classifyVisit({ ua, hasLang, asnOrg, recent, secFetch, tls, http }) {
+  const s = (ua || '').toLowerCase();
+  if (!s) return { kind: 'bot', reason: '没有 User-Agent' };
+  if (parseUA(ua).bot) {
+    const hit = BOT_NAMES.find(([k]) => s.includes(k));
+    return { kind: 'bot', reason: hit ? hit[1] : '自报为爬虫 / 工具' };
+  }
+  const strong = [], weak = [];
+  if (asnOrg && DC_RE.test(asnOrg) && !/cloudflare|akamai/i.test(asnOrg)) strong.push(`机房 IP · ${asnOrg}`);
+  if (!hasLang) strong.push('没有语言信息（Accept-Language）');
+  if (recent >= 5) strong.push(`同一 IP 1 分钟内第 ${recent} 次访问`);
+  if (/^TLSv1(\.[01])?$/.test(tls || '')) strong.push(`过旧的 ${tls}`);
+  // 以下只有新记录才有，补算旧记录时为 undefined
+  if (secFetch === false) {
+    const chrome = /(?:chrome|chromium)\/(\d+)/.exec(s), ff = /firefox\/(\d+)/.exec(s);
+    if ((chrome && +chrome[1] >= 80 && !/crios/.test(s)) || (ff && +ff[1] >= 90 && !/fxios/.test(s))) weak.push('自称新版浏览器，却缺少浏览器请求头');
+  }
+  if (/^HTTP\/1/.test(http || '')) weak.push(`使用 ${http}`);
+  if (strong.length || weak.length >= 2) return { kind: 'suspect', reason: [...strong, ...weak].join('；') };
+  return { kind: 'human', reason: weak.join('；') };
+}
+
 function parseUA(ua) {
   const s = ua.toLowerCase();
-  const bot = /bot|crawl|spider|slurp|facebookexternalhit|preview|curl|wget|python|go-http|headless|monitor/.test(s);
+  const bot = /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|preview|curl|wget|python|go-http|node-fetch|axios|headless|monitor|scan|lighthouse/.test(s);
   let browser = 'Other';
   if (/micromessenger/.test(s)) browser = 'WeChat';
   else if (/qq\//.test(s) || /mqqbrowser/.test(s)) browser = 'QQ';
@@ -930,7 +1009,7 @@ async function linkStats(env, id, url) {
     env.DB.prepare(`SELECT ${col} AS k, COUNT(*) AS n ${base} GROUP BY ${col} ORDER BY n DESC LIMIT ${limit}`)
       .bind(id, since).all().then((r) => r.results);
 
-  const [summary, prev, daily, prevDaily, hourly, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, targets, utmSources] =
+  const [summary, prev, daily, prevDaily, hourly, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, targets, utmSources, kinds, reasons] =
     await Promise.all([
       env.DB.prepare(`SELECT COUNT(*) AS total, COUNT(DISTINCT ip) AS unique_ips ${base}`).bind(id, since).first(),
       env.DB.prepare(
@@ -950,9 +1029,23 @@ async function linkStats(env, id, url) {
       ).bind(id, since, tz).all().then((r) => r.results),
       top('source', 20), top('referer_host', 20), top('country'), top('city'),
       top('device'), top('browser'), top('os'), top('utm_campaign'), top('rule_id', 50), top('utm_source', 20),
+      // 访客类型（不受“含机器访问”开关影响）
+      env.DB.prepare('SELECT kind AS k, COUNT(*) AS n FROM clicks WHERE link_id = ?1 AND ts >= ?2 GROUP BY kind').bind(id, since).all().then((r) => r.results),
+      env.DB.prepare("SELECT reason AS k, COUNT(*) AS n FROM clicks WHERE link_id = ?1 AND ts >= ?2 AND kind != 'human' AND reason != '' GROUP BY reason ORDER BY n DESC LIMIT 200")
+        .bind(id, since).all().then((r) => r.results),
     ]);
 
-  return json({ summary, prev, daily, prevDaily, hourly, targets, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, utmSources });
+  return json({ summary, prev, daily, prevDaily, hourly, targets, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, utmSources, kinds, reasons: reasonTop(reasons) });
+}
+
+// 把“原因”拆成单条并归类计数（机房 IP 按运营商区分）
+function reasonTop(rows) {
+  const m = new Map();
+  for (const r of rows) for (const one of r.k.split('；')) {
+    const k = one.replace(/第 \d+ 次/, '多次');
+    m.set(k, (m.get(k) || 0) + r.n);
+  }
+  return [...m].map(([k, n]) => ({ k, n })).sort((a, b) => b.n - a.n).slice(0, 12);
 }
 
 async function linkClicks(env, id, url) {
@@ -974,7 +1067,7 @@ async function exportClicks(env, id) {
   const rows = (await env.DB.prepare('SELECT * FROM clicks WHERE link_id = ? ORDER BY id DESC LIMIT 100000')
     .bind(id).all()).results;
   const cols = ['ts', 'source', 'referer', 'utm_source', 'utm_medium', 'utm_campaign', 'ip', 'country',
-    'region', 'city', 'asn_org', 'device', 'os', 'browser', 'is_bot', 'lang', 'rule_id', 'ua'];
+    'region', 'city', 'asn_org', 'device', 'os', 'browser', 'is_bot', 'kind', 'reason', 'asn', 'tls', 'http', 'lang', 'rule_id', 'ua'];
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [cols.join(',')];
   for (const r of rows) {
@@ -997,7 +1090,7 @@ async function overview(env, url) {
   const q = (sql, ...args) => env.DB.prepare(sql).bind(...args);
   const all = (stmt) => stmt.all().then((r) => r.results);
 
-  const [links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent] =
+  const [links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds] =
     await Promise.all([
       env.DB.prepare('SELECT COUNT(*) AS n FROM links').first('n'),
       q(`SELECT COUNT(DISTINCT link_id) AS n FROM clicks c WHERE ts >= ? ${botFilter}`, since).first('n'),
@@ -1022,13 +1115,14 @@ async function overview(env, url) {
                     CAST(strftime('%H', (ts + ?2 * 60000) / 1000, 'unixepoch') AS INTEGER) AS h, COUNT(*) AS n
              FROM clicks c WHERE ts >= ?1 ${botFilter} GROUP BY d, h`, since, tz)),
       recentClicks(env, bots),
+      all(q('SELECT kind AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? GROUP BY kind', since)),
     ]);
-  return json({ links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent });
+  return json({ links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds });
 }
 
 async function recentClicks(env, bots) {
   const r = await env.DB.prepare(
-    `SELECT c.id, c.ts, c.source, c.country, c.city, c.device, c.os, c.browser, l.id AS link_id, l.slug
+    `SELECT c.id, c.ts, c.source, c.country, c.city, c.device, c.os, c.browser, c.kind, c.reason, l.id AS link_id, l.slug
      FROM clicks c JOIN links l ON l.id = c.link_id
      ${bots ? '' : 'WHERE c.is_bot = 0'} ORDER BY c.ts DESC LIMIT 12`
   ).all();

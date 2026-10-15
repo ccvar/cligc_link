@@ -385,6 +385,19 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .dlg .x span { flex: 1; }
 .dlg .x b { font-variant-numeric: tabular-nums; font-weight: 600; }
 .dlg .x em { font-style: normal; color: var(--muted); width: 38px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; }
+.kt { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; margin-left: 6px; border-radius: 5px; font-size: 11px; font-weight: 600; vertical-align: 1px; cursor: help; white-space: nowrap; font-family: var(--sans); }
+.kt.suspect { color: var(--warn); background: var(--warn-bg); }
+.kt.bot { color: var(--muted); background: var(--sunken); }
+.kmix .bmix-bar { margin-top: 4px; }
+.kmix-l { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.kmix-l .x { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.kmix-l .x i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.kmix-l .x b { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 650; }
+.kmix-l .x em { font-style: normal; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.kmix-r { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.kc-k { display: flex; gap: 10px; margin-top: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.kc-k span::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; background: var(--amber); }
+.kc-k span + span::before { background: var(--faint); }
 .bmix { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); }
 .bmix-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
 .bmix-h span:first-child { color: var(--text-2); font-weight: 600; }
@@ -1162,7 +1175,7 @@ function shell(active, inner) {
 
 function rangeBar() {
   return `<div class="toolbar">
-    <label class="switch" title="爬虫、预览抓取、curl 等非真人访问"><input type="checkbox" id="bots" ${state.bots ? 'checked' : ''}><span class="t"></span>含爬虫</label>
+    <label class="switch" title="爬虫，以及机房 IP、缺少浏览器特征、高频访问等可疑访问"><input type="checkbox" id="bots" ${state.bots ? 'checked' : ''}><span class="t"></span>含机器访问</label>
     <div class="seg" id="range" role="tablist">${[[1, '24 小时'], [7, '7 天'], [30, '30 天'], [90, '90 天'], [365, '1 年']]
       .map(([d, l]) => `<button role="tab" data-d="${d}" class="${d === state.days ? 'on' : ''}">${l}</button>`).join('')}</div>
   </div>`;
@@ -1670,16 +1683,36 @@ function renderLogin() {
 }
 
 // ---------------------------------------------------------------- overview
+const KIND = { human: ['真人', 'var(--good)'], bot: ['爬虫', 'var(--faint)'], suspect: ['可疑', 'var(--amber)'] };
+const kindTag = (r) => r.kind && r.kind !== 'human'
+  ? `<span class="kt ${r.kind}" title="${esc(r.reason || '')}">${KIND[r.kind][0]}</span>` : '';
+// 访客类型占比：分段条 + 图例
+function kindMix(items) {
+  const m = new Map((items || []).map((x) => [x.k || 'human', x.n]));
+  const sum = [...m.values()].reduce((a, b) => a + b, 0);
+  if (!sum) return '';
+  const rows = ['human', 'suspect', 'bot'].map((k) => ({ k, n: m.get(k) || 0 }));
+  return `<div class="kmix"><div class="bmix-bar">${rows.filter((r) => r.n).map((r, i) => `<i style="flex:${r.n};background:${KIND[r.k][1]};--j:${i}" title="${KIND[r.k][0]} · ${num(r.n)} 次"></i>`).join('')}</div>
+    <div class="kmix-l">${rows.map((r) => `<div class="x"><i style="background:${KIND[r.k][1]}"></i><span>${KIND[r.k][0]}</span><b>${num(r.n)}</b><em>${Math.round((r.n / sum) * 100)}%</em></div>`).join('')}</div></div>`;
+}
+
 function feedItems(items, newIds = new Set()) {
   if (!items.length) return `<div class="empty">${ic('pulse')}还没有访问，分享短链后这里会实时出现</div>`;
   return items.map((r) => `<a class="fi ${newIds.has(r.id) ? 'new' : ''}" href="#/link/${r.link_id}">
       <span class="av">${ic((DEV[r.device] || [, 'desk'])[1])}</span>
-      <div class="m"><div class="a"><b>/${esc(r.slug)}</b> <span>· ${esc(r.source)}</span></div>
+      <div class="m"><div class="a"><b>/${esc(r.slug)}</b> <span>· ${esc(r.source)}</span>${kindTag(r)}</div>
         <div class="s">${esc([country(r.country), r.city].filter(Boolean).join(' · '))} · ${esc(r.os)} ${esc(r.browser)}</div></div>
       <time datetime="${new Date(r.ts).toISOString()}" data-ts="${r.ts}">${ago(r.ts)}</time></a>`).join('');
 }
 
 const FEED_N = 4;
+const kindCount = (kinds, k) => (kinds || []).filter((x) => (x.k || 'human') === k).reduce((a, b) => a + b.n, 0);
+const humanPct = (kinds) => {
+  const sum = (kinds || []).reduce((a, b) => a + b.n, 0);
+  return sum ? Math.round((kindCount(kinds, 'human') / sum) * 100) : '—';
+};
+const kindBar = (kinds) => `<div class="kc-k" title="真人 ${num(kindCount(kinds, 'human'))} · 可疑 ${num(kindCount(kinds, 'suspect'))} · 爬虫 ${num(kindCount(kinds, 'bot'))}">
+  <span>可疑 ${num(kindCount(kinds, 'suspect'))}</span><span>爬虫 ${num(kindCount(kinds, 'bot'))}</span></div>`;
 async function renderHome(token) {
   const now = new Date();
   shell('home', `<header class="ph">
@@ -1731,9 +1764,9 @@ async function renderHome(token) {
         <div class="kc-d">最近 ${rangeLabel()}</div>
       </div>
       <div class="kc">
-        <div class="kc-h"><span class="l">人均访问</span></div>
-        <div class="kc-v"><b>${(d.totals.total / Math.max(1, d.totals.unique_ips)).toFixed(1)}</b><small>次 / 访客</small></div>
-        <div class="kc-d">访问次数 ÷ 独立访客</div>
+        <div class="kc-h"><span class="l">真人占比</span></div>
+        <div class="kc-v"><b>${humanPct(d.kinds)}</b><small>%</small></div>
+        ${kindBar(d.kinds)}
       </div>
       <div class="kc">
         <div class="kc-h"><span class="l">活跃短链</span><a href="#/links" class="kc-a">管理 →</a></div>
@@ -2088,7 +2121,7 @@ async function renderLink(token, id) {
           <div class="v" data-count="${s.summary.unique_ips}">0</div><div class="d">按 IP 去重</div>
           <div class="ks">${kpiSpark(series.map((x) => x.u), 'var(--violet)')}</div></section>
         <section class="card kpi rv"><div class="kh"><span class="l"><i class="dot" style="background:var(--teal)"></i>累计访问</span></div>
-          <div class="v" data-count="${link.clicks}">0</div><div class="d">自创建以来，含爬虫</div>
+          <div class="v" data-count="${link.clicks}">0</div><div class="d">自创建以来，含机器访问</div>
           <div class="ks">${kpiSpark(series.reduce((a, x) => (a.push((a.at(-1) || 0) + x.n), a), []), 'var(--teal)')}</div></section>
         <section class="card kpi rv"><div class="kh"><span class="l">最后访问</span>${link.last_click && Date.now() - link.last_click < 3600000 ? '<span class="live">活跃</span>' : ''}</div>
           <div class="v sm">${ago(link.last_click)}</div><div class="d">${fmtTime(link.last_click)}</div>
@@ -2120,6 +2153,8 @@ async function renderLink(token, id) {
           { label: '设备', html: rankList(s.devices, { head: ['设备类型', '访问'], fmt: devName }) },
           { label: '系统', html: rankList(s.oses, { head: ['操作系统', '访问'] }) },
           { label: '浏览器', html: rankList(s.browsers, { head: ['浏览器', '访问'] }) },
+          { label: '访客类型', html: (kindMix(s.kinds) || `<div class="empty">${ic('inbox')}该时间段内暂无数据</div>`)
+            + (s.reasons?.length ? `<div class="kmix-r">${rankList(s.reasons, { head: ['爬虫 / 可疑原因', '访问'] })}</div>` : '') },
         ], 'rv')}
         <section class="card rv"><div class="card-h"><h3>时段分布</h3><span class="sp"></span><span class="sub">按本地时间</span></div>
           <div class="card-b">${s.hourly.length ? `
@@ -2161,7 +2196,7 @@ async function renderLink(token, id) {
             <td><div>${esc(r.source)}</div>${r.utm_campaign ? `<div class="sm">${esc(r.utm_campaign)}</div>` : ''}</td>
             <td><div>${esc(country(r.country))}</div><div class="sm">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
             <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" title="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (link.target_url || '—'))}</div>`; })()}</td>
-            <td title="${esc(r.ua)}"><div>${esc(r.os)} · ${esc(r.browser)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div></td>
+            <td title="${esc(r.ua)}"><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div></td>
             <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:180px">${esc(r.asn_org)}</div></td>
             <td class="ell" title="${esc(r.referer)}">${r.referer ? esc(r.referer) : '<span class="sm">—</span>'}</td>
           </tr>`).join('')}</tbody></table></div>
