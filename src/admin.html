@@ -701,6 +701,13 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 }
 @media (max-width: 1180px) { #c-geo .card-b { max-height: 420px; } }
 .heat-card { display: flex; flex-direction: column; }
+/* 第三行与上一行列宽一致：设备、国家共用左侧，活跃时段与右侧“来源”同宽 */
+#home .home-g3 { grid-template-columns: minmax(0, 1.85fr) minmax(300px, 1fr); }
+#home .home-g3 > :last-child { grid-column: auto; }
+.g3-l { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-width: 0; }
+.g3-l > * { min-width: 0; }
+@media (max-width: 1180px) { #home .home-g3 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .g3-l { grid-template-columns: minmax(0, 1fr); } }
 .heat-card .card-b { flex: 1; display: flex; flex-direction: column; }
 .heat-card .wk-f { margin-top: auto !important; padding-top: 16px; }
 .rts { display: grid; gap: 14px; max-height: 420px; overflow: auto; overscroll-behavior: contain; align-content: start; }
@@ -2064,9 +2071,11 @@ async function renderHome(token) {
       ${d.link ? routesCard(d) : tabCard('c-src', '来源', [{ label: '来源', html: rankList(d.sources, { head: ['来源', '访问'] }) }], 'rv')}
     </div>
 
-    <div class="g3">
+    <div class="g3 home-g3">
+      <div class="g3-l">
       <section class="card rv" id="c-dev"><div class="card-h"><h3>设备 / 浏览器 / 系统</h3></div><div class="card-b">${donut(d.devices)}${shareMix('浏览器', d.browsers)}${shareMix('操作系统', d.oses)}</div></section>
       ${tabCard('c-geo', '国家 / 地区', [{ label: '国家', html: rankList(d.countries, { head: ['国家', '访问'], fmt: country }) }], 'rv')}
+      </div>
       <section class="card rv heat-card"><div class="card-h"><h3>活跃时段</h3><span class="sp"></span><span class="sub">按本地时间</span></div><div class="card-b">${weekHeat(d.heat)}</div></section>
     </div>
     ${machinesCard(d)}`;
