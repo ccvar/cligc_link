@@ -35,7 +35,6 @@ CREATE TABLE IF NOT EXISTS clicks (
   is_bot       INTEGER NOT NULL DEFAULT 0,
   lang         TEXT NOT NULL DEFAULT '',
   rule_id      INTEGER NOT NULL DEFAULT 0, -- 命中的跳转规则，0 = 默认地址
-  sub          TEXT NOT NULL DEFAULT '',  -- 访问的二级路径，如 /a/b 记为 "b"
   FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE
 );
 
@@ -46,8 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_clicks_ts ON clicks(ts);
 CREATE TABLE IF NOT EXISTS link_targets (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   link_id     INTEGER NOT NULL,
-  path        TEXT NOT NULL DEFAULT '',   -- 二级路径，如 "b" 表示 /a/b；空 = 地区规则
-  countries   TEXT NOT NULL,              -- 逗号分隔的 ISO 国家代码，如 "HK,MO,TW"；二级路径规则可为空，表示所有地区
+  countries   TEXT NOT NULL,              -- 逗号分隔的 ISO 国家代码，如 "HK,MO,TW"
   url         TEXT NOT NULL,
   note        TEXT NOT NULL DEFAULT '',
   fallback    INTEGER NOT NULL DEFAULT 0, -- 1 = 访客打不开该地址时回退到默认地址

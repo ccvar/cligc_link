@@ -730,23 +730,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 @keyframes pop { from { transform: translateX(-50%) scale(.95); opacity: 0; } }
 .dialog h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -.01em; }
 .dialog p { margin: 0 0 22px; color: var(--text-2); }
-/* 二级路径规则 */
-.rb.path { color: var(--violet); background: color-mix(in srgb, var(--violet) 12%, transparent); }
-.chip.path { font-family: var(--mono); font-size: 12.5px; color: var(--text-2); background: color-mix(in srgb, var(--violet) 10%, transparent); }
-.chip.path b { color: var(--violet); font-weight: 650; }
-.rule.is-path .ri { color: var(--violet); }
-.sub-paths { margin: 0 20px 16px; padding: 14px 16px; border-radius: 12px; border: 1px dashed var(--line); }
-.sp-h { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); margin-bottom: 10px; }
-.sp-h svg { flex: none; }
-.sp-l { display: flex; flex-wrap: wrap; gap: 8px; }
-.sp-i { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; font-size: 12.5px; transition: border-color .15s, background .15s; }
-.sp-i:hover { border-color: var(--accent); background: var(--accent-2); }
-.sp-i code { font-family: var(--mono); }
-.sp-i b { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
-.sp-i svg { color: var(--accent); }
-.sim-p { display: inline-flex; align-items: center; height: 34px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); padding-left: 10px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); transition: border-color .15s, box-shadow .15s; }
-.sim-p:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-2); }
-.sim-p input { border: 0; outline: 0; background: none; font: inherit; color: var(--text); width: 130px; height: 100%; padding: 0 10px 0 1px; }
 .dialog.dup p { margin-bottom: 18px; }
 .dialog.dup .field { margin-bottom: 16px; }
 .dialog.dup .row { margin-top: 22px; }
@@ -858,7 +841,6 @@ const I = {
   tab: '<rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M11 18h2"/>',
   bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 13h.01M15 13h.01"/>',
   pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
-  tree: '<path d="M6 4v9a3 3 0 0 0 3 3h10"/><path d="m15 12 4 4-4 4"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   route: '<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/>',
   chev: '<path d="m6 9 6 6 6-6"/>',
@@ -924,8 +906,7 @@ function countryChips(codes, n = 6) {
   const shown = codes.slice(0, n).map((c) => `<span class="chip" title="${esc(c)}">${`${flag(c)} ${esc(cname(c))}`.trim()}</span>`).join('');
   return shown + (codes.length > n ? `<span class="chip more" title="${esc(codes.slice(n).map(cname).join('、'))}">+${codes.length - n}</span>` : '');
 }
-const countriesText = (t) => t.countries.slice(0, 3).map((c) => `${flag(c)} ${cname(c)}`.trim()).join('、') + (t.countries.length > 3 ? ` 等 ${t.countries.length} 个` : '');
-const ruleText = (t) => !t ? '默认地址' : t.path ? `/${t.path}${t.countries.length ? ' · ' + countriesText(t) : ''}` : countriesText(t);
+const ruleText = (t) => t ? t.countries.slice(0, 3).map((c) => `${flag(c)} ${cname(c)}`.trim()).join('、') + (t.countries.length > 3 ? ` 等 ${t.countries.length} 个` : '') : '默认地址';
 
 const DEV = { Mobile: ['手机', 'phone'], Desktop: ['电脑', 'desk'], Tablet: ['平板', 'tab'], Bot: ['爬虫', 'bot'] };
 const devName = (k) => (DEV[k] || [k || '未知'])[0];
@@ -1826,7 +1807,7 @@ async function renderLinks(token, opts = {}) {
     <div class="lrow ${listState.flash === l.id ? 'flash' : ''}" data-go="${l.id}" tabindex="0">
       <div style="min-width:0">
         <div class="su">${esc(shortDisp(l.slug))}${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}</div>
-        <div class="tg">${l.paths ? `<span class="rb path">${ic('tree')}${l.paths} 个二级路径</span>` : ''}${l.rules ? `<span class="rb">${ic('globe')}${l.rules} 条地区规则</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
+        <div class="tg">${l.rules ? `<span class="rb">${ic('globe')}${l.rules} 条地区规则</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
       </div>
       <div class="c-spark">${sparkline(l.spark)}</div>
       <div class="num c-clicks">${num(l.clicks)}</div>
@@ -2039,7 +2020,7 @@ async function renderLink(token, id) {
           <div class="short">${esc(shortDisp(link.slug))}
             ${copyBtn(url, 'btn sm', '复制')}
             <a class="btn sm ghost icon" href="${esc(url)}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 15)}</a></div>
-          <div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}${link.targets.length ? `<span class="rb" style="margin-left:4px">${ic('route')}${link.targets.length} 条跳转规则</span>` : ''}</div>
+          <div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}${link.targets.length ? `<span class="rb" style="margin-left:4px">${ic('globe')}${link.targets.length} 条地区规则</span>` : ''}</div>
           <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.note ? ` · ${esc(link.note)}` : ''}</div>
         </div>
         <div class="acts">
@@ -2131,7 +2112,7 @@ async function renderLink(token, id) {
             <td><div>${ago(r.ts)}</div><div class="sm">${fmtTime(r.ts)}</div></td>
             <td><div>${esc(r.source)}</div>${r.utm_campaign ? `<div class="sm">${esc(r.utm_campaign)}</div>` : ''}</td>
             <td><div>${esc(country(r.country))}</div><div class="sm">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
-            <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? (t.path ? '二级路径' : '地区规则') : '默认地址'}${r.sub ? ` <code class="sm">/${esc(r.sub)}</code>` : ''}</div><div class="sm ell" style="max-width:200px" title="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (link.target_url || '—'))}</div>`; })()}</td>
+            <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" title="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (link.target_url || '—'))}</div>`; })()}</td>
             <td title="${esc(r.ua)}"><div>${esc(r.os)} · ${esc(r.browser)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div></td>
             <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:180px">${esc(r.asn_org)}</div></td>
             <td class="ell" title="${esc(r.referer)}">${r.referer ? esc(r.referer) : '<span class="sm">—</span>'}</td>
@@ -2314,12 +2295,11 @@ function rulesCard(link, s) {
     return `<div class="rh"><b>${num(n)}</b>次 · ${Math.round((n / total) * 100)}%<div class="bar"><i style="width:${(n / max) * 100}%"></i></div>${
       fallbacks != null ? `<div class="fbn ${fallbacks ? 'has' : ''}" title="累计回退到默认地址的次数">已回退 ${num(fallbacks)} 次</div>` : ''}</div>`;
   };
-  const geo = link.targets.filter((t) => !t.path).length;
   const rows = link.targets.map((t) => `
-    <div class="rule ${t.path ? 'is-path' : ''}">
-      <span class="ri">${t.path ? ic('tree', 18) : (t.countries.length === 1 && flag(t.countries[0])) || ic('globe', 18)}</span>
+    <div class="rule">
+      <span class="ri">${(t.countries.length === 1 && flag(t.countries[0])) || ic('globe', 18)}</span>
       <div style="min-width:0">
-        <div class="rc">${t.path ? `<span class="chip path"><span>/${esc(link.slug)}/<b>${esc(t.path)}</b></span></span>${t.countries.length ? countryChips(t.countries) : '<span class="chip">所有地区</span>'}` : countryChips(t.countries)}${t.note ? `<span class="rn" title="备注">${esc(t.note)}</span>` : ''}${t.fallback
+        <div class="rc">${countryChips(t.countries)}${t.note ? `<span class="rn" title="备注">${esc(t.note)}</span>` : ''}${t.fallback
           ? `<span class="tag-fb" title="访客打不开这个地址时，自动改去默认地址">${ic('undo', 12)}打不开时回退</span>` : ''}</div>
         <div class="ru">${ic('arrow', 13)}<a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.url)}">${esc(t.url)}</a></div>
       </div>
@@ -2331,7 +2311,7 @@ function rulesCard(link, s) {
     <div class="rule def">
       <span class="ri">${ic('globe', 18)}</span>
       <div style="min-width:0">
-        <div class="rc"><span class="chip def">${link.targets.length ? '其他所有访问' : '所有访问'}</span><span class="tag-def">默认</span></div>
+        <div class="rc"><span class="chip def">${link.targets.length ? '其他所有地区' : '所有地区'}</span><span class="tag-def">默认</span></div>
         <div class="ru">${ic('arrow', 13)}${link.target_url
           ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer" title="${esc(link.target_url)}">${esc(link.target_url)}</a>`
           : `<span class="warn">未设置，${link.targets.length ? '未命中规则的' : '所有'}访问会显示“链接暂不可用”</span>`}</div>
@@ -2339,19 +2319,12 @@ function rulesCard(link, s) {
       ${hitCell(0)}
       <div class="acts"><button class="btn ${link.target_url ? 'ghost icon' : 'sm'}" ${link.target_url ? 'data-tip="设置默认地址" aria-label="设置默认地址"' : ''} data-rdef>${link.target_url ? ic('edit') : `${ic('plus', 14)}设置`}</button></div>
     </div>`;
-  // 有人访问、但还没有规则的二级路径
-  const has = new Set(link.targets.filter((t) => t.path).map((t) => t.path.toLowerCase()));
-  const loose = (s.subs || []).filter((x) => !has.has(x.k.toLowerCase()) && /^[A-Za-z0-9_\/-]{1,200}$/.test(x.k));
   return `<section class="card rv" id="rules">
-    <div class="card-h"><h3>跳转规则</h3><span class="sub">按二级路径或访问者所在国家 / 地区跳到不同地址 · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
-      <button class="btn sm" id="padd">${ic('tree', 14)}添加二级路径</button>
+    <div class="card-h"><h3>跳转规则</h3><span class="sub">按访问者所在国家 / 地区跳到不同地址 · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
       <button class="btn sm primary" id="radd">${ic('plus', 14)}添加地区规则</button></div>
-    <div class="rules">${rows || `<div class="none">${ic('route', 18)}还没有规则，所有访问都会跳到默认地址。可以按二级路径（如 /${esc(link.slug)}/zhihu）或按国家 / 地区分别设置推广地址。</div>`}${def}</div>
-    ${loose.length ? `<div class="sub-paths"><div class="sp-h">${ic('info', 14)}最近 ${rangeLabel()} 有人访问了这些二级路径，但还没有对应规则（按上面的规则跳转）：</div>
-      <div class="sp-l">${loose.map((x) => `<button type="button" class="sp-i" data-mk="${esc(x.k)}" data-tip="为 /${esc(x.k)} 添加规则"><code>/${esc(x.k)}</code><b>${num(x.n)}</b>${ic('plus', 12)}</button>`).join('')}</div></div>` : ''}
+    <div class="rules">${rows || `<div class="none">${ic('route', 18)}还没有地区规则，所有访问都会跳到默认地址。可以为中国、港澳台、北美等地区分别设置推广地址。</div>`}${def}</div>
     <div class="sim"><span>如果访客来自</span>
       <div class="combo" id="sim"></div>
-      <span>访问</span><label class="sim-p"><span>/${esc(link.slug)}/</span><input id="simp" placeholder="二级路径，可不填" autocomplete="off" spellcheck="false"></label>
       <span class="res" id="simres"></span></div>
   </section>`;
 }
@@ -2360,31 +2333,22 @@ function bindRules(link) {
   const card = document.getElementById('rules');
   if (!card) return;
   const res = card.querySelector('#simres');
-  const simp = card.querySelector('#simp');
-  let cur = store.get('sim', 'CN');
-  const simulate = (c = cur) => {
-    cur = c;
-    const p = simp.value.trim().replace(/^\/+|\/+$/g, '').toLowerCase();
-    const byPath = p ? link.targets.filter((x) => x.path.toLowerCase() === p) : [];
-    const t = byPath.find((x) => x.countries.includes(c)) || byPath.find((x) => !x.countries.length)
-      || link.targets.find((x) => !x.path && x.countries.includes(c));
-    const kind = t ? (t.path ? '二级路径规则' : '地区规则') : '';
+  const simulate = (c) => {
+    const t = link.targets.find((x) => x.countries.includes(c));
     const url = t ? t.url : link.target_url;
     res.innerHTML = url
-      ? `<span>会跳到</span><b title="${esc(url)}">${esc(url)}</b><span class="tag">${!t ? '（默认地址）' : t.fallback && link.target_url ? `（命中${kind}，打不开时回退到默认地址）` : `（命中${kind}）`}</span>`
+      ? `<span>会跳到</span><b title="${esc(url)}">${esc(url)}</b><span class="tag">${!t ? '（默认地址）' : t.fallback && link.target_url ? '（命中地区规则，打不开时回退到默认地址）' : '（命中地区规则）'}</span>`
       : '<span>会看到</span><b class="warn">“链接暂不可用”</b><span class="tag">（未设置默认地址）</span>';
   };
-  countryCombo(card.querySelector('#sim'), cur, (c) => { store.set('sim', c); simulate(c); });
-  simp.oninput = () => simulate();
-  simulate();
+  const start = store.get('sim', 'CN');
+  countryCombo(card.querySelector('#sim'), start, (c) => { store.set('sim', c); simulate(c); });
+  simulate(start);
   card.querySelector('#radd').onclick = () => openRuleDrawer(link, null);
-  card.querySelector('#padd').onclick = () => openRuleDrawer(link, null, '');
-  card.querySelectorAll('[data-mk]').forEach((b) => (b.onclick = () => openRuleDrawer(link, null, b.dataset.mk)));
   card.querySelector('[data-rdef]').onclick = () => openDrawer(link, (saved) => saved ? route() : null);
   card.querySelectorAll('[data-rule]').forEach((b) => (b.onclick = () => openRuleDrawer(link, link.targets.find((t) => t.id == b.dataset.rule))));
   card.querySelectorAll('[data-rdel]').forEach((b) => (b.onclick = async () => {
     const t = link.targets.find((x) => x.id == b.dataset.rdel);
-    const ok = await confirmDialog({ title: '删除这条规则？', text: `${ruleText(t)} 的访问之后会按其他规则或默认地址跳转。已有的访问记录会保留。`, ok: '删除', danger: true });
+    const ok = await confirmDialog({ title: '删除这条规则？', text: `${ruleText(t)} 的访问之后会跳到默认地址。已有的访问记录会保留。`, ok: '删除', danger: true });
     if (!ok) return;
     await api(`/links/${link.id}/targets/${t.id}`, { method: 'DELETE' });
     toast('规则已删除');
@@ -2392,36 +2356,24 @@ function bindRules(link) {
   }));
 }
 
-// preset 不为 undefined 时是二级路径规则（值为预填的路径）
-function openRuleDrawer(link, rule, preset) {
+function openRuleDrawer(link, rule) {
   const isNew = !rule;
-  const isPath = rule ? !!rule.path : preset !== undefined;
   const selected = new Set(rule ? rule.countries : []);
-  // 同一个二级路径（或地区规则）下，其他规则已占用的国家
+  // 其他规则已占用的国家
   const taken = new Map();
-  const calcTaken = (p) => {
-    taken.clear();
-    link.targets.forEach((t, i) => {
-      if ((rule && t.id === rule.id) || t.path.toLowerCase() !== p.toLowerCase()) return;
-      t.countries.forEach((c) => taken.set(c, `规则 ${i + 1}`));
-    });
-  };
-  calcTaken(isPath ? (rule ? rule.path : preset) : '');
+  link.targets.forEach((t, i) => { if (!rule || t.id !== rule.id) t.countries.forEach((c) => taken.set(c, `规则 ${i + 1}`)); });
 
   const ov = document.createElement('div'); ov.className = 'ov';
   const dr = document.createElement('form'); dr.className = 'drawer'; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-modal', 'true');
   dr.innerHTML = `
-    <div class="dh"><h2>${isPath ? (isNew ? '添加二级路径' : '编辑二级路径') : (isNew ? '添加地区规则' : '编辑地区规则')}</h2><button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
+    <div class="dh"><h2>${isNew ? '添加地区规则' : '编辑地区规则'}</h2><button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
     <div class="db">
-      ${isPath ? `<div class="field"><label for="r-p">二级路径</label>
-        <div class="pre"><span>${esc(HOST)}/${esc(link.slug)}/</span><input class="input" id="r-p" required placeholder="zhihu" value="${esc(rule ? rule.path : preset)}" autocomplete="off" spellcheck="false"></div>
-        <div class="hint">访问 /${esc(link.slug)}/这个路径 时按本规则跳转，不区分大小写。字母、数字、- 或 _</div></div>` : ''}
-      <div class="field"><label>国家 / 地区${isPath ? ' <span class="hint" style="font-weight:400">可选，不选 = 所有地区</span>' : ''}</label>
+      <div class="field"><label>国家 / 地区</label>
         <div class="sel" id="sel"></div>
         <div class="groups" style="margin-top:10px">${GROUPS.map(([n, cs], i) => `<button type="button" data-g="${i}">+ ${n}</button>`).join('')}</div>
         <div class="psearch">${ic('search')}<input class="input" id="ps" placeholder="搜索国家、地区或代码，如 日本 / JP" autocomplete="off"></div>
         <div class="plist" id="pl"></div>
-        <div class="hint" style="margin-top:6px">${isPath ? '同一个二级路径可以按国家再细分：先匹配选了国家的规则，再匹配“所有地区”的。' : '按访问者 IP 所在的国家 / 地区匹配。同一个国家只能属于一条规则。'}</div></div>
+        <div class="hint" style="margin-top:6px">按访问者 IP 所在的国家 / 地区匹配。同一个国家只能属于一条规则。</div></div>
       <div class="field"><label for="r-u">跳转到</label>
         <input class="input" id="r-u" name="url" required placeholder="https://b.com/promo-cn" value="${esc(rule ? rule.url : '')}"></div>
       <div class="field"><label for="r-n">备注 <span class="hint" style="font-weight:400">可选</span></label>
@@ -2474,23 +2426,19 @@ function openRuleDrawer(link, rule, preset) {
     renderSel(); renderList();
   }));
   ps.oninput = renderList;
-  const rp = dr.querySelector('#r-p');
-  if (rp) rp.oninput = () => { calcTaken(rp.value.trim().replace(/^\/+|\/+$/g, '')); renderList(); };
   renderSel(); renderList();
-  (isPath && !(rule ? rule.path : preset) ? rp : isNew && !isPath ? ps : dr.querySelector('#r-u')).focus();
+  (isNew ? ps : dr.querySelector('#r-u')).focus();
 
   dr.onsubmit = async (e) => {
     e.preventDefault();
     const err = dr.querySelector('.err');
-    const path = rp ? rp.value.trim().replace(/^\/+|\/+$/g, '') : '';
-    if (rp && !path) { err.textContent = '请填写二级路径'; rp.focus(); return; }
-    if (!rp && !selected.size) { err.textContent = '请至少选择一个国家 / 地区'; return; }
+    if (!selected.size) { err.textContent = '请至少选择一个国家 / 地区'; return; }
     let url = dr.querySelector('#r-u').value.trim();
     if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
     const btn = dr.querySelector('.df .primary'); btn.disabled = true;
     try {
       await api(`/links/${link.id}/targets${isNew ? '' : '/' + rule.id}`, {
-        method: isNew ? 'POST' : 'PUT', body: { path, countries: [...selected], url, note: dr.querySelector('#r-n').value, fallback: dr.querySelector('#r-fb').checked },
+        method: isNew ? 'POST' : 'PUT', body: { countries: [...selected], url, note: dr.querySelector('#r-n').value, fallback: dr.querySelector('#r-fb').checked },
       });
       close(); toast(isNew ? '规则已添加' : '规则已保存');
       route();

@@ -8,7 +8,6 @@ const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
 // 回退检测：访客浏览器内探测地区地址的超时时间
 const PROBE_TIMEOUT = 2500;
 const SLUG_RE = /^[A-Za-z0-9_-]{1,64}$/;
-const PATH_RE = /^[A-Za-z0-9_-]{1,64}(\/[A-Za-z0-9_-]{1,64}){0,2}$/; // 二级路径，最多三段
 const SESSION_TTL = 7 * 24 * 3600 * 1000;
 // 未设置任何密码时使用的默认密码；用它登录后必须先修改密码才能使用后台
 const DEFAULT_PASSWORD = 'admin';
@@ -86,23 +85,12 @@ async function migrate(env) {
   if (!tcols.includes('fallbacks')) {
     await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN fallbacks INTEGER NOT NULL DEFAULT 0').run();
   }
-  if (!tcols.includes('path')) {
-    await env.DB.prepare("ALTER TABLE link_targets ADD COLUMN path TEXT NOT NULL DEFAULT ''").run();
-  }
-  if (!cols.includes('sub')) {
-    await env.DB.prepare("ALTER TABLE clicks ADD COLUMN sub TEXT NOT NULL DEFAULT ''").run();
-  }
 }
 
 // ---------------------------------------------------------------- 跳转
 
 async function handleRedirect(request, env, ctx, url) {
-  let full;
-  try { full = decodeURIComponent(url.pathname.slice(1)).replace(/\/+$/, ''); } catch { return notFound(); }
-  // /a/b：a 是短链，b 是二级路径
-  const cut0 = full.indexOf('/');
-  const slug = cut0 < 0 ? full : full.slice(0, cut0);
-  const sub = cut0 < 0 ? '' : full.slice(cut0 + 1).slice(0, 200);
+  const slug = decodeURIComponent(url.pathname.slice(1)).replace(/\/$/, '');
   if (!SLUG_RE.test(slug)) return notFound();
 
   const link = await env.DB.prepare(
@@ -111,19 +99,12 @@ async function handleRedirect(request, env, ctx, url) {
   if (!link || !link.enabled) return notFound();
   if (link.expires_at && link.expires_at < Date.now()) return new Response('Link expired', { status: 410 });
 
-  // 匹配顺序：二级路径 + 国家 > 二级路径（所有地区）> 地区规则 > 默认地址
+  // 按访问者所在国家 / 地区匹配跳转规则，未命中则用默认地址
   const country = request.cf?.country || '';
   let rule = null;
-  if (sub) {
+  if (country) {
     rule = await env.DB.prepare(
-      `SELECT id, url, fallback FROM link_targets WHERE link_id = ?1 AND path = ?2 COLLATE NOCASE
-         AND (countries = '' OR (',' || countries || ',') LIKE ?3)
-       ORDER BY countries = '' LIMIT 1`
-    ).bind(link.id, sub, `%,${country || '-'},%`).first();
-  }
-  if (!rule && country) {
-    rule = await env.DB.prepare(
-      `SELECT id, url, fallback FROM link_targets WHERE link_id = ? AND path = '' AND (',' || countries || ',') LIKE ?`
+      `SELECT id, url, fallback FROM link_targets WHERE link_id = ? AND (',' || countries || ',') LIKE ?`
     ).bind(link.id, `%,${country},%`).first();
   }
   const ruleId = rule ? rule.id : 0;
@@ -141,7 +122,7 @@ async function handleRedirect(request, env, ctx, url) {
   const target = withQuery(raw);
 
   if (request.method === 'GET') {
-    ctx.waitUntil(logClick(request, env, link.id, url, ruleId, sub).catch((e) => console.error('log failed', e)));
+    ctx.waitUntil(logClick(request, env, link.id, url, ruleId).catch((e) => console.error('log failed', e)));
   }
 
   // 规则开启了“打不开时回退”：先在访客浏览器里探测地区地址，连不上再改去默认地址。
@@ -206,7 +187,7 @@ async function recordFallback(request, env) {
   return new Response(null, { status: 204 });
 }
 
-async function logClick(request, env, linkId, url, ruleId, sub = '') {
+async function logClick(request, env, linkId, url, ruleId) {
   const h = request.headers;
   const cf = request.cf || {};
   const referer = h.get('referer') || '';
@@ -223,8 +204,8 @@ async function logClick(request, env, linkId, url, ruleId, sub = '') {
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO clicks (link_id, ts, source, referer, referer_host, utm_source, utm_medium, utm_campaign,
-         ip, country, region, city, asn_org, ua, browser, os, device, is_bot, lang, rule_id, sub)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         ip, country, region, city, asn_org, ua, browser, os, device, is_bot, lang, rule_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       linkId, now, cut(source, 200), cut(referer, 1000), cut(refererHost, 200),
       cut(utmSource, 200), cut(qs.get('utm_medium') || '', 200), cut(qs.get('utm_campaign') || '', 200),
@@ -232,7 +213,7 @@ async function logClick(request, env, linkId, url, ruleId, sub = '') {
       cut(cf.asOrganization || '', 200), cut(ua, 500),
       parsed.browser, parsed.os, parsed.device, parsed.bot ? 1 : 0,
       cut((h.get('accept-language') || '').split(',')[0], 32),
-      ruleId, sub
+      ruleId
     ),
     env.DB.prepare('UPDATE links SET clicks = clicks + 1, last_click = ? WHERE id = ?').bind(now, linkId),
   ]);
@@ -705,8 +686,8 @@ async function duplicateLink(request, env, id) {
      VALUES (?,?,?,?,?,?,?,?,?) RETURNING *`
   ).bind(data.slug, src.target_url, data.title, src.note, src.enabled, src.pass_query, src.expires_at, now, now).first();
   await env.DB.prepare(
-    `INSERT INTO link_targets (link_id, path, countries, url, note, fallback, created_at, updated_at)
-     SELECT ?, path, countries, url, note, fallback, ?, ? FROM link_targets WHERE link_id = ? ORDER BY id`
+    `INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at)
+     SELECT ?, countries, url, note, fallback, ?, ? FROM link_targets WHERE link_id = ? ORDER BY id`
   ).bind(row.id, now, now, id).run();
   return json(row, 201);
 }
@@ -742,7 +723,7 @@ async function getLink(env, id) {
 }
 
 async function loadTargets(env, linkId) {
-  const r = await env.DB.prepare("SELECT * FROM link_targets WHERE link_id = ? ORDER BY path = '', path COLLATE NOCASE, id").bind(linkId).all();
+  const r = await env.DB.prepare('SELECT * FROM link_targets WHERE link_id = ? ORDER BY id').bind(linkId).all();
   return r.results.map((t) => ({ ...t, countries: t.countries.split(',').filter(Boolean) }));
 }
 
@@ -755,19 +736,13 @@ async function saveTarget(request, env, linkId, tid) {
 
   const url = normalizeUrl(String(body.url || '').trim());
   if (!url) return json({ error: '目标地址必须是合法的 http / https 地址' }, 400);
-  const path = String(body.path || '').trim().replace(/^\/+|\/+$/g, '');
-  if (path && !PATH_RE.test(path)) return json({ error: '二级路径只能包含字母、数字、- 和 _' }, 400);
   const countries = [...new Set((Array.isArray(body.countries) ? body.countries : [])
     .map((c) => String(c).trim().toUpperCase()))];
-  if (!countries.length && !path) return json({ error: '至少选择一个国家 / 地区' }, 400);
+  if (!countries.length) return json({ error: '至少选择一个国家 / 地区' }, 400);
   if (countries.some((c) => !/^[A-Z]{2}$/.test(c))) return json({ error: '国家代码不合法' }, 400);
 
-  // 同一个二级路径（或地区规则）下，同一个国家只能出现在一条规则里
-  const same = (t) => t.path.toLowerCase() === path.toLowerCase();
-  const others = (await loadTargets(env, linkId)).filter((t) => t.id !== tid && same(t));
-  if (path && !countries.length && others.some((t) => !t.countries.length)) {
-    return json({ error: `二级路径 /${path} 已经有一条“所有地区”的规则` }, 400);
-  }
+  // 同一个国家只能出现在一条规则里
+  const others = (await loadTargets(env, linkId)).filter((t) => t.id !== tid);
   const taken = countries.filter((c) => others.some((t) => t.countries.includes(c)));
   if (taken.length) return json({ error: `这些国家 / 地区已在其他规则中：${taken.join('、')}`, taken }, 400);
 
@@ -776,11 +751,11 @@ async function saveTarget(request, env, linkId, tid) {
   const fallback = body.fallback ? 1 : 0;
   const row = tid
     ? await env.DB.prepare(
-      'UPDATE link_targets SET path = ?, countries = ?, url = ?, note = ?, fallback = ?, updated_at = ? WHERE id = ? AND link_id = ? RETURNING *'
-    ).bind(path, countries.join(','), url, note, fallback, now, tid, linkId).first()
+      'UPDATE link_targets SET countries = ?, url = ?, note = ?, fallback = ?, updated_at = ? WHERE id = ? AND link_id = ? RETURNING *'
+    ).bind(countries.join(','), url, note, fallback, now, tid, linkId).first()
     : await env.DB.prepare(
-      'INSERT INTO link_targets (link_id, path, countries, url, note, fallback, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?) RETURNING *'
-    ).bind(linkId, path, countries.join(','), url, note, fallback, now, now).first();
+      'INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at) VALUES (?,?,?,?,?,?,?) RETURNING *'
+    ).bind(linkId, countries.join(','), url, note, fallback, now, now).first();
   if (!row) return json({ error: 'not found' }, 404);
   return json({ ...row, countries }, tid ? 200 : 201);
 }
@@ -815,8 +790,7 @@ async function listLinks(env, url) {
   const params = q ? [`%${q}%`] : [];
   const [total, rows] = await Promise.all([
     env.DB.prepare(`SELECT COUNT(*) AS n FROM links ${where}`).bind(...params).first('n'),
-    env.DB.prepare(`SELECT *, (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id AND t.path = '') AS rules,
-        (SELECT COUNT(DISTINCT lower(t.path)) FROM link_targets t WHERE t.link_id = links.id AND t.path != '') AS paths
+    env.DB.prepare(`SELECT *, (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id) AS rules
       FROM links ${where} ORDER BY ${order} LIMIT ${size} OFFSET ${(page - 1) * size}`)
       .bind(...params).all(),
   ]);
@@ -877,7 +851,7 @@ async function linkStats(env, id, url) {
     env.DB.prepare(`SELECT ${col} AS k, COUNT(*) AS n ${base} GROUP BY ${col} ORDER BY n DESC LIMIT ${limit}`)
       .bind(id, since).all().then((r) => r.results);
 
-  const [summary, prev, daily, prevDaily, hourly, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, targets, subs] =
+  const [summary, prev, daily, prevDaily, hourly, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, targets] =
     await Promise.all([
       env.DB.prepare(`SELECT COUNT(*) AS total, COUNT(DISTINCT ip) AS unique_ips ${base}`).bind(id, since).first(),
       env.DB.prepare(
@@ -897,11 +871,9 @@ async function linkStats(env, id, url) {
       ).bind(id, since, tz).all().then((r) => r.results),
       top('source', 20), top('referer_host', 20), top('country'), top('city'),
       top('device'), top('browser'), top('os'), top('utm_campaign'), top('rule_id', 50),
-      env.DB.prepare(`SELECT sub AS k, COUNT(*) AS n ${base} AND sub != '' GROUP BY sub ORDER BY n DESC LIMIT 30`)
-        .bind(id, since).all().then((r) => r.results),
     ]);
 
-  return json({ summary, prev, daily, prevDaily, hourly, targets, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, subs });
+  return json({ summary, prev, daily, prevDaily, hourly, targets, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns });
 }
 
 async function linkClicks(env, id, url) {
@@ -923,7 +895,7 @@ async function exportClicks(env, id) {
   const rows = (await env.DB.prepare('SELECT * FROM clicks WHERE link_id = ? ORDER BY id DESC LIMIT 100000')
     .bind(id).all()).results;
   const cols = ['ts', 'source', 'referer', 'utm_source', 'utm_medium', 'utm_campaign', 'ip', 'country',
-    'region', 'city', 'asn_org', 'device', 'os', 'browser', 'is_bot', 'lang', 'rule_id', 'sub', 'ua'];
+    'region', 'city', 'asn_org', 'device', 'os', 'browser', 'is_bot', 'lang', 'rule_id', 'ua'];
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [cols.join(',')];
   for (const r of rows) {
