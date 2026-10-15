@@ -671,6 +671,13 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .fold-b { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .35s var(--ease-out); }
 .fold-b > * { overflow: hidden; min-height: 0; }
 .fold.open .fold-b { grid-template-rows: 1fr; }
+.fold.settled .fold-b > * { overflow: visible; }
+#rules .rsum { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-family: var(--mono); font-size: 12px; }
+#rules.open .rsum { visibility: hidden; }
+.rules-bar { display: flex; align-items: center; gap: 12px; padding: 12px 20px 14px; }
+.rules-bar .sub { margin: 0; }
+.rules-bar .sp { flex: 1; }
+@media (max-width: 640px) { .rules-bar { flex-wrap: wrap; } }
 .fold-b .card-b { transition: padding .35s var(--ease-out); }
 .fold:not(.open) .fold-b .card-b { padding-top: 0; padding-bottom: 0; }
 .fold.open .fold-h { padding-bottom: 0; }
@@ -2111,7 +2118,7 @@ async function renderLink(token, id) {
 
       ${rulesCard(link, s)}
 
-      <section class="card rv fold ${store.get('fold:builder', false) ? 'open' : ''}" id="builder">
+      <section class="card rv fold ${store.get('fold:builder', false) ? 'open settled' : ''}" id="builder">
         <button type="button" class="card-h fold-h" aria-expanded="${store.get('fold:builder', false)}">
           <span class="fold-ic">${ic('route', 15)}</span><h3>高级设置 · 按站点生成投放链接</h3><span class="sub hide-m">每个站点用不同链接，来源统计更准</span>
           <span class="sp"></span><span class="rb" id="bcount" hidden></span>${ic('chev', 16)}</button>
@@ -2244,13 +2251,7 @@ async function renderLink(token, id) {
   };
   sites.oninput = build;
   build();
-  const fold = document.getElementById('builder'), fh = fold.querySelector('.fold-h');
-  fh.onclick = () => {
-    const open = !fold.classList.contains('open');
-    fold.classList.toggle('open', open); fh.setAttribute('aria-expanded', open);
-    store.set('fold:builder', open);
-    if (open) setTimeout(() => sites.focus(), 200);
-  };
+  bindFold(document.getElementById('builder'), 'fold:builder', () => setTimeout(() => sites.focus(), 200));
 }
 
 // ---------------------------------------------------------------- 跳转规则
@@ -2403,19 +2404,43 @@ function rulesCard(link, s) {
       ${hitCell(0)}
       <div class="acts"><button class="btn ${link.target_url ? 'ghost icon' : 'sm'}" ${link.target_url ? 'data-tip="设置默认地址" aria-label="设置默认地址"' : ''} data-rdef>${link.target_url ? ic('edit') : `${ic('plus', 14)}设置`}</button></div>
     </div>`;
-  return `<section class="card rv" id="rules">
-    <div class="card-h"><h3>跳转规则</h3><span class="sub">按访问者所在国家 / 地区跳到不同地址 · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
+  // 收起时标题旁显示的一句话摘要
+  const sum = link.targets.length
+    ? `${link.targets.length} 条地区规则 · 其他地区 → ${link.target_url ? esc(link.target_url.replace(/^https?:\/\//, '')) : '未设置'}`
+    : link.target_url ? `所有访问 → ${esc(link.target_url.replace(/^https?:\/\//, ''))}` : '还没有设置推广地址';
+  const open = store.get('fold:rules', false);
+  return `<section class="card rv fold ${open ? 'open settled' : ''}" id="rules">
+    <button type="button" class="card-h fold-h" aria-expanded="${open}">
+      <span class="fold-ic">${ic('route', 15)}</span><h3>跳转规则</h3><span class="sub rsum">${sum}</span>
+      <span class="sp"></span>${ic('chev', 16)}</button>
+    <div class="fold-b"><div>
+    <div class="rules-bar"><span class="sub">按访问者所在国家 / 地区跳到不同地址 · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
       <button class="btn sm primary" id="radd">${ic('plus', 14)}添加地区规则</button></div>
     <div class="rules">${rows || `<div class="none">${ic('route', 18)}还没有地区规则，所有访问都会跳到默认地址。可以为中国、港澳台、北美等地区分别设置推广地址。</div>`}${def}</div>
     <div class="sim"><span>如果访客来自</span>
       <div class="combo" id="sim"></div>
       <span class="res" id="simres"></span></div>
+    </div></div>
   </section>`;
+}
+
+// 折叠卡片：展开动画结束后取消裁剪，让悬停提示和浮层能超出卡片
+function bindFold(fold, key, onOpen) {
+  const fh = fold.querySelector('.fold-h');
+  fh.onclick = () => {
+    const open = !fold.classList.contains('open');
+    fold.classList.toggle('open', open); fh.setAttribute('aria-expanded', open);
+    store.set(key, open);
+    clearTimeout(fold._t);
+    if (open) { fold._t = setTimeout(() => fold.classList.add('settled'), 380); onOpen && onOpen(); }
+    else fold.classList.remove('settled');
+  };
 }
 
 function bindRules(link) {
   const card = document.getElementById('rules');
   if (!card) return;
+  bindFold(card, 'fold:rules');
   const res = card.querySelector('#simres');
   const simulate = (c) => {
     const t = link.targets.find((x) => x.countries.includes(c));
