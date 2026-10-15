@@ -132,6 +132,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
   transition: color .15s, background .15s; }
 .side .foot .host .out:hover, .side .foot .host .out:focus-visible { color: var(--bad); background: var(--bad-bg); }
 [data-tip] { position: relative; }
+.ftip { position: fixed; z-index: 80; max-width: min(380px, calc(100vw - 16px)); padding: 5px 9px; border-radius: 7px; background: var(--text); color: var(--panel);
+  font: 500 12px/1.5 var(--sans); white-space: normal; overflow-wrap: anywhere; pointer-events: none; box-shadow: var(--shadow-3);
+  opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .2s var(--ease-out); }
+.ftip.on { opacity: 1; transform: none; }
 [data-tip]::after { content: attr(data-tip); position: absolute; z-index: 30; left: 50%; bottom: calc(100% + 8px); transform: translate(-50%, 4px); padding: 5px 9px; border-radius: 7px;
   background: var(--text); color: var(--panel); font: 500 12px/1.4 var(--sans); white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s, transform .2s var(--ease-out); box-shadow: var(--shadow-3); }
 [data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
@@ -1268,6 +1272,31 @@ function duplicateDialog(src, onDone) {
   document.addEventListener('keydown', onKey);
   document.body.append(ov, d);
   inp.value = src.slug + '-2'; inp.focus(); inp.select();
+}
+
+// 浮动提示：挂在 body 上，不会被表格、省略号文本等裁剪溢出的容器截掉；样式与 data-tip 一致。
+// 默认只在文字被截断时显示，加 data-tipf-always 则总是显示
+{
+  let tip = null, cur = null;
+  const hide = () => { if (tip) tip.remove(); tip = null; cur = null; };
+  document.addEventListener('mouseover', (e) => {
+    const el = e.target.closest && e.target.closest('[data-tipf]');
+    if (el === cur) return;
+    hide();
+    if (!el || !el.dataset.tipf) return;
+    if (!el.hasAttribute('data-tipf-always') && el.scrollWidth <= el.clientWidth + 1) return;
+    cur = el;
+    tip = document.createElement('div'); tip.className = 'ftip'; tip.setAttribute('role', 'tooltip'); tip.textContent = el.dataset.tipf;
+    document.body.append(tip);
+    const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - t.width / 2), innerWidth - t.width - 8);
+    let top = r.top - t.height - 8;
+    if (top < 8) top = r.bottom + 8;
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+    setTimeout(() => tip && tip.classList.add('on'), 10);
+  });
+  addEventListener('scroll', hide, true);
+  addEventListener('blur', hide);
 }
 
 // 在任意元素上用 data-copy 即可复制
@@ -2579,12 +2608,12 @@ async function renderLink(token, id) {
           <thead><tr><th>时间</th><th>来源</th><th>地区</th><th>跳转到</th><th>设备</th><th>IP</th><th>Referer</th></tr></thead>
           <tbody>${c.items.map((r) => `<tr>
             <td><div>${ago(r.ts)}</div><div class="sm">${fmtTime(r.ts)}</div></td>
-            <td><div title="${esc(r.source)}">${esc(r.source)}</div>${r.utm_campaign ? `<div class="sm" title="${esc(r.utm_campaign)}">${esc(r.utm_campaign)}</div>` : ''}</td>
-            <td><div>${esc(country(r.country))}</div><div class="sm" title="${esc([r.region, r.city].filter(Boolean).join(' · '))}">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
-            <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" title="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (link.target_url || '—'))}</div>`; })()}</td>
-            <td title="${esc(r.ua)}"><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r, false)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div>${(r.kind && r.kind !== 'human') || r.proxy ? (r.reason ? `<div class="kr ${r.kind === 'human' ? 'proxy' : r.kind} ell" title="${esc(r.reason)}">${esc(r.reason)}</div>` : '') : ''}</td>
-            <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:200px" title="${esc([r.asn ? 'AS' + r.asn : '', r.asn_org].filter(Boolean).join(' · '))}">${esc(r.asn_org || '—')}</div></td>
-            <td class="ell" title="${esc(r.referer)}">${r.referer ? esc(r.referer) : '<span class="sm">—</span>'}</td>
+            <td><div data-tipf="${esc(r.source)}">${esc(r.source)}</div>${r.utm_campaign ? `<div class="sm" data-tipf="${esc(r.utm_campaign)}">${esc(r.utm_campaign)}</div>` : ''}</td>
+            <td><div>${esc(country(r.country))}</div><div class="sm" data-tipf="${esc([r.region, r.city].filter(Boolean).join(' · '))}">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
+            <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (link.target_url || '—'))}</div>`; })()}</td>
+            <td data-tipf="${esc(r.ua)}" data-tipf-always><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r, false)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div>${(r.kind && r.kind !== 'human') || r.proxy ? (r.reason ? `<div class="kr ${r.kind === 'human' ? 'proxy' : r.kind} ell" data-tipf="${esc(r.reason)}">${esc(r.reason)}</div>` : '') : ''}</td>
+            <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:200px" data-tipf-always data-tipf="${esc([r.asn ? 'AS' + r.asn : '', r.asn_org].filter(Boolean).join(' · '))}">${esc(r.asn_org || '—')}</div></td>
+            <td class="ell" data-tipf="${esc(r.referer)}">${r.referer ? esc(r.referer) : '<span class="sm">—</span>'}</td>
           </tr>`).join('')}</tbody></table></div>
           ${pages > 1 ? `<div class="pager"><span class="tnum">第 ${clickState.page} / ${pages} 页</span><div class="g">
             <button class="btn sm" id="prev" ${clickState.page <= 1 ? 'disabled' : ''}>上一页</button>
