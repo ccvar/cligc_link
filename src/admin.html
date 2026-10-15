@@ -599,7 +599,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
   .tbl.vt th:nth-child(1) { width: 15%; } .tbl.vt th:nth-child(2) { width: 14%; } .tbl.vt th:nth-child(3) { width: 18%; }
   .tbl.vt th:nth-child(4) { width: 22%; } .tbl.vt th:nth-child(5) { width: 15%; } .tbl.vt th:nth-child(6) { width: 16%; }
 }
-.tbl-wrap { max-height: 640px; overflow: auto; overscroll-behavior: contain; }
+.tbl-wrap { max-height: 640px; overflow: auto; }
 .tbl-wrap thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line); border-bottom: 0; }
 .hero .acts { display: flex; gap: 8px; }
 .builder { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
@@ -762,14 +762,14 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .kc-v b.sm { font-size: 20px; padding-bottom: 3px; }
 /* 概览“来源”：跟左侧热门短链等高，多出的在卡片内滚动 */
 #c-src { display: flex; flex-direction: column; }
-#c-src .card-b { overflow: auto; overscroll-behavior: contain; max-height: 460px; }
+#c-src .card-b { overflow: auto; max-height: 460px; }
 @media (min-width: 1181px) {
   #c-src { height: 0; min-height: max(100%, 320px); }
   #c-src .card-b { flex: 1; min-height: 0; max-height: none; }
 }
 /* 概览第三行：行高由“设备”卡决定；国家列表填满同样高度，多出的在卡片内滚动；
    活跃时段的“高峰”一行贴底，避免下方留白 */
-#c-geo .card-b { overflow: auto; overscroll-behavior: contain; }
+#c-geo .card-b { overflow: auto; }
 @media (min-width: 1181px) {
   #c-geo { height: 0; min-height: 100%; display: flex; flex-direction: column; }
   #c-geo .card-b { flex: 1; min-height: 0; }
@@ -785,8 +785,8 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 @media (max-width: 640px) { .g3-l { grid-template-columns: minmax(0, 1fr); } }
 .heat-card .card-b { flex: 1; display: flex; flex-direction: column; }
 .heat-card .wk-f { margin-top: auto !important; padding-top: 16px; }
-.rts { display: grid; gap: 14px; max-height: 420px; overflow: auto; overscroll-behavior: contain; align-content: start; }
-#ov-src .card-b { max-height: 420px; overflow: auto; overscroll-behavior: contain; }
+.rts { display: grid; gap: 14px; max-height: 420px; overflow: auto; align-content: start; }
+#ov-src .card-b { max-height: 420px; overflow: auto; }
 .rt-h { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
 .rt-c { flex: 1; min-width: 0; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rt-h b { font-variant-numeric: tabular-nums; font-weight: 650; }
@@ -799,7 +799,7 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 /* 详情页：趋势图右侧叠放设备与时段分布 */
 .side-col { display: grid; gap: 20px; align-content: start; min-width: 0; }
 .side-col > * { min-width: 0; }
-#t-dev .card-b { max-height: 280px; overflow: auto; overscroll-behavior: contain; }
+#t-dev .card-b { max-height: 280px; overflow: auto; }
 #t-dev .kmix-l { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 @media (min-width: 1181px) {
   .link-top .trend { display: flex; flex-direction: column; }
@@ -823,7 +823,7 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .pop .ot .mono { font-family: var(--mono); font-size: 12.5px; }
 /* 详情页：来源卡跟右侧“地区”卡等高，列表在卡内滚动 */
 #t-src { display: flex; flex-direction: column; }
-#t-src .card-b { overflow: auto; overscroll-behavior: contain; }
+#t-src .card-b { overflow: auto; }
 @media (min-width: 961px) {
   #t-src { height: 0; min-height: 100%; }
   #t-src .card-b { flex: 1; min-height: 0; }
