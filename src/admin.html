@@ -644,7 +644,9 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
   .link-top .trend .card-b { flex: 1; display: flex; flex-direction: column; }
   .link-top .trend .chart { flex: 1; min-height: 288px; }
 }
-.ov-link .combo-btn { height: 34px; min-width: 150px; max-width: 220px; gap: 7px; }
+.ov-link .combo-btn { height: 34px; min-width: 140px; max-width: 220px; gap: 7px; padding: 0 10px 0 12px; border: 0; background: var(--sunken); color: var(--text-2); font-weight: 500; transition: background .15s, color .15s; }
+.ov-link .combo-btn:hover, .ov-link .combo-btn[aria-expanded="true"] { background: color-mix(in srgb, var(--sunken) 70%, var(--line)); color: var(--text); }
+.ov-link .combo-btn > svg { color: var(--muted); }
 .ov-link .combo-btn .nm { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
 .pop .ot small { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8px; }
 .pop .ot .mono { font-family: var(--mono); font-size: 12.5px; }
