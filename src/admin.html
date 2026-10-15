@@ -644,10 +644,19 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
   .link-top .trend .card-b { flex: 1; display: flex; flex-direction: column; }
   .link-top .trend .chart { flex: 1; min-height: 288px; }
 }
-.ov-link .combo-btn { height: 34px; min-width: 140px; max-width: 220px; gap: 7px; padding: 0 10px 0 12px; border: 0; background: var(--sunken); color: var(--text-2); font-weight: 500; transition: background .15s, color .15s; }
-.ov-link .combo-btn:hover, .ov-link .combo-btn[aria-expanded="true"] { background: color-mix(in srgb, var(--sunken) 70%, var(--line)); color: var(--text); }
-.ov-link .combo-btn > svg { color: var(--muted); }
-.ov-link .combo-btn .nm { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
+.ov-title { display: flex; align-items: center; gap: 4px 6px; flex-wrap: wrap; min-width: 0; }
+.ov-title h1 { margin: 0; }
+.ov-sep { font-size: 22px; font-weight: 300; color: var(--faint); margin: 0 2px; }
+.ov-date { font-size: 14px; color: var(--muted); margin-left: 8px; }
+.ov-link .combo-btn { height: 34px; min-width: 0; width: auto; max-width: 260px; gap: 6px; padding: 0 8px; border: 0; background: none; box-shadow: none;
+  font-size: 17px; font-weight: 650; letter-spacing: -.01em; color: var(--text); border-radius: 9px; transition: background .15s; }
+.ov-link .combo-btn:hover, .ov-link .combo-btn[aria-expanded="true"] { background: var(--sunken); }
+.ov-link .combo-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ov-link .combo-btn > svg:first-child { display: none; }
+.ov-link .combo-btn > svg:last-child { color: var(--muted); width: 16px; height: 16px; }
+.ov-link .combo-btn .nm { flex: none; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-link .combo-btn .nm.mono { font-family: var(--mono); font-size: 16px; }
+@media (max-width: 640px) { .ov-date { flex-basis: 100%; margin-left: 0; } }
 .pop .ot small { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8px; }
 .pop .ot .mono { font-family: var(--mono); font-size: 12.5px; }
 /* 详情页：来源卡跟右侧“地区”卡等高，列表在卡内滚动 */
@@ -1778,7 +1787,7 @@ function linkPicker(root, items) {
       const hit = ids.filter((v) => !q || by.get(v).slug.toLowerCase().includes(q) || (by.get(v).title || '').toLowerCase().includes(q));
       return q ? [['', hit]] : [['', ['']], [`短链 · 按访问量`, hit]];
     },
-    button: (v) => `${ic(v ? 'link' : 'home', 14)}<span class="nm">${esc(label(v))}</span>`,
+    button: (v) => `${ic(v ? 'link' : 'home', 14)}<span class="nm ${v ? 'mono' : ''}">${esc(label(v))}</span>`,
     option: (v, q) => v
       ? `<span class="ot"><span class="mono">/${hl(by.get(v).slug, q)}</span>${by.get(v).title ? `<small>${hl(by.get(v).title, q)}</small>` : ''}</span>`
       : `<span class="ot">全部短链</span>`,
@@ -1808,8 +1817,9 @@ const kindBar = (kinds) => `<div class="kc-k" title="真人 ${num(kindCount(kind
 async function renderHome(token) {
   const now = new Date();
   shell('home', `<header class="ph">
-      <div><h1 class="h1-meta">概览<span>${now.getMonth() + 1} 月 ${now.getDate()} 日 ${WEEK[now.getDay()]} · ${greet()}</span></h1></div>
-      <span class="sp"></span><div class="combo ov-link" id="ov-link"></div>${rangeBar()}</header>
+      <div class="ov-title"><h1>概览</h1><span class="ov-sep" aria-hidden="true">/</span><div class="combo ov-link" id="ov-link"></div>
+        <span class="ov-date">${now.getMonth() + 1} 月 ${now.getDate()} 日 ${WEEK[now.getDay()]} · ${greet()}</span></div>
+      <span class="sp"></span>${rangeBar()}</header>
     <div class="stack" id="home">
       ${skel(112)}
       <div class="g-main">${skel(316, 2)}</div>
