@@ -362,6 +362,16 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .dlg .x span { flex: 1; }
 .dlg .x b { font-variant-numeric: tabular-nums; font-weight: 600; }
 .dlg .x em { font-style: normal; color: var(--muted); width: 38px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; }
+.bmix { margin-top: 22px; padding-top: 18px; border-top: 1px dashed var(--line); }
+.bmix-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+.bmix-h span:first-child { color: var(--text-2); font-weight: 600; }
+.bmix-bar { display: flex; gap: 3px; height: 10px; }
+.bmix-bar i { min-width: 4px; border-radius: 3px; transform-origin: left; animation: grow .8s var(--ease-out) both; animation-delay: calc(.15s + var(--j) * 60ms); }
+.bmix-l { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 18px; margin-top: 14px; }
+.bmix-l .x { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+.bmix-l .x i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.bmix-l .x span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bmix-l .x em { font-style: normal; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 @media (max-width: 400px) { .donut-w { flex-direction: column; align-items: stretch; } .donut { margin: 0 auto; } }
 
 /* 实时访问流 */
@@ -1249,6 +1259,19 @@ function donut(items) {
     <div class="dlg">${items.slice(0, 5).map((it, i) => `<div class="x"><i style="background:${COLORS[i]}"></i><span>${esc(devName(it.k))}</span><b>${num(it.n)}</b><em>${Math.round((it.n / sum) * 100)}%</em></div>`).join('')}</div></div>`;
 }
 
+// 浏览器占比：分段条 + 图例（前 4 个，其余合并为“其他”）
+function browserMix(items) {
+  const COLORS = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', 'var(--faint)'];
+  const sum = (items || []).reduce((a, b) => a + b.n, 0);
+  if (!sum) return '';
+  const top = items.slice(0, 4).map((i) => ({ k: i.k || '未知', n: i.n }));
+  const rest = sum - top.reduce((a, b) => a + b.n, 0);
+  if (rest) top.push({ k: '其他', n: rest });
+  return `<div class="bmix"><div class="bmix-h"><span>浏览器</span><span>${top.length > 1 ? `${esc(top[0].k)} 占 ${Math.round((top[0].n / sum) * 100)}%` : ''}</span></div>
+    <div class="bmix-bar">${top.map((it, i) => `<i style="flex:${it.n};background:${COLORS[i]};--j:${i}" title="${esc(it.k)} · ${num(it.n)} 次"></i>`).join('')}</div>
+    <div class="bmix-l">${top.map((it, i) => `<div class="x"><i style="background:${COLORS[i]}"></i><span>${esc(it.k)}</span><em>${Math.round((it.n / sum) * 100)}%</em></div>`).join('')}</div></div>`;
+}
+
 // 星期 × 小时热力图
 function weekHeat(cells) {
   if (!cells.length) return `<div class="empty">${ic('inbox')}该时间段内暂无数据</div>`;
@@ -1620,7 +1643,7 @@ async function renderHome(token) {
     </div>
 
     <div class="g3">
-      <section class="card rv"><div class="card-h"><h3>设备</h3></div><div class="card-b">${donut(d.devices)}</div></section>
+      <section class="card rv"><div class="card-h"><h3>设备 / 浏览器</h3></div><div class="card-b">${donut(d.devices)}${browserMix(d.browsers)}</div></section>
       ${tabCard('c-geo', '国家 / 地区', [{ label: '国家', html: rankList(d.countries, { head: ['国家', '访问'], fmt: country }) }], 'rv')}
       <section class="card rv"><div class="card-h"><h3>活跃时段</h3><span class="sp"></span><span class="sub">按本地时间</span></div><div class="card-b">${weekHeat(d.heat)}</div></section>
     </div>`;
