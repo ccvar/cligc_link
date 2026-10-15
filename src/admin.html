@@ -670,6 +670,13 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .chan:not(.on) .card-b { opacity: .55; }
 .grid2.tight { gap: 14px; }
 .kc-v b.sm { font-size: 20px; padding-bottom: 3px; }
+/* 概览“来源”：跟左侧热门短链等高，多出的在卡片内滚动 */
+#c-src { display: flex; flex-direction: column; }
+#c-src .card-b { overflow: auto; overscroll-behavior: contain; max-height: 460px; }
+@media (min-width: 1181px) {
+  #c-src { height: 0; min-height: max(100%, 320px); }
+  #c-src .card-b { flex: 1; min-height: 0; max-height: none; }
+}
 .rts { display: grid; gap: 14px; max-height: 420px; overflow: auto; overscroll-behavior: contain; align-content: start; }
 #ov-src .card-b { max-height: 420px; overflow: auto; overscroll-behavior: contain; }
 .rt-h { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
@@ -2026,7 +2033,7 @@ async function renderHome(token) {
               <span class="n">${num(l.n)}</span><span class="u">${num(l.u)}</span><span class="t">${ago(l.last)}</span></a>`).join('')}</div>`
           : `<div class="empty">${ic('inbox')}该时间段内暂无访问</div>`}
       </section>`}
-      ${d.link ? routesCard(d) : tabCard('c-src', '来源 Top 6', [{ label: '来源', html: rankList(d.sources.slice(0, 6), { head: ['来源', '访问'] }) }], 'rv')}
+      ${d.link ? routesCard(d) : tabCard('c-src', '来源', [{ label: '来源', html: rankList(d.sources, { head: ['来源', '访问'] }) }], 'rv')}
     </div>
 
     <div class="g3">

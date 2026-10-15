@@ -1207,7 +1207,7 @@ async function overview(env, url) {
       all(q(`SELECT l.id, l.slug, l.title, l.target_url, COUNT(*) AS n, COUNT(DISTINCT c.ip) AS u, MAX(c.ts) AS last
              FROM clicks c JOIN links l ON l.id = c.link_id
              WHERE c.ts >= ? ${botFilter} GROUP BY l.id ORDER BY n DESC LIMIT 8`, since)),
-      all(q(`SELECT source AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY source ORDER BY n DESC LIMIT 8`, since)),
+      all(q(`SELECT source AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY source ORDER BY n DESC LIMIT 20`, since)),
       all(q(`SELECT device AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY device ORDER BY n DESC`, since)),
       all(q(`SELECT browser AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY browser ORDER BY n DESC`, since)),
       all(q(`SELECT os AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY os ORDER BY n DESC`, since)),
