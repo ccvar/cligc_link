@@ -882,6 +882,32 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 @keyframes pop { from { transform: translateX(-50%) scale(.95); opacity: 0; } }
 .dialog h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -.01em; }
 .dialog p { margin: 0 0 22px; color: var(--text-2); }
+/* 批量替换 */
+.drawer.bulk { width: min(620px, calc(100vw - 16px)); }
+.drawer.bulk .seg { align-self: flex-start; }
+.bulk-res { display: flex; flex-direction: column; gap: 12px; min-height: 120px; }
+.bulk-empty { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 32px 16px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 13px; text-align: center; }
+.bulk-stat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.bulk-stat > div { padding: 12px 14px; display: grid; gap: 2px; }
+.bulk-stat > div + div { border-left: 1px solid var(--line-2); }
+.bulk-stat b { font-size: 20px; font-weight: 680; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.bulk-stat span { font-size: 12px; color: var(--muted); }
+.bulk-bad { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--bad-bg); color: var(--bad); font-size: 12.5px; word-break: break-all; }
+.bulk-bad svg { flex: none; }
+.bulk-list { display: grid; gap: 6px; }
+.bi { padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line-2); min-width: 0; }
+.bi-h { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-bottom: 4px; }
+.bi-h .mono { font-family: var(--mono); font-weight: 600; }
+.bi-t { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bi-u { font: 12px/1.6 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bi-u.from { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent); }
+.bi-u.to { display: flex; align-items: center; gap: 5px; color: var(--text); }
+.bi-u.to span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bi-u.to svg { flex: none; color: var(--accent); }
+.bi-u em { font-style: normal; color: var(--faint); font-family: var(--sans); }
+.bi-u mark.del { background: var(--bad-bg); color: var(--bad); border-radius: 3px; padding: 0 1px; }
+.bi-u mark.add { background: var(--good-bg); color: var(--good); border-radius: 3px; padding: 0 1px; }
+@media (max-width: 640px) { .bulk-stat b { font-size: 17px; } }
 .dialog.dup p { margin-bottom: 18px; }
 .dialog.dup .field { margin-bottom: 16px; }
 .dialog.dup .row { margin-top: 22px; }
@@ -993,6 +1019,7 @@ const I = {
   tab: '<rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M11 18h2"/>',
   bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 13h.01M15 13h.01"/>',
   pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  swap: '<path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   route: '<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/>',
   chev: '<path d="m6 9 6 6 6-6"/>',
@@ -2049,6 +2076,7 @@ async function renderLinks(token, opts = {}) {
             <span class="sp"></span>
             <div class="seg" id="sort">${[['created', '最新创建'], ['clicks', '访问最多'], ['last_click', '最近访问']]
               .map(([k, l]) => `<button data-s="${k}" class="${k === listState.sort ? 'on' : ''}">${l}</button>`).join('')}</div>
+            <button class="btn" id="bulk" aria-label="批量替换目标地址">${ic('swap')}<span class="hide-m">批量替换</span></button>
             <button class="btn" id="add">${ic('plus')}<span class="hide-m">高级创建</span></button>
           </div>
           <div id="lbody">${skel(280)}</div>
@@ -2121,6 +2149,7 @@ function bindLinksChrome() {
     renderLinks(routeToken);
   }));
   document.getElementById('add').onclick = () => openDrawer(null, () => renderLinks(routeToken));
+  document.getElementById('bulk').onclick = () => openBulkReplace(() => renderLinks(routeToken));
 
   const form = document.getElementById('quick');
   const qSlug = form.querySelector('[name=slug]'), qTarget = form.querySelector('[name=target_url]'), qBtn = form.querySelector('button');
@@ -2170,6 +2199,114 @@ function rulePop(l) {
     <div class="rp-u">${ic('arrow', 12)}<span>${esc(r.url)}</span></div></div>`;
   return `<span class="rb-pop" role="tooltip">${list.map(row).join('')}
     <div class="rp-r rp-def"><div class="rp-c">其他地区</div><div class="rp-u">${ic('arrow', 12)}<span>${l.target_url ? esc(l.target_url) : '未设置默认地址'}</span></div></div></span>`;
+}
+
+// 批量替换目标地址：先预览影响范围，确认后一次性替换
+function openBulkReplace(onDone) {
+  let mode = store.get('bulk:mode', 'exact'), last = null, timer, seq = 0;
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const dr = document.createElement('form'); dr.className = 'drawer bulk'; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-modal', 'true');
+  dr.innerHTML = `
+    <div class="dh"><h2>批量替换目标地址</h2><button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
+    <div class="db">
+      <div class="field"><label>匹配方式</label>
+        <div class="seg" id="b-mode">${[['exact', '完全匹配'], ['contains', '包含替换']].map(([k, l]) => `<button type="button" data-m="${k}" class="${k === mode ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <div class="hint" id="b-hint"></div></div>
+      <div class="field"><label for="b-find">原始链接</label>
+        <input class="input" id="b-find" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="b-to">替换为</label>
+        <input class="input" id="b-to" autocomplete="off" spellcheck="false"></div>
+      <div class="bulk-res" id="b-res"><div class="bulk-empty">${ic('search', 18)}填写原始链接后，这里会列出会被替换的地址</div></div>
+    </div>
+    <div class="df">
+      <span class="hint" id="b-sum"></span><span class="sp"></span>
+      <button type="button" class="btn" data-close>取消</button>
+      <button class="btn primary" id="b-go" disabled>替换</button>
+    </div>`;
+  const close = () => { ov.remove(); dr.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.dialog')) close(); };
+  document.addEventListener('keydown', onKey);
+  ov.onclick = close;
+  dr.querySelectorAll('[data-close]').forEach((b) => (b.onclick = close));
+  document.body.append(ov, dr);
+
+  const $ = (q) => dr.querySelector(q);
+  const fi = $('#b-find'), ti = $('#b-to'), res = $('#b-res'), sum = $('#b-sum'), go = $('#b-go');
+  const hint = () => {
+    $('#b-hint').textContent = mode === 'exact'
+      ? '地址与原始链接完全一致时，整条换成新链接。'
+      : '把地址中出现的这一段换掉，其余部分不变。适合换域名、换推广码（如 ref=OLD → ref=NEW）。';
+    fi.placeholder = mode === 'exact' ? 'https://old.example.com/register?ref=OLD' : '例如 ref=OLD 或 old.example.com';
+    ti.placeholder = mode === 'exact' ? 'https://new.example.com/register?ref=NEW' : '例如 ref=NEW 或 new.example.com';
+  };
+  segThumb($('#b-mode'));
+  $('#b-mode').querySelectorAll('button').forEach((b) => (b.onclick = () => {
+    mode = b.dataset.m; store.set('bulk:mode', mode);
+    $('#b-mode').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    segThumb($('#b-mode')); hint(); preview();
+  }));
+  hint();
+
+  // 把原地址里匹配的部分 / 新地址里替换进去的部分标出来
+  const mark = (u, part, cls) => {
+    if (!part || mode === 'exact') return esc(u);
+    return u.split(part).map(esc).join(`<mark class="${cls}">${esc(part)}</mark>`);
+  };
+  const render = (d) => {
+    last = d;
+    if (!d.total) {
+      res.innerHTML = `<div class="bulk-empty">${ic('inbox', 18)}没有找到${mode === 'exact' ? '完全一致的' : '包含这段内容的'}地址</div>`;
+      sum.textContent = ''; go.disabled = true; go.textContent = '替换'; return;
+    }
+    sum.innerHTML = `共 <b>${num(d.total)}</b> 处 · ${d.affected} 个短链`;
+    go.textContent = `替换 ${num(d.total)} 处`;
+    go.disabled = !ti.value.trim() || !!d.invalid;
+    res.innerHTML = `
+      <div class="bulk-stat"><div><b>${num(d.links)}</b><span>个默认地址</span></div><div><b>${num(d.rules)}</b><span>条地区规则</span></div><div><b>${num(d.affected)}</b><span>个短链受影响</span></div></div>
+      ${d.invalid ? `<div class="bulk-bad">${ic('info', 15)}替换后 /${esc(d.invalid.slug)} 的地址不合法：<code>${esc(d.invalid.to)}</code></div>` : ''}
+      <div class="bulk-list">${d.items.map((x) => `<div class="bi">
+        <div class="bi-h"><span class="mono">/${esc(x.slug)}</span><span class="bi-t">${x.type === 'link' ? '默认地址' : esc(ruleText(x))}</span></div>
+        <div class="bi-u from" title="${esc(x.from)}">${mark(x.from, fi.value.trim(), 'del')}</div>
+        <div class="bi-u to" title="${esc(x.to)}">${ic('arrow', 12)}<span>${ti.value.trim() ? mark(x.to, ti.value.trim(), 'add') : '<em>填写“替换为”后显示</em>'}</span></div>
+      </div>`).join('')}</div>
+      ${d.total > d.items.length ? `<div class="hint" style="margin-top:8px">只显示前 ${d.items.length} 处，执行时会全部替换。</div>` : ''}`;
+  };
+  const preview = () => {
+    clearTimeout(timer);
+    const find = fi.value.trim();
+    if (!find) { res.innerHTML = `<div class="bulk-empty">${ic('search', 18)}填写原始链接后，这里会列出会被替换的地址</div>`; sum.textContent = ''; go.disabled = true; return; }
+    timer = setTimeout(async () => {
+      const my = ++seq;
+      try {
+        let to = ti.value.trim();
+        if (mode === 'exact' && to && !/^https?:\/\//i.test(to)) to = 'https://' + to;
+        const d = await api('/links/replace', { method: 'POST', body: { mode, find, replace: to || (mode === 'exact' ? 'https://placeholder.invalid/' : find), dry: true } });
+        if (my === seq) render(d);
+      } catch (err) {
+        if (my === seq) { res.innerHTML = `<div class="bulk-bad">${ic('info', 15)}${esc(err.message)}</div>`; go.disabled = true; }
+      }
+    }, 350);
+  };
+  fi.oninput = preview; ti.oninput = preview;
+  fi.focus();
+
+  dr.onsubmit = async (e) => {
+    e.preventDefault();
+    if (!last || !last.total) return;
+    let to = ti.value.trim();
+    if (mode === 'exact' && !/^https?:\/\//i.test(to)) to = 'https://' + to;
+    const ok = await confirmDialog({
+      title: `替换 ${num(last.total)} 处地址？`,
+      text: `会修改 ${last.affected} 个短链：${last.links} 个默认地址、${last.rules} 条地区规则。替换后立即生效，之后的访问都会跳到新地址。`,
+      ok: '确认替换',
+    });
+    if (!ok) return;
+    go.disabled = true;
+    try {
+      const d = await api('/links/replace', { method: 'POST', body: { mode, find: fi.value.trim(), replace: to, dry: false } });
+      close(); toast(`已替换 ${num(d.total)} 处地址`); onDone();
+    } catch (err) { toast(err.message, 'bad'); go.disabled = false; }
+  };
 }
 
 function statusPill(l) {

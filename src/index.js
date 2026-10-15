@@ -424,6 +424,7 @@ async function handleApi(request, env, url) {
   }
   if (path === '/api/links' && method === 'GET') return listLinks(env, url);
   if (path === '/api/links' && method === 'POST') return createLink(request, env);
+  if (path === '/api/links/replace' && method === 'POST') return bulkReplace(request, env);
 
   const t = path.match(/^\/api\/links\/(\d+)\/targets(?:\/(\d+))?$/);
   if (t) {
@@ -888,6 +889,55 @@ async function duplicateLink(request, env, id) {
      SELECT ?, countries, url, note, fallback, ?, ? FROM link_targets WHERE link_id = ? ORDER BY id`
   ).bind(row.id, now, now, id).run();
   return json(row, 201);
+}
+
+// 批量替换目标地址：默认地址和地区规则的地址都会处理。dry = true 时只预览不修改
+async function bulkReplace(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const mode = body.mode === 'contains' ? 'contains' : 'exact';
+  const find = String(body.find || '').trim();
+  let to = String(body.replace || '').trim();
+  if (!find) return json({ error: '请填写原始链接' }, 400);
+  if (!to) return json({ error: '请填写替换后的链接' }, 400);
+  if (mode === 'exact') {
+    to = normalizeUrl(to);
+    if (!to) return json({ error: '替换后的链接必须是合法的 http / https 地址' }, 400);
+  }
+  // 完全匹配时同时匹配用户输入和规范化后的写法（如 https://a.com 与 https://a.com/）
+  const finds = mode === 'exact' ? [...new Set([find, normalizeUrl(find)].filter(Boolean))] : [find];
+  const where = mode === 'exact' ? `IN (${finds.map(() => '?').join(',')})` : '';
+  const [links, rules] = await Promise.all([
+    (mode === 'exact'
+      ? env.DB.prepare(`SELECT id, slug, title, target_url AS url FROM links WHERE target_url ${where} ORDER BY id`).bind(...finds)
+      : env.DB.prepare('SELECT id, slug, title, target_url AS url FROM links WHERE instr(target_url, ?) > 0 ORDER BY id').bind(find)).all(),
+    (mode === 'exact'
+      ? env.DB.prepare(`SELECT t.id, t.link_id, t.countries, t.url, l.slug FROM link_targets t JOIN links l ON l.id = t.link_id WHERE t.url ${where} ORDER BY t.link_id, t.id`).bind(...finds)
+      : env.DB.prepare('SELECT t.id, t.link_id, t.countries, t.url, l.slug FROM link_targets t JOIN links l ON l.id = t.link_id WHERE instr(t.url, ?) > 0 ORDER BY t.link_id, t.id').bind(find)).all(),
+  ]);
+  const next = (u) => (mode === 'exact' ? to : u.split(find).join(to));
+  const items = [
+    ...links.results.map((l) => ({ type: 'link', id: l.id, slug: l.slug, title: l.title, from: l.url, to: next(l.url) })),
+    ...rules.results.map((t) => ({ type: 'rule', id: t.id, link_id: t.link_id, slug: t.slug, countries: t.countries.split(',').filter(Boolean), from: t.url, to: next(t.url) })),
+  ];
+  // 替换后的地址都必须合法
+  const bad = items.find((x) => !normalizeUrl(x.to));
+  const summary = {
+    mode, find, replace: to, total: items.length,
+    links: items.filter((x) => x.type === 'link').length,
+    rules: items.filter((x) => x.type === 'rule').length,
+    affected: new Set(items.map((x) => (x.type === 'link' ? x.id : x.link_id))).size,
+    invalid: bad ? { slug: bad.slug, to: bad.to } : null,
+  };
+  if (body.dry !== false) return json({ ...summary, items: items.slice(0, 200) });
+  if (!items.length) return json({ error: '没有找到要替换的地址' }, 400);
+  if (bad) return json({ error: `替换后 /${bad.slug} 的地址不合法：${bad.to}` }, 400);
+
+  const now = Date.now();
+  const stmts = items.map((x) => (x.type === 'link'
+    ? env.DB.prepare('UPDATE links SET target_url = ?, updated_at = ? WHERE id = ?').bind(normalizeUrl(x.to), now, x.id)
+    : env.DB.prepare('UPDATE link_targets SET url = ?, updated_at = ? WHERE id = ?').bind(normalizeUrl(x.to), now, x.id)));
+  for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
+  return json({ ...summary, done: true });
 }
 
 async function updateLink(request, env, id) {
