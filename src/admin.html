@@ -693,6 +693,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .use-mine b { font-variant-numeric: tabular-nums; }
 .use-h { flex-wrap: wrap; }
 .use-why { min-width: 0; }
+.use-lv { font-weight: 650; }
+.use-lv.ok { color: var(--good); } .use-lv.warn { color: var(--warn); } .use-lv.bad { color: var(--bad); }
 .use-why span { cursor: default; border-bottom: 1px dashed var(--line); }
 /* 设置页折叠卡片：键盘聚焦时用卡片描边提示，不再在标题外再套一圈粗框 */
 .acc-i .fold-h:focus-visible { outline: none; }
@@ -3119,7 +3121,7 @@ async function renderSettings(token) {
   renderTracking(document.getElementById('acc-trk'), trk, (on) => { page.querySelector('[data-st="trk"]').innerHTML = pill(on); });
   renderUsage(document.getElementById('acc-use'), use, (u) => {
     page.querySelector('[data-st="use"]').innerHTML = usagePill(u);
-    page.querySelector('[data-sub="use"]').textContent = usageSummary(u);
+    page.querySelector('[data-sub="use"]').innerHTML = usageSummary(u);
   });
   renderRetention(document.getElementById('acc-ret'), ret, (days) => { page.querySelector('[data-st="ret"]').innerHTML = `<span class="pill on">${days ? days + ' 天' : '永久'}</span>`; });
 }
@@ -3131,17 +3133,40 @@ const bytes = (b) => (b >= 1e9 ? `${+(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${+
 const usagePill = (u) => !u.configured ? '<span class="pill off">未配置</span>'
   : u.plan === 'paid' ? '<span class="pill on">付费版</span>' : u.plan === 'free' ? '<span class="pill on">免费版</span>' : '<span class="pill off">套餐未知</span>';
 
+// 用量是否足够：按目前速度推算到月底（付费版）或今天结束（免费版），取最紧的一项
+function usageHealth(u) {
+  if (!u.configured || !(u.days || []).length) return null;
+  const paid = u.plan === 'paid';
+  const cur = paid ? u.month : (u.days || []).find((d) => d.date === u.today);
+  if (!cur) return null;
+  const L = paid ? { rowsRead: 25e9, rowsWritten: 5e7, requests: 1e7 } : { rowsRead: 5e6, rowsWritten: 1e5, requests: 1e5 };
+  const now = new Date();
+  // 已过去的比例：付费版按本月天数，免费版按今天的小时（UTC）
+  const dim = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+  const elapsed = paid
+    ? (now.getUTCDate() - 1 + (now.getUTCHours() * 60 + now.getUTCMinutes()) / 1440) / dim
+    : (now.getUTCHours() * 60 + now.getUTCMinutes()) / 1440;
+  const NAME = { rowsRead: '读取', rowsWritten: '写入', requests: '请求' };
+  const items = Object.keys(L).map((k) => {
+    const used = cur[k] / L[k];
+    return { k, name: NAME[k], used, proj: elapsed > 0.02 ? used / elapsed : used };
+  });
+  const worst = items.reduce((a, b) => (b.proj > a.proj ? b : a));
+  const level = worst.proj >= 1 ? 'bad' : worst.proj >= 0.8 ? 'warn' : 'ok';
+  return { paid, items, worst, level };
+}
+const pctText = (x) => (x > 0 && x < 0.01 ? '<1%' : `${Math.round(x * 100)}%`);
+
 // 收起时标题下的一句话摘要
 function usageSummary(u) {
   if (!u.configured) return '未配置 API 令牌，展开查看配置方法';
   if (u.errors?.length && !(u.days || []).some((d) => d.rowsRead)) return '读取用量失败，展开查看原因';
-  const paid = u.plan === 'paid';
-  const cur = paid ? u.month : (u.days || []).find((d) => d.date === u.today);
-  if (!cur) return '暂无数据';
-  const limit = paid ? 25e9 : 5e6;
-  const pct = Math.round((cur.rowsRead / limit) * 100);
-  return `${paid ? '本月' : '今天'} · D1 读取 ${wan(cur.rowsRead)}（额度的 ${pct < 1 && cur.rowsRead ? '<1' : pct}%）· 请求 ${wan(cur.requests)}`
-    + (u.hasMine?.d1 && cur.mine ? ` · 本项目读取 ${wan(cur.mine.rowsRead)}` : '');
+  const h = usageHealth(u);
+  if (!h) return '暂无数据';
+  const label = { ok: '充足', warn: '偏紧', bad: '将超出' }[h.level];
+  const tip = h.level === 'bad' ? (h.paid ? '，超出部分按量计费' : '，超出后当天请求会失败') : '';
+  return `<b class="use-lv ${h.level}">${label}</b> · ${h.paid ? '本月' : '今天'}已用 ${h.items.map((x) => `${x.name} ${pctText(x.used)}`).join('、')}`
+    + ` · 按目前速度${h.paid ? '月底' : '今天结束时'}最高约 ${pctText(h.worst.proj)}（${h.worst.name}）${tip}`;
 }
 
 function renderUsage(box, u, onState) {
