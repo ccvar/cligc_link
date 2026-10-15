@@ -512,6 +512,15 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .hero .target a { transition: color .15s; }
 .hero .target a:hover { color: var(--accent-ink); }
 .hero .target svg { color: var(--muted); }
+.hroutes { display: grid; grid-template-columns: minmax(0, max-content) 14px minmax(0, 1fr); gap: 5px 8px; align-items: center; margin-top: 2px; max-width: 760px; font-size: 13px; color: var(--text-2); }
+.hr-r { display: contents; }
+.hr-c { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; color: var(--text); font-weight: 500; }
+.hr-r.def .hr-c { color: var(--muted); font-weight: 400; }
+.hr-r svg { color: var(--faint); }
+.hr-r a { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
+.hr-r a:hover { color: var(--accent-ink); }
+.hr-more { grid-column: 1 / -1; justify-self: start; display: inline-flex; align-items: center; gap: 3px; border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; color: var(--accent-ink); cursor: pointer; }
+@media (max-width: 640px) { .hr-c { max-width: 120px; } }
 .hero .meta { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
 .hero .acts { display: flex; gap: 8px; }
 .builder { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
@@ -669,7 +678,7 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .fold-h > svg:last-child { color: var(--muted); transition: transform .3s var(--ease-out); }
 .fold.open .fold-h > svg:last-child { transform: rotate(180deg); }
 .fold-b { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .35s var(--ease-out); }
-.fold-b > * { overflow: hidden; min-height: 0; }
+.fold-b > * { overflow: hidden; min-height: 0; min-width: 0; }
 .fold.open .fold-b { grid-template-rows: 1fr; }
 .fold.settled .fold-b > * { overflow: visible; }
 #rules .rsum { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-family: var(--mono); font-size: 12px; }
@@ -2107,7 +2116,7 @@ async function renderLink(token, id) {
           <div class="short">${esc(shortDisp(link.slug))}
             ${copyBtn(url, 'btn sm', '复制')}
             <a class="btn sm ghost icon" href="${esc(url)}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 15)}</a></div>
-          <div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}${link.targets.length ? `<span class="rb" style="margin-left:4px">${ic('globe')}${link.targets.length} 条地区规则</span>` : ''}</div>
+          ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}</div>`}
           <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.note ? ` · ${esc(link.note)}` : ''}</div>
         </div>
         <div class="acts">
@@ -2437,10 +2446,24 @@ function bindFold(fold, key, onOpen) {
   };
 }
 
+// 顶部信息卡：地区规则 + 默认地址，一行一条
+function heroRoutes(link) {
+  const MAX = 4;
+  const url = (u) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u)}</a>` : '<span class="warn">未设置，会显示“链接暂不可用”</span>';
+  const rows = link.targets.slice(0, MAX).map((t) => `<div class="hr-r"><span class="hr-c" title="${esc(t.countries.map(cname).join("、"))}">${esc(ruleText(t))}</span>${ic('arrow', 13)}${url(t.url)}</div>`).join('');
+  const more = link.targets.length > MAX ? `<button type="button" class="hr-more" data-goto-rules>还有 ${link.targets.length - MAX} 条规则 ${ic('chev', 12)}</button>` : '';
+  return `<div class="hroutes">${rows}${more}<div class="hr-r def"><span class="hr-c">其他地区</span>${ic('arrow', 13)}${url(link.target_url)}</div></div>`;
+}
+
 function bindRules(link) {
   const card = document.getElementById('rules');
   if (!card) return;
   bindFold(card, 'fold:rules');
+  // 顶部“还有 N 条规则”：展开规则卡并滚过去
+  document.querySelector('[data-goto-rules]')?.addEventListener('click', () => {
+    if (!card.classList.contains('open')) card.querySelector('.fold-h').click();
+    card.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+  });
   const res = card.querySelector('#simres');
   const simulate = (c) => {
     const t = link.targets.find((x) => x.countries.includes(c));
