@@ -525,6 +525,20 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .nstat.ok { background: var(--good-bg); color: var(--good); }
 .nstat.bad { background: var(--bad-bg); color: var(--bad); }
 
+/* 渠道卡片 */
+.sec-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 4px 0 -6px; }
+.sec-t { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+.chcard { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; transition: border-color .2s, box-shadow .2s; }
+.chcard.live { border-color: color-mix(in srgb, var(--good) 35%, var(--line)); }
+.chtop { display: flex; align-items: center; gap: 12px; }
+.chtop .chi { width: 38px; height: 38px; border-radius: 11px; }
+.chname { flex: 1; display: flex; align-items: center; gap: 10px; }
+.chname b { font-size: 15px; }
+.chsum { display: flex; flex-direction: column; gap: 4px; color: var(--text-2); font-size: 13px; min-height: 42px; }
+.chsum span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chsum code { background: var(--sunken); }
+.chact { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--line-2); }
+
 /* 提示框 */
 .tipbox { display: flex; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--accent-2); color: var(--text-2); font-size: 12.5px; line-height: 1.7; }
 .tipbox > svg { color: var(--accent-ink); margin-top: 2px; }
@@ -2297,28 +2311,25 @@ async function renderSettings(token) {
 
 // ---------------------------------------------------------------- 通知
 async function renderNotify(token) {
-  shell('notify', `<header class="ph"><div><div class="kicker">设置</div><h1>统计通知</h1><div class="sub">定期把访问统计推送到 Telegram 或邮箱</div></div></header><div class="stack">${skel(160, 3)}</div>`);
-  const c = await api('/notify');
+  const head = `<header class="ph"><div><div class="kicker">设置</div><h1>统计通知</h1><div class="sub">定期把访问统计推送到 Telegram 或邮箱</div></div></header>`;
+  shell('notify', `${head}<div class="stack">${skel(160)}<div class="grid2">${skel(170, 2)}</div></div>`);
+  let st = await api('/notify');
   if (token !== routeToken) return;
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const tzLabel = (m) => `UTC${m >= 0 ? '+' : '−'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + pad(Math.abs(m) % 60) : ''}`;
-  const status = c.status ? `<div class="nstat ${c.status.ok ? 'ok' : 'bad'}">${ic(c.status.ok ? 'check' : 'alert', 15)}
-      上次推送：${fmtTime(c.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报' }[c.status.kind] || ''}${c.status.ok ? ' · 发送成功' : ` · 失败：${esc(c.status.error)}`}</div>` : '';
 
-  document.getElementById('page').innerHTML = `
-    <header class="ph"><div><div class="kicker">设置</div><h1>统计通知</h1><div class="sub">定期把访问统计推送到 Telegram 或邮箱</div></div></header>
-    <form class="stack" id="nf">
-      ${status}
+  document.getElementById('page').innerHTML = `${head}
+    <div class="stack" id="nf">
+      <div id="nstat"></div>
       <section class="card rv">
         <div class="card-h"><h3>推送内容</h3><span class="sub">报告包含访问次数、独立访客、与上一周期对比、热门短链、来源与国家</span></div>
         <div class="card-b">
           <div class="kinds">
             ${[['daily', '日报', '每天发送昨天的数据'], ['weekly', '周报', '每周一发送上周的数据'], ['monthly', '月报', '每月 1 号发送上个月的数据']].map(([k, t, d]) => `
-              <label class="kind"><input type="checkbox" name="r-${k}" ${c.reports[k] ? 'checked' : ''}><span class="kb">${ic('check', 13)}</span><div><b>${t}</b><span>${d}</span></div></label>`).join('')}
+              <label class="kind"><input type="checkbox" name="r-${k}" ${st.reports[k] ? 'checked' : ''}><span class="kb">${ic('check', 13)}</span><div><b>${t}</b><span>${d}</span></div></label>`).join('')}
           </div>
           <div class="when">
-            <label for="n-hour">发送时间</label>
-            <div class="combo" id="n-hour"></div>
+            <label>发送时间</label><div class="combo" id="n-hour"></div>
             <span class="hint">时区 ${tzLabel(TZ)}（跟随当前浏览器）</span>
             <span class="sp" style="flex:1"></span>
             <span class="hint">预览报告：</span>
@@ -2326,94 +2337,172 @@ async function renderNotify(token) {
           </div>
         </div>
       </section>
-
-      <section class="card rv chan ${c.tg.enabled ? 'on' : ''}" id="ch-tg">
-        <div class="card-h"><span class="chi tg">${ic('send', 17)}</span><h3>Telegram</h3><span class="sp"></span>
-          <label class="switch"><input type="checkbox" name="tg-on" ${c.tg.enabled ? 'checked' : ''}><span class="t"></span>启用</label></div>
-        <div class="card-b">
-          <div class="grid2 tight">
-            <div class="field"><label for="tg-token">Bot Token</label><input class="input mono" id="tg-token" placeholder="123456789:AAH…" value="${esc(c.tg.token)}" autocomplete="off" spellcheck="false"></div>
-            <div class="field"><label for="tg-chat">Chat ID</label><input class="input mono" id="tg-chat" placeholder="例如 123456789 或 -100…" value="${esc(c.tg.chat)}" autocomplete="off"></div>
-          </div>
-          <details class="howto"><summary>如何获取？</summary><ol>
-            <li>在 Telegram 里找 <b>@BotFather</b>，发送 <code>/newbot</code> 按提示创建机器人，得到 Bot Token。</li>
-            <li>给你的机器人发一条任意消息（推送到群组的话，把机器人拉进群并在群里发一条消息）。</li>
-            <li>浏览器打开 <code>https://api.telegram.org/bot&lt;Token&gt;/getUpdates</code>，返回内容里 <code>"chat":{"id":…}</code> 的数字就是 Chat ID。</li>
-          </ol></details>
-          <div class="ctest"><button type="button" class="btn sm" data-test="tg">${ic('send', 14)}保存并发送测试</button><span class="hint" data-res="tg"></span></div>
-        </div>
-      </section>
-
-      <section class="card rv chan ${c.email.enabled ? 'on' : ''}" id="ch-mail">
-        <div class="card-h"><span class="chi mail">${ic('mail', 17)}</span><h3>邮件</h3><span class="sp"></span>
-          <label class="switch"><input type="checkbox" name="mail-on" ${c.email.enabled ? 'checked' : ''}><span class="t"></span>启用</label></div>
-        <div class="card-b">
-          <div class="seg" id="prov">
-            <button type="button" data-p="resend" class="${c.email.provider !== 'cloudflare' ? 'on' : ''}">Resend</button>
-            <button type="button" data-p="cloudflare" class="${c.email.provider === 'cloudflare' ? 'on' : ''}">Cloudflare 邮件路由</button>
-          </div>
-          <p class="hint prov-hint" data-for="resend">在 <a href="https://resend.com" target="_blank" rel="noopener">resend.com</a> 注册并验证发件域名，创建 API Key。免费额度每月 3000 封。</p>
-          <p class="hint prov-hint" data-for="cloudflare">${c.cloudflareEmail
-            ? '使用 Cloudflare Email Routing 发送：发件人需是已开通邮件路由的域名下的地址，收件人需在 Email Routing 中验证过。'
-            : '<span class="warn">当前部署没有配置 <code>send_email</code> 绑定，暂时无法使用。按 README 在 wrangler.toml 中添加绑定并重新部署后即可使用。</span>'}</p>
-          <div class="grid2 tight">
-            <div class="field" data-for="resend"><label for="m-key">API Key</label><input class="input mono" id="m-key" placeholder="re_…" value="${esc(c.email.key)}" autocomplete="off" spellcheck="false"></div>
-            <div class="field"><label for="m-from">发件人</label><input class="input" id="m-from" placeholder="cligc 报告 &lt;report@example.com&gt;" value="${esc(c.email.from)}"></div>
-            <div class="field"><label for="m-to">收件人</label><input class="input" id="m-to" placeholder="you@example.com，多个用逗号分隔" value="${esc(c.email.to)}"></div>
-          </div>
-          <div class="ctest"><button type="button" class="btn sm" data-test="email">${ic('mail', 14)}保存并发送测试</button><span class="hint" data-res="email"></span></div>
-        </div>
-      </section>
-
-      <div class="savebar rv"><span class="hint">推送由 Cloudflare 定时任务每小时检查一次，在设定时间发出。</span><span class="sp"></span><button class="btn primary">${ic('check', 15)}保存设置</button></div>
-    </form>`;
-
+      <div class="sec-row rv"><h2 class="sec-t">推送渠道</h2><span class="hint">参数只需配置一次，之后用开关控制是否推送</span></div>
+      <div class="grid2" id="chans"></div>
+    </div>`;
   const page = document.getElementById('page');
   reveal(page);
-  const f = document.getElementById('nf');
+
+  // 推送内容：改动后自动保存
   const hourLabel = (x) => `每天 ${pad(x)}:00`;
+  let saveTimer;
+  const autoSave = () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => { try { await persist(); toast('已保存'); } catch (ex) { toast(ex.message, 'bad'); } }, 300);
+  };
   const hourBox = dropdown(document.getElementById('n-hour'), {
-    value: c.hour, aria: '发送时间', minWidth: 188, maxWidth: 220,
+    value: st.hour, aria: '发送时间', minWidth: 188, maxWidth: 220,
     groups: () => [['', hours]],
     button: (x) => `<span class="nm">${hourLabel(x)}</span>`,
     option: (x) => `<span class="ot">${hourLabel(x)}</span><span class="hint">${x < 6 ? '凌晨' : x < 12 ? '上午' : x < 13 ? '中午' : x < 18 ? '下午' : '晚上'}</span>`,
+    onChange: autoSave,
   });
-  let provider = c.email.provider === 'cloudflare' ? 'cloudflare' : 'resend';
-  const prov = document.getElementById('prov');
-  const syncProv = () => {
-    prov.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.p === provider));
-    f.querySelectorAll('[data-for]').forEach((el) => { el.hidden = el.dataset.for !== provider; });
-    segThumb(prov);
+  page.querySelectorAll('.kind input').forEach((i) => (i.onchange = autoSave));
+
+  // 保存整份配置（渠道参数取自 st，密钥为掩码时服务端保留原值）
+  const persist = async (patch = {}) => {
+    const body = {
+      reports: Object.fromEntries(['daily', 'weekly', 'monthly'].map((k) => [k, page.querySelector(`[name=r-${k}]`).checked])),
+      hour: hourBox.value, tz: TZ,
+      tg: { ...st.tg, ...(patch.tg || {}) },
+      email: { ...st.email, ...(patch.email || {}) },
+    };
+    st = await api('/notify', { method: 'PUT', body });
+    renderChannels();
+    return st;
   };
-  prov.querySelectorAll('button').forEach((b) => (b.onclick = () => { provider = b.dataset.p; syncProv(); }));
-  syncProv();
-  f.querySelector('[name=tg-on]').onchange = (e) => document.getElementById('ch-tg').classList.toggle('on', e.target.checked);
-  f.querySelector('[name=mail-on]').onchange = (e) => document.getElementById('ch-mail').classList.toggle('on', e.target.checked);
 
-  const collect = () => ({
-    reports: { daily: f.querySelector('[name=r-daily]').checked, weekly: f.querySelector('[name=r-weekly]').checked, monthly: f.querySelector('[name=r-monthly]').checked },
-    hour: hourBox.value, tz: TZ,
-    tg: { enabled: f.querySelector('[name=tg-on]').checked, token: document.getElementById('tg-token').value, chat: document.getElementById('tg-chat').value },
-    email: { enabled: f.querySelector('[name=mail-on]').checked, provider, key: document.getElementById('m-key').value, from: document.getElementById('m-from').value, to: document.getElementById('m-to').value },
-  });
-  const save = () => api('/notify', { method: 'PUT', body: collect() });
+  const ready = (k) => k === 'tg' ? !!(st.tg.token && st.tg.chat)
+    : !!(st.email.from && st.email.to && (st.email.provider === 'cloudflare' ? st.cloudflareEmail : st.email.key));
+  const maskMail = (v) => v.split(/[\s,，;；]+/).filter(Boolean).map((a) => a.replace(/^(.{3}).*(@.*)$/, '$1***$2')).join('、');
 
-  f.onsubmit = async (e) => {
-    e.preventDefault();
-    const btn = f.querySelector('.savebar .primary'); btn.disabled = true;
-    try { await save(); toast('通知设置已保存'); } catch (ex) { toast(ex.message, 'bad'); }
+  const renderStatus = () => {
+    document.getElementById('nstat').innerHTML = st.status ? `<div class="nstat ${st.status.ok ? 'ok' : 'bad'}">${ic(st.status.ok ? 'check' : 'alert', 15)}
+      上次推送：${fmtTime(st.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报' }[st.status.kind] || ''}${st.status.ok ? ' · 发送成功' : ` · 失败：${esc(st.status.error)}`}</div>` : '';
+  };
+
+  function renderChannels() {
+    renderStatus();
+    const card = (k) => {
+      const on = k === 'tg' ? st.tg.enabled : st.email.enabled, ok = ready(k);
+      const pill = !ok ? '<span class="pill off">未配置</span>' : on ? '<span class="pill on">已启用</span>' : '<span class="pill off">已停用</span>';
+      const sum = k === 'tg'
+        ? (ok ? `<span>Bot Token ${esc(st.tg.token)}</span><span>Chat ID <code>${esc(st.tg.chat)}</code></span>` : '<span>填写 Bot Token 和 Chat ID 后即可推送到个人或群组</span>')
+        : (ok ? `<span>发送到 ${esc(maskMail(st.email.to))}</span><span>${st.email.provider === 'cloudflare' ? 'Cloudflare 邮件路由' : 'Resend'} · ${esc(st.email.from)}</span>`
+          : '<span>通过 Resend 或 Cloudflare 邮件路由发送 HTML 报告</span>');
+      return `<section class="card chcard ${on && ok ? 'live' : ''}">
+        <div class="chtop"><span class="chi ${k === 'tg' ? 'tg' : 'mail'}">${ic(k === 'tg' ? 'send' : 'mail', 18)}</span>
+          <div class="chname"><b>${k === 'tg' ? 'Telegram' : '邮件'}</b>${pill}</div>
+          <label class="switch" title="${ok ? '启用 / 停用推送' : '先完成配置'}"><input type="checkbox" data-on="${k}" ${on && ok ? 'checked' : ''}><span class="t"></span></label></div>
+        <div class="chsum">${sum}</div>
+        <div class="chact">
+          <button type="button" class="btn sm" data-cfg="${k}">${ic('gear', 14)}${ok ? '修改配置' : '去配置'}</button>
+          <button type="button" class="btn sm ghost" data-test="${k}" ${ok ? '' : 'disabled'}>${ic('send', 14)}发送测试</button>
+          <span class="hint" data-res="${k}"></span>
+        </div>
+      </section>`;
+    };
+    const box = document.getElementById('chans');
+    box.innerHTML = card('tg') + card('email');
+    box.querySelectorAll('[data-on]').forEach((i) => (i.onchange = async () => {
+      const k = i.dataset.on;
+      if (!ready(k)) { i.checked = false; return openChannel(k); }
+      try {
+        await persist({ [k]: { enabled: i.checked } });
+        toast(i.checked ? '已启用推送' : '已停用推送');
+      } catch (ex) { i.checked = !i.checked; toast(ex.message, 'bad'); }
+    }));
+    box.querySelectorAll('[data-cfg]').forEach((b) => (b.onclick = () => openChannel(b.dataset.cfg)));
+    box.querySelectorAll('[data-test]').forEach((b) => (b.onclick = () => sendTest(b.dataset.test, box.querySelector(`[data-res="${b.dataset.test}"]`), b)));
+  }
+
+  const sendTest = async (k, res, btn) => {
+    btn.disabled = true; res.className = 'hint'; res.textContent = '正在发送…';
+    try {
+      await api('/notify/test', { method: 'POST', body: { channel: k === 'tg' ? 'tg' : 'email', kind: 'daily' } });
+      res.className = 'hint ok'; res.textContent = '已发送，请查收（标题带“测试”）';
+    } catch (ex) { res.className = 'hint bad'; res.textContent = ex.message; }
     btn.disabled = false;
   };
-  f.querySelectorAll('[data-test]').forEach((b) => (b.onclick = async () => {
-    const ch = b.dataset.test, res = f.querySelector(`[data-res="${ch}"]`);
-    b.disabled = true; res.className = 'hint'; res.textContent = '正在发送…';
-    try {
-      await save();
-      await api('/notify/test', { method: 'POST', body: { channel: ch, kind: 'daily' } });
-      res.className = 'hint ok'; res.textContent = '已发送，请查收一份昨天的日报（标题带“测试”）';
-    } catch (ex) { res.className = 'hint bad'; res.textContent = ex.message; }
-    b.disabled = false;
-  }));
+
+  // 渠道配置面板
+  function openChannel(k) {
+    const isTg = k === 'tg';
+    let provider = st.email.provider === 'cloudflare' ? 'cloudflare' : 'resend';
+    const ov = document.createElement('div'); ov.className = 'ov';
+    const dr = document.createElement('form'); dr.className = 'drawer'; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-modal', 'true');
+    dr.innerHTML = `
+      <div class="dh"><span class="chi ${isTg ? 'tg' : 'mail'}" style="margin-right:10px">${ic(isTg ? 'send' : 'mail', 17)}</span><h2>${isTg ? 'Telegram 配置' : '邮件配置'}</h2>
+        <button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
+      <div class="db">${isTg ? `
+        <div class="field"><label for="tg-token">Bot Token</label><input class="input mono" id="tg-token" placeholder="123456789:AAH…" value="${esc(st.tg.token)}" autocomplete="off" spellcheck="false">
+          <div class="hint">已保存的 Token 只显示末 4 位，不修改就保持原值</div></div>
+        <div class="field"><label for="tg-chat">Chat ID</label><input class="input mono" id="tg-chat" placeholder="例如 123456789 或 -100…" value="${esc(st.tg.chat)}" autocomplete="off"></div>
+        <div class="tipbox">${ic('info', 16)}<div><b>如何获取？</b>
+          1. 在 Telegram 里找 <b style="display:inline">@BotFather</b>，发送 <code>/newbot</code> 创建机器人，得到 Bot Token。<br>
+          2. 给机器人发一条任意消息（推送到群组的话，把机器人拉进群并在群里发一条消息）。<br>
+          3. 打开 <code>https://api.telegram.org/bot&lt;Token&gt;/getUpdates</code>，返回内容里 <code>"chat":{"id":…}</code> 的数字就是 Chat ID。</div></div>` : `
+        <div class="field"><label>发送方式</label>
+          <div class="seg" id="prov"><button type="button" data-p="resend">Resend</button><button type="button" data-p="cloudflare">Cloudflare 邮件路由</button></div>
+          <div class="hint" data-for="resend" style="margin-top:8px">在 <a href="https://resend.com" target="_blank" rel="noopener" style="color:var(--accent-ink)">resend.com</a> 验证发件域名并创建 API Key，免费额度每月 3000 封。</div>
+          <div class="hint" data-for="cloudflare" style="margin-top:8px">${st.cloudflareEmail
+            ? '发件人需是已开通邮件路由的域名下的地址；收件人需在 Cloudflare 邮件路由中验证过。'
+            : '<span class="warn">当前部署没有配置 <code>send_email</code> 绑定，暂时无法使用，见 README。</span>'}</div></div>
+        <div class="field" data-for="resend"><label for="m-key">API Key</label><input class="input mono" id="m-key" placeholder="re_…" value="${esc(st.email.key)}" autocomplete="off" spellcheck="false">
+          <div class="hint">已保存的 Key 只显示末 4 位，不修改就保持原值</div></div>
+        <div class="field"><label for="m-from">发件人</label><input class="input" id="m-from" placeholder="cligc 报告 &lt;report@example.com&gt;" value="${esc(st.email.from)}"></div>
+        <div class="field"><label for="m-to">收件人</label><input class="input" id="m-to" placeholder="you@example.com，多个用逗号分隔" value="${esc(st.email.to)}"></div>`}
+        <label class="opt"><div class="tx"><b>启用推送</b><span class="hint">关闭后保留配置，只是不再发送</span></div>
+          <span class="switch"><input type="checkbox" id="ch-on" ${(isTg ? st.tg.enabled : st.email.enabled) || !ready(k) ? 'checked' : ''}><span class="t"></span></span></label>
+        <div class="err" role="alert"></div>
+      </div>
+      <div class="df">
+        <button type="button" class="btn" data-test2>${ic('send', 14)}保存并测试</button>
+        <span class="sp"></span>
+        <button type="button" class="btn" data-close>取消</button>
+        <button class="btn primary">保存</button>
+      </div>`;
+    const close = () => { ov.remove(); dr.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.pop')) close(); };
+    document.addEventListener('keydown', onKey);
+    ov.onclick = close;
+    dr.querySelectorAll('[data-close]').forEach((b) => (b.onclick = close));
+    document.body.append(ov, dr);
+    if (!isTg) {
+      const prov = dr.querySelector('#prov');
+      const sync = () => {
+        prov.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.p === provider));
+        dr.querySelectorAll('[data-for]').forEach((el) => { el.hidden = el.dataset.for !== provider; });
+        segThumb(prov);
+      };
+      prov.querySelectorAll('button').forEach((b) => (b.onclick = () => { provider = b.dataset.p; sync(); }));
+      sync();
+    }
+    dr.querySelector('input').focus();
+    const err = dr.querySelector('.err');
+    const save = async () => {
+      const enabled = dr.querySelector('#ch-on').checked;
+      const patch = isTg
+        ? { tg: { enabled, token: dr.querySelector('#tg-token').value, chat: dr.querySelector('#tg-chat').value } }
+        : { email: { enabled, provider, key: dr.querySelector('#m-key').value, from: dr.querySelector('#m-from').value, to: dr.querySelector('#m-to').value } };
+      await persist(patch);
+    };
+    dr.onsubmit = async (e) => {
+      e.preventDefault();
+      const b = dr.querySelector('.df .primary'); b.disabled = true;
+      try { await save(); close(); toast('配置已保存'); } catch (ex) { err.textContent = ex.message; b.disabled = false; }
+    };
+    dr.querySelector('[data-test2]').onclick = async () => {
+      const b = dr.querySelector('[data-test2]'); b.disabled = true; err.textContent = '';
+      try {
+        await save();
+        await api('/notify/test', { method: 'POST', body: { channel: isTg ? 'tg' : 'email', kind: 'daily' } });
+        close(); toast('配置已保存，测试报告已发送');
+      } catch (ex) { err.textContent = ex.message; b.disabled = false; }
+    };
+  }
+
+  renderChannels();
 }
 
 // ---------------------------------------------------------------- router
