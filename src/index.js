@@ -1112,7 +1112,7 @@ async function overview(env, url) {
   const q = (sql, ...args) => env.DB.prepare(sql).bind(...args);
   const all = (stmt) => stmt.all().then((r) => r.results);
 
-  const [links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds] =
+  const [links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds, machines] =
     await Promise.all([
       env.DB.prepare('SELECT COUNT(*) AS n FROM links').first('n'),
       q(`SELECT COUNT(DISTINCT link_id) AS n FROM clicks c WHERE ts >= ? ${botFilter}`, since).first('n'),
@@ -1138,8 +1138,12 @@ async function overview(env, url) {
              FROM clicks c WHERE ts >= ?1 ${botFilter} GROUP BY d, h`, since, tz)),
       recentClicks(env, bots, linkId),
       all(q(`SELECT kind AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${linkFilter} GROUP BY kind`, since)),
+      // 机器访问按运营商汇总（只用于查看，不影响跳转）
+      all(q(`SELECT asn, asn_org, kind, COUNT(*) AS n, COUNT(DISTINCT link_id) AS links, COUNT(DISTINCT ip) AS ips, MAX(ts) AS last, MAX(reason) AS reason
+             FROM clicks c WHERE ts >= ? AND kind IN ('bot', 'suspect') ${linkFilter}
+             GROUP BY CASE WHEN asn > 0 THEN asn ELSE asn_org END, kind ORDER BY n DESC LIMIT 10`, since)),
     ]);
-  const out = { links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds };
+  const out = { links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds, machines };
   if (linkId) {
     // 单个短链：附带短链信息和各跳转去向（地区规则 / 默认地址）的命中数
     const top = (col) => all(q(`SELECT ${col} AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY ${col} ORDER BY n DESC LIMIT 20`, since));
