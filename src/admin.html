@@ -700,6 +700,18 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .field .plist label em { font-style: normal; font-size: 11.5px; color: var(--muted); }
 .plist input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
 .warn { color: var(--warn); }
+.rb.has-pop { position: relative; cursor: default; outline: none; }
+.rb-pop { position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; width: max-content; max-width: min(420px, calc(100vw - 48px)); padding: 6px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-3); color: var(--text); font-weight: 400; white-space: normal;
+  opacity: 0; visibility: hidden; transform: translateY(-4px); transition: opacity .15s, transform .2s var(--ease-out), visibility 0s .2s; pointer-events: none; }
+.rb.has-pop:hover .rb-pop, .rb.has-pop:focus-visible .rb-pop { opacity: 1; visibility: visible; transform: none; transition-delay: .12s, .12s, 0s; }
+.rp-r { padding: 7px 9px; border-radius: 8px; }
+.rp-r + .rp-r { border-top: 1px dashed var(--line-2); border-radius: 0; }
+.rp-c { font-size: 12.5px; font-weight: 550; color: var(--text); }
+.rp-u { display: flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 12px; color: var(--muted); min-width: 0; }
+.rp-u svg { flex: none; }
+.rp-u span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-def .rp-c { color: var(--text-2); }
 .rb { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 6px; background: var(--accent-2); color: var(--accent-ink); font-size: 11.5px; font-weight: 550; white-space: nowrap; flex: none; font-family: var(--sans); }
 .rb svg { width: 12px; height: 12px; }
 .rb[hidden] { display: none; }
@@ -1807,7 +1819,7 @@ async function renderLinks(token, opts = {}) {
     <div class="lrow ${listState.flash === l.id ? 'flash' : ''}" data-go="${l.id}" tabindex="0">
       <div style="min-width:0">
         <div class="su">${esc(shortDisp(l.slug))}${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}</div>
-        <div class="tg">${l.rules ? `<span class="rb">${ic('globe')}${l.rules} 条地区规则</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
+        <div class="tg">${l.rules ? `<span class="rb has-pop" tabindex="0">${ic('globe')}${l.rules} 条地区规则${rulePop(l)}</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
       </div>
       <div class="c-spark">${sparkline(l.spark)}</div>
       <div class="num c-clicks">${num(l.clicks)}</div>
@@ -1900,6 +1912,16 @@ function bindLinksChrome() {
     } catch (err) { toast(err.message, 'bad'); }
     finally { syncQuick(); }
   };
+}
+
+// 列表里“N 条地区规则”的悬停浮层：每条规则的国家和跳转地址
+function rulePop(l) {
+  const list = l.ruleList || [];
+  if (!list.length) return '';
+  const row = (r) => `<div class="rp-r"><div class="rp-c">${r.countries.slice(0, 4).map((c) => `${flag(c)} ${esc(cname(c))}`.trim()).join('、')}${r.countries.length > 4 ? ` 等 ${r.countries.length} 个` : ''}</div>
+    <div class="rp-u">${ic('arrow', 12)}<span>${esc(r.url)}</span></div></div>`;
+  return `<span class="rb-pop" role="tooltip">${list.map(row).join('')}
+    <div class="rp-r rp-def"><div class="rp-c">其他地区</div><div class="rp-u">${ic('arrow', 12)}<span>${l.target_url ? esc(l.target_url) : '未设置默认地址'}</span></div></div></span>`;
 }
 
 function statusPill(l) {

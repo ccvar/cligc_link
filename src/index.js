@@ -810,6 +810,15 @@ async function listLinks(env, url) {
       byId.get(r.link_id).push({ k: r.k, n: r.n });
     }
     for (const l of items) l.spark = byId.get(l.id) || [];
+
+    // 地区规则摘要（列表里鼠标悬停显示）
+    const rules = await env.DB.prepare(
+      `SELECT link_id, countries, url FROM link_targets WHERE link_id IN (${ids.map(() => '?').join(',')}) ORDER BY id`
+    ).bind(...ids).all();
+    for (const l of items) {
+      l.ruleList = rules.results.filter((r) => r.link_id === l.id)
+        .map((r) => ({ countries: r.countries.split(',').filter(Boolean), url: r.url }));
+    }
   }
   return json({ total, page, size, items });
 }
