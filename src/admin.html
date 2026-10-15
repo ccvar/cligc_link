@@ -309,13 +309,19 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .chart.sm { height: 228px; }
 #home .g-main.top > .card:first-child { display: flex; flex-direction: column; }
 #home .g-main.top > .card:first-child .card-b { flex: 1; display: flex; flex-direction: column; }
-#home .g-main.top .chart.sm { flex: 1; max-height: 300px; }
-.home-feed .feed { max-height: none; -webkit-mask-image: none; mask-image: none; padding-bottom: 6px; overflow: visible; }
-.feed-more { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 0 20px 14px; height: 32px; border: 0; border-radius: 9px; background: var(--sunken);
-  color: var(--text-2); font-size: 12.5px; cursor: pointer; transition: background .15s, color .15s; }
-.feed-more:hover { color: var(--text); background: color-mix(in srgb, var(--sunken) 70%, var(--line)); }
-.feed-more svg { transition: transform .25s var(--ease-out); }
-.feed-more.open svg { transform: rotate(180deg); }
+#home .g-main.top .chart.sm { flex: none; }
+/* 概览实时访问：高度跟左侧趋势图一致，列表在卡片内滚动 */
+.home-feed { display: flex; flex-direction: column; }
+.home-feed .feed { flex: 1; min-height: 0; max-height: 360px; overflow: auto; padding-bottom: 10px; scrollbar-width: thin;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 24px), transparent); mask-image: linear-gradient(#000 calc(100% - 24px), transparent); }
+@media (min-width: 1181px) {
+  #home .g-main.top { align-items: stretch; }
+  .home-feed { height: 0; min-height: 100%; }
+  .home-feed .feed { max-height: none; }
+}
+/* 列表会滚动，标签提示改到左侧显示，避免被上下边缘裁掉 */
+.home-feed .fi-r .kt[data-tip]::after { left: auto; right: calc(100% + 8px); bottom: auto; top: 50%; transform: translate(4px, -50%); }
+.home-feed .fi-r .kt[data-tip]:hover::after, .home-feed .fi-r .kt[data-tip]:focus-visible::after { transform: translate(0, -50%); }
 .delta { display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 7px; border-radius: 999px; font-weight: 600; font-size: 12px; background: var(--sunken); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .delta svg { width: 12px; height: 12px; stroke-width: 2.4; }
 .delta.up { color: var(--good); background: var(--good-bg); }
@@ -1841,7 +1847,6 @@ function feedItems(items, newIds = new Set()) {
       <div class="fi-r">${kindTag(r)}<time datetime="${new Date(r.ts).toISOString()}" data-ts="${r.ts}">${ago(r.ts)}</time></div></a>`).join('');
 }
 
-const FEED_N = 4;
 
 // 概览的短链切换：默认全部，可搜索
 function linkPicker(root, items) {
@@ -1998,8 +2003,7 @@ async function renderHome(token) {
       </section>
       <section class="card rv home-feed">
         <div class="card-h"><h3>实时访问</h3><span class="sp"></span><span class="live">实时</span></div>
-        <div class="feed" id="feed">${feedItems(d.recent.slice(0, FEED_N))}</div>
-        ${d.recent.length > FEED_N ? `<button type="button" class="feed-more" id="feed-more">查看更多 ${ic('chev', 14)}</button>` : ''}
+        <div class="feed" id="feed">${feedItems(d.recent)}</div>
       </section>
     </div>
 
@@ -2032,15 +2036,7 @@ async function renderHome(token) {
     { id: 'p', key: 'p', label: `上一个 ${rangeLabel()}`, type: 'dash' },
   ], document.getElementById('lg'));
 
-  // 实时访问：默认显示 5 条，可展开；每 30 秒刷新，新出现的记录高亮
-  let feedAll = false, latest = d.recent;
-  const more = document.getElementById('feed-more');
-  if (more) more.onclick = () => {
-    feedAll = !feedAll;
-    document.getElementById('feed').innerHTML = feedItems(latest.slice(0, feedAll ? latest.length : FEED_N));
-    more.classList.toggle('open', feedAll);
-    more.firstChild.textContent = feedAll ? '收起 ' : '查看更多 ';
-  };
+  // 实时访问：卡片内滚动；每 30 秒刷新，新出现的记录高亮
   let seen = new Set(d.recent.map((r) => r.id));
   clearInterval(liveTimer);
   liveTimer = setInterval(async () => {
@@ -2050,8 +2046,7 @@ async function renderHome(token) {
       const { items } = await api('/recent?bots=' + (state.bots ? 1 : 0) + linkQs());
       const fresh = new Set(items.filter((r) => !seen.has(r.id)).map((r) => r.id));
       seen = new Set(items.map((r) => r.id));
-      latest = items;
-      feed.innerHTML = feedItems(items.slice(0, feedAll ? items.length : FEED_N), fresh);
+      feed.innerHTML = feedItems(items, fresh);
     } catch {}
   }, 30000);
 }
