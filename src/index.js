@@ -371,7 +371,8 @@ async function handleApi(request, env, url) {
   if (mustChange) return json({ error: '请先修改默认密码', mustChange: true }, 403);
   if (path === '/api/overview' && method === 'GET') return overview(env, url);
   if (path === '/api/recent' && method === 'GET') {
-    return json({ items: await recentClicks(env, url.searchParams.get('bots') === '1') });
+    const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
+    return json({ items: await recentClicks(env, url.searchParams.get('bots') === '1', linkId) });
   }
   if (path === '/api/links' && method === 'GET') return listLinks(env, url);
   if (path === '/api/links' && method === 'POST') return createLink(request, env);
@@ -1083,7 +1084,10 @@ async function exportClicks(env, id) {
 
 async function overview(env, url) {
   const { tz, bots, since, prevSince, bucket, span } = rangeParams(url);
-  const botFilter = bots ? '' : 'AND c.is_bot = 0';
+  // 可按单个短链筛选（link 为短链 id，校验为正整数后拼进 SQL）
+  const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
+  const linkFilter = linkId ? `AND c.link_id = ${linkId}` : '';
+  const botFilter = `${bots ? '' : 'AND c.is_bot = 0'} ${linkFilter}`;
   const now = Date.now();
   // 浏览器所在时区的今天 0 点，以及昨天同一时刻
   const dayStart = Math.floor((now + tz * 60000) / 86400000) * 86400000 - tz * 60000;
@@ -1114,18 +1118,35 @@ async function overview(env, url) {
       all(q(`SELECT CAST(strftime('%w', (ts + ?2 * 60000) / 1000, 'unixepoch') AS INTEGER) AS d,
                     CAST(strftime('%H', (ts + ?2 * 60000) / 1000, 'unixepoch') AS INTEGER) AS h, COUNT(*) AS n
              FROM clicks c WHERE ts >= ?1 ${botFilter} GROUP BY d, h`, since, tz)),
-      recentClicks(env, bots),
-      all(q('SELECT kind AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? GROUP BY kind', since)),
+      recentClicks(env, bots, linkId),
+      all(q(`SELECT kind AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${linkFilter} GROUP BY kind`, since)),
     ]);
-  return json({ links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds });
+  const out = { links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds };
+  if (linkId) {
+    // 单个短链：附带短链信息和各跳转去向（地区规则 / 默认地址）的命中数
+    const [link, hits] = await Promise.all([
+      env.DB.prepare('SELECT id, slug, title, target_url, last_click, enabled, expires_at FROM links WHERE id = ?').bind(linkId).first(),
+      all(q(`SELECT rule_id AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY rule_id`, since)),
+    ]);
+    if (!link) return json({ error: '短链不存在' }, 404);
+    const targets = await loadTargets(env, linkId);
+    const n = new Map(hits.map((h) => [h.k, h.n]));
+    out.link = link;
+    out.routes = [
+      ...targets.map((t) => ({ countries: t.countries, url: t.url, n: n.get(t.id) || 0 })),
+      { countries: [], url: link.target_url, n: n.get(0) || 0, def: true },
+    ];
+  }
+  return json(out);
 }
 
-async function recentClicks(env, bots) {
+async function recentClicks(env, bots, linkId = 0) {
+  const where = [bots ? '' : 'c.is_bot = 0', linkId ? 'c.link_id = ?' : ''].filter(Boolean);
   const r = await env.DB.prepare(
     `SELECT c.id, c.ts, c.source, c.country, c.city, c.device, c.os, c.browser, c.kind, c.reason, l.id AS link_id, l.slug
      FROM clicks c JOIN links l ON l.id = c.link_id
-     ${bots ? '' : 'WHERE c.is_bot = 0'} ORDER BY c.ts DESC LIMIT 12`
-  ).all();
+     ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY c.ts DESC LIMIT 12`
+  ).bind(...(linkId ? [linkId] : [])).all();
   return r.results;
 }
 
