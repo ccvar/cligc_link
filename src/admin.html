@@ -537,6 +537,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .tbl tbody tr:hover { background: var(--panel-2); }
 .tbl tr:last-child td { border-bottom: 0; }
 .tbl td.ell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.tbl div.ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tbl .sm { color: var(--muted); font-size: 12px; }
 .scroll { overflow-x: auto; margin-top: 8px; }
 
@@ -2314,7 +2315,7 @@ async function renderLink(token, id) {
             <td><div>${esc(country(r.country))}</div><div class="sm">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
             <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" title="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (link.target_url || '—'))}</div>`; })()}</td>
             <td title="${esc(r.ua)}"><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div></td>
-            <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:180px">${esc(r.asn_org)}</div></td>
+            <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:200px" title="${esc([r.asn ? 'AS' + r.asn : '', r.asn_org].filter(Boolean).join(' · '))}">${esc(r.asn_org || '—')}</div></td>
             <td class="ell" title="${esc(r.referer)}">${r.referer ? esc(r.referer) : '<span class="sm">—</span>'}</td>
           </tr>`).join('')}</tbody></table></div>
           ${pages > 1 ? `<div class="pager"><span class="tnum">第 ${clickState.page} / ${pages} 页</span><div class="g">

@@ -90,14 +90,16 @@ async function migrate(env) {
     ['asn', 'INTEGER NOT NULL DEFAULT 0'], ['tls', "TEXT NOT NULL DEFAULT ''"], ['http', "TEXT NOT NULL DEFAULT ''"]]) {
     if (!cols.includes(c)) await env.DB.prepare(`ALTER TABLE clicks ADD COLUMN ${c} ${def}`).run();
   }
-  // 只补算一次，避免每次冷启动都扫描整张表
-  if (!(await getSetting(env, 'kind_backfilled'))) await backfillKinds(env);
+  // 判定规则更新时提高版本号，旧记录重新检查一次；平时不扫描整张表
+  if ((await getSetting(env, 'kind_backfilled'))?.value !== KIND_VER) await backfillKinds(env);
 }
 
 // 按已有的 IP、运营商、User-Agent、语言补算旧访问记录的访客类型（每次最多处理 2 万条，下次启动继续）
+const KIND_VER = '2';
 async function backfillKinds(env) {
+  // 已判为爬虫 / 可疑的不再改动（新规则只会多识别，不会少识别）
   const rows = (await env.DB.prepare(
-    "SELECT id, link_id, ts, ip, ua, asn_org, lang FROM clicks WHERE kind = '' ORDER BY ts LIMIT 20000"
+    "SELECT id, link_id, ts, ip, ua, asn, asn_org, lang FROM clicks WHERE kind IN ('', 'human') ORDER BY ts LIMIT 20000"
   ).all()).results;
   // 同一 IP 访问同一短链：统计 60 秒内的次数
   const recent = new Map(), hist = new Map();
@@ -108,7 +110,7 @@ async function backfillKinds(env) {
   }
   const groups = new Map();
   for (const r of rows) {
-    const v = classifyVisit({ ua: r.ua, hasLang: !!r.lang, asnOrg: r.asn_org, recent: recent.get(r.id) });
+    const v = classifyVisit({ ua: r.ua, hasLang: !!r.lang, asnOrg: r.asn_org, asn: r.asn, recent: recent.get(r.id) });
     const k = v.kind + '\u0000' + v.reason;
     if (!groups.has(k)) groups.set(k, { ...v, ids: [] });
     groups.get(k).ids.push(r.id);
@@ -122,7 +124,7 @@ async function backfillKinds(env) {
     }
   }
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
-  if (rows.length < 20000) await setSetting(env, 'kind_backfilled', '1');
+  if (rows.length < 20000) await setSetting(env, 'kind_backfilled', KIND_VER);
 }
 
 // ---------------------------------------------------------------- 跳转
@@ -242,7 +244,7 @@ async function logClick(request, env, linkId, url, ruleId) {
   const recent = 1 + (await env.DB.prepare('SELECT COUNT(*) AS n FROM clicks WHERE link_id = ? AND ts > ? AND ip = ?')
     .bind(linkId, now - 60000, ip).first('n'));
   const visit = classifyVisit({
-    ua, hasLang: h.has('accept-language'), asnOrg: cf.asOrganization || '', recent,
+    ua, hasLang: h.has('accept-language'), asnOrg: cf.asOrganization || '', asn: Number(cf.asn) || 0, recent,
     secFetch: h.has('sec-fetch-mode'), tls: cf.tlsVersion || '', http: cf.httpProtocol || '',
   });
 
@@ -267,7 +269,7 @@ async function logClick(request, env, linkId, url, ruleId) {
 // ---------------------------------------------------------------- 访客类型：真人 / 爬虫 / 可疑
 
 // 云服务商 / 机房的运营商名称。Cloudflare、Akamai 不算：iCloud 私密中继、WARP 的真人用户也走它们
-const DC_RE = /amazon|aws|google llc|google cloud|microsoft|azure|digitalocean|linode|hetzner|ovh|vultr|choopa|alibaba|aliyun|tencent|huawei cloud|oracle|scaleway|contabo|leaseweb|m247|datacamp|zenlayer|ucloud|kingsoft cloud|hostinger|ionos|g-core|gcore|psychz|quadranet|colocrossing|hostwinds|kamatera|upcloud|netcup|racknerd|dmit|it7 networks|frantech|buyvm|clouvider|servers\.com|hosting|data ?cent(er|re)|dedicated server|vps/i;
+const DC_RE = /collyer quay|aceville|amazon|aws|google llc|google cloud|microsoft|azure|digitalocean|linode|hetzner|ovh|vultr|choopa|alibaba|aliyun|tencent|huawei cloud|oracle|scaleway|contabo|leaseweb|m247|datacamp|zenlayer|ucloud|kingsoft cloud|hostinger|ionos|g-core|gcore|psychz|quadranet|colocrossing|hostwinds|kamatera|upcloud|netcup|racknerd|dmit|it7 networks|frantech|buyvm|clouvider|servers\.com|hosting|data ?cent(er|re)|dedicated server|vps/i;
 const BOT_NAMES = [
   ['googlebot', 'Googlebot'], ['bingbot', 'Bingbot'], ['baiduspider', '百度蜘蛛'], ['yandex', 'Yandex'], ['bytespider', '字节跳动'],
   ['sogou', '搜狗蜘蛛'], ['360spider', '360 蜘蛛'], ['petalbot', '华为 Petal'], ['applebot', 'Applebot'], ['gptbot', 'GPTBot'],
@@ -276,8 +278,18 @@ const BOT_NAMES = [
   ['curl', 'curl'], ['wget', 'wget'], ['python', 'Python 脚本'], ['go-http', 'Go 脚本'], ['headless', '无头浏览器'], ['node-fetch', 'Node 脚本'],
 ];
 
+// 常见云服务商的 ASN。运营商名称不可靠（如腾讯云新加坡登记为“6 COLLYER QUAY”），按 ASN 识别更准
+const DC_ASN = new Map([
+  [132203, '腾讯云'], [45090, '腾讯云'], [133478, '腾讯云'], [45102, '阿里云'], [37963, '阿里云'], [24429, '阿里云'],
+  [136907, '华为云'], [55990, '华为云'], [137718, '火山引擎'], [396986, '字节跳动'], [38365, '百度云'], [59019, '金山云'], [135377, 'UCloud'],
+  [16509, 'AWS'], [14618, 'AWS'], [8987, 'AWS'], [15169, 'Google'], [396982, 'Google Cloud'], [19527, 'Google'],
+  [8075, 'Microsoft Azure'], [8068, 'Microsoft'], [14061, 'DigitalOcean'], [63949, 'Linode'], [20473, 'Vultr'], [16276, 'OVH'],
+  [24940, 'Hetzner'], [31898, 'Oracle Cloud'], [51167, 'Contabo'], [12876, 'Scaleway'], [60781, 'Leaseweb'], [28753, 'Leaseweb'],
+  [9009, 'M247'], [21859, 'Zenlayer'], [212238, 'Datacamp'], [36352, 'ColoCrossing'], [62904, 'Eonix'],
+]);
+
 // 强信号命中一条即为“可疑”；弱信号要两条以上
-function classifyVisit({ ua, hasLang, asnOrg, recent, secFetch, tls, http }) {
+function classifyVisit({ ua, hasLang, asnOrg, asn, recent, secFetch, tls, http }) {
   const s = (ua || '').toLowerCase();
   if (!s) return { kind: 'bot', reason: '没有 User-Agent' };
   if (parseUA(ua).bot) {
@@ -285,7 +297,8 @@ function classifyVisit({ ua, hasLang, asnOrg, recent, secFetch, tls, http }) {
     return { kind: 'bot', reason: hit ? hit[1] : '自报为爬虫 / 工具' };
   }
   const strong = [], weak = [];
-  if (asnOrg && DC_RE.test(asnOrg) && !/cloudflare|akamai/i.test(asnOrg)) strong.push(`机房 IP · ${asnOrg}`);
+  if (DC_ASN.has(asn)) strong.push(`机房 IP · ${DC_ASN.get(asn)}（AS${asn}）`);
+  else if (asnOrg && DC_RE.test(asnOrg) && !/cloudflare|akamai/i.test(asnOrg)) strong.push(`机房 IP · ${asnOrg}`);
   if (!hasLang) strong.push('没有语言信息（Accept-Language）');
   if (recent >= 5) strong.push(`同一 IP 1 分钟内第 ${recent} 次访问`);
   if (/^TLSv1(\.[01])?$/.test(tls || '')) strong.push(`过旧的 ${tls}`);
