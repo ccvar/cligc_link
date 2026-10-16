@@ -909,7 +909,10 @@ details[open] > summary::before { transform: rotate(90deg); }
 .use-bar { height: 5px; border-radius: 3px; background: var(--sunken); margin-top: 8px; overflow: hidden; }
 .use-bar i { display: block; height: 100%; border-radius: 3px; background: var(--good); }
 .use-bar.warn i { background: var(--amber); } .use-bar.bad i { background: var(--bad); }
-.use-t { margin-top: 14px; }
+.use-t { margin-top: 14px; table-layout: fixed; width: 100%; }
+.use-t th:nth-child(1) { width: 13%; } .use-t th:nth-child(2) { width: 15%; } .use-t th:nth-child(3) { width: 28%; }
+.use-t td:first-child { white-space: nowrap; }
+.use-t td { overflow: hidden; }
 .use-t td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .use-mini { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
 .use-mini { position: relative; }
@@ -921,6 +924,10 @@ details[open] > summary::before { transform: rotate(90deg); }
 .use-who { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
 .use-who span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .use-who i { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.use-who.r { flex-direction: column; align-items: flex-end; gap: 2px; margin-top: 4px; }
+.use-who.r { align-items: stretch; }
+.use-who.r span { display: flex; justify-content: flex-end; gap: 5px; max-width: 100%; min-width: 0; }
+.use-who.r em { font-style: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .use-top { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 0; }
 .use-top b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 600; }
 .use-top em { flex: none; font-style: normal; font-variant-numeric: tabular-nums; }
@@ -5558,6 +5565,19 @@ function renderUsage(box, u, onState) {
   // 颜色按最近 7 天的总排名分配，同一个数据库每天颜色一样
   const UCOL = ['var(--accent)', 'var(--violet)', 'var(--teal)'];
   const colorOf = new Map((u.top?.week?.rowsRead || []).map(([id], i) => [id, UCOL[i]]));
+  // 写入多、读取少的数据库也给个颜色；Worker 按最近 7 天的请求量另配颜色
+  for (const [id] of u.top?.week?.rowsWritten || []) if (!colorOf.has(id) && colorOf.size < 5) colorOf.set(id, ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', '#e26d9c'][colorOf.size]);
+  const wkColor = new Map((u.top?.week?.requests || []).map(([n], i) => [n, UCOL[i]]));
+  // 写入 / 请求格子里：数字下面列出占用最多的两个
+  const topCell = (list, total, k, d) => {
+    const mineId = k === 'requests' ? u.myWorker : u.myDb, has = k === 'requests' ? u.hasMine?.worker : u.hasMine?.d1;
+    const shown = (list || []).slice(0, 2);
+    // 本项目不在前两名时，单独再列一行
+    const mine = has && !shown.some(([id]) => id === mineId) ? `<div class="sm">本项目 ${wan(d.mine?.[k] || 0)}</div>` : '';
+    if (!shown.length || !total) return mine;
+    return `<div class="use-who r">${shown.map(([id, n]) =>
+      `<span><i style="background:${(k === 'requests' ? wkColor : colorOf).get(id) || 'var(--faint)'}"></i><em>${esc(nameOf(k)(id))}</em>${pctText(n / total)}</span>`).join('')}</div>${mine}`;
+  };
   const topTip = (list, total, k) => (list?.length ? list.map(([id, n]) => `${nameOf(k)(id)}：${wan(n)}（${pctText(total ? n / total : 0)}）`).join('\n') : '');
   const topLine = (k) => {
     const list = u.top?.[paid ? 'month' : 'today']?.[k], total = cur[k];
@@ -5610,9 +5630,9 @@ function renderUsage(box, u, onState) {
       <tbody>${(u.days || []).slice().reverse().map((d) => `<tr>
         <td>${d.date.slice(5)}${d.date === u.today ? ' <span class="sm">今天</span>' : ''}</td>
         <td class="num">${wan(d.rowsRead)}${u.hasMine?.d1 ? `<div class="sm">本项目 ${wan(d.mine?.rowsRead || 0)}</div>` : ''}</td>
-        <td style="width:34%">${useBar(d)}</td>
-        <td class="num"${d.top?.rowsWritten?.length ? ` data-tipf-always data-tipf="${esc(`D1 写入最多：\n${topTip(d.top.rowsWritten, d.rowsWritten, 'rowsWritten')}`)}"` : ''}>${wan(d.rowsWritten)}${u.hasMine?.d1 ? `<div class="sm">本项目 ${wan(d.mine?.rowsWritten || 0)}</div>` : ''}</td>
-        <td class="num"${d.top?.requests?.length ? ` data-tipf-always data-tipf="${esc(`Worker 请求最多：\n${topTip(d.top.requests, d.requests, 'requests')}`)}"` : ''}>${wan(d.requests)}${u.hasMine?.worker ? `<div class="sm">本项目 ${wan(d.mine?.requests || 0)}</div>` : ''}</td></tr>`).join('')}</tbody></table>`;
+        <td>${useBar(d)}</td>
+        <td class="num"${d.top?.rowsWritten?.length ? ` data-tipf-always data-tipf="${esc(`D1 写入最多：\n${topTip(d.top.rowsWritten, d.rowsWritten, 'rowsWritten')}`)}"` : ''}>${wan(d.rowsWritten)}${topCell(d.top?.rowsWritten, d.rowsWritten, 'rowsWritten', d)}</td>
+        <td class="num"${d.top?.requests?.length ? ` data-tipf-always data-tipf="${esc(`Worker 请求最多：\n${topTip(d.top.requests, d.requests, 'requests')}`)}"` : ''}>${wan(d.requests)}${topCell(d.top?.requests, d.requests, 'requests', d)}</td></tr>`).join('')}</tbody></table>`;
   bindCfForm(box, u, onState);
   segThumb(box.querySelector('#use-plan'));
   box.querySelectorAll('#use-plan button').forEach((b) => (b.onclick = async () => {
