@@ -135,6 +135,7 @@ CREATE TABLE IF NOT EXISTS g_sites (
   gsc_acct      TEXT NOT NULL DEFAULT '',   -- GSC 数据来自哪个 Google 账号
   users         TEXT NOT NULL DEFAULT '',   -- 区间去重用户数 JSON（7 / 28 / 90 天）
   synced_at     INTEGER NOT NULL DEFAULT 0,
+  ch_at         INTEGER NOT NULL DEFAULT 0,   -- 渠道占比数据补齐的时间（0 = 还没补）
   error         TEXT NOT NULL DEFAULT '',
   updated_at    INTEGER NOT NULL DEFAULT 0
 );
@@ -143,6 +144,7 @@ CREATE TABLE IF NOT EXISTS g_daily (
   date         TEXT NOT NULL,
   users        INTEGER, sessions INTEGER, views INTEGER, key_events REAL, engagement REAL,   -- GA4
   clicks       INTEGER, impressions INTEGER, ctr REAL, position REAL,                       -- GSC
+  channels     TEXT,                                                                         -- GA4 渠道分组会话数 JSON
   PRIMARY KEY (host, date)
 );
 CREATE TABLE IF NOT EXISTS g_cache (

@@ -199,6 +199,9 @@ async function migrate(env) {
   for (const c of ['ga4_acct', 'gsc_acct']) {
     if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`).run();
   }
+  if (!gcols.includes('ch_at')) await env.DB.prepare('ALTER TABLE g_sites ADD COLUMN ch_at INTEGER NOT NULL DEFAULT 0').run();
+  const dcols = (await env.DB.prepare('PRAGMA table_info(g_daily)').all()).results.map((c) => c.name);
+  if (!dcols.includes('channels')) await env.DB.prepare('ALTER TABLE g_daily ADD COLUMN channels TEXT').run();
   for (const [c, def] of [['kind', "TEXT NOT NULL DEFAULT ''"], ['reason', "TEXT NOT NULL DEFAULT ''"],
     ['asn', 'INTEGER NOT NULL DEFAULT 0'], ['tls', "TEXT NOT NULL DEFAULT ''"], ['http', "TEXT NOT NULL DEFAULT ''"],
     ['proxy', 'INTEGER NOT NULL DEFAULT 0']]) {

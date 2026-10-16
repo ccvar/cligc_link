@@ -225,6 +225,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .btn.danger { color: var(--bad); }
 .btn.sm { height: 30px; padding: 0 10px; font-size: 13px; border-radius: 8px; }
 .btn.icon { width: 32px; height: 32px; padding: 0; }
+.btn.sm.icon { width: 30px; height: 30px; }
+/* 和普通按钮放在同一行的图标按钮、下拉也是 36px */
+.hero .acts .btn.icon, .ph-acts .btn.icon { width: 36px; height: 36px; }
+.when .btn.sm { height: 36px; }
 .btn:disabled { opacity: .45; cursor: default; transform: none; }
 .btn .sw { display: grid; }
 .btn .sw > * { grid-area: 1 / 1; display: grid; transition: opacity .15s, transform .25s var(--ease); }
@@ -526,6 +530,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 
 .lh { padding: 14px var(--cp); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .lh .sp { flex: 1; }
+/* 列表工具栏里的搜索框、下拉、分段按钮、按钮统一 36px 高 */
+.lh .search .input { height: 36px; }
+.lh .seg button { height: 30px; }
 .lrow { display: grid; grid-template-columns: minmax(0, 1fr) 100px 76px 96px 72px 144px; gap: 16px; align-items: center;
   padding: 14px var(--cp); border-top: 1px solid var(--line-2); cursor: pointer; transition: background .15s; }
 .lrow:hover { background: var(--panel-2); }
@@ -565,10 +572,11 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .pager { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 12px var(--cp); border-top: 1px solid var(--line-2); color: var(--muted); font-size: 13px; }
 .pager .g { display: flex; gap: 6px; align-items: center; }
 .search { position: relative; flex: 1; max-width: 340px; min-width: 200px; }
-.search > svg { position: absolute; left: 11px; top: 11px; color: var(--muted); }
-.search .input { padding-left: 34px; padding-right: 34px; }
+.search > svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.search .input { padding-left: 34px; padding-right: 12px; text-overflow: ellipsis; }
+.search:has(.s-clear:not([hidden])) .input, .search:has(.kbd) .input { padding-right: 34px; }
 .kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; color: var(--muted); background: var(--panel); }
-.search .kbd { position: absolute; right: 10px; top: 9px; }
+.search .kbd { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
 .search .s-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border: 0; border-radius: 6px;
   display: grid; place-items: center; background: none; color: var(--muted); cursor: pointer; }
 .search .s-clear:hover { background: var(--sunken); color: var(--text); }
@@ -750,6 +758,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .rules .none { padding: 18px var(--cp); border-top: 1px solid var(--line-2); display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
 .sim { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px var(--cp); border-top: 1px solid var(--line-2); background: var(--panel-2); border-radius: 0 0 var(--r-lg) var(--r-lg); font-size: 13px; color: var(--text-2); }
 .sim .combo { flex: none; }
+.sim .combo-btn { height: 32px; }
 .sim .res > span:first-child { white-space: nowrap; }
 
 /* 设置页 */
@@ -1158,7 +1167,7 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 
 /* 可搜索的下拉框 */
 .combo { position: relative; }
-.combo-btn { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 136px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+.combo-btn { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 136px; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
   cursor: pointer; font-size: 13px; text-align: left; transition: border-color .15s, box-shadow .15s; }
 .combo-btn:hover { border-color: color-mix(in srgb, var(--line) 60%, var(--text) 12%); }
 .combo-btn[aria-expanded="true"] { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-2); }
@@ -1394,6 +1403,41 @@ button.gtg { cursor: pointer; }
 .gd { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
 .gd.up { color: var(--good); } .gd.down { color: var(--bad); }
 .kstrip.gk .kc-h .gd { display: inline; }
+/* 搜索词筛选 */
+.qf { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.qf button { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+  color: var(--text-2); font: inherit; font-size: 12.5px; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.qf button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); color: var(--text); }
+.qf button.on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-2); color: var(--accent-ink); font-weight: 550; }
+.qf button:disabled { opacity: .45; cursor: default; }
+.qf small { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.qf button.on small { color: inherit; opacity: .8; }
+.qf-h { margin: -2px 0 8px; font-size: 12px; }
+.qt .gd { display: inline; margin-left: 5px; font-size: 11px; }
+.qt .qn { margin-left: 5px; font-size: 10.5px; font-weight: 650; padding: 1px 5px; border-radius: 4px; color: var(--violet); background: color-mix(in srgb, var(--violet) 12%, transparent); }
+.qt td.num .sm { color: var(--muted); }
+.tbl.gt.qt th:first-child { width: 34%; }
+.tbl.gt.qt th:last-child { width: 22%; }
+.tbl.gt.qt.q3 th:first-child { width: 40%; }
+.tbl.gt.qt.q3 th:last-child { width: 30%; }
+.qt td.num { white-space: nowrap; }
+.ch-h { margin-top: 12px; font-size: 12px; }
+/* 站点列表汇总：流量渠道小环形图 */
+.kstrip.gs.has-ch { grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.6fr) minmax(0, 1fr); }
+.chm { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.chm svg { width: 52px; height: 52px; flex: none; transform: rotate(-90deg); }
+.chm circle { fill: none; stroke-width: 9; }
+.chm-l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.chm-l span { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); min-width: 0; }
+.chm-l i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.chm-l em { font-style: normal; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chm-l b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+@media (max-width: 1100px) { .kstrip.gs.has-ch { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .kstrip.gs.has-ch { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+#g-ga .donut-w { gap: 28px; padding: 6px 0 2px; }
+#g-ga .donut { width: 148px; height: 148px; }
+#g-ga .donut .ctr b { font-size: 24px; }
+#g-ga .dlg { gap: 10px; }
 /* 站点详情：GA4 / Search Console 两行数据卡 */
 .kstrip.g8 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .kstrip.g8 .kc { border-left: 1px solid var(--line-2); border-top: 0; }
@@ -2244,9 +2288,15 @@ function tabCard(id, title, tabs, cls = '') {
 }
 
 // 设备环形图
-function donut(items) {
+// o.unit 中心的单位，o.name 图例名称；超过 5 项时前 4 项 + “其他”
+function donut(items, o = {}) {
   const COLORS = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', 'var(--faint)'];
+  const unit = o.unit || '次访问', name = o.name || devName;
   const sum = items.reduce((a, b) => a + b.n, 0);
+  if (items.length > 5) {
+    const top = items.slice(0, 4);
+    items = [...top, { k: '其他', n: sum - top.reduce((a, b) => a + b.n, 0), other: true }];
+  }
   if (!sum) return `<div class="empty">${ic('inbox')}该时间段内暂无数据</div>`;
   const r = 54, C = 2 * Math.PI * r, gap = items.length > 1 ? 3 : 0;
   let off = 0;
@@ -2258,8 +2308,8 @@ function donut(items) {
   }).join('');
   setTimeout(() => document.querySelectorAll('.donut circle[data-len]').forEach((c) => c.setAttribute('stroke-dasharray', `${c.dataset.len} ${C}`)), 80);
   return `<div class="donut-w"><div class="donut"><svg viewBox="0 0 136 136" aria-hidden="true"><circle cx="68" cy="68" r="${r}" stroke="var(--sunken)"/>${segs}</svg>
-      <div class="ctr" data-tipf-always data-tipf="${num(sum)} 次访问"><b data-count="${sum}" data-fmt="wan">0</b><span>次访问</span></div></div>
-    <div class="dlg">${items.slice(0, 5).map((it, i) => `<div class="x"><i style="background:${COLORS[i]}"></i><span>${esc(devName(it.k))}</span><b>${num(it.n)}</b><em>${Math.round((it.n / sum) * 100)}%</em></div>`).join('')}</div></div>`;
+      <div class="ctr" data-tipf-always data-tipf="${num(sum)} ${unit}"><b data-count="${sum}" data-fmt="wan">0</b><span>${unit}</span></div></div>
+    <div class="dlg">${items.slice(0, 5).map((it, i) => `<div class="x"${it.tip ? ` data-tipf-always data-tipf="${esc(it.tip)}"` : ''}><i style="background:${COLORS[i]}"></i><span>${esc(it.other ? '其他' : name(it.k))}</span><b>${num(it.n)}</b><em>${Math.round((it.n / sum) * 100)}%</em></div>`).join('')}</div></div>`;
 }
 
 // 浏览器 / 系统占比：分段条 + 图例（前 4 个，其余合并为“其他”）
@@ -4122,6 +4172,90 @@ const gDelta = (a, b, inverse = false) => {
   return `<span class="gd ${Math.abs(d) < 0.005 ? '' : good ? 'up' : 'down'}">${up ? '↑' : '↓'}${Math.abs(d * 100) >= 100 ? Math.round(Math.abs(d * 100)) : Math.abs(d * 100).toFixed(1)}%</span>`;
 };
 const pct1 = (x) => `${(x * 100).toFixed(1)}%`;
+// 各排名的大致点击率（和服务端 AI 报告用的一致），用来判断“点击率偏低”
+const G_CTR = [0, 0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018];
+const gExpCtr = (pos) => (pos < 1 ? 0.28 : pos <= 10 ? G_CTR[Math.round(pos)] : pos <= 20 ? 0.01 : 0.003);
+
+// GA4 默认渠道分组的中文名（英文界面用 GA4 原名）
+const GA_CH = { 'AI Assistant': 'AI 助手', 'Organic Search': '自然搜索', Direct: '直接访问', Referral: '引荐', 'Organic Social': '社交媒体', 'Paid Search': '付费搜索', Email: '邮件',
+  Unassigned: '未归类', 'Organic Video': '视频', Display: '展示广告', 'Paid Social': '付费社交', Affiliates: '联盟推广', 'Cross-network': '跨网络广告',
+  'Organic Shopping': '购物', 'Paid Shopping': '付费购物', 'Paid Video': '付费视频', 'Paid Other': '其他付费', SMS: '短信', Audio: '音频', 'Mobile Push Notifications': '推送通知' };
+const gaChannel = (k) => (EN ? k : GA_CH[k] || k);
+
+// 站点列表汇总里的“流量渠道”：当前筛选的站点按 GA4 渠道分组相加的会话占比
+function chCard(rows) {
+  const m = new Map();
+  for (const x of rows) for (const [k, n] of Object.entries(x.cur.ga?.channels || {})) m.set(k, (m.get(k) || 0) + n);
+  const items = [...m].map(([k, n]) => ({ k, n })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n);
+  const sum = items.reduce((a, x) => a + x.n, 0);
+  if (!sum) return '';
+  const COL = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', 'var(--faint)'];
+  const top = items.length > 4 ? [...items.slice(0, 3), { k: '其他', n: sum - items.slice(0, 3).reduce((a, x) => a + x.n, 0), other: true }] : items;
+  const r = 22, C = 2 * Math.PI * r;
+  let off = 0;
+  const segs = top.map((it, i) => { const len = (it.n / sum) * C; const c = `<circle cx="28" cy="28" r="${r}" stroke="${COL[i]}" stroke-dasharray="${Math.max(0, len - (top.length > 1 ? 1.5 : 0))} ${C}" stroke-dashoffset="${-off}"/>`; off += len; return c; }).join('');
+  const name = (it) => (it.other ? '其他' : gaChannel(it.k));
+  const missing = rows.filter((x) => x.cur.ga && !x.cur.ga.channels).length;
+  const tip = items.map((it) => `${gaChannel(it.k)} ${pctText(it.n / sum)} · ${num(it.n)} 次会话`).join('\n') + (missing ? `\n\n还有 ${missing} 个站点的渠道数据在同步中` : '');
+  return `<div class="kc kc-ch"><div class="kc-h"><span class="l" data-tipf-always data-tipf="${esc(tip)}">流量渠道</span></div>
+    <div class="chm"><svg viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="${r}" stroke="var(--sunken)"/>${segs}</svg>
+      <div class="chm-l">${top.map((it, i) => `<span><i style="background:${COL[i]}"></i><em>${esc(name(it))}</em><b>${pctText(it.n / sum)}</b></span>`).join('')}</div></div></div>`;
+}
+
+// 站点详情 · 搜索词：全部 / 排名 4–20 / 点击率偏低 / 下滑 / 新出现（筛选规则和 AI 报告一致）
+const QF = [['all', '全部'], ['near', '排名 4–20'], ['low', '点击率偏低'], ['down', '下滑'], ['new', '新出现']];
+const QF_HINT = {
+  near: '排名 4–20、展示较多的词：优化标题和内容后，最容易进入前三',
+  low: '点击率不到该排名常见水平一半的词：多半是标题或描述不够吸引人',
+  down: '点击比上一周期少 3 次以上的词（包括这期跌出前 250 的）',
+  new: '上一周期不在前 250、这期展示 20 次以上的词',
+};
+function queryLists(sc) {
+  const qs = sc?.queries || [];
+  return {
+    all: [...qs].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 25),
+    near: qs.filter((x) => x.position >= 4 && x.position <= 20 && x.impressions >= 10).sort((a, b) => b.impressions - a.impressions).slice(0, 25),
+    low: qs.filter((x) => x.impressions >= 30 && x.ctr < gExpCtr(x.position) * 0.5)
+      .map((x) => ({ ...x, lost: Math.round(x.impressions * (gExpCtr(x.position) - x.ctr)) })).sort((a, b) => b.lost - a.lost).slice(0, 25),
+    down: (sc?.declining || []).slice(0, 25),
+    new: sc?.hasPrev ? qs.filter((x) => x.prevPosition == null && x.impressions >= 20).slice(0, 25) : [],
+  };
+}
+// 排名和上一周期比：数字变小是上升
+function rankChange(x, hasPrev) {
+  if (!hasPrev) return '';
+  // 上期前 250 里没有、本期展示又不多的词，不一定是新词，不标
+  if (x.prevPosition == null) return x.impressions >= 20 ? '<span class="qn" data-tipf-always data-tipf="上一周期不在前 250">新</span>' : '';
+  const d = x.prevPosition - x.position;
+  if (Math.abs(d) < 0.1) return '';
+  return `<span class="gd ${d > 0 ? 'up' : 'down'}" data-tipf-always data-tipf="${esc(`上一周期排名 ${x.prevPosition.toFixed(1)}`)}">${d > 0 ? '↑' : '↓'}${Math.abs(d).toFixed(1)}</span>`;
+}
+function queryView(sc, f) {
+  const lists = queryLists(sc);
+  if (!sc?.hasPrev && (f === 'down' || f === 'new')) f = 'all';
+  const rows = lists[f];
+  const kc = (k) => `<div class="ell" data-tipf="${esc(k)}">${esc(k)}</div>`;
+  const chips = `<div class="qf">${QF.map(([k, l]) => {
+    const off = !sc?.hasPrev && (k === 'down' || k === 'new');
+    return `<button type="button" class="${k === f ? 'on' : ''}" data-qf="${k}" ${off ? 'disabled data-tipf-always data-tipf="时间范围太长，没有上一周期可比"' : ''}>${l}${k !== 'all' ? `<small>${lists[k].length}</small>` : ''}</button>`;
+  }).join('')}</div>${QF_HINT[f] ? `<div class="hint qf-h">${QF_HINT[f]}</div>` : ''}`;
+  if (!rows.length) return `${chips}<div class="empty">${ic('inbox')}${f === 'all' ? '该时间段内暂无数据' : '没有符合条件的搜索词'}</div>`;
+  const hp = sc.hasPrev;
+  let head, row;
+  if (f === 'low') {
+    head = ['搜索词', '展示', '点击率', '常见', '少拿的点击'];
+    row = (x) => [kc(x.k), num(x.impressions), pct1(x.ctr), `<span class="sm">${pct1(gExpCtr(x.position))}</span>`, `<b data-tipf-always data-tipf="按该排名常见点击率估算">${num(x.lost)}</b>`];
+  } else if (f === 'down') {
+    head = ['搜索词', '点击', '排名'];
+    row = (x) => [kc(x.k), `<span class="sm">${num(x.prevClicks)} →</span> ${num(x.clicks)} <span class="gd down">${num(x.clicks - x.prevClicks)}</span>`,
+      x.gone ? '<span class="sm">跌出前 250</span>' : `<span class="sm">${x.prevPosition.toFixed(1)} →</span> ${x.position.toFixed(1)}`];
+  } else {
+    head = ['搜索词', '点击', '展示', '点击率', '排名'];
+    row = (x) => [kc(x.k), num(x.clicks), num(x.impressions), pct1(x.ctr), `${x.position.toFixed(1)}${rankChange(x, hp)}`];
+  }
+  return `${chips}<table class="tbl gt qt${head.length === 3 ? ' q3' : ''}"><thead><tr>${head.map((h, i) => `<th class="${i ? 'r' : ''}">${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((x) => `<tr>${row(x).map((c, i) => `<td class="${i ? 'num' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
 const tzLabelOf = (m) => `UTC${m >= 0 ? '+' : '−'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + String(Math.abs(m) % 60).padStart(2, '0') : ''}`;
 const gKc = (label, v, delta, sub = '', tip = '', extra = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b>${extra.startsWith('<svg') ? `<span class="kc-sp">${extra}</span>` : ''}</div>${extra && !extra.startsWith('<svg') ? extra : ''}${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
 // 跳转去向的文字：默认地址 / 地区规则的国家
@@ -4834,9 +4968,11 @@ async function renderSites(token) {
       gKc('搜索点击', num(clk), hasP ? gDelta(clk, pclk) : '', imp ? `点击率 ${pct1(clk / imp)}` : '暂无搜索数据', '', kpiSpark(sClk, 'var(--teal)')),
       gKc('搜索展示', num(imp), hasP ? gDelta(imp, pimp) : '', pos != null ? `平均排名 ${pos.toFixed(1)}${hasP && ppos != null ? ` ${gDelta(pos, ppos, true)}` : ''}` : '暂无搜索数据',
         'Search Console 的展示次数；平均排名按展示加权，数字越小越靠前', kpiSpark(sImp, '#0ea5e9')),
+      chCard(rows),
       gKc('短链点击', num(lh), hasP ? gDelta(lh, lph) : '', lids ? `${lv ? `${num(lv)} 位访客 · ` : ''}${lids} 个短链${ses ? ` · 点出率 ${pct1(lh / ses)}` : ''}` : '这些站点还没有点出的短链',
         '从这些站点点出去的短链真人点击：按短链访问的来源（src 参数或 Referer 域名）匹配站点。访客按 IP 去重（估算，误差约 5%），多个站点的访客直接相加。点出率 = 短链点击 ÷ 会话', sLnk.some(Boolean) ? kpiSpark(sLnk, 'var(--amber)') : ''),
     ].join('');
+    document.getElementById('g-sum').classList.toggle('has-ch', !!document.querySelector('#g-sum .kc-ch'));
     fitNums(document.getElementById('g-sum'));
   };
   const draw = () => {
@@ -5007,8 +5143,7 @@ async function renderSite(token, host) {
     <div class="kc-v"><b>${v}</b>${extra || ''}</div>${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
   const GA_TIP = d.ga?.totals ? LIVE : '', NO_GA = d.ga4 ? '暂时无法读取' : '未关联 GA4', NO_SC = '未关联 Search Console';
   // 点击率：和该排名的常见点击率比；排名：1–50 的刻度上标出本期和上期的位置
-  const CTR_CURVE = [0, 0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018];
-  const expCtr = (pos) => (pos < 1 ? 0.28 : pos <= 10 ? CTR_CURVE[Math.round(pos)] : pos <= 20 ? 0.01 : 0.003);
+  const expCtr = gExpCtr;
   const ctrBar = () => {
     if (!sc?.impressions) return '';
     const e = expCtr(sc.position), top = Math.max(sc.ctr, e) * 1.25 || 1;
@@ -5056,12 +5191,16 @@ async function renderSite(token, host) {
       </div>
       <div class="grid2">
         ${d.gsc ? tabCard('g-sc', 'Google 搜索', [
-          { label: '搜索词', html: gt(d.sc?.queries, scCols('搜索词')) },
+          { label: '搜索词', get html() { return queryView(d.sc, store.get('g:qf', 'all')); } },
           { label: '页面', html: gt(d.sc?.pages?.map((r) => ({ ...r, k: r.k.replace(/^https?:\/\/[^/]+/, '') || '/' })), scCols('页面')) },
           { label: '国家', html: gt(d.sc?.countries?.map((r) => ({ ...r, k: r.k.toUpperCase() })), scCols('国家')) },
           { label: '设备', html: gt(d.sc?.devices, scCols('设备')) },
         ], 'rv') : ''}
         ${d.ga4 ? tabCard('g-ga', '访问来源 · GA4', [
+          { label: '渠道占比', get html() {
+            const ch = (d.ga?.channels || []).map((r) => ({ k: r.k, n: r.v[0], tip: `${gaChannel(r.k)} · ${num(r.v[0])} 次会话 · ${num(r.v[1])} 位用户 · ${num(r.v[2])} 次关键事件` }));
+            return `${donut(ch, { unit: '次会话', name: gaChannel })}<div class="hint ch-h">按会话数 · GA4 默认渠道分组${d.ga?.src?.length ? '；具体来源看“来源 / 媒介”' : ''}</div>`;
+          } },
           { label: '来源 / 媒介', html: gt(d.ga?.src, [{ h: '来源 / 媒介', f: (r) => kcell(r.k) }, { h: '会话', r: 1, f: (r) => num(r.v[0]) }, { h: '用户', r: 1, f: (r) => num(r.v[1]) }, { h: '关键事件', r: 1, f: (r) => num(r.v[2]) }]) },
           { label: '页面', html: gt(d.ga?.pages, [{ h: '页面', f: (r) => kcell(r.k) }, { h: '浏览量', r: 1, f: (r) => num(r.v[0]) }, { h: '用户', r: 1, f: (r) => num(r.v[1]) }]) },
           { label: '国家', html: gt(d.ga?.countries, [{ h: '国家', f: (r) => kcell(r.k) }, { h: '用户', r: 1, f: (r) => num(r.v[0]) }, { h: '会话', r: 1, f: (r) => num(r.v[1]) }]) },
@@ -5074,6 +5213,15 @@ async function renderSite(token, host) {
   bindGRange(() => renderSite(routeToken, host));
   bindSiteTags(host, () => renderSite(routeToken, host));
   bindSiteLinksHint(d);
+  countUp(page);
+  // 搜索词筛选：卡片本身不重建，切换时只换内容
+  const gsc = document.getElementById('g-sc');
+  if (gsc) gsc.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-qf]');
+    if (!b || b.disabled) return;
+    store.set('g:qf', b.dataset.qf);
+    gsc.querySelector('.card-b').innerHTML = queryView(d.sc, b.dataset.qf);
+  });
   document.getElementById('g-ai1').onclick = () => shareDialog([{ host, sessions: d.cur.ga?.sessions || 0 }], [host]);
   page.querySelectorAll('.gsl-t tr[data-href]').forEach((tr) => {
     const go = () => { location.hash = tr.dataset.href; };

@@ -16,6 +16,8 @@ const SCOPES = [
 const DAY = 86400000;
 // 首次回填 486 天（Search Console 最多保留 16 个月），够“最近 6 个月”做环比；回填天数变了会重新回填一次
 const BACKFILL_DAYS = 486, REFRESH_DAYS = 10;
+// 渠道占比只回填一年（最长的区间是 12 个月，且不做环比），省写入
+const CHANNEL_DAYS = 366;
 export const RANGE_DAYS = [7, 14, 28, 90, 180, 365];
 // 有完整的上一周期数据才做环比（365 天的上一周期超出了回填范围）
 const hasPrev = (days) => days * 2 <= BACKFILL_DAYS;
@@ -376,6 +378,28 @@ async function syncSite(env, secret, s) {
         ).bind(s.host, date, ...m));
       }
     } catch (e) { errors.push(`GA4：${e.message}`); }
+    // 每天的渠道分组会话数（存成 JSON），首次补一年
+    try {
+      const cs = s.ch_at ? start : ymd(Date.now() - CHANNEL_DAYS * DAY);
+      const d = await gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${s.ga4_property}:runReport`, {
+        dateRanges: [{ startDate: cs, endDate: end }],
+        dimensions: [{ name: 'date' }, { name: 'sessionDefaultChannelGroup' }],
+        metrics: [{ name: 'sessions' }],
+        limit: 25000,
+      });
+      const byDay = new Map();
+      for (const r of d.rows || []) {
+        const v = r.dimensionValues[0].value, ch = r.dimensionValues[1].value || 'Unassigned';
+        const date = `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`;
+        if (!byDay.has(date)) byDay.set(date, {});
+        byDay.get(date)[ch] = Number(r.metricValues[0].value) || 0;
+      }
+      for (const [date, ch] of byDay) {
+        stmts.push(env.DB.prepare('INSERT INTO g_daily (host, date, channels) VALUES (?, ?, ?) ON CONFLICT(host, date) DO UPDATE SET channels = excluded.channels')
+          .bind(s.host, date, JSON.stringify(ch)));
+      }
+      stmts.push(env.DB.prepare('UPDATE g_sites SET ch_at = ? WHERE host = ?').bind(Date.now(), s.host));
+    } catch (e) { errors.push(`GA4 渠道：${e.message}`); }
   }
   if (s.gsc_site) {
     try {
@@ -430,11 +454,13 @@ export async function syncBatch(env, secret, { limit = 12, cutoff = Date.now() -
   }
   // 每个账号每天重新发现一次站点
   if (accts.some((a) => a.found_at < Date.now() - DAY)) await discover(env, secret);
-  const due = (await env.DB.prepare('SELECT * FROM g_sites WHERE synced_at < ? ORDER BY synced_at LIMIT ?')
+  // 还没补过渠道数据的 GA4 站点也算待同步（升级后一次性补）
+  const DUE = `synced_at < ? OR (ga4_property IS NOT NULL AND ga4_property != '' AND ch_at = 0)`;
+  const due = (await env.DB.prepare(`SELECT * FROM g_sites WHERE ${DUE} ORDER BY ch_at > 0, synced_at LIMIT ?`)
     .bind(cutoff, limit).all()).results;
   let done = 0;
   for (const s of due) { await syncSite(env, secret, s); done++; }
-  const left = await env.DB.prepare('SELECT COUNT(*) AS n FROM g_sites WHERE synced_at < ?').bind(cutoff).first('n');
+  const left = await env.DB.prepare(`SELECT COUNT(*) AS n FROM g_sites WHERE ${DUE}`).bind(cutoff).first('n');
   return { done, left };
 }
 
@@ -465,9 +491,13 @@ export async function status(env, secret) {
 }
 
 const sumRange = (rows, from, to) => {
-  const t = { users: 0, sessions: 0, views: 0, key_events: 0, clicks: 0, impressions: 0, posw: 0, engw: 0, hasGa: false, hasGsc: false };
+  const t = { users: 0, sessions: 0, views: 0, key_events: 0, clicks: 0, impressions: 0, posw: 0, engw: 0, hasGa: false, hasGsc: false, ch: null };
   for (const r of rows) {
     if (r.date < from || r.date > to) continue;
+    if (r.channels) {
+      t.ch ??= {};
+      try { for (const [k, n] of Object.entries(JSON.parse(r.channels))) t.ch[k] = (t.ch[k] || 0) + n; } catch {}
+    }
     if (r.sessions != null) {
       t.hasGa = true; t.users += r.users; t.sessions += r.sessions; t.views += r.views; t.key_events += r.key_events;
       t.engw += (r.engagement || 0) * r.sessions;
@@ -475,7 +505,7 @@ const sumRange = (rows, from, to) => {
     if (r.clicks != null) { t.hasGsc = true; t.clicks += r.clicks; t.impressions += r.impressions; t.posw += (r.position || 0) * r.impressions; }
   }
   return {
-    ga: t.hasGa ? { sessions: t.sessions, views: t.views, keyEvents: t.key_events, engagement: t.sessions ? t.engw / t.sessions : 0 } : null,
+    ga: t.hasGa ? { sessions: t.sessions, views: t.views, keyEvents: t.key_events, engagement: t.sessions ? t.engw / t.sessions : 0, ...(t.ch ? { channels: t.ch } : {}) } : null,
     gsc: t.hasGsc ? { clicks: t.clicks, impressions: t.impressions, ctr: t.impressions ? t.clicks / t.impressions : 0, position: t.impressions ? t.posw / t.impressions : 0 } : null,
   };
 };
@@ -778,7 +808,7 @@ export async function siteDetail(env, secret, host, days) {
       dateRanges: [{ startDate: from, endDate: to }], dimensions: [{ name: dim }],
       metrics: metrics.map((name) => ({ name })), limit, orderBys: [{ metric: { metricName: order }, desc: true }],
     });
-    tasks.push(cached(env, `ga4|${prop}|${days}|${to}`, 3600000, async () => {
+    tasks.push(cached(env, `ga4b|${prop}|${days}|${to}`, 3600000, async () => {
       const [tot, tops] = await Promise.all([
         gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${prop}:runReport`, {
           dateRanges: [{ startDate: from, endDate: to, name: 'cur' }, { startDate: pfrom, endDate: pto, name: 'prev' }],
@@ -790,6 +820,7 @@ export async function siteDetail(env, secret, host, days) {
             report('pagePath', ['screenPageViews', 'activeUsers']),
             report('country', ['activeUsers', 'sessions']),
             report('deviceCategory', ['activeUsers', 'sessions'], 10),
+            report('sessionDefaultChannelGroup', ['sessions', 'activeUsers', 'keyEvents'], 20),
           ],
         }),
       ]);
@@ -800,8 +831,8 @@ export async function siteDetail(env, secret, host, days) {
         totals[name] = Object.fromEntries(r.metricValues.map((m, i) => [names[i], Number(m.value) || 0]));
       }
       const rows = (rep) => (rep.rows || []).map((r) => ({ k: r.dimensionValues[0].value, v: r.metricValues.map((m) => Number(m.value) || 0) }));
-      const [src, pages, countries, devices] = (tops.reports || []).map(rows);
-      return { totals, src, pages, countries, devices };
+      const [src, pages, countries, devices, channels] = (tops.reports || []).map(rows);
+      return { totals, src, pages, countries, devices, channels: channels || [] };
     }).then((v) => { out.ga = v; }).catch((e) => { out.errors.push(`GA4：${e.message}`); }));
     tasks.push(gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${prop}:runRealtimeReport`, { metrics: [{ name: 'activeUsers' }] })
       .then((d) => { out.realtime = Number(d.rows?.[0]?.metricValues?.[0]?.value) || 0; }).catch(() => { out.realtime = null; }));
@@ -811,10 +842,26 @@ export async function siteDetail(env, secret, host, days) {
     const q = (dims, extra = {}) => gfetch(env, secret, s.gsc_acct, `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site)}/searchAnalytics/query`, {
       startDate: from, endDate: to, dimensions: dims, rowLimit: 25, dataState: 'all', ...extra,
     });
-    tasks.push(cached(env, `gsc|${site}|${days}|${to}`, 3600000, async () => {
-      const [queries, pages, countries, devices] = await Promise.all([q(['query']), q(['page']), q(['country'], { rowLimit: 15 }), q(['device'], { rowLimit: 5 })]);
+    // 搜索词取本期和上一周期各前 250 个：带上上期排名 / 点击，用来显示排名变化、筛出下滑和新出现的词
+    const withPrev = hasPrev(days);
+    tasks.push(cached(env, `gsc2|${site}|${days}|${to}`, 3600000, async () => {
+      const [queries, prevQueries, pages, countries, devices] = await Promise.all([
+        q(['query'], { rowLimit: 250 }), withPrev ? q(['query'], { rowLimit: 250, startDate: pfrom, endDate: pto }) : { rows: [] },
+        q(['page']), q(['country'], { rowLimit: 15 }), q(['device'], { rowLimit: 5 }),
+      ]);
       const rows = (d) => (d.rows || []).map((r) => ({ k: r.keys[0], clicks: r.clicks, impressions: r.impressions, ctr: r.ctr, position: r.position }));
-      return { queries: rows(queries), pages: rows(pages), countries: rows(countries), devices: rows(devices) };
+      const cur = rows(queries), prev = new Map(rows(prevQueries).map((x) => [x.k, x]));
+      const curMap = new Map(cur.map((x) => [x.k, x]));
+      return {
+        hasPrev: withPrev,
+        queries: cur.map((x) => { const p = prev.get(x.k); return { ...x, prevClicks: p ? p.clicks : null, prevPosition: p ? p.position : null }; }),
+        // 下滑：点击比上期少 3 次以上（包括这期掉出前 250 的词）
+        declining: [...prev.values()].map((p) => {
+          const c = curMap.get(p.k);
+          return { k: p.k, clicks: c ? c.clicks : 0, impressions: c ? c.impressions : 0, ctr: c ? c.ctr : 0, position: c ? c.position : null, prevClicks: p.clicks, prevPosition: p.position, gone: !c };
+        }).filter((x) => x.clicks - x.prevClicks <= -3).sort((a, b) => (a.clicks - a.prevClicks) - (b.clicks - b.prevClicks)).slice(0, 50),
+        pages: rows(pages), countries: rows(countries), devices: rows(devices),
+      };
     }).then((v) => { out.sc = v; }).catch((e) => { out.errors.push(`GSC：${e.message}`); }));
   }
   await Promise.all(tasks);

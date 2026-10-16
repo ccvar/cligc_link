@@ -338,7 +338,7 @@ Every visit records a row. Stats pages (ranges of 7 days or more) read hourly / 
 
 ### Sites: GA4 and Search Console
 
-After connecting a Google account on the "Sites" page, every GA4 property and Search Console site in the account is listed (paired by domain), with users, sessions, key events, search clicks, impressions, CTR, average position and trends; site pages have daily trends, query / page / country / device rankings, GA4 source / medium / page rankings and live users. Read-only access only.
+After connecting a Google account on the "Sites" page, every GA4 property and Search Console site in the account is listed (paired by domain), with users, sessions, key events, search clicks, impressions, CTR, average position and trends; site pages have daily trends, query / page / country / device rankings (queries show their position change from the previous period and can be filtered to positions 4–20, low CTR, declining and new), GA4 source / medium / page rankings and live users. Read-only access only.
 
 Setup (each deployment needs its own OAuth client):
 
