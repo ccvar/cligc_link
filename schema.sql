@@ -138,3 +138,19 @@ CREATE TABLE IF NOT EXISTS g_cache (
   v   TEXT NOT NULL,
   at  INTEGER NOT NULL
 );
+
+-- AI 分析链接：只读，只能看创建时选定的站点；token 即访问凭据
+CREATE TABLE IF NOT EXISTS shares (
+  token       TEXT PRIMARY KEY,
+  label       TEXT NOT NULL DEFAULT '',
+  hosts       TEXT NOT NULL,                -- 站点 JSON 数组
+  days        INTEGER NOT NULL DEFAULT 28,
+  sections    TEXT NOT NULL DEFAULT '',     -- 包含的内容 JSON：search / traffic / links
+  hide        INTEGER NOT NULL DEFAULT 1,   -- 1 = 隐藏账号邮箱、GA4 媒体资源 ID
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER,                      -- NULL 为永久
+  views       INTEGER NOT NULL DEFAULT 0,
+  last_view   INTEGER,
+  hour        INTEGER NOT NULL DEFAULT 0,   -- 限流：当前小时序号和本小时访问次数
+  hour_n      INTEGER NOT NULL DEFAULT 0
+);

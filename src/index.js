@@ -39,8 +39,10 @@ export default {
       }
       if (path === '/_fb' && request.method === 'POST') return await recordFallback(request, env);
       if (path === '/t.js') return await trackerScript(env, url);
+      if (path.startsWith('/r/')) return await shareView(env, url);
       if (path === '/robots.txt') {
-        return new Response('User-agent: *\nDisallow: /\n', { headers: { 'content-type': 'text/plain' } });
+        // 短链不需要被收录；/r/ 是给 AI 读的分析报告，要允许 AI 工具抓取（报告本身带 noindex，不会被搜索引擎收录）
+        return new Response('User-agent: *\nAllow: /r/\nDisallow: /\n', { headers: { 'content-type': 'text/plain' } });
       }
       if (path === '/' || path === '') {
         if (env.HOME_URL) return Response.redirect(env.HOME_URL, 302);
@@ -64,6 +66,8 @@ export default {
       await aggregate(env);
       await pruneClicks(env);
       await env.DB.prepare('DELETE FROM login_guard WHERE at < ? AND until < ?').bind(Date.now() - 7 * DAY, Date.now()).run();
+      // Google 接口缓存和 AI 报告缓存：只用 1 小时，两天前的清掉
+      await env.DB.prepare('DELETE FROM g_cache WHERE at < ?').bind(Date.now() - 2 * DAY).run();
       const gsec = await sessionSecret(env);
       if (await google.googleConfigured(env, gsec)) await google.syncBatch(env, gsec, { limit: 10 }).catch((e) => console.error('google sync failed', e));
     })().catch((e) => console.error('aggregate / prune failed', e)));
@@ -439,6 +443,21 @@ async function handleApi(request, env, url) {
   if (path === '/api/overview' && method === 'GET') return overview(env, url);
   if (path === '/api/retention' && method === 'GET') return json(await retentionInfo(env));
   if (path.startsWith('/api/google/')) return googleApi(request, env, url);
+  if (path === '/api/shares' && method === 'GET') return json(await listShares(env, url));
+  if (path === '/api/shares' && method === 'POST') return createShare(request, env, url);
+  if (path.startsWith('/api/shares/') && path.endsWith('/warm') && method === 'POST') {
+    // 预先生成报告（不计入打开次数），AI 第一次打开时直接读缓存
+    const row = await env.DB.prepare('SELECT * FROM shares WHERE token = ?').bind(path.slice('/api/shares/'.length, -'/warm'.length)).first();
+    if (!row) return json({ error: 'not found' }, 404);
+    const t0 = Date.now();
+    await shareReport(env, await sessionSecret(env), row, true);
+    return json({ ok: true, ms: Date.now() - t0 });
+  }
+  if (path.startsWith('/api/shares/') && method === 'DELETE') {
+    await env.DB.prepare("DELETE FROM g_cache WHERE k = ?").bind(`ai-report|${path.slice('/api/shares/'.length)}`).run();
+    await env.DB.prepare('DELETE FROM shares WHERE token = ?').bind(path.slice('/api/shares/'.length)).run();
+    return json({ ok: true });
+  }
   if (path === '/api/usage' && method === 'GET') return json(await cfUsage(env, url.searchParams.get('force') === '1'));
   if (path === '/api/usage/config' && method === 'PUT') {
     const r = await saveCfConfig(env, await request.json().catch(() => ({})));
@@ -1176,54 +1195,13 @@ function rangeParams(url) {
   const now = Date.now();
   const since = now - days * 86400000;
   const prevSince = since - days * 86400000;
-  // 1 天以内按小时出趋势，否则按天
-  const bucket = (tzParam) => days <= 1
-    ? `strftime('%Y-%m-%d %H:00', (ts + ${tzParam} * 60000) / 1000, 'unixepoch')`
-    : `date((ts + ${tzParam} * 60000) / 1000, 'unixepoch')`;
-  const span = days * 1440;
-  return { days, tz, bots, since, prevSince, bucket, span };
+  const span = days * 1440;   // 上一周期的时间桶整体后移一个周期，和本期对齐
+  return { days, tz, bots, since, prevSince, span };
 }
 
 async function linkStats(env, id, url) {
   const p = rangeParams(url);
   return p.days <= 1 || url.searchParams.get('raw') === '1' ? linkStatsRaw(env, id, url) : linkStatsAgg(env, id, p);
-}
-
-async function linkStatsRaw(env, id, url) {
-  const { tz, bots, since, prevSince, bucket, span } = rangeParams(url);
-  const botFilter = bots ? '' : 'AND is_bot = 0';
-  const base = `FROM clicks WHERE link_id = ?1 AND ts >= ?2 ${botFilter}`;
-  const top = (col, limit = 10) =>
-    env.DB.prepare(`SELECT ${col} AS k, COUNT(*) AS n ${base} GROUP BY ${col} ORDER BY n DESC LIMIT ${limit}`)
-      .bind(id, since).all().then((r) => r.results);
-
-  const [summary, prev, daily, prevDaily, hourly, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, targets, utmSources, kinds, reasons] =
-    await Promise.all([
-      env.DB.prepare(`SELECT COUNT(*) AS total, COUNT(DISTINCT ip) AS unique_ips ${base}`).bind(id, since).first(),
-      env.DB.prepare(
-        `SELECT COUNT(*) AS total, COUNT(DISTINCT ip) AS unique_ips FROM clicks
-         WHERE link_id = ?1 AND ts >= ?2 AND ts < ?3 ${botFilter}`
-      ).bind(id, prevSince, since).first(),
-      env.DB.prepare(
-        `SELECT ${bucket('?3')} AS k, COUNT(*) AS n, COUNT(DISTINCT ip) AS u ${base} GROUP BY k ORDER BY k`
-      ).bind(id, since, tz).all().then((r) => r.results),
-      env.DB.prepare(
-        `SELECT ${bucket('?4')} AS k, COUNT(*) AS n FROM clicks WHERE link_id = ?1 AND ts >= ?2 AND ts < ?3 ${botFilter}
-         GROUP BY k ORDER BY k`
-      ).bind(id, prevSince, since, tz + span).all().then((r) => r.results),
-      env.DB.prepare(
-        `SELECT CAST(strftime('%H', (ts + ?3 * 60000) / 1000, 'unixepoch') AS INTEGER) AS k, COUNT(*) AS n
-         ${base} GROUP BY k ORDER BY k`
-      ).bind(id, since, tz).all().then((r) => r.results),
-      top('source', 20), top('referer_host', 20), top('country'), top('city'),
-      top('device'), top('browser'), top('os'), top('utm_campaign'), top('rule_id', 50), top('utm_source', 20),
-      // 访客类型（不受“含机器访问”开关影响）
-      env.DB.prepare('SELECT kind AS k, proxy AS p, COUNT(*) AS n FROM clicks WHERE link_id = ?1 AND ts >= ?2 GROUP BY kind, proxy').bind(id, since).all().then((r) => r.results),
-      env.DB.prepare("SELECT reason AS k, COUNT(*) AS n FROM clicks WHERE link_id = ?1 AND ts >= ?2 AND kind != 'human' AND reason != '' GROUP BY reason ORDER BY n DESC LIMIT 200")
-        .bind(id, since).all().then((r) => r.results),
-    ]);
-
-  return json({ summary, prev, daily, prevDaily, hourly, targets, sources, refererHosts, countries, cities, devices, browsers, oses, campaigns, utmSources, kinds, reasons: reasonTop(reasons) });
 }
 
 // 把“原因”拆成单条并归类计数（机房 IP 按运营商区分）
@@ -1275,63 +1253,110 @@ async function overview(env, url) {
   return p.days <= 1 || url.searchParams.get('raw') === '1' ? overviewRaw(env, url) : overviewAgg(env, url, p);
 }
 
-async function overviewRaw(env, url) {
-  const { tz, bots, since, prevSince, bucket, span } = rangeParams(url);
-  // 可按单个短链筛选（link 为短链 id，校验为正整数后拼进 SQL）
-  const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
-  const linkFilter = linkId ? `AND c.link_id = ${linkId}` : '';
-  const botFilter = `${bots ? '' : 'AND c.is_bot = 0'} ${linkFilter}`;
-  const now = Date.now();
-  // 浏览器所在时区的今天 0 点，以及昨天同一时刻
-  const dayStart = Math.floor((now + tz * 60000) / 86400000) * 86400000 - tz * 60000;
-  const q = (sql, ...args) => env.DB.prepare(sql).bind(...args);
-  const all = (stmt) => stmt.all().then((r) => r.results);
+// ---------------------------------------------------------------- 统计（24 小时：读原始明细）
+// 一次取出本期和上一期的明细（24 小时 + 上一个 24 小时），在内存里算出全部统计，
+// 代替原来每个指标各查一次（每次都要扫一遍同样的行）。结果与逐条 SQL 统计一致。
 
-  const [links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds, machines] =
-    await Promise.all([
-      env.DB.prepare('SELECT COUNT(*) AS n FROM links').first('n'),
-      q(`SELECT COUNT(DISTINCT link_id) AS n FROM clicks c WHERE ts >= ? ${botFilter}`, since).first('n'),
-      q(`SELECT COUNT(*) AS total, COUNT(DISTINCT ip) AS unique_ips FROM clicks c WHERE ts >= ? ${botFilter}`, since).first(),
-      q(`SELECT COUNT(*) AS total, COUNT(DISTINCT ip) AS unique_ips FROM clicks c WHERE ts >= ? AND ts < ? ${botFilter}`, prevSince, since).first(),
-      q(`SELECT COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter}`, dayStart).first('n'),
-      q(`SELECT COUNT(*) AS n FROM clicks c WHERE ts >= ? AND ts < ? ${botFilter}`, dayStart - 86400000, now - 86400000).first('n'),
-      all(q(`SELECT ${bucket('?2')} AS k, COUNT(*) AS n, COUNT(DISTINCT ip) AS u FROM clicks c
-             WHERE ts >= ?1 ${botFilter} GROUP BY k ORDER BY k`, since, tz)),
-      all(q(`SELECT ${bucket('?3')} AS k, COUNT(*) AS n FROM clicks c
-             WHERE ts >= ?1 AND ts < ?2 ${botFilter} GROUP BY k ORDER BY k`, prevSince, since, tz + span)),
-      all(q(`SELECT l.id, l.slug, l.title, l.target_url, COUNT(*) AS n, COUNT(DISTINCT c.ip) AS u, MAX(c.ts) AS last
-             FROM clicks c JOIN links l ON l.id = c.link_id
-             WHERE c.ts >= ? ${botFilter} GROUP BY l.id ORDER BY n DESC LIMIT 8`, since)),
-      all(q(`SELECT source AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY source ORDER BY n DESC LIMIT 20`, since)),
-      all(q(`SELECT device AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY device ORDER BY n DESC`, since)),
-      all(q(`SELECT browser AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY browser ORDER BY n DESC`, since)),
-      all(q(`SELECT os AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY os ORDER BY n DESC`, since)),
-      all(q(`SELECT country AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY country ORDER BY n DESC LIMIT 20`, since)),
-      // 星期 × 小时（0 = 周日）
-      all(q(`SELECT CAST(strftime('%w', (ts + ?2 * 60000) / 1000, 'unixepoch') AS INTEGER) AS d,
-                    CAST(strftime('%H', (ts + ?2 * 60000) / 1000, 'unixepoch') AS INTEGER) AS h, COUNT(*) AS n
-             FROM clicks c WHERE ts >= ?1 ${botFilter} GROUP BY d, h`, since, tz)),
-      recentClicks(env, bots, linkId),
-      all(q(`SELECT kind AS k, proxy AS p, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${linkFilter} GROUP BY kind, proxy`, since)),
-      // 机器访问按运营商汇总（只用于查看，不影响跳转）
-      all(q(`SELECT asn, asn_org, kind, COUNT(*) AS n, COUNT(DISTINCT link_id) AS links, COUNT(DISTINCT ip) AS ips, MAX(ts) AS last, MAX(reason) AS reason
-             FROM clicks c WHERE ts >= ? AND kind IN ('bot', 'suspect') ${linkFilter}
-             GROUP BY CASE WHEN asn > 0 THEN asn ELSE asn_org END, kind ORDER BY n DESC LIMIT 10`, since)),
-    ]);
-  const out = { links, activeLinks, totals, prev, today, yesterday, daily, prevDaily, topLinks, sources, devices, browsers, oses, countries, heat, recent, kinds, machines };
+const RAW_COLS = 'link_id, ts, ip, is_bot, kind, proxy, reason, source, referer_host, utm_source, utm_campaign, country, city, device, browser, os, asn, asn_org, rule_id';
+
+// 计数工具：按 key 计数（可同时统计不重复 IP），排序取前 limit 个
+function tally(rows, key, limit = Infinity) {
+  const m = new Map();
+  for (const r of rows) { const k = key(r); m.set(k, (m.get(k) || 0) + 1); }
+  return [...m].map(([k, n]) => ({ k, n })).sort((a, b) => b.n - a.n).slice(0, limit);
+}
+const uniq = (rows, key = (r) => r.ip) => new Set(rows.map(key)).size;
+// 与 SQL 里 strftime('%Y-%m-%d %H:00', (ts + tz * 60000) / 1000, 'unixepoch') 相同
+const hourKey = (ts, tzMin) => { const s = new Date(Math.floor((ts + tzMin * 60000) / 1000) * 1000).toISOString(); return `${s.slice(0, 10)} ${s.slice(11, 13)}:00`; };
+const dateKey = (ts, tzMin) => new Date(Math.floor((ts + tzMin * 60000) / 1000) * 1000).toISOString().slice(0, 10);
+// 按时间桶：n 次数、u 不重复 IP，按 k 排序
+function buckets(rows, keyOf, withUv = true) {
+  const m = new Map();
+  for (const r of rows) {
+    const k = keyOf(r.ts);
+    if (!m.has(k)) m.set(k, { k, n: 0, ips: withUv ? new Set() : null });
+    const b = m.get(k); b.n++; if (withUv) b.ips.add(r.ip);
+  }
+  return [...m.values()].sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0)).map((b) => (withUv ? { k: b.k, n: b.n, u: b.ips.size } : { k: b.k, n: b.n }));
+}
+
+async function rawRows(env, from, linkId) {
+  return (await env.DB.prepare(`SELECT ${RAW_COLS} FROM clicks WHERE ts >= ? ${linkId ? 'AND link_id = ?' : ''}`)
+    .bind(from, ...(linkId ? [linkId] : [])).all()).results;
+}
+
+async function overviewRaw(env, url) {
+  const { days, tz, bots, since, prevSince, span } = rangeParams(url);
+  const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
+  const now = Date.now();
+  const dayStart = Math.floor((now + tz * 60000) / 86400000) * 86400000 - tz * 60000;
+  const from = Math.min(prevSince, dayStart - 86400000);
+  const [links, rows, recent] = await Promise.all([
+    env.DB.prepare('SELECT COUNT(*) AS n FROM links').first('n'),
+    rawRows(env, from, linkId),
+    recentClicks(env, bots, linkId),
+  ]);
+  const vis = bots ? rows : rows.filter((r) => !r.is_bot);          // 跟随“含机器访问”开关
+  const cur = vis.filter((r) => r.ts >= since), before = vis.filter((r) => r.ts >= prevSince && r.ts < since);
+  const all = rows.filter((r) => r.ts >= since);                    // 访客类型 / 机器访问：不受开关影响
+  const bucket = days <= 1 ? hourKey : dateKey;   // 1 天以内按小时出趋势，否则按天
+  const out = {
+    links, activeLinks: uniq(cur, (r) => r.link_id),
+    totals: { total: cur.length, unique_ips: uniq(cur) },
+    prev: { total: before.length, unique_ips: uniq(before) },
+    today: vis.filter((r) => r.ts >= dayStart).length,
+    yesterday: vis.filter((r) => r.ts >= dayStart - 86400000 && r.ts < now - 86400000).length,
+    daily: buckets(cur, (ts) => bucket(ts, tz)),
+    prevDaily: buckets(before, (ts) => bucket(ts, tz + span), false),
+    sources: tally(cur, (r) => r.source, 20),
+    devices: tally(cur, (r) => r.device), browsers: tally(cur, (r) => r.browser), oses: tally(cur, (r) => r.os),
+    countries: tally(cur, (r) => r.country, 20),
+    recent,
+  };
+  // 热门短链
+  const top = new Map();
+  for (const r of cur) {
+    if (!top.has(r.link_id)) top.set(r.link_id, { id: r.link_id, n: 0, ips: new Set(), last: 0 });
+    const t = top.get(r.link_id); t.n++; t.ips.add(r.ip); if (r.ts > t.last) t.last = r.ts;
+  }
+  const topIds = [...top.values()].sort((a, b) => b.n - a.n).slice(0, 8);
+  const meta = topIds.length ? new Map((await env.DB.prepare(`SELECT id, slug, title, target_url FROM links WHERE id IN (${topIds.map(() => '?').join(',')})`)
+    .bind(...topIds.map((t) => t.id)).all()).results.map((l) => [l.id, l])) : new Map();
+  out.topLinks = topIds.filter((t) => meta.has(t.id)).map((t) => ({ ...meta.get(t.id), n: t.n, u: t.ips.size, last: t.last }));
+  // 星期 × 小时（0 = 周日，按浏览器时区）
+  const heat = new Map();
+  for (const r of cur) {
+    const d = new Date(Math.floor((r.ts + tz * 60000) / 1000) * 1000), k = `${d.getUTCDay()}|${d.getUTCHours()}`;
+    heat.set(k, (heat.get(k) || 0) + 1);
+  }
+  out.heat = [...heat].map(([k, n]) => { const [d, h] = k.split('|').map(Number); return { d, h, n }; });
+  // 访客类型
+  const km = new Map();
+  for (const r of all) { const k = `${r.kind}|${r.proxy}`; km.set(k, (km.get(k) || 0) + 1); }
+  out.kinds = [...km].map(([k, n]) => { const i = k.lastIndexOf('|'); return { k: k.slice(0, i), p: Number(k.slice(i + 1)), n }; });
+  // 机器访问按运营商（有 ASN 按 ASN，否则按运营商名称）
+  const mm = new Map();
+  for (const r of all) {
+    if (r.kind !== 'bot' && r.kind !== 'suspect') continue;
+    const k = `${r.asn > 0 ? r.asn : 'o:' + r.asn_org}|${r.kind}`;
+    if (!mm.has(k)) mm.set(k, { asn: r.asn, asn_org: r.asn_org, kind: r.kind, n: 0, links: new Set(), ips: new Set(), last: 0, reason: '' });
+    const m = mm.get(k);
+    m.n++; m.links.add(r.link_id); m.ips.add(r.ip);
+    if (r.ts > m.last) m.last = r.ts;
+    if (r.reason > m.reason) m.reason = r.reason;
+  }
+  out.machines = [...mm.values()].sort((a, b) => b.n - a.n).slice(0, 10)
+    .map((m) => ({ asn: m.asn, asn_org: m.asn_org, kind: m.kind, n: m.n, links: m.links.size, ips: m.ips.size, last: m.last, reason: m.reason }));
   if (linkId) {
-    // 单个短链：附带短链信息和各跳转去向（地区规则 / 默认地址）的命中数
-    const top = (col) => all(q(`SELECT ${col} AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY ${col} ORDER BY n DESC LIMIT 20`, since));
-    const [link, hits, srcAll, refererHosts, utmSources, campaigns] = await Promise.all([
-      env.DB.prepare('SELECT id, slug, title, target_url, last_click, enabled, expires_at FROM links WHERE id = ?').bind(linkId).first(),
-      all(q(`SELECT rule_id AS k, COUNT(*) AS n FROM clicks c WHERE ts >= ? ${botFilter} GROUP BY rule_id`, since)),
-      top('source'), top('referer_host'), top('utm_source'), top('utm_campaign'),
-    ]);
-    // 单个短链：来源的完整统计（与详情页一致）
-    Object.assign(out, { sources: srcAll, refererHosts, utmSources, campaigns });
+    // 单个短链：附带短链信息、来源完整统计和各跳转去向（地区规则 / 默认地址）的命中数
+    const link = await env.DB.prepare('SELECT id, slug, title, target_url, last_click, enabled, expires_at FROM links WHERE id = ?').bind(linkId).first();
     if (!link) return json({ error: '短链不存在' }, 404);
+    Object.assign(out, {
+      sources: tally(cur, (r) => r.source, 20), refererHosts: tally(cur, (r) => r.referer_host, 20),
+      utmSources: tally(cur, (r) => r.utm_source, 20), campaigns: tally(cur, (r) => r.utm_campaign, 20),
+    });
+    const n = new Map(tally(cur, (r) => r.rule_id).map((h) => [h.k, h.n]));
     const targets = await loadTargets(env, linkId);
-    const n = new Map(hits.map((h) => [h.k, h.n]));
     out.link = link;
     out.routes = [
       ...targets.map((t) => ({ countries: t.countries, url: t.url, n: n.get(t.id) || 0 })),
@@ -1339,6 +1364,32 @@ async function overviewRaw(env, url) {
     ];
   }
   return json(out);
+}
+
+async function linkStatsRaw(env, id, url) {
+  const { days, tz, bots, since, prevSince, span } = rangeParams(url);
+  const rows = await rawRows(env, prevSince, id);
+  const vis = bots ? rows : rows.filter((r) => !r.is_bot);
+  const cur = vis.filter((r) => r.ts >= since), before = vis.filter((r) => r.ts < since);
+  const all = rows.filter((r) => r.ts >= since);
+  const key = days <= 1 ? hourKey : dateKey;
+  const hourly = tally(cur, (r) => new Date(Math.floor((r.ts + tz * 60000) / 1000) * 1000).getUTCHours()).sort((a, b) => a.k - b.k);
+  const km = new Map();
+  for (const r of all) { const k = `${r.kind}|${r.proxy}`; km.set(k, (km.get(k) || 0) + 1); }
+  const reasons = tally(all.filter((r) => r.kind !== 'human' && r.reason !== ''), (r) => r.reason, 200);
+  return json({
+    summary: { total: cur.length, unique_ips: uniq(cur) },
+    prev: { total: before.length, unique_ips: uniq(before) },
+    daily: buckets(cur, (ts) => key(ts, tz)), prevDaily: buckets(before, (ts) => key(ts, tz + span), false),
+    hourly,
+    targets: tally(cur, (r) => r.rule_id, 50),
+    sources: tally(cur, (r) => r.source, 20), refererHosts: tally(cur, (r) => r.referer_host, 20),
+    countries: tally(cur, (r) => r.country, 10), cities: tally(cur, (r) => r.city, 10),
+    devices: tally(cur, (r) => r.device, 10), browsers: tally(cur, (r) => r.browser, 10), oses: tally(cur, (r) => r.os, 10),
+    campaigns: tally(cur, (r) => r.utm_campaign, 10), utmSources: tally(cur, (r) => r.utm_source, 20),
+    kinds: [...km].map(([k, n]) => { const i = k.lastIndexOf('|'); return { k: k.slice(0, i), p: Number(k.slice(i + 1)), n }; }),
+    reasons: reasonTop(reasons),
+  });
 }
 
 // ---------------------------------------------------------------- 统计（7 天及以上：读汇总表）
@@ -1709,7 +1760,7 @@ async function googleApi(request, env, url) {
     }
     const days = google.RANGE_DAYS.includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 28;
     if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days) });
-    if (path === '/api/google/link') return json({ days, ranges: google.ranges(days), items: await google.linkSites(env, Number(url.searchParams.get('id')) || 0, days) });
+    if (path === '/api/google/link') return json({ days, ranges: google.ranges(days), ...(await google.linkSites(env, Number(url.searchParams.get('id')) || 0, days)) });
     if (path === '/api/google/site') {
       const d = await google.siteDetail(env, secret, String(url.searchParams.get('host') || ''), days);
       return d.error ? json(d, 404) : json(d);
@@ -1737,6 +1788,74 @@ async function googleCallback(env, url) {
   return new Response(`<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>正在返回后台…</title>
 <body style="font:14px -apple-system,sans-serif;color:#888;display:grid;place-items:center;min-height:90vh">正在返回后台…
 <script>location.replace(${JSON.stringify(to)})</script></body>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+}
+
+// ---------------------------------------------------------------- AI 分析链接
+const SHARE_SECTIONS = ['search', 'traffic', 'links'];
+const SHARE_MAX_HOSTS = 100, SHARE_PER_HOUR = 60;
+
+const shareOut = (r, origin) => ({
+  token: r.token, url: `${origin}/r/${r.token}`, label: r.label, hosts: JSON.parse(r.hosts), days: r.days,
+  sections: r.sections ? JSON.parse(r.sections) : SHARE_SECTIONS, hide: !!r.hide,
+  createdAt: r.created_at, expiresAt: r.expires_at, views: r.views, lastView: r.last_view,
+  expired: !!(r.expires_at && r.expires_at < Date.now()),
+});
+
+async function listShares(env, url) {
+  const rows = (await env.DB.prepare('SELECT * FROM shares ORDER BY created_at DESC').all()).results;
+  return { items: rows.map((r) => shareOut(r, url.origin)) };
+}
+
+async function createShare(request, env, url) {
+  const b = await request.json().catch(() => ({}));
+  const known = new Set((await env.DB.prepare('SELECT host FROM g_sites').all()).results.map((r) => r.host));
+  const hosts = [...new Set((Array.isArray(b.hosts) ? b.hosts : []).map(String))].filter((h) => known.has(h));
+  if (!hosts.length) return json({ error: '请至少选择一个站点' }, 400);
+  if (hosts.length > SHARE_MAX_HOSTS) return json({ error: `一个链接最多包含 ${SHARE_MAX_HOSTS} 个站点` }, 400);
+  const days = [28, 90, 180].includes(Number(b.days)) ? Number(b.days) : 28;
+  const sections = SHARE_SECTIONS.filter((k) => (Array.isArray(b.sections) ? b.sections : SHARE_SECTIONS).includes(k));
+  if (!sections.length) return json({ error: '请至少选择一项内容' }, 400);
+  const expDays = [7, 30, 0].includes(Number(b.expires)) ? Number(b.expires) : 7;
+  // 128 位随机 token，URL 安全
+  const token = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const now = Date.now();
+  await env.DB.prepare('INSERT INTO shares (token, label, hosts, days, sections, hide, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(token, cut(String(b.label || '').trim(), 100), JSON.stringify(hosts), days, JSON.stringify(sections), b.hide === false ? 0 : 1, now, expDays ? now + expDays * 86400000 : null).run();
+  return json(shareOut(await env.DB.prepare('SELECT * FROM shares WHERE token = ?').bind(token).first(), url.origin));
+}
+
+// 报告缓存 1 小时（同一个链接反复打开不会重复请求 Google 接口）；创建链接后后台会先生成一次
+async function shareReport(env, secret, row, force = false) {
+  const key = `ai-report|${row.token}`;
+  const hit = force ? null : await env.DB.prepare('SELECT v, at FROM g_cache WHERE k = ?').bind(key).first();
+  if (hit && hit.at > Date.now() - 3600000) return JSON.parse(hit.v);
+  const rep = await google.aiReport(env, secret, JSON.parse(row.hosts), row.days, row.sections ? JSON.parse(row.sections) : null, !!row.hide);
+  await env.DB.prepare('INSERT INTO g_cache (k, v, at) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v, at = excluded.at')
+    .bind(key, JSON.stringify(rep), Date.now()).run();
+  return rep;
+}
+
+// 公开的只读报告：/r/<token>（Markdown），?format=json 为结构化数据，?download=1 下载文件
+async function shareView(env, url) {
+  const text = (body, status = 200, type = 'text/markdown; charset=utf-8', extra = {}) => new Response(body, {
+    status, headers: { 'content-type': type, 'x-robots-tag': 'noindex, nofollow', 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', ...extra },
+  });
+  const m = url.pathname.match(/^\/r\/([\w-]{16,40})(\.md|\.json)?$/);
+  if (!m) return text('链接无效。', 404, 'text/plain; charset=utf-8');
+  const row = await env.DB.prepare('SELECT * FROM shares WHERE token = ?').bind(m[1]).first();
+  if (!row || (row.expires_at && row.expires_at < Date.now())) return text('这个分析链接已过期或已被撤销。', 410, 'text/plain; charset=utf-8');
+  // 限流：每个链接每小时最多 60 次
+  const hour = Math.floor(Date.now() / 3600000);
+  const n = row.hour === hour ? row.hour_n + 1 : 1;
+  if (n > SHARE_PER_HOUR) return text('访问太频繁，请稍后再试。', 429, 'text/plain; charset=utf-8', { 'retry-after': '600' });
+  await env.DB.prepare('UPDATE shares SET views = views + 1, last_view = ?, hour = ?, hour_n = ? WHERE token = ?').bind(Date.now(), hour, n, row.token).run();
+  const secret = await sessionSecret(env);
+  if (!(await google.googleConfigured(env, secret))) return text('站点数据暂时不可用：Google 集成未配置。', 503, 'text/plain; charset=utf-8');
+  const rep = await shareReport(env, secret, row);
+  const json1 = url.searchParams.get('format') === 'json' || m[2] === '.json';
+  const name = `seo-report-${new Date().toISOString().slice(0, 10)}.${json1 ? 'json' : 'md'}`;
+  const dl = url.searchParams.get('download') === '1' ? { 'content-disposition': `attachment; filename="${name}"` } : {};
+  return json1 ? text(JSON.stringify(rep, null, 2), 200, 'application/json; charset=utf-8', dl) : text(google.reportMarkdown(rep), 200, undefined, dl);
 }
 
 async function retentionInfo(env) {

@@ -494,7 +494,8 @@ export async function sitesList(env, days) {
   ]);
   const byHost = new Map();
   for (const r of rows) { if (!byHost.has(r.host)) byHost.set(r.host, []); byHost.get(r.host).push(r); }
-  const sl = await siteLinks(env, new Set(sites.map((s) => s.host)), days).catch(() => new Map());
+  const hostSet = new Set(sites.map((s) => s.host));
+  const [sl, sf] = await Promise.all([siteLinks(env, hostSet, days).catch(() => new Map()), siteSources(env, hostSet, days).catch(() => new Map())]);
   return sites.map((s) => {
     const rs = byHost.get(s.host) || [];
     const users = s.users ? JSON.parse(s.users) : {};
@@ -502,11 +503,12 @@ export async function sitesList(env, days) {
       host: s.host, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '' } : null,
       gsc: s.gsc_site || null, gscAcct: s.gsc_acct || '', gscEmail: s.gsc_email || '', syncedAt: s.synced_at || null, error: s.error || '',
       users: users[days] ?? null, prevUsers: hasPrev(days) ? users[`p${days}`] ?? null : null,
-      links: sl.get(s.host) || [],
+      links: sl.get(s.host) || [],          // 跳转到这个站点的短链
+      linksFrom: sf.get(s.host) || [],      // 从这个站点点出的短链
       cur: sumRange(rs, from, to), prev: hasPrev(days) ? sumRange(rs, pfrom, pto) : { ga: null, gsc: null },
-      // 每日：n 会话、c 搜索点击、u 用户（按天）；prevSpark 是上一周期每天的会话
+      // 每日：n 会话、c 搜索点击、u 用户（按天）、i 搜索展示；prevSpark 是上一周期每天的会话
       spark: rs.filter((r) => r.date >= from).sort((a, b) => (a.date < b.date ? -1 : 1))
-        .map((r) => ({ k: r.date, n: r.sessions ?? 0, c: r.clicks ?? 0, u: r.users ?? 0 })),
+        .map((r) => ({ k: r.date, n: r.sessions ?? 0, c: r.clicks ?? 0, u: r.users ?? 0, i: r.impressions ?? 0 })),
       prevSpark: hasPrev(days) ? rs.filter((r) => r.date >= pfrom && r.date <= pto).map((r) => ({ k: r.date, n: r.sessions ?? 0 })) : [],
     };
   });
@@ -520,6 +522,59 @@ export async function sitesList(env, days) {
 function matchHost(host, hosts) {
   for (let h = host; h && h.includes('.'); h = h.slice(h.indexOf('.') + 1)) if (hosts.has(h)) return h;
   return null;
+}
+
+// 访问来源 → 站点：来源是域名时按域名（含子域名、忽略 www.）匹配；
+// 是不带点的名字（如 ?src=gaterar）时，只有一个站点的主名称与它相同才算
+function sourceSite(k, hosts, labels) {
+  const v = String(k || '').trim().toLowerCase().replace(/^www\./, '');
+  if (!v || v === '(direct)') return null;
+  if (v.includes('.')) return matchHost(v, hosts);
+  const hit = labels.get(v);
+  return hit && hit.length === 1 ? hit[0] : null;
+}
+
+// 从站点点出的短链：按访问来源（?src= / utm_source 优先，其次 Referer 域名）匹配站点。
+// 返回 Map：站点 → [{ id, slug, title, cur, human, prev, prevHuman, daily }]
+async function siteSources(env, hosts, days) {
+  const { from, to, pfrom } = ranges(days);
+  const labels = new Map();
+  for (const h of hosts) { const l = h.split('.')[0]; if (!labels.has(l)) labels.set(l, []); labels.get(l).push(h); }
+  const [links, counts, daily] = await Promise.all([
+    env.DB.prepare('SELECT id, slug, title FROM links').all().then((r) => r.results),
+    env.DB.prepare(
+      `SELECT link_id, k, machine, SUM(CASE WHEN day >= ? THEN n ELSE 0 END) AS cur, SUM(CASE WHEN day < ? THEN n ELSE 0 END) AS prev
+       FROM agg_d WHERE dim = 'source' AND day >= ? AND day <= ? AND k != '(direct)' GROUP BY link_id, k, machine`
+    ).bind(from, from, pfrom, to).all().then((r) => r.results),
+    env.DB.prepare(
+      `SELECT link_id, k, day, SUM(n) AS n FROM agg_d WHERE dim = 'source' AND machine = 0 AND day >= ? AND day <= ? AND k != '(direct)' GROUP BY link_id, k, day`
+    ).bind(from, to).all().then((r) => r.results),
+  ]);
+  const byId = new Map(links.map((l) => [l.id, l]));
+  const out = new Map();
+  const entry = (site, id) => {
+    if (!out.has(site)) out.set(site, new Map());
+    const m = out.get(site), l = byId.get(id);
+    if (!m.has(id)) m.set(id, { id, slug: l.slug, title: l.title, cur: 0, human: 0, prev: 0, prevHuman: 0, daily: {}, sources: new Set() });
+    return m.get(id);
+  };
+  const siteOf = new Map();
+  const site = (k) => { if (!siteOf.has(k)) siteOf.set(k, sourceSite(k, hosts, labels)); return siteOf.get(k); };
+  for (const c of counts) {
+    const h = site(c.k);
+    if (!h || !byId.has(c.link_id)) continue;
+    const e = entry(h, c.link_id);
+    e.cur += c.cur; e.prev += c.prev; e.sources.add(c.k);
+    if (!c.machine) { e.human += c.cur; e.prevHuman += c.prev; }
+  }
+  for (const d of daily) {
+    const h = site(d.k);
+    if (!h || !byId.has(d.link_id)) continue;
+    const e = entry(h, d.link_id);
+    e.daily[d.day] = (e.daily[d.day] || 0) + d.n;
+  }
+  return new Map([...out].map(([k, m]) => [k, [...m.values()].map((e) => ({ ...e, sources: [...e.sources] }))
+    .filter((e) => e.cur > 0).sort((a, b) => b.human - a.human || b.cur - a.cur)]));
 }
 
 // 返回 Map：站点 → [{ id, slug, title, routes: [{ rule, url, countries }], cur, human, prev }]
@@ -573,12 +628,16 @@ async function siteLinks(env, hosts, days) {
 // 一条短链指向的站点（短链详情页用）：每个去向匹配到的站点及其区间数据
 export async function linkSites(env, linkId, days) {
   const l = await env.DB.prepare('SELECT target_url FROM links WHERE id = ?').bind(linkId).first();
-  if (!l) return [];
+  if (!l) return { targets: [], sources: [] };
   const urls = [l.target_url, ...(await env.DB.prepare('SELECT url FROM link_targets WHERE link_id = ?').bind(linkId).all()).results.map((r) => r.url)].filter(Boolean);
   const list = await sitesList(env, days);
   const hosts = new Set(list.map((x) => x.host));
   const want = new Set(urls.map((u) => matchHost(siteHost(u), hosts)).filter(Boolean));
-  return list.filter((x) => want.has(x.host)).map((x) => ({ ...x, links: (x.links || []).filter((e) => e.id === linkId) }));
+  const pick = (x) => ({ ...x, links: (x.links || []).filter((e) => e.id === linkId), linksFrom: (x.linksFrom || []).filter((e) => e.id === linkId) });
+  return {
+    targets: list.filter((x) => want.has(x.host)).map(pick),
+    sources: list.filter((x) => x.linksFrom.some((e) => e.id === linkId)).map(pick).sort((a, b) => b.linksFrom[0].human - a.linksFrom[0].human),
+  };
 }
 
 async function cached(env, key, ttl, fn) {
@@ -604,7 +663,11 @@ export async function siteDetail(env, secret, host, days) {
     daily: rows.filter((r) => r.date >= from), prevDaily: hasPrev(days) ? rows.filter((r) => r.date < from) : [],
     cur: sumRange(rows, from, to), prev: hasPrev(days) ? sumRange(rows, pfrom, pto) : { ga: null, gsc: null }, errors: [],
     links: (await siteLinks(env, new Set([host]), days).catch(() => new Map())).get(host) || [],
+    linksFrom: [],
   };
+  // 来源匹配要用全部站点（不带点的 src 名称需要确认只对应一个站点）
+  const all = new Set((await env.DB.prepare('SELECT host FROM g_sites').all()).results.map((r) => r.host));
+  out.linksFrom = (await siteSources(env, all, days).catch(() => new Map())).get(host) || [];
   const tasks = [];
   if (s.ga4_property) {
     const prop = s.ga4_property;
@@ -653,4 +716,287 @@ export async function siteDetail(env, secret, host, days) {
   }
   await Promise.all(tasks);
   return out;
+}
+
+// ---------------------------------------------------------------- AI 分析报告
+// 给 AI 读的只读报告：概览、站点对比、每个站点的搜索表现 / 机会 / 流量质量 / 短链。
+// 机会类数据（排名 4–20 的高展示词、点击率偏低的词、下滑和新出现的词）在这里算好，AI 不用自己从原始数字里猜。
+
+// 各排名的大致点击率（行业经验值），用来判断“点击率偏低”
+const CTR_CURVE = [0, 0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018];
+const expectedCtr = (pos) => (pos < 1 ? 0.28 : pos <= 10 ? CTR_CURVE[Math.round(pos)] : pos <= 20 ? 0.01 : 0.003);
+
+export async function aiReport(env, secret, hosts, days, sections, hide) {
+  const { from, to, pfrom, pto } = ranges(days);
+  const want = (k) => !sections || sections.includes(k);
+  const rows = (await env.DB.prepare(`SELECT * FROM g_sites WHERE host IN (${hosts.map(() => '?').join(',')})`).bind(...hosts).all()).results;
+  const byHost = new Map(rows.map((r) => [r.host, r]));
+  const links = want('links') ? await siteLinks(env, new Set(hosts), days).catch(() => new Map()) : new Map();
+  const allHosts = new Set((await env.DB.prepare('SELECT host FROM g_sites').all()).results.map((r) => r.host));
+  const fromLinks = want('links') ? await siteSources(env, allHosts, days).catch(() => new Map()) : new Map();
+  // 站点多时每个站点的明细表少列一些，避免报告太长（机会类数据不受影响）。
+  // 超过 30 个站点用精简格式：每个站点只保留核心指标和机会，不查 GA4 明细报表和 GSC 国家 / 设备，也不列趋势和搜索词全表
+  const n = hosts.length, compact = n > 30;
+  const lim = { top: compact ? 0 : n <= 3 ? 50 : n <= 10 ? 25 : 12, opp: compact ? 5 : n <= 10 ? 15 : 8, weekly: n > 5, compact };
+  const one = async (host) => {
+    const s = byHost.get(host);
+    if (!s) return null;
+    const daily = (await env.DB.prepare('SELECT * FROM g_daily WHERE host = ? AND date >= ? AND date <= ? ORDER BY date').bind(host, pfrom, to).all()).results;
+    const users = s.users ? JSON.parse(s.users) : {};
+    const site = {
+      host,
+      ga4: s.ga4_property ? { name: s.ga4_name, ...(hide ? {} : { property: s.ga4_property, account: s.ga4_account }) } : null,
+      searchConsole: s.gsc_site ? (hide ? true : s.gsc_site) : null,
+      syncedAt: s.synced_at ? new Date(s.synced_at).toISOString() : null,
+      cur: sumRange(daily, from, to), prev: hasPrev(days) ? sumRange(daily, pfrom, pto) : { ga: null, gsc: null },
+      users: users[days] ?? null, prevUsers: hasPrev(days) ? users[`p${days}`] ?? null : null,
+      trend: compact ? [] : trendRows(daily.filter((r) => r.date >= from), lim.weekly ? Math.max(days, 29) : days),
+      errors: [],
+    };
+    if (want('search') && s.gsc_site) {
+      try { site.search = await searchSection(env, secret, s, days, from, to, pfrom, pto, lim); } catch (e) { site.errors.push(`Search Console：${e.message}`); }
+    }
+    if (want('traffic') && s.ga4_property && !compact) {
+      try { site.traffic = await trafficSection(env, secret, s, days, from, to, pfrom, pto, lim); } catch (e) { site.errors.push(`GA4：${e.message}`); }
+    }
+    if (want('links')) {
+      site.linksFrom = (fromLinks.get(host) || []).map((l) => ({ slug: l.slug, title: l.title, humanClicks: l.human, allClicks: l.cur, prevHumanClicks: l.prevHuman, sources: l.sources }));
+      site.links = (links.get(host) || []).map((l) => ({ slug: l.slug, title: l.title, humanClicks: l.human, allClicks: l.cur, prevHumanClicks: l.prevHuman,
+        routes: l.routes.map((r) => ({ to: r.url, when: r.rule ? `访客来自 ${r.countries}` : '默认' })) }));
+    }
+    return site;
+  };
+  // 并发处理（精简格式每个站点请求更少，并发多一些）
+  const sites = [], step = compact ? 10 : 5;
+  for (let i = 0; i < hosts.length; i += step) sites.push(...(await Promise.all(hosts.slice(i, i + step).map(one))).filter(Boolean));
+  return { compact, generatedAt: new Date().toISOString(), days, range: { from, to }, prevRange: hasPrev(days) ? { from: pfrom, to: pto } : null, sections: sections || ['search', 'traffic', 'links'], sites };
+}
+
+// 趋势：28 天以内按天，更长按周（周一开始）
+function trendRows(daily, days) {
+  const key = (d) => {
+    if (days <= 28) return d;
+    const t = new Date(d + 'T00:00:00Z'), dow = (t.getUTCDay() + 6) % 7;
+    return new Date(t - dow * DAY).toISOString().slice(0, 10);
+  };
+  const m = new Map();
+  for (const r of daily) {
+    const k = key(r.date);
+    const t = m.get(k) || { period: k, sessions: 0, users: 0, clicks: 0, impressions: 0, posw: 0 };
+    t.sessions += r.sessions || 0; t.users += r.users || 0; t.clicks += r.clicks || 0; t.impressions += r.impressions || 0; t.posw += (r.position || 0) * (r.impressions || 0);
+    m.set(k, t);
+  }
+  return [...m.values()].sort((a, b) => (a.period < b.period ? -1 : 1))
+    .map(({ posw, ...t }) => ({ ...t, position: t.impressions ? +(posw / t.impressions).toFixed(1) : null }));
+}
+
+async function searchSection(env, secret, s, days, from, to, pfrom, pto, lim) {
+  const site = s.gsc_site;
+  const q = (start, end, dims, rowLimit) => gfetch(env, secret, s.gsc_acct, `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site)}/searchAnalytics/query`, {
+    startDate: start, endDate: end, dimensions: dims, rowLimit, dataState: 'all',
+  }).then((d) => (d.rows || []).map((r) => ({ k: r.keys[0], clicks: r.clicks, impressions: r.impressions, ctr: r.ctr, position: r.position })));
+  const d = await cached(env, `ai-gsc|${site}|${days}|${to}${lim.compact ? '|c' : ''}`, 3600000, async () => {
+    const [queries, prevQueries, pages, prevPages, countries, devices] = await Promise.all([
+      q(from, to, ['query'], 250), q(pfrom, pto, ['query'], 250), q(from, to, ['page'], 100), q(pfrom, pto, ['page'], 100),
+      ...(lim.compact ? [[], []] : [q(from, to, ['country'], 15), q(from, to, ['device'], 5)]),
+    ]);
+    return { queries, prevQueries, pages, prevPages, countries, devices };
+  });
+  const r1 = (x) => ({ ...x, ctr: +(x.ctr * 100).toFixed(2), position: +x.position.toFixed(1) });
+  const prevQ = new Map(d.prevQueries.map((x) => [x.k, x])), prevP = new Map(d.prevPages.map((x) => [x.k, x]));
+  const page = (u) => u.replace(/^https?:\/\/[^/]+/, '') || '/';
+  // 机会
+  const striking = d.queries.filter((x) => x.position >= 4 && x.position <= 20 && x.impressions >= 10)
+    .sort((a, b) => b.impressions - a.impressions).slice(0, lim.opp).map(r1);
+  const lowCtr = d.queries.filter((x) => x.impressions >= 30 && x.ctr < expectedCtr(x.position) * 0.5)
+    .map((x) => ({ ...x, expectedCtr: expectedCtr(x.position), lostClicks: Math.round(x.impressions * (expectedCtr(x.position) - x.ctr)) }))
+    .sort((a, b) => b.lostClicks - a.lostClicks).slice(0, lim.opp)
+    .map((x) => ({ ...r1(x), expectedCtr: +(x.expectedCtr * 100).toFixed(1), lostClicks: x.lostClicks }));
+  const drop = (cur, prev) => [...prev.values()].map((p) => {
+    const c = cur.get(p.k) || { clicks: 0, impressions: 0, position: null };
+    return { k: p.k, clicks: c.clicks, prevClicks: p.clicks, change: c.clicks - p.clicks, position: c.position != null ? +c.position.toFixed(1) : null, prevPosition: +p.position.toFixed(1) };
+  }).filter((x) => x.change <= -3).sort((a, b) => a.change - b.change);
+  const curQ = new Map(d.queries.map((x) => [x.k, x])), curP = new Map(d.pages.map((x) => [x.k, x]));
+  return {
+    topQueries: d.queries.slice(0, lim.top).map(r1),
+    topPages: d.pages.slice(0, lim.top).map((x) => r1({ ...x, k: page(x.k) })),
+    countries: d.countries.map(r1), devices: d.devices.map(r1),
+    opportunities: {
+      strikingDistance: striking,
+      lowCtr,
+      decliningQueries: hasPrev(days) ? drop(curQ, prevQ).slice(0, lim.opp) : [],
+      decliningPages: hasPrev(days) ? drop(curP, prevP).slice(0, Math.min(10, lim.opp)).map((x) => ({ ...x, k: page(x.k) })) : [],
+      newQueries: hasPrev(days) ? d.queries.filter((x) => !prevQ.has(x.k) && x.impressions >= 20).slice(0, 10).map(r1) : [],
+    },
+  };
+}
+
+async function trafficSection(env, secret, s, days, from, to, pfrom, pto, lim) {
+  const prop = s.ga4_property;
+  const report = (dim, metrics, limit = 20) => ({
+    dateRanges: [{ startDate: from, endDate: to }], dimensions: [{ name: dim }],
+    metrics: metrics.map((name) => ({ name })), limit, orderBys: [{ metric: { metricName: metrics[0] }, desc: true }],
+  });
+  return cached(env, `ai-ga|${prop}|${days}|${to}`, 3600000, async () => {
+    const [tot, tops] = await Promise.all([
+      gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${prop}:runReport`, {
+        dateRanges: [{ startDate: from, endDate: to, name: 'cur' }, ...(hasPrev(days) ? [{ startDate: pfrom, endDate: pto, name: 'prev' }] : [])],
+        metrics: ['activeUsers', 'newUsers', 'sessions', 'screenPageViews', 'keyEvents', 'engagementRate', 'averageSessionDuration', 'bounceRate'].map((name) => ({ name })),
+      }),
+      gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${prop}:batchRunReports`, {
+        requests: [
+          report('sessionDefaultChannelGroup', ['sessions', 'engagementRate', 'keyEvents'], 12),
+          report('sessionSourceMedium', ['sessions', 'engagementRate', 'keyEvents']),
+          report('landingPage', ['sessions', 'engagementRate', 'keyEvents', 'activeUsers']),
+          report('country', ['activeUsers', 'sessions'], 15),
+          report('deviceCategory', ['activeUsers', 'sessions', 'engagementRate'], 5),
+        ],
+      }),
+    ]);
+    const names = ['users', 'newUsers', 'sessions', 'views', 'keyEvents', 'engagementRate', 'avgSessionSeconds', 'bounceRate'];
+    const totals = {};
+    for (const r of tot.rows || []) {
+      const name = r.dimensionValues?.[0]?.value || 'cur';
+      totals[name] = Object.fromEntries(r.metricValues.map((m, i) => [names[i], Math.round((Number(m.value) || 0) * 1000) / 1000]));
+    }
+    const rows = (rep, cols) => (rep.rows || []).map((r) => ({ k: r.dimensionValues[0].value, ...Object.fromEntries(r.metricValues.map((m, i) => [cols[i], Math.round((Number(m.value) || 0) * 1000) / 1000])) }));
+    const [ch, src, land, countries, devices] = tops.reports || [];
+    const cutN = (a, k) => a.slice(0, k);
+    return {
+      totals,
+      channels: rows(ch || {}, ['sessions', 'engagementRate', 'keyEvents']),
+      sourceMedium: cutN(rows(src || {}, ['sessions', 'engagementRate', 'keyEvents']), lim.top >= 25 ? 20 : 10),
+      landingPages: cutN(rows(land || {}, ['sessions', 'engagementRate', 'keyEvents', 'users']), lim.top >= 25 ? 20 : 10),
+      countries: cutN(rows(countries || {}, ['users', 'sessions']), lim.top >= 25 ? 15 : 8),
+      devices: rows(devices || {}, ['users', 'sessions', 'engagementRate']),
+    };
+  });
+}
+
+// ---------------------------------------------------------------- 报告 → Markdown
+export function reportMarkdown(r) {
+  const nf = new Intl.NumberFormat('en-US');
+  const n = (v) => (v == null ? '—' : nf.format(Math.round(v)));
+  const pc = (v, d = 1) => (v == null ? '—' : `${(v * 100).toFixed(d)}%`);
+  const chg = (a, b) => (a == null || b == null || !b ? '—' : `${a >= b ? '+' : ''}${(((a - b) / b) * 100).toFixed(1)}%`);
+  const cell = (v) => String(v ?? '—').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  const table = (head, data) => (data.length
+    ? `| ${head.join(' | ')} |\n| ${head.map(() => '---').join(' | ')} |\n${data.map((row) => `| ${row.map(cell).join(' | ')} |`).join('\n')}\n`
+    : '_（无数据）_\n');
+  const has = (k) => r.sections.includes(k);
+  const L = [];
+  L.push(`# 站点 SEO 与流量数据报告`, '');
+  L.push(`- 生成时间：${r.generatedAt}（UTC）`);
+  L.push(`- 统计区间：${r.range.from} 至 ${r.range.to}（共 ${r.days} 天，截至昨天）`);
+  L.push(`- 对比区间：${r.prevRange ? `${r.prevRange.from} 至 ${r.prevRange.to}（上一个同长度周期）` : '无（区间过长，不做环比）'}`);
+  L.push(`- 站点数：${r.sites.length}`);
+  L.push(`- 数据来源：Google Search Console（搜索表现）、Google Analytics 4（访问与转化）、cligc 短链（推广短链的点击）`);
+  L.push(`- 说明：Search Console 数据通常延迟 2–3 天，最近两天偏低；CTR 和排名按展示加权；“机会”部分由程序按规则预先筛选。`);
+  if (r.compact) L.push(`- 格式：站点较多（${r.sites.length} 个），使用精简格式——每个站点只列核心指标和搜索机会（每类前 5 条），不含趋势、搜索词 / 页面全表和 GA4 渠道、着陆页明细。需要深入分析某个站点时，可单独为它生成报告。`);
+  L.push('');
+
+  if (r.sites.length > 1) {
+    L.push(`## 站点对比`, '');
+    L.push(table(['站点', '用户', '会话', '会话环比', '关键事件', '搜索点击', '点击环比', '展示', 'CTR', '平均排名'],
+      r.sites.map((s) => [s.host, n(s.users), n(s.cur.ga?.sessions), chg(s.cur.ga?.sessions, s.prev.ga?.sessions), n(s.cur.ga?.keyEvents),
+        n(s.cur.gsc?.clicks), chg(s.cur.gsc?.clicks, s.prev.gsc?.clicks), n(s.cur.gsc?.impressions), pc(s.cur.gsc?.ctr, 2),
+        s.cur.gsc?.impressions ? s.cur.gsc.position.toFixed(1) : '—'])));
+  }
+
+  for (const s of r.sites) {
+    L.push(`## ${s.host}`, '');
+    L.push(`- GA4：${s.ga4 ? `已关联（${s.ga4.name}${s.ga4.property ? `，媒体资源 ${s.ga4.property}` : ''}）` : '未关联'}`);
+    L.push(`- Search Console：${s.searchConsole ? `已关联${typeof s.searchConsole === 'string' ? `（${s.searchConsole}）` : ''}` : '未关联'}`);
+    if (s.errors.length) L.push(`- 读取出错：${s.errors.join('；')}`);
+    L.push('');
+    L.push(`### 核心指标`, '');
+    const ga = s.traffic?.totals?.cur, gp = s.traffic?.totals?.prev;
+    if (r.compact) {
+      // 精简格式：只列有数据的指标
+      L.push(table(['指标', '本期', '上期', '变化'], [
+        ...(s.cur.ga ? [
+          ['用户', n(s.users), n(s.prevUsers), chg(s.users, s.prevUsers)],
+          ['会话', n(s.cur.ga.sessions), n(s.prev.ga?.sessions), chg(s.cur.ga.sessions, s.prev.ga?.sessions)],
+          ['关键事件', n(s.cur.ga.keyEvents), n(s.prev.ga?.keyEvents), chg(s.cur.ga.keyEvents, s.prev.ga?.keyEvents)],
+          ['互动率', pc(s.cur.ga.engagement), pc(s.prev.ga?.engagement), '—'],
+        ] : []),
+        ...(s.cur.gsc ? [
+          ['搜索点击', n(s.cur.gsc.clicks), n(s.prev.gsc?.clicks), chg(s.cur.gsc.clicks, s.prev.gsc?.clicks)],
+          ['搜索展示', n(s.cur.gsc.impressions), n(s.prev.gsc?.impressions), chg(s.cur.gsc.impressions, s.prev.gsc?.impressions)],
+          ['CTR / 平均排名', `${pc(s.cur.gsc.ctr, 2)} / ${s.cur.gsc.impressions ? s.cur.gsc.position.toFixed(1) : '—'}`, `${pc(s.prev.gsc?.ctr, 2)} / ${s.prev.gsc?.impressions ? s.prev.gsc.position.toFixed(1) : '—'}`, '—'],
+        ] : []),
+      ]));
+    } else
+    L.push(table(['指标', '本期', '上期', '变化'], [
+      ['用户', n(ga?.users ?? s.users), n(gp?.users ?? s.prevUsers), chg(ga?.users ?? s.users, gp?.users ?? s.prevUsers)],
+      ['新用户', n(ga?.newUsers), n(gp?.newUsers), chg(ga?.newUsers, gp?.newUsers)],
+      ['会话', n(s.cur.ga?.sessions), n(s.prev.ga?.sessions), chg(s.cur.ga?.sessions, s.prev.ga?.sessions)],
+      ['浏览量', n(s.cur.ga?.views), n(s.prev.ga?.views), chg(s.cur.ga?.views, s.prev.ga?.views)],
+      ['关键事件', n(s.cur.ga?.keyEvents), n(s.prev.ga?.keyEvents), chg(s.cur.ga?.keyEvents, s.prev.ga?.keyEvents)],
+      ['互动率', pc(ga?.engagementRate ?? s.cur.ga?.engagement), pc(gp?.engagementRate ?? s.prev.ga?.engagement), '—'],
+      ['平均会话时长（秒）', n(ga?.avgSessionSeconds), n(gp?.avgSessionSeconds), chg(ga?.avgSessionSeconds, gp?.avgSessionSeconds)],
+      ['搜索点击', n(s.cur.gsc?.clicks), n(s.prev.gsc?.clicks), chg(s.cur.gsc?.clicks, s.prev.gsc?.clicks)],
+      ['搜索展示', n(s.cur.gsc?.impressions), n(s.prev.gsc?.impressions), chg(s.cur.gsc?.impressions, s.prev.gsc?.impressions)],
+      ['搜索 CTR', pc(s.cur.gsc?.ctr, 2), pc(s.prev.gsc?.ctr, 2), '—'],
+      ['平均排名', s.cur.gsc?.impressions ? s.cur.gsc.position.toFixed(1) : '—', s.prev.gsc?.impressions ? s.prev.gsc.position.toFixed(1) : '—', '—'],
+    ]));
+    if (s.trend.length) {
+      L.push(`### 趋势（${r.days <= 28 && r.sites.length <= 5 ? '按天' : '按周，日期为周一'}）`, '');
+      L.push(table(['日期', '会话', '用户（按天相加）', '搜索点击', '展示', '平均排名'], s.trend.map((t) => [t.period, n(t.sessions), n(t.users), n(t.clicks), n(t.impressions), t.position ?? '—'])));
+    }
+    if (has('search') && s.search) {
+      const o = s.search.opportunities;
+      const qrow = (x) => [x.k, n(x.clicks), n(x.impressions), `${x.ctr}%`, x.position];
+      // 精简格式只输出有内容的机会；全都没有时写一句
+      const blocks = [
+        ['**排名 4–20、展示较多的搜索词**（优化后最容易进入前三）', o.strikingDistance, () => table(['搜索词', '点击', '展示', 'CTR', '排名'], o.strikingDistance.map(qrow))],
+        ['**点击率明显偏低的搜索词**（低于该排名常见点击率的一半，可能是标题 / 描述不够吸引人）', o.lowCtr, () => table(['搜索词', '点击', '展示', 'CTR', '排名', '该排名常见 CTR', '估计少拿的点击'], o.lowCtr.map((x) => [...qrow(x), `${x.expectedCtr}%`, n(x.lostClicks)]))],
+        ...(r.prevRange ? [
+          ['**点击下滑最多的搜索词**', o.decliningQueries, () => table(['搜索词', '本期点击', '上期点击', '变化', '本期排名', '上期排名'], o.decliningQueries.map((x) => [x.k, n(x.clicks), n(x.prevClicks), x.change, x.position ?? '—', x.prevPosition]))],
+          ['**点击下滑最多的页面**', o.decliningPages, () => table(['页面', '本期点击', '上期点击', '变化', '本期排名', '上期排名'], o.decliningPages.map((x) => [x.k, n(x.clicks), n(x.prevClicks), x.change, x.position ?? '—', x.prevPosition]))],
+          ['**本期新出现的搜索词**（上期不在前 250 名里）', o.newQueries, () => table(['搜索词', '点击', '展示', 'CTR', '排名'], o.newQueries.map(qrow))],
+        ] : []),
+      ].filter(([, rows]) => !r.compact || rows.length);
+      L.push(`### 搜索机会`, '');
+      if (!blocks.length) L.push('_没有明显的搜索机会（展示量太少）_', '');
+      for (const [title, , render] of blocks) L.push(title, '', render());
+      if (!r.compact) {
+        L.push(`### 搜索词（前 ${s.search.topQueries.length}，按点击）`, '');
+        L.push(table(['搜索词', '点击', '展示', 'CTR', '排名'], s.search.topQueries.map(qrow)));
+        L.push(`### 页面（前 ${s.search.topPages.length}，按点击）`, '');
+        L.push(table(['页面', '点击', '展示', 'CTR', '排名'], s.search.topPages.map(qrow)));
+        L.push(`### 搜索：国家 / 设备`, '');
+        L.push(table(['国家', '点击', '展示', 'CTR', '排名'], s.search.countries.map((x) => [x.k.toUpperCase(), n(x.clicks), n(x.impressions), `${x.ctr}%`, x.position])));
+        L.push(table(['设备', '点击', '展示', 'CTR', '排名'], s.search.devices.map(qrow)));
+      }
+    }
+    if (has('traffic') && s.traffic) {
+      const t = s.traffic;
+      L.push(`### 流量渠道（GA4）`, '');
+      L.push(table(['渠道', '会话', '互动率', '关键事件'], t.channels.map((x) => [x.k, n(x.sessions), pc(x.engagementRate), n(x.keyEvents)])));
+      L.push(`### 来源 / 媒介（GA4，前 ${t.sourceMedium.length}）`, '');
+      L.push(table(['来源 / 媒介', '会话', '互动率', '关键事件'], t.sourceMedium.map((x) => [x.k, n(x.sessions), pc(x.engagementRate), n(x.keyEvents)])));
+      L.push(`### 着陆页（GA4，前 ${t.landingPages.length}）`, '');
+      L.push(table(['着陆页', '会话', '用户', '互动率', '关键事件'], t.landingPages.map((x) => [x.k, n(x.sessions), n(x.users), pc(x.engagementRate), n(x.keyEvents)])));
+      L.push(`### 访问：国家 / 设备（GA4）`, '');
+      L.push(table(['国家', '用户', '会话'], t.countries.map((x) => [x.k, n(x.users), n(x.sessions)])));
+      L.push(table(['设备', '用户', '会话', '互动率'], t.devices.map((x) => [x.k, n(x.users), n(x.sessions), pc(x.engagementRate)])));
+    }
+    if (has('links') && (!r.compact || s.linksFrom?.length)) {
+      const out = (s.linksFrom || []).reduce((a, l) => a + l.humanClicks, 0), ses = s.cur.ga?.sessions;
+      L.push(`### 站点上的推广短链（从这个站点点出去的短链）`, '');
+      if (s.linksFrom?.length) L.push(`共 ${n(out)} 次真人点击${ses ? `，约为站点会话的 ${pc(out / ses)}（点出率）` : ''}。按短链访问的来源（src 参数或 Referer）匹配。`, '');
+      L.push(s.linksFrom?.length
+        ? table(['短链', '标题', '真人点击', '上期真人点击', '含机器访问', '来源标识'], s.linksFrom.map((l) => [`/${l.slug}`, l.title || '—', n(l.humanClicks), r.prevRange ? n(l.prevHumanClicks) : '—', n(l.allClicks), l.sources.join('、')]))
+        : '_没有从这个站点点出的短链_\n');
+    }
+    if (has('links') && s.links?.length) {
+      L.push(`### 跳转到这个站点的短链`, '');
+      L.push(s.links?.length
+        ? table(['短链', '标题', '真人点击', '上期真人点击', '含机器访问', '跳转'], s.links.map((l) => [`/${l.slug}`, l.title || '—', n(l.humanClicks), r.prevRange ? n(l.prevHumanClicks) : '—', n(l.allClicks), l.routes.map((x) => `${x.when} → ${x.to}`).join('；')]))
+        : '_没有短链跳转到这个站点_\n');
+    }
+  }
+  L.push('---', '', '_本报告由 cligc link 生成，只读；链接过期或被撤销后无法访问。_');
+  return L.join('\n');
 }
