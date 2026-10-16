@@ -4204,14 +4204,17 @@ function chCard(rows) {
   for (const x of rows) for (const [k, n] of Object.entries(x.cur.ga?.channels || {})) m.set(k, (m.get(k) || 0) + n);
   const items = [...m].map(([k, n]) => ({ k, n })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n);
   const sum = items.reduce((a, x) => a + x.n, 0);
-  if (!sum) return '';
+  // 升级后渠道数据要由定时任务逐个站点补（每小时约 10 个），没补到时先说明进度
+  const pending = rows.filter((x) => x.ga4 && !x.chReady).length;
+  if (!sum) return pending ? `<div class="kc kc-ch"><div class="kc-h"><span class="l">流量渠道</span></div>
+    <div class="kc-v"><b class="sm">同步中</b></div><div class="kc-d" data-tipf-always data-tipf="定时任务每小时补约 10 个站点；也可以点右上角的刷新按钮立即同步">还剩 ${pending} 个站点 · 约 ${Math.ceil(pending / 10)} 小时</div></div>` : '';
   const COL = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', 'var(--faint)'];
   const top = items.length > 4 ? [...items.slice(0, 3), { k: '其他', n: sum - items.slice(0, 3).reduce((a, x) => a + x.n, 0), other: true }] : items;
   const r = 22, C = 2 * Math.PI * r;
   let off = 0;
   const segs = top.map((it, i) => { const len = (it.n / sum) * C; const c = `<circle cx="28" cy="28" r="${r}" stroke="${COL[i]}" stroke-dasharray="${Math.max(0, len - (top.length > 1 ? 1.5 : 0))} ${C}" stroke-dashoffset="${-off}"/>`; off += len; return c; }).join('');
   const name = (it) => (it.other ? '其他' : gaChannel(it.k));
-  const missing = rows.filter((x) => x.cur.ga && !x.cur.ga.channels).length;
+  const missing = pending;
   const tip = items.map((it) => `${gaChannel(it.k)} ${pctText(it.n / sum)} · ${num(it.n)} 次会话`).join('\n') + (missing ? `\n\n还有 ${missing} 个站点的渠道数据在同步中` : '');
   return `<div class="kc kc-ch"><div class="kc-h"><span class="l" data-tipf-always data-tipf="${esc(tip)}">流量渠道</span></div>
     <div class="chm"><svg viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="${r}" stroke="var(--sunken)"/>${segs}</svg>

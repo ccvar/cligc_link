@@ -557,7 +557,7 @@ async function sitesListRaw(env, days) {
     const rs = byHost.get(s.host) || [];
     const users = s.users ? JSON.parse(s.users) : {};
     return {
-      host: s.host, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '' } : null,
+      host: s.host, chReady: !!s.ch_at, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '' } : null,
       gsc: s.gsc_site || null, gscAcct: s.gsc_acct || '', gscEmail: s.gsc_email || '', syncedAt: s.synced_at || null, error: s.error || '',
       users: users[days] ?? null, prevUsers: hasPrev(days) ? users[`p${days}`] ?? null : null,
       tags: tagsOf.get(s.host) || [],
