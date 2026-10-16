@@ -915,6 +915,15 @@ details[open] > summary::before { transform: rotate(90deg); }
 .use-mini { position: relative; }
 .use-mini i { display: block; height: 100%; background: color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 3px; }
 .use-mini b { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent); border-radius: 3px; }
+.use-mini.seg { display: flex; gap: 1px; }
+.use-mini.seg i { flex: none; height: 6px; border-radius: 0; }
+.use-mini.seg i:first-child { border-radius: 3px 0 0 3px; } .use-mini.seg i:last-child { border-radius: 0 3px 3px 0; } .use-mini.seg i:only-child { border-radius: 3px; }
+.use-who { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+.use-who span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.use-who i { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.use-top { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 0; }
+.use-top b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 600; }
+.use-top em { flex: none; font-style: normal; font-variant-numeric: tabular-nums; }
 .use-mine { margin-top: 8px; font-size: 12px; color: var(--text-2); }
 .use-mine b { font-variant-numeric: tabular-nums; }
 .use-h { flex-wrap: wrap; }
@@ -4357,11 +4366,9 @@ const googleSteps = () => `<ol class="use-steps">
   <li>“凭据 → 创建凭据 → OAuth 客户端 ID”：类型选 <b>Web 应用</b>，已获授权的重定向 URI 填：<div class="use-cmd"><code>${esc(location.origin)}/api/google/callback</code>${copyBtn(`${location.origin}/api/google/callback`, 'btn sm ghost icon')}</div></li>
   <li>创建后会显示 <b>客户端 ID</b> 和 <b>客户端密钥</b>，填到下一步。</li></ol>`;
 
-// 第 2 步：客户端 ID / 密钥。环境变量配置的只读显示；后台填写的加密保存，密钥只显示末 4 位
+// 第 2 步：客户端 ID / 密钥。加密保存，密钥只显示末 4 位
 function googleConfigBox(st) {
   const cfg = st.config || {};
-  if (cfg.source === 'env') return `<div class="cfg-ro">${ic('lock', 14)}<div>已通过环境变量配置（<code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>），如需修改请改 wrangler.toml 和 secret 后重新部署。
-    <div class="sm mono">${esc(cfg.clientId)} · 密钥 ••••${esc(cfg.secretTail)}</div></div></div>`;
   if (st.configured) return `<div class="cfg-ro" data-cfg-view>${ic('check', 14)}<div>已保存（加密存储在数据库）
       <div class="sm mono">${esc(cfg.clientId)} · 密钥 ••••${esc(cfg.secretTail)}</div></div>
       <span class="sp"></span><button type="button" class="btn sm" data-cfg-edit>修改</button></div>
@@ -5540,10 +5547,33 @@ function renderUsage(box, u, onState) {
       <div class="use-s">${paid ? '付费版' : '免费版'}${unit} ${fmt(limit)} · 已用 ${pct < 1 && v ? '<1' : Math.round(pct)}%</div>
       <div class="use-bar ${lv}">${f ? `<s style="width:${Math.max(pp, pct)}%"></s>` : ''}<i style="width:${Math.max(pct, v ? 1 : 0)}%"></i></div>
       ${f ? `<div class="use-fc ${lv}">${endName}预计 <b>${fmt(f.proj)}</b>（${pctText(f.projRatio)}）· ${f.ratio >= 1 ? '已超出' : f.runOut ? `约 ${md(f.runOut)} 用完` : '够用'}</div>` : ''}
-      ${has ? `<div class="use-mine">其中本项目 <b>${fmt(mine || 0)}</b></div>` : ''}</div>`;
+      ${has ? `<div class="use-mine">其中本项目 <b>${fmt(mine || 0)}</b></div>` : ''}${key ? topLine(key) : ''}</div>`;
   };
   const mine = cur.mine || zero.mine;
   const maxDay = Math.max(1, ...(u.days || []).map((d) => d.rowsRead));
+  // 占用最多的数据库 / Worker：名称（拿不到名称时显示 ID 前 8 位），本项目加标记
+  const dbName = (id) => (u.dbNames?.[id] || `${String(id).slice(0, 8)}…`) + (id && id === u.myDb ? '（本项目）' : '');
+  const wkName = (n) => (n || '未知') + (n && n === u.myWorker ? '（本项目）' : '');
+  const nameOf = (k) => (k === 'requests' ? wkName : dbName);
+  // 颜色按最近 7 天的总排名分配，同一个数据库每天颜色一样
+  const UCOL = ['var(--accent)', 'var(--violet)', 'var(--teal)'];
+  const colorOf = new Map((u.top?.week?.rowsRead || []).map(([id], i) => [id, UCOL[i]]));
+  const topTip = (list, total, k) => (list?.length ? list.map(([id, n]) => `${nameOf(k)(id)}：${wan(n)}（${pctText(total ? n / total : 0)}）`).join('\n') : '');
+  const topLine = (k) => {
+    const list = u.top?.[paid ? 'month' : 'today']?.[k], total = cur[k];
+    if (!list?.length || !total) return '';
+    const [id, n] = list[0];
+    return `<div class="use-top" data-tipf-always data-tipf="${esc(`${when}占用最多：\n${topTip(list, total, k)}`)}"><span>占用最多</span><b>${esc(nameOf(k)(id))}</b><em>${pctText(n / total)}</em></div>`;
+  };
+  // 每天的 D1 读取：长度按最近 7 天最高的那天，按数据库分段着色；下面列出占用最多的几个
+  const useBar = (d) => {
+    const list = d.top?.rowsRead || [];
+    if (!list.length || !d.rowsRead) return `<div class="use-mini"><i style="width:${(d.rowsRead / maxDay) * 100}%"></i></div>`;
+    const rest = d.rowsRead - list.reduce((a, [, n]) => a + n, 0);
+    const seg = (n, c, tip) => `<i style="width:${(n / maxDay) * 100}%;background:${c}" data-tipf-always data-tipf="${esc(tip)}"></i>`;
+    return `<div class="use-mini seg">${list.map(([id, n]) => seg(n, colorOf.get(id) || 'var(--faint)', `${dbName(id)}：${wan(n)}（${pctText(n / d.rowsRead)}）`)).join('')}${rest > 0 ? seg(rest, 'var(--sunken-2, var(--line))', `其他：${wan(rest)}`) : ''}</div>
+      <div class="use-who">${list.slice(0, 2).map(([id, n]) => `<span><i style="background:${colorOf.get(id) || 'var(--faint)'}"></i>${esc(dbName(id))} ${pctText(n / d.rowsRead)}</span>`).join('')}</div>`;
+  };
   const plans = [['auto', '自动识别'], ['free', '免费版'], ['paid', '付费版']];
   box.innerHTML = `
     <div class="use-h"><div class="seg" id="use-plan">${plans.map(([k, l]) => `<button type="button" data-p="${k}" class="${k === (u.planSetting || 'auto') ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -5572,17 +5602,17 @@ function renderUsage(box, u, onState) {
         : meter('D1 存储（整个账户）', u.storageBytes, 5e9, u.myStorage, u.myStorage != null, bytes, '包含')}
     </div>
     <div class="hint" style="margin-top:10px">额度按整个 Cloudflare 账户计算，${paid ? '付费版按自然月累计，超出部分按量计费' : '免费版每天 UTC 0 点（北京时间 8 点）重置，超出后当天的请求会失败'}。按 UTC 日期统计${u.updatedAt ? ` · 更新于 ${fmtTime(u.updatedAt)}` : ''}。</div>
-    <div class="cfg-ro use-cfg" data-cfg-view>${ic(u.config?.source === 'env' ? 'lock' : 'key', 14)}<div>${u.config?.source === 'env' ? '凭据来自环境变量（CF_ACCOUNT_ID / CF_API_TOKEN）' : '凭据已加密保存在数据库'}
+    <div class="cfg-ro use-cfg" data-cfg-view>${ic('key', 14)}<div>凭据已加密保存在数据库
         <div class="sm mono">账户 ${esc(u.config?.accountId || '')} · 令牌 ••••${esc(u.config?.tokenTail || '')}${u.config?.dbId ? ` · D1 ${esc(u.config.dbId.slice(0, 8))}…` : ''}${u.config?.worker ? ` · Worker ${esc(u.config.worker)}` : ''}</div></div>
-      <span class="sp"></span>${u.config?.source === 'env' ? '' : '<button type="button" class="btn sm" data-cfg-edit>修改</button>'}</div>
-    <div data-cfg-form hidden>${u.config?.source === 'env' ? '' : cfForm(u.config || {})}</div>
+      <span class="sp"></span><button type="button" class="btn sm" data-cfg-edit>修改</button></div>
+    <div data-cfg-form hidden>${cfForm(u.config || {})}</div>
     <table class="tbl use-t"><thead><tr><th>日期（UTC）</th><th style="text-align:right">D1 读取</th><th></th><th style="text-align:right">D1 写入</th><th style="text-align:right">Worker 请求</th></tr></thead>
       <tbody>${(u.days || []).slice().reverse().map((d) => `<tr>
         <td>${d.date.slice(5)}${d.date === u.today ? ' <span class="sm">今天</span>' : ''}</td>
         <td class="num">${wan(d.rowsRead)}${u.hasMine?.d1 ? `<div class="sm">本项目 ${wan(d.mine?.rowsRead || 0)}</div>` : ''}</td>
-        <td style="width:34%"><div class="use-mini"><i style="width:${(d.rowsRead / maxDay) * 100}%"></i><b style="width:${(((d.mine?.rowsRead) || 0) / maxDay) * 100}%"></b></div></td>
-        <td class="num">${wan(d.rowsWritten)}${u.hasMine?.d1 ? `<div class="sm">本项目 ${wan(d.mine?.rowsWritten || 0)}</div>` : ''}</td>
-        <td class="num">${wan(d.requests)}${u.hasMine?.worker ? `<div class="sm">本项目 ${wan(d.mine?.requests || 0)}</div>` : ''}</td></tr>`).join('')}</tbody></table>`;
+        <td style="width:34%">${useBar(d)}</td>
+        <td class="num"${d.top?.rowsWritten?.length ? ` data-tipf-always data-tipf="${esc(`D1 写入最多：\n${topTip(d.top.rowsWritten, d.rowsWritten, 'rowsWritten')}`)}"` : ''}>${wan(d.rowsWritten)}${u.hasMine?.d1 ? `<div class="sm">本项目 ${wan(d.mine?.rowsWritten || 0)}</div>` : ''}</td>
+        <td class="num"${d.top?.requests?.length ? ` data-tipf-always data-tipf="${esc(`Worker 请求最多：\n${topTip(d.top.requests, d.requests, 'requests')}`)}"` : ''}>${wan(d.requests)}${u.hasMine?.worker ? `<div class="sm">本项目 ${wan(d.mine?.requests || 0)}</div>` : ''}</td></tr>`).join('')}</tbody></table>`;
   bindCfForm(box, u, onState);
   segThumb(box.querySelector('#use-plan'));
   box.querySelectorAll('#use-plan button').forEach((b) => (b.onclick = async () => {

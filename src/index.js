@@ -519,8 +519,8 @@ async function authedApi(request, env, url, cred) {
     return r.error ? json(r, 400) : json(await cfUsage(env, true));
   }
   if (path === '/api/usage/config' && method === 'DELETE') {
-    if (env.CF_API_TOKEN && env.CF_ACCOUNT_ID) return json({ error: '已通过环境变量配置，请在 wrangler.toml 中修改' }, 400);
     await env.DB.prepare("DELETE FROM settings WHERE key IN ('int_cf', 'usage_cache')").run();
+    await setSetting(env, 'env_import_cf', String(Date.now()));   // 删除后不再从环境变量导入
     return json({ configured: false });
   }
   if (path === '/api/usage/plan' && method === 'PUT') {
@@ -1884,22 +1884,25 @@ async function linkStatsAgg(env, id, { days, tz, bots }) {
 
 // ---------------------------------------------------------------- Cloudflare 用量
 // 需要 CF_ACCOUNT_ID（变量）和 CF_API_TOKEN（密钥，权限 帐户分析 · 读取；可选 账单 · 读取 用于识别套餐）。
-// 额度按整个账户计算：免费版每天 UTC 0 点重置，付费版按自然月计。D1_DATABASE_ID / WORKER_NAME 用于单独统计本项目。
+// 额度按整个账户计算：免费版每天 UTC 0 点重置，付费版按自然月计。凭据里的 D1 数据库 ID / Worker 名称用于单独统计本项目。
 // 结果缓存 5 分钟。
-// 账号 ID / API 令牌：环境变量优先，否则读后台填写的（加密保存在 settings.int_cf）
+// Cloudflare 凭据：在后台填写，加密保存在 settings.int_cf。
+// 旧版本写在环境变量 CF_ACCOUNT_ID / CF_API_TOKEN（及 D1_DATABASE_ID / WORKER_NAME）里的，第一次用到时导入一次，之后只认后台这份
 async function cfCreds(env) {
-  if (env.CF_API_TOKEN && env.CF_ACCOUNT_ID) {
-    return { accountId: String(env.CF_ACCOUNT_ID).trim(), token: String(env.CF_API_TOKEN).trim(),
-      dbId: String(env.D1_DATABASE_ID || '').trim(), worker: String(env.WORKER_NAME || '').trim(), source: 'env' };
-  }
   const s = await getSetting(env, 'int_cf');
-  if (!s) return null;
-  try { return { ...(await google.unseal(await sessionSecret(env), s.value)), source: 'db' }; } catch { return null; }
+  if (s) { try { return { ...(await google.unseal(await sessionSecret(env), s.value)), source: 'db' }; } catch { return null; } }
+  if (env.CF_API_TOKEN && env.CF_ACCOUNT_ID && !(await getSetting(env, 'env_import_cf'))) {
+    const c = { accountId: String(env.CF_ACCOUNT_ID).trim(), token: String(env.CF_API_TOKEN).trim(),
+      dbId: String(env.D1_DATABASE_ID || '').trim(), worker: String(env.WORKER_NAME || '').trim() };
+    await setSetting(env, 'int_cf', await google.seal(await sessionSecret(env), c));
+    await setSetting(env, 'env_import_cf', String(Date.now()));
+    return { ...c, source: 'db' };
+  }
+  return null;
 }
 
 // 保存前先请求一次 Cloudflare 接口，确认令牌有效、有分析读取权限
 async function saveCfConfig(env, body) {
-  if (env.CF_API_TOKEN && env.CF_ACCOUNT_ID) return { error: '已通过环境变量配置，请在 wrangler.toml 中修改' };
   const old = await cfCreds(env);
   const accountId = String(body.accountId || '').trim();
   const token = String(body.token || '').trim() || old?.token || '';
@@ -1973,6 +1976,9 @@ async function cfUsageRaw(env, force) {
     fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/subscriptions`, { headers })
       .then((r) => r.json()).then((d) => (d.success ? (d.result || []) : null)).catch(() => null),
   ]);
+  // 数据库名称：令牌有 D1 读取权限时才能拿到，否则界面上显示数据库 ID
+  const dbNames = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database?per_page=1000`, { headers })
+    .then((r) => r.json()).then((d) => (d.success ? Object.fromEntries((d.result || []).map((x) => [x.uuid, x.name])) : {})).catch(() => ({}));
 
   // 每天：账户合计 + 本项目
   const days = new Map();
@@ -1981,15 +1987,37 @@ async function cfUsageRaw(env, force) {
     return days.get(date);
   };
   for (let t = Date.parse(start + 'T00:00:00Z'); t <= Date.parse(today + 'T00:00:00Z'); t += DAY) day(new Date(t).toISOString().slice(0, 10));
+  // 每天按数据库 / Worker 分开记，用来列出占用最多的几个
+  const per = new Map();   // 日期 → { rowsRead: Map, rowsWritten: Map, requests: Map }
+  const bump = (date, k, id, n) => {
+    if (!n) return;
+    if (!per.has(date)) per.set(date, { rowsRead: new Map(), rowsWritten: new Map(), requests: new Map() });
+    const m = per.get(date)[k];
+    m.set(id, (m.get(id) || 0) + n);
+  };
   for (const r of d1.rows || []) {
     const x = day(r.dimensions.date);
     x.rowsRead += r.sum.rowsRead || 0; x.rowsWritten += r.sum.rowsWritten || 0;
     if (dbId && r.dimensions.databaseId === dbId) { x.mine.rowsRead += r.sum.rowsRead || 0; x.mine.rowsWritten += r.sum.rowsWritten || 0; }
+    bump(r.dimensions.date, 'rowsRead', r.dimensions.databaseId, r.sum.rowsRead || 0);
+    bump(r.dimensions.date, 'rowsWritten', r.dimensions.databaseId, r.sum.rowsWritten || 0);
   }
   for (const r of workers.rows || []) {
     const x = day(r.dimensions.date);
     x.requests += r.sum.requests || 0;
     if (worker && r.dimensions.scriptName === worker) x.mine.requests += r.sum.requests || 0;
+    bump(r.dimensions.date, 'requests', r.dimensions.scriptName, r.sum.requests || 0);
+  }
+  const TOP = 3;
+  const topOf = (m) => [...m].sort((a, b) => b[1] - a[1]).slice(0, TOP);
+  const merge = (dates, k) => {
+    const m = new Map();
+    for (const d of dates) for (const [id, n] of per.get(d)?.[k] || []) m.set(id, (m.get(id) || 0) + n);
+    return m;
+  };
+  for (const x of days.values()) {
+    const p = per.get(x.date);
+    x.top = p ? { rowsRead: topOf(p.rowsRead), rowsWritten: topOf(p.rowsWritten), requests: topOf(p.requests) } : null;
   }
   // 存储：最近一天各数据库大小
   const lastDate = (storage.rows || []).map((r) => r.dimensions.date).sort().pop();
@@ -2019,6 +2047,9 @@ async function cfUsageRaw(env, force) {
   const detectedBy = workersSub ? 'subscription' : overFree ? 'usage' : null;
   const sum = (rows, k, mine) => rows.reduce((s, x) => s + (mine ? x.mine[k] : x[k]), 0);
   const month = all.filter((x) => x.date >= monthStart);
+  const monthDates = month.map((x) => x.date), weekDates = all.filter((x) => x.date >= weekStart).map((x) => x.date);
+  // 本月 / 今天占用最多的；用于颜色的“最近 7 天总排名”（每个数据库在各天的色块颜色保持一致）
+  const tops = (dates) => ({ rowsRead: topOf(merge(dates, 'rowsRead')), rowsWritten: topOf(merge(dates, 'rowsWritten')), requests: topOf(merge(dates, 'requests')) });
   const out = {
     configured: true, today, monthStart, detected, detectedBy, subscriptions: subNames,
     hasMine: { d1: !!dbId, worker: !!worker },
@@ -2028,6 +2059,8 @@ async function cfUsageRaw(env, force) {
       mine: { rowsRead: sum(month, 'rowsRead', 1), rowsWritten: sum(month, 'rowsWritten', 1), requests: sum(month, 'requests', 1) },
     },
     storageBytes, myStorage,
+    top: { month: tops(monthDates), today: tops([today]), week: tops(weekDates) },
+    dbNames, myDb: dbId, myWorker: worker,
     errors: [d1.error && `D1：${d1.error}`, workers.error && `Workers：${workers.error}`, storage.error && `存储：${storage.error}`].filter(Boolean),
     updatedAt: Date.now(),
   };
@@ -2041,7 +2074,7 @@ async function googleApi(request, env, url) {
   const secret = await sessionSecret(env);
   try {
     if (path === '/api/google/status') return json(await google.status(env, secret));
-    // 后台填写 OAuth 客户端（环境变量优先，配置了环境变量时不能在后台修改）
+    // 后台填写 OAuth 客户端（加密保存）
     if (path === '/api/google/config' && method === 'PUT') {
       const r = await google.saveGoogleConfig(env, secret, await request.json().catch(() => ({})));
       return r.error ? json(r, 400) : json(await google.status(env, secret));

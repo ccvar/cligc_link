@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------- Google：GA4 + Search Console
 // 授权：OAuth 2.0（Web 应用），只读权限 analytics.readonly、webmasters.readonly。
-// OAuth 客户端：优先读环境变量 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET，否则读后台填写的（加密保存在 settings.int_google）。
+// OAuth 客户端：在后台填写，加密保存在 settings.int_google（旧版本的环境变量会自动导入一次）。
 // 回调地址为 <域名>/api/google/callback。
 // 可以连接多个 Google 账号：每个账号一行 g_accounts，刷新令牌用会话密钥派生的 AES-GCM 密钥加密保存。
 // 所有账号的 GA4 媒体资源和 GSC 站点按域名合并到 g_sites，并记下各自来自哪个账号（ga4_acct / gsc_acct）。
@@ -62,19 +62,22 @@ export function siteHost(u) {
 
 // ---------------------------------------------------------------- 授权
 
-// 客户端 ID / 密钥：环境变量优先
+// 客户端 ID / 密钥：在后台填写，加密保存在 settings.int_google。
+// 旧版本写在环境变量 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET 里的，第一次用到时导入一次，之后只认后台这份（删除后也不会再导入）
 export async function googleCreds(env, secret) {
-  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
-    return { clientId: String(env.GOOGLE_CLIENT_ID).trim(), clientSecret: String(env.GOOGLE_CLIENT_SECRET).trim(), source: 'env' };
-  }
   const s = await getSetting(env, 'int_google');
-  if (!s) return null;
-  try { const c = await unseal(secret, s); return { ...c, source: 'db' }; } catch { return null; }
+  if (s) { try { const c = await unseal(secret, s); return { ...c, source: 'db' }; } catch { return null; } }
+  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && !(await getSetting(env, 'env_import_google'))) {
+    const c = { clientId: String(env.GOOGLE_CLIENT_ID).trim(), clientSecret: String(env.GOOGLE_CLIENT_SECRET).trim() };
+    await setSetting(env, 'int_google', await seal(secret, c));
+    await setSetting(env, 'env_import_google', String(Date.now()));
+    return { ...c, source: 'db' };
+  }
+  return null;
 }
 export const googleConfigured = async (env, secret) => !!(await googleCreds(env, secret));
 
 export async function saveGoogleConfig(env, secret, body) {
-  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) return { error: '已通过环境变量配置，请在 wrangler.toml 中修改' };
   const old = await googleCreds(env, secret);
   const clientId = String(body.clientId || '').trim();
   const clientSecret = String(body.clientSecret || '').trim() || old?.clientSecret || '';
@@ -88,9 +91,10 @@ export async function saveGoogleConfig(env, secret, body) {
 }
 
 export async function deleteGoogleConfig(env, secret) {
-  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) return { error: '已通过环境变量配置，请在 wrangler.toml 中修改' };
   await disconnect(env, secret);
   await delSetting(env, 'int_google');
+  await setSetting(env, 'env_import_google', String(Date.now()));   // 删除后不再从环境变量导入
+  tokenCache.clear();
   return { ok: true };
 }
 const redirectUri = (origin) => `${origin}/api/google/callback`;

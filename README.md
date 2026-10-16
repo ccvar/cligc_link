@@ -92,8 +92,6 @@ routes = [
 | `HOME_URL` | 访问根路径 `/` 时跳转到的地址；留空则显示内置的产品首页 |
 | `ADMIN_HOST` | 后台只允许通过这个域名访问；留空则任意域名的 `/admin` 都可访问 |
 | `TURNSTILE_SITEKEY` | Cloudflare Turnstile 站点密钥；留空则登录不做人机验证 |
-| `CF_ACCOUNT_ID` | Cloudflare 账号 ID，用于后台“Cloudflare 用量”；需配合 `CF_API_TOKEN`。也可以不设置，直接在后台填写 |
-| `GOOGLE_CLIENT_ID` | Google OAuth 客户端 ID，用于“站点”；需配合 `GOOGLE_CLIENT_SECRET`。也可以不设置，直接在后台填写 |
 
 **密钥**（用 `npx wrangler secret put <名称>` 设置）：
 
@@ -102,8 +100,6 @@ routes = [
 | `ADMIN_PASSWORD` | 否 | 初始后台密码。不设置时默认为 `admin`，首次登录强制修改 |
 | `SESSION_SECRET` | 建议 | 会话签名密钥，也用于加密保存在数据库里的令牌和客户端密钥。不设置时首次运行自动生成并保存在数据库中（这时数据库被导出或泄露，加密的内容也能被解开）；更换后需要在后台重新填写客户端信息、重新连接 Google |
 | `TURNSTILE_SECRET` | 否 | Turnstile 服务端密钥，与 `TURNSTILE_SITEKEY` 配套 |
-| `CF_API_TOKEN` | 否 | 只读 API 令牌（Account Analytics: Read），用于后台“Cloudflare 用量”；也可以在后台填写 |
-| `GOOGLE_CLIENT_SECRET` | 否 | Google OAuth 客户端密钥；也可以在后台填写 |
 
 ### 把自动生成的会话密钥换成 Secret（推荐）
 
@@ -346,7 +342,7 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 4. 打开后台“设置 → Google 集成”，填写客户端 ID 和客户端密钥并保存（密钥加密保存在 D1，之后只显示末 4 位）。
 5. 到“站点”页点“连接 Google 账号”完成授权。
 
-也可以用环境变量配置：在 `wrangler.toml` 填写 `GOOGLE_CLIENT_ID`，执行 `npx wrangler secret put GOOGLE_CLIENT_SECRET`，重新部署。环境变量优先，此时后台只读显示。客户端可以在“设置 → Google 集成”里修改或删除；更换客户端 ID 会断开所有已连接的账号。
+客户端可以在“设置 → Google 集成”里修改或删除；更换客户端 ID 会断开所有已连接的账号。旧版本写在环境变量（`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`）里的客户端，升级后第一次用到时会自动导入后台，之后可以把环境变量删掉。
 
 列表上方汇总当前筛选的站点数（及增长 / 下降的站点数）、用户、会话、关键事件、搜索点击和短链点击，表格里有每个站点的会话（或搜索点击）占比。
 
@@ -381,12 +377,12 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 
 ### Cloudflare 用量
 
-后台“设置 → Cloudflare 用量”显示整个账户的 D1 读写行数、Worker 请求数和 D1 存储，并单独列出本项目的用量（`D1_DATABASE_ID`、`WORKER_NAME`）。免费版对比每天的额度（UTC 0 点重置），付费版对比本月累计与每月包含额度；套餐可自动识别，也可在面板里手动指定。需要：
+后台“设置 → Cloudflare 用量”显示整个账户的 D1 读写行数、Worker 请求数和 D1 存储，并单独列出本项目的用量（在面板里填写本项目的 D1 数据库 ID 和 Worker 名称）；每天的用量还会列出占用最多的数据库和 Worker（显示数据库名称需要令牌另有 **账户 · D1 · 读取** 权限，否则显示数据库 ID）。免费版对比每天的额度（UTC 0 点重置），付费版对比本月累计与每月包含额度；套餐可自动识别，也可在面板里手动指定。需要：
 
 1. 在 Cloudflare 控制台创建自定义 API 令牌，权限 **账户 · Account Analytics · 读取**（可选 **账户 · 账单 · 读取**，用于显示是否为付费版）。
 2. 在面板里填写账户 ID 和令牌（可选填 D1 数据库 ID、Worker 名称，用于单独显示本项目用量），点“验证并保存”。保存前会先请求一次 Cloudflare 接口确认令牌有效；令牌加密保存在 D1，之后只显示末 4 位。
 
-也可以用环境变量：`npx wrangler secret put CF_API_TOKEN`，并在 `wrangler.toml` 的 `[vars]` 里填写 `CF_ACCOUNT_ID`（以及 `D1_DATABASE_ID`、`WORKER_NAME`），重新部署。环境变量优先，此时面板只读显示。
+旧版本写在环境变量（`CF_ACCOUNT_ID` / `CF_API_TOKEN` / `D1_DATABASE_ID` / `WORKER_NAME`）里的凭据，升级后第一次用到时会自动导入后台，之后可以把环境变量删掉。
 
 面板会按目前速度推算到期末的用量（付费版按最近 7 天日均推算到月底，免费版推算到今天结束），显示是否够用、预计哪天用完包含额度。
 

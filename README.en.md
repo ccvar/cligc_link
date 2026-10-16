@@ -92,8 +92,6 @@ Then run `npx wrangler deploy` again.
 | `HOME_URL` | Where `/` redirects to; leave empty to show the built-in home page |
 | `ADMIN_HOST` | Only allow the admin on this hostname; leave empty to allow `/admin` on any hostname |
 | `TURNSTILE_SITEKEY` | Cloudflare Turnstile site key; leave empty to skip the bot check at sign-in |
-| `CF_ACCOUNT_ID` | Cloudflare account ID for "Cloudflare usage", together with `CF_API_TOKEN`. Can also be entered in the admin instead |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID for "Sites", together with `GOOGLE_CLIENT_SECRET`. Can also be entered in the admin instead |
 
 **Secrets** (set with `npx wrangler secret put <NAME>`):
 
@@ -102,8 +100,6 @@ Then run `npx wrangler deploy` again.
 | `ADMIN_PASSWORD` | No | Initial admin password. Defaults to `admin` when unset, and must be changed on first sign-in |
 | `SESSION_SECRET` | Recommended | Session signing key, also used to encrypt tokens and client secrets stored in the database. When unset, it's generated on first run and stored in the database (so if the database is exported or leaked, the encrypted values can be decrypted too); after changing it you need to re-enter client credentials in the admin and reconnect Google |
 | `TURNSTILE_SECRET` | No | Turnstile secret key, paired with `TURNSTILE_SITEKEY` |
-| `CF_API_TOKEN` | No | Read-only API token (Account Analytics: Read) for "Cloudflare usage"; can also be entered in the admin |
-| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret; can also be entered in the admin |
 
 ### Move the generated session secret into a Secret (recommended)
 
@@ -348,7 +344,7 @@ Setup (each deployment needs its own OAuth client):
 4. In the admin, open "Settings → Google integration", enter the client ID and secret and save (the secret is stored encrypted in D1 and only the last 4 characters are shown afterwards).
 5. On the "Sites" page, click "Connect a Google account" to authorize.
 
-You can also use environment variables: set `GOOGLE_CLIENT_ID` in `wrangler.toml`, run `npx wrangler secret put GOOGLE_CLIENT_SECRET`, and redeploy. Environment variables win, and the admin shows them read-only. The client can be changed or deleted under "Settings → Google integration"; changing the client ID disconnects all connected accounts.
+The client can be changed or deleted under "Settings → Google integration"; changing the client ID disconnects all connected accounts. Clients that older versions kept in environment variables (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) are imported into the admin automatically the first time they're used after upgrading; you can then delete the environment variables.
 
 Above the list is a summary of the filtered sites (and how many are growing / declining), users, sessions, key events, search clicks and link clicks; the table shows each site's share of sessions (or search clicks).
 
@@ -383,12 +379,12 @@ On the "Sites" page (or a site page), click "AI analysis" at the top right, choo
 
 ### Cloudflare usage
 
-"Settings → Cloudflare usage" shows the whole account's D1 rows read / written, Worker requests and D1 storage, plus this project's own usage (`D1_DATABASE_ID`, `WORKER_NAME`). The free plan is compared against daily quotas (reset at 0:00 UTC), the paid plan against the month-to-date total and monthly included quota; the plan is detected automatically or can be set by hand. You need:
+"Settings → Cloudflare usage" shows the whole account's D1 rows read / written, Worker requests and D1 storage, plus this project's own usage (enter this project's D1 database ID and Worker name in the panel); each day also lists the databases and Workers using the most (database names need the token to also have **Account · D1 · Read**, otherwise database IDs are shown). The free plan is compared against daily quotas (reset at 0:00 UTC), the paid plan against the month-to-date total and monthly included quota; the plan is detected automatically or can be set by hand. You need:
 
 1. A custom API token from the Cloudflare dashboard with **Account · Account Analytics · Read** (optionally **Account · Billing · Read** to show whether you're on a paid plan).
 2. Enter the account ID and token in the panel (optionally the D1 database ID and Worker name to show this project separately) and click "Verify and save". The token is checked against the Cloudflare API before saving, stored encrypted in D1, and only the last 4 characters are shown afterwards.
 
-Or use environment variables: `npx wrangler secret put CF_API_TOKEN`, and set `CF_ACCOUNT_ID` (and `D1_DATABASE_ID`, `WORKER_NAME`) in `[vars]` of `wrangler.toml`, then redeploy. Environment variables win, and the panel shows them read-only.
+Credentials that older versions kept in environment variables (`CF_ACCOUNT_ID` / `CF_API_TOKEN` / `D1_DATABASE_ID` / `WORKER_NAME`) are imported into the admin automatically the first time they're used after upgrading; you can then delete the environment variables.
 
 The panel projects usage to the end of the period at the current rate (paid: last 7 days' daily average to month-end; free: to the end of today), showing whether it's enough and when the included quota would run out.
 
