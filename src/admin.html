@@ -1196,8 +1196,8 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .pop .oi .f { width: 18px; font-size: 14px; }
 .pop .oi > svg { width: 13px; height: 13px; }
 .pop .oi .ot { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pop .ot .ot-h { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 400; color: var(--muted); white-space: normal; line-height: 1.4; }
-.pop .oi:has(.ot-h) { height: auto; min-height: 30px; padding: 7px 8px; }
+.pop .ot .ot-i { display: inline-flex; vertical-align: -2px; margin-left: 4px; color: var(--faint); font-style: normal; cursor: help; }
+.pop .ot .ot-i:hover { color: var(--muted); }
 .pop .opts:focus { outline: none; }
 .pop.plain .opts { padding-top: 4px; max-height: 280px; }
 .pop .oi.act { background: var(--sunken); }
@@ -4758,7 +4758,7 @@ function googleAcctPicker(root, accts, items, onFilter) {
     button: (v) => `<span class="nm">${v ? mailTip(by.get(v)?.email || '') : '全部'}</span>${accts.some((a) => a.error) ? `<i class="g-dot" data-tip="有账号需要重新连接"></i>` : ''}`,
     option: (v) => v === ADD ? `<span class="ot g-op g-sep">${ic('plus', 14)}添加账号</span>`
       : v === MANAGE ? `<span class="ot g-op">${ic('gear', 14)}管理账号</span>`
-      : !v ? `<span class="ot">全部账号<small>${items.length} 个站点</small>${split && accts.length > 1 ? `<span class="ot-h">其中 ${split} 个站点的 GA4 和 GSC 来自不同账号，两边各算一次</span>` : ''}</span>`
+      : !v ? `<span class="ot">全部账号<small>${items.length} 个站点${split && accts.length > 1 ? `<i class="ot-i" data-tipf-always data-tipf="${esc(`其中 ${split} 个站点的 GA4 和 Search Console 来自不同账号，在两个账号下各算一次，所以各账号的站点数相加会多出 ${split} 个`)}">${ic('info', 12)}</i>` : ''}</small></span>`
       : `<span class="ot">${by.get(v).error ? ic('alert', 13) : ''}${mailTip(by.get(v).email)}<small>${by.get(v).error ? '需要重新连接' : `${count(v)} 个站点`}</small></span>`,
     onChange: (v) => {
       if (v === ADD || v === MANAGE) { init(); return v === ADD ? googleConnect(null) : goSettings('goo'); }

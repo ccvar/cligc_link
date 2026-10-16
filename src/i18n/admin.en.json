@@ -503,7 +503,7 @@
 "关闭后访问短链返回 404": "When off, the link returns 404",
 "关闭后，Script 链接不再生效；已粘贴到页面的完整代码不受影响。": "When off, the Script link stops working; full code already pasted into pages is unaffected.",
 "其中": "Of which",
-"其中 {} 个站点的 GA4 和 GSC 来自不同账号，两边各算一次": "{} sites get GA4 and GSC from different accounts and count under both",
+"其中 {} 个站点的 GA4 和 Search Console 来自不同账号，在两个账号下各算一次，所以各账号的站点数相加会多出 {} 个": "{0} sites get GA4 and Search Console from different accounts and count under both, so the per-account totals add up to {1} more",
 "其中本项目": "This project:",
 "其他": "Other",
 "其他 {} 台设备需要重新输入密码才能登录。当前设备不受影响。": "The other {} devices will need to enter the password again. This device isn't affected.",
