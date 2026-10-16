@@ -592,6 +592,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .hr-r a { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
 .hr-r a:hover { color: var(--accent-ink); }
 .hr-more { grid-column: 1 / -1; justify-self: start; display: inline-flex; align-items: center; gap: 3px; border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; color: var(--accent-ink); cursor: pointer; }
+.hr-more.g-lh { color: var(--muted); gap: 4px; margin-left: 10px; }
+.hr-more.g-lh:hover { color: var(--accent-ink); }
 @media (max-width: 640px) { .hr-c { max-width: 120px; } }
 .hero .meta { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
 .hero .ttl-t { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1392,6 +1394,33 @@ button.gtg { cursor: pointer; }
 .gd { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
 .gd.up { color: var(--good); } .gd.down { color: var(--bad); }
 .kstrip.gk .kc-h .gd { display: inline; }
+/* 站点详情：GA4 / Search Console 两行数据卡 */
+.kstrip.g8 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kstrip.g8 .kc { border-left: 1px solid var(--line-2); border-top: 0; }
+.kstrip.g8 .kc:nth-child(4n+1) { border-left: 0; }
+.kstrip.g8 .kc:nth-child(n+5) { border-top: 1px solid var(--line-2); }
+.kstrip.g8 .kc-h .l svg { flex: none; }
+.kstrip.g8 .kc-d { display: flex; align-items: center; gap: 8px; }
+.kc-mi { flex: 1; max-width: 90px; height: 4px; border-radius: 2px; background: var(--sunken); overflow: hidden; }
+.kc-mi i { display: block; height: 100%; border-radius: 2px; background: var(--amber); transform-origin: left; animation: grow 1s var(--ease-out) both .2s; }
+.kc-bar { position: relative; flex: 1; max-width: 110px; height: 6px; border-radius: 3px; background: var(--sunken); }
+.kc-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--accent); transform-origin: left; animation: grow 1s var(--ease-out) both .2s; }
+.kc-bar.good i { background: var(--good); } .kc-bar.low i { background: var(--amber); }
+.kc-bar s { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--text-2); }
+.kc-rank { flex: 1; padding: 4px 4px 0; }
+.kr-t { position: relative; height: 6px; border-radius: 3px; background: linear-gradient(90deg, color-mix(in srgb, var(--good) 55%, transparent), color-mix(in srgb, var(--amber) 45%, transparent) 60%, var(--sunken)); }
+.kr-t i { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--panel); transition: left .8s var(--ease-out); }
+.kr-t i.p { width: 8px; height: 8px; margin: -4px 0 0 -4px; background: var(--faint); box-shadow: none; }
+.kr-l { position: relative; height: 14px; margin-top: 3px; font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.kr-l span { position: absolute; left: 0; transform: translateX(-50%); }
+.kr-l span:first-child { transform: none; }
+.kr-l span.e { left: auto; right: 0; transform: none; }
+@media (max-width: 1100px) {
+  .kstrip.g8 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kstrip.g8 .kc { border-left: 0; border-top: 1px solid var(--line-2); }
+  .kstrip.g8 .kc:nth-child(even) { border-left: 1px solid var(--line-2); }
+  .kstrip.g8 .kc:nth-child(-n+2) { border-top: 0; }
+}
 /* 站点列表上方汇总 */
 .kstrip.gs { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 16px; }
 .kstrip.gs .kc-d .gd { display: inline; margin-left: 2px; }
@@ -1812,10 +1841,26 @@ function duplicateDialog(src, onDone) {
   const hide = () => { if (tip) tip.remove(); tip = null; cur = null; clearTimeout(timer); };
   // 触屏设备没有悬停：点一下显示，3 秒后或点别处时收起（data-tip 的提示也一样处理）
   const touch = matchMedia('(hover: none)').matches;
+  // 没写提示、但被省略号截断的文字：自动用完整文字做提示（往上找几层，找到截断的那个元素）
+  const clipped = (start) => {
+    for (let el = start, i = 0; el && el.nodeType === 1 && i < 4; el = el.parentElement, i++) {
+      if (el.closest('[data-tipf], .ftip, input, textarea, select, svg')) return null;
+      const cs = getComputedStyle(el);
+      const cut = (cs.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1)
+        || (cs.webkitLineClamp && cs.webkitLineClamp !== 'none' && el.scrollHeight > el.clientHeight + 1);
+      if (cut) { const t = el.innerText.trim(); return t ? [el, t] : null; }
+    }
+    return null;
+  };
   if (touch) {
     document.addEventListener('click', (e) => {
       const el = e.target.closest && e.target.closest('[data-tipf], [data-tip]');
-      if (!el || el === cur) { hide(); return; }
+      if (!el) {
+        const c = !e.target.closest?.('a, button') && clipped(e.target);
+        if (c && c[0] !== cur) { show(c[0], c[1], true); timer = setTimeout(hide, 3000); } else hide();
+        return;
+      }
+      if (el === cur) { hide(); return; }
       show(el, el.dataset.tipf || el.dataset.tip, true);
       timer = setTimeout(hide, 3000);
     }, true);
@@ -1823,9 +1868,16 @@ function duplicateDialog(src, onDone) {
   document.addEventListener('mouseover', (e) => {
     if (touch) return;
     const el = e.target.closest && e.target.closest('[data-tipf]');
+    if (!el) {
+      const c = clipped(e.target);
+      if (c && c[0] === cur) return;
+      hide();
+      if (c) show(c[0], c[1]);
+      return;
+    }
     if (el === cur) return;
     hide();
-    if (!el || !el.dataset.tipf) return;
+    if (!el.dataset.tipf) return;
     if (!el.hasAttribute('data-tipf-always') && el.scrollWidth <= el.clientWidth + 1) return;
     show(el, el.dataset.tipf);
   });
@@ -4877,13 +4929,24 @@ async function renderSites(token) {
 }
 
 // 站点详情：站点上的推广短链（从这个站点点出去的，按访问来源匹配）+ 跳转到这个站点的短链（有才显示）
+// 顶部信息栏里的小提示：这个站点还没有点出的短链，点一下复制 ?src= 标记
+function siteLinksHint(d) {
+  if ((d.linksFrom || []).length || !d.host.includes('.')) return '';
+  return `<button type="button" class="hr-more g-lh" id="g-lh" data-tipf-always data-tipf="${esc(`还没有从这个站点点出的短链。在 ${d.host} 的页面上放短链时带上 ?src=${d.host}（短链详情页的“投放链接”可以生成），点击就会算到这个站点。点一下复制这个标记`)}">${ic('link', 12)}还没有关联短链</button>`;
+}
+function bindSiteLinksHint(d) {
+  const b = document.getElementById('g-lh');
+  if (b) b.onclick = () => copy(`?src=${d.host}`, '已复制，加到短链地址后面即可');
+}
+
 function siteLinksCard(d) {
   const hasP = d.days !== 365;
   const from = d.linksFrom || [], to = d.links || [];
   const fromTotal = from.reduce((a, l) => a + l.human, 0), toTotal = to.reduce((a, l) => a + l.human, 0);
   const ses = d.ga?.totals?.cur?.sessions ?? d.cur.ga?.sessions;
   const slug = (l) => `<td><div class="mono">/${esc(l.slug)}</div>${l.title ? `<div class="sm ell" data-tipf="${esc(l.title)}">${esc(l.title)}</div>` : ''}</td>`;
-  const fromCard = `<section class="card rv">
+  // 没有从这个站点点出的短链时不占一块区域，改在顶部信息栏里提示（siteLinksHint）
+  const fromCard = !from.length ? '' : `<section class="card rv">
     <div class="card-h"><h3>站点上的推广短链</h3><span class="sp"></span>
       <span class="sub">${from.length ? `${from.length} 个短链 · ${G_LABEL()}真人点击 ${num(fromTotal)}${d.linksFromVisitors ? ` · <span data-tipf-always data-tipf="按 IP 去重（估算，误差约 5%）">${num(d.linksFromVisitors)} 位访客</span>` : ''}${ses ? ` · 点出率 <b data-tipf-always data-tipf="短链真人点击 ÷ 站点会话">${pct1(fromTotal / ses)}</b>` : ''}` : '按短链访问的来源（src 参数或 Referer）匹配'}</span></div>
     ${from.length ? `<div class="scroll"><table class="tbl gt gsl-t">
@@ -4894,9 +4957,7 @@ function siteLinksCard(d) {
         <td class="num">${l.visitors != null ? num(l.visitors) : '—'}</td>
         <td class="num">${num(l.cur)}</td>
         <td class="num">${fromTotal ? pctText(l.human / fromTotal) : '—'}</td></tr>`).join('')}</tbody></table></div>`
-      : `<div class="g-empty"><span class="g-empty-i">${ic('link', 18)}</span>
-          <div><b>还没有从这个站点点出的短链</b><span>在 ${esc(d.host)} 的页面上放短链时，带上 <code>?src=${esc(d.host)}</code>（短链详情页的“投放链接”可以生成），点击就会算到这个站点</span></div>
-          <a class="btn sm" href="#/links">${ic('link', 14)}去短链</a></div>`}
+      : ''}
   </section>`;
   const toCard = to.length ? `<section class="card rv">
     <div class="card-h"><h3>跳转到这个站点的短链</h3><span class="sp"></span><span class="sub">${to.length} 个短链 · ${G_LABEL()}真人点击 ${num(toTotal)}</span></div>
@@ -4919,7 +4980,6 @@ async function renderSite(token, host) {
   const ga = d.ga?.totals?.cur || fromDaily(d.cur.ga), gp = d.ga?.totals?.prev || fromDaily(d.prev.ga), sc = d.cur.gsc, sp = d.prev.gsc;
   // GA4 指标来自实时查询（用户数按区间去重）；列表页用每天同步的数据相加，数字可能略有差异
   const LIVE = 'GA4 实时查询的区间数据（用户按整个区间去重）；站点列表用每天同步的数据相加，两边数字可能略有差异';
-  const kc = (label, v, delta, sub = '') => `<div class="kc"><div class="kc-h"><span class="l"${['用户', '会话', '浏览量', '关键事件'].includes(label) && d.ga?.totals ? ` data-tipf-always data-tipf="${LIVE}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b></div>${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
   const title = host.startsWith('ga4-') ? d.ga4?.name || host : host;
 
   // 每日序列（缺的日期补 0），上一周期按序号对齐
@@ -4936,8 +4996,27 @@ async function renderSite(token, host) {
     const r = map.get(k) || {}, p = prev[prev.length - days.length + i] || {};
     const dt = new Date(k + 'T00:00:00');
     return { k, t: `${dt.getMonth() + 1} 月 ${dt.getDate()} 日 ${WEEK[dt.getDay()]}`, label: `${dt.getMonth() + 1}/${dt.getDate()}`,
-      s: r.sessions || 0, u: r.users || 0, c: r.clicks || 0, i: r.impressions || 0, ps: p.sessions || 0, pc: p.clicks || 0 };
+      s: r.sessions || 0, u: r.users || 0, c: r.clicks || 0, i: r.impressions || 0, ps: p.sessions || 0, pc: p.clicks || 0,
+      v: r.views || 0, e: r.key_events || 0, pu: p.users || 0, pv: p.views || 0, pe: p.key_events || 0, pi: p.impressions || 0 };
   });
+  // 数据卡：标签前是数据来源图标，数值旁是每日趋势（虚线为上一周期）
+  const col = (k) => series.map((x) => x[k]);
+  const hasPrevS = prev.length > 0;
+  const sk = (k, pk, color) => (series.length > 1 ? `<span class="kc-sp">${kpiSpark(col(k), color, hasPrevS ? col(pk) : null)}</span>` : '');
+  const kc2 = (src, label, v, delta, extra, sub, tip = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${src === 'ga' ? BRAND.ga(13) : BRAND.gsc(13)}${label}</span>${delta || ''}</div>
+    <div class="kc-v"><b>${v}</b>${extra || ''}</div>${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
+  const GA_TIP = d.ga?.totals ? LIVE : '', NO_GA = d.ga4 ? '暂时无法读取' : '未关联 GA4', NO_SC = '未关联 Search Console';
+  // 点击率：和该排名的常见点击率比；排名：1–50 的刻度上标出本期和上期的位置
+  const CTR_CURVE = [0, 0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018];
+  const expCtr = (pos) => (pos < 1 ? 0.28 : pos <= 10 ? CTR_CURVE[Math.round(pos)] : pos <= 20 ? 0.01 : 0.003);
+  const ctrBar = () => {
+    if (!sc?.impressions) return '';
+    const e = expCtr(sc.position), top = Math.max(sc.ctr, e) * 1.25 || 1;
+    return `<div class="kc-bar ${sc.ctr >= e ? 'good' : 'low'}" data-tipf-always data-tipf="${esc(`排名 ${sc.position.toFixed(1)} 的常见点击率约 ${pct1(e)}`)}"><i style="width:${(sc.ctr / top) * 100}%"></i><s style="left:${(e / top) * 100}%"></s></div>`;
+  };
+  const rankX = (pos) => (Math.log(Math.min(50, Math.max(1, pos))) / Math.log(50)) * 100;
+  const rankScale = () => (sc?.impressions ? `<div class="kc-rank"><div class="kr-t">${sp?.impressions ? `<i class="p" style="left:${rankX(sp.position)}%" data-tipf-always data-tipf="${esc(`上一周期 ${sp.position.toFixed(1)}`)}"></i>` : ''}<i style="left:${rankX(sc.position)}%"></i></div>
+    <div class="kr-l"><span>1</span><span style="left:${rankX(10)}%">10</span><span style="left:${rankX(20)}%">20</span><span class="e">50+</span></div></div>` : '');
 
   const gt = (rows, cols) => rows?.length ? `<table class="tbl gt"><thead><tr>${cols.map((c) => `<th class="${c.r ? 'r' : ''}">${c.h}</th>`).join('')}</tr></thead>
     <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td class="${c.r ? 'num' : ''}">${c.f(r)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
@@ -4955,16 +5034,18 @@ async function renderSite(token, host) {
           <span class="gico${d.ga4 ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.ga4 ? `Google Analytics 4：${d.ga4.account} / ${d.ga4.name}（${d.ga4.property}）${d.ga4.email ? ` · ${d.ga4.email}` : ''}` : '未关联 Google Analytics 4')}">${BRAND.ga(15)}</span>
           <span class="gico${d.gsc ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.gsc ? `Search Console：${d.gsc}${d.gscEmail ? ` · ${d.gscEmail}` : ''}` : '未关联 Search Console')}">${BRAND.gsc(15)}</span>
           ${d.syncedAt ? `<span class="g-si" data-tipf-always data-tipf="${esc(fmtTime(d.syncedAt))}">${ic('refresh', 13)}同步于 ${ago(d.syncedAt)}</span>` : ''}
-          ${siteTagsBar(host, d.tags || [])}</div>
+          ${siteTagsBar(host, d.tags || [])}${siteLinksHint(d)}</div>
       </div><div class="acts"><button class="btn ghost g-ai" id="g-ai1">${ic('ai', 15)}AI 分析</button>${gRangeBar()}</div></section>
       ${d.errors?.length || d.error ? `<div class="bulk-bad">${ic('info', 15)}<div>${[d.error, ...(d.errors || [])].filter(Boolean).map(esc).join('<br>')}</div></div>` : ''}
-      <section class="card kstrip gk rv">
-        ${kc('用户', ga?.users != null ? num(ga.users) : '—', ga?.users != null && gp?.users != null ? gDelta(ga.users, gp.users) : '', ga?.newUsers != null ? `新用户 ${num(ga.newUsers)}` : d.ga4 ? '暂时无法读取' : '未关联 GA4')}
-        ${kc('会话', ga ? num(ga.sessions) : '—', ga && gp ? gDelta(ga.sessions, gp.sessions) : '', ga?.duration != null ? `平均时长 ${Math.round(ga.duration)} 秒` : '')}
-        ${kc('浏览量', ga ? num(ga.views) : '—', ga && gp ? gDelta(ga.views, gp.views) : '')}
-        ${kc('关键事件', ga ? num(ga.keyEvents) : '—', ga && gp ? gDelta(ga.keyEvents, gp.keyEvents) : '', ga ? `互动率 ${pct1(ga.engagement)}` : '')}
-        ${kc('搜索点击', sc ? num(sc.clicks) : '—', sc && sp ? gDelta(sc.clicks, sp.clicks) : '', sc ? `展示 ${num(sc.impressions)}` : '未关联 Search Console')}
-        ${kc('点击率 / 排名', sc ? `${pct1(sc.ctr)}<small> · ${sc.impressions ? sc.position.toFixed(1) : '—'}</small>` : '—', sc && sp && sp.impressions ? gDelta(sc.position, sp.position, true) : '', sc ? '排名越小越好' : '')}
+      <section class="card kstrip gk g8 rv">
+        ${kc2('ga', '用户', ga?.users != null ? num(ga.users) : '—', ga?.users != null && gp?.users != null ? gDelta(ga.users, gp.users) : '', ga ? sk('u', 'pu', 'var(--accent)') : '', ga?.newUsers != null ? `新用户 ${num(ga.newUsers)}` : ga ? '' : NO_GA, GA_TIP)}
+        ${kc2('ga', '会话', ga ? num(ga.sessions) : '—', ga && gp ? gDelta(ga.sessions, gp.sessions) : '', ga ? sk('s', 'ps', 'var(--violet)') : '', ga?.duration != null ? `平均时长 ${Math.round(ga.duration)} 秒` : ga ? '' : NO_GA, GA_TIP)}
+        ${kc2('ga', '浏览量', ga ? num(ga.views) : '—', ga && gp ? gDelta(ga.views, gp.views) : '', ga ? sk('v', 'pv', 'var(--teal)') : '', ga?.sessions ? `每次会话 ${(ga.views / ga.sessions).toFixed(1)} 页` : ga ? '' : NO_GA, GA_TIP)}
+        ${kc2('ga', '关键事件', ga ? num(ga.keyEvents) : '—', ga && gp ? gDelta(ga.keyEvents, gp.keyEvents) : '', ga ? sk('e', 'pe', 'var(--amber)') : '', ga ? `互动率 ${pct1(ga.engagement)}<span class="kc-mi"><i style="width:${Math.min(100, ga.engagement * 100)}%"></i></span>` : NO_GA, GA_TIP)}
+        ${kc2('gsc', '搜索点击', sc ? num(sc.clicks) : '—', sc && sp ? gDelta(sc.clicks, sp.clicks) : '', sc ? sk('c', 'pc', 'var(--accent)') : '', sc ? (sp ? `上一周期 ${num(sp.clicks)}` : '') : NO_SC)}
+        ${kc2('gsc', '曝光量', sc ? num(sc.impressions) : '—', sc && sp ? gDelta(sc.impressions, sp.impressions) : '', sc ? sk('i', 'pi', 'var(--violet)') : '', sc ? (sp ? `上一周期 ${num(sp.impressions)}` : '') : NO_SC, '在 Google 搜索结果中出现的次数')}
+        ${kc2('gsc', '点击率', sc?.impressions ? pct1(sc.ctr) : '—', sc && sp?.impressions ? gDelta(sc.ctr, sp.ctr) : '', '', sc?.impressions ? `${ctrBar()}<span>该排名常见约 ${pct1(expCtr(sc.position))}</span>` : sc ? '' : NO_SC)}
+        ${kc2('gsc', '平均排名', sc?.impressions ? sc.position.toFixed(1) : '—', sc && sp?.impressions ? gDelta(sc.position, sp.position, true) : '', '', sc?.impressions ? rankScale() : sc ? '' : NO_SC, '按展示加权的平均排名，越小越靠前')}
       </section>
       ${siteLinksCard(d)}
       <div class="grid2">
@@ -4992,6 +5073,7 @@ async function renderSite(token, host) {
   reveal(page);
   bindGRange(() => renderSite(routeToken, host));
   bindSiteTags(host, () => renderSite(routeToken, host));
+  bindSiteLinksHint(d);
   document.getElementById('g-ai1').onclick = () => shareDialog([{ host, sessions: d.cur.ga?.sessions || 0 }], [host]);
   page.querySelectorAll('.gsl-t tr[data-href]').forEach((tr) => {
     const go = () => { location.hash = tr.dataset.href; };
