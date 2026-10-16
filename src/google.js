@@ -15,7 +15,7 @@ const SCOPES = [
 ];
 const DAY = 86400000;
 // 首次回填 486 天（Search Console 最多保留 16 个月），够“最近 6 个月”做环比；回填天数变了会重新回填一次
-const BACKFILL_DAYS = 486, REFRESH_DAYS = 10;
+const BACKFILL_DAYS = 486, GA_REFRESH = 4, SC_REFRESH = 5;
 // 渠道占比只回填一年（最长的区间是 12 个月，且不做环比），省写入
 const CHANNEL_DAYS = 366;
 export const RANGE_DAYS = [7, 14, 28, 90, 180, 365];
@@ -305,6 +305,8 @@ export async function discover(env, secret, only) {
 async function rebuildSites(env) {
   const accts = (await env.DB.prepare('SELECT id, found FROM g_accounts ORDER BY connected_at').all()).results
     .map((a) => ({ id: a.id, found: a.found ? JSON.parse(a.found) : null }));
+  // 已有的对应关系优先保留：同一域名对应多个媒体资源 / 站点时，Google 返回的顺序变了也不换（否则会清空数据重新回填）
+  const old = new Map((await env.DB.prepare('SELECT host, ga4_property, gsc_site FROM g_sites').all()).results.map((r) => [r.host, r]));
   const sites = new Map();
   const get = (host) => {
     if (!sites.has(host)) sites.set(host, { host, ga4_property: '', ga4_name: '', ga4_account: '', ga4_acct: '', gsc_site: '', gsc_acct: '' });
@@ -313,7 +315,8 @@ async function rebuildSites(env) {
   for (const a of accts) {
     for (const p of a.found?.props || []) {
       const s = get(p.host || `ga4-${p.id}`);
-      if (!s.ga4_property) Object.assign(s, { ga4_property: p.id, ga4_name: p.name, ga4_account: p.account, ga4_acct: a.id });
+      const keep = old.get(s.host)?.ga4_property;
+      if (!s.ga4_property || (p.id === keep && s.ga4_property !== keep)) Object.assign(s, { ga4_property: p.id, ga4_name: p.name, ga4_account: p.account, ga4_acct: a.id });
     }
   }
   const gsc = accts.flatMap((a) => (a.found?.gsc || []).map((g) => ({ ...g, acct: a.id })));
@@ -321,12 +324,12 @@ async function rebuildSites(env) {
   for (const g of gsc.sort((a, b) => dom(a) - dom(b))) {   // sort 是稳定的：同类里仍按账号连接顺序
     if (!g.host) continue;
     const s = get(g.host);
-    if (!s.gsc_site) Object.assign(s, { gsc_site: g.url, gsc_acct: g.acct });
+    const keep = old.get(g.host)?.gsc_site;
+    if (!s.gsc_site || (g.url === keep && s.gsc_site !== keep)) Object.assign(s, { gsc_site: g.url, gsc_acct: g.acct });
   }
 
   const now = Date.now();
-  const old = new Map((await env.DB.prepare('SELECT host, ga4_property, gsc_site FROM g_sites').all()).results.map((r) => [r.host, r]));
-  const stmts = [];
+  const stmts = [gVerStmt(env)];
   for (const s of sites.values()) {
     const o = old.get(s.host);
     stmts.push(env.DB.prepare(
@@ -357,12 +360,20 @@ async function rebuildSites(env) {
 
 async function syncSite(env, secret, s) {
   const first = !s.synced_at;
-  const end = ymd(Date.now()), start = ymd(Date.now() - (first ? BACKFILL_DAYS : REFRESH_DAYS) * DAY);
+  // 复查窗口：GA4 的数据一两天内就定了，Search Console 要三四天；首次同步回填 16 个月
+  const day = (n) => ymd(Date.now() - n * DAY);
+  const end = ymd(Date.now());
+  const gaStart = day(first ? BACKFILL_DAYS : GA_REFRESH), scStart = day(first ? BACKFILL_DAYS : SC_REFRESH);
+  const chStart = s.ch_at ? gaStart : day(CHANNEL_DAYS);
   const stmts = [], errors = [];
+  // 只写有变化的行：先读出窗口内已有的数据比对（读比写便宜得多）
+  const from = [gaStart, scStart, chStart].sort()[0];
+  const old = new Map((await env.DB.prepare('SELECT * FROM g_daily WHERE host = ? AND date >= ?').bind(s.host, from).all()).results.map((r) => [r.date, r]));
+  const same = (a, b) => (a == null || b == null ? a == null && b == null : Math.abs(a - b) < 1e-9);
   if (s.ga4_property) {
     try {
       const d = await gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${s.ga4_property}:runReport`, {
-        dateRanges: [{ startDate: start, endDate: end }],
+        dateRanges: [{ startDate: gaStart, endDate: end }],
         dimensions: [{ name: 'date' }],
         metrics: ['activeUsers', 'sessions', 'screenPageViews', 'keyEvents', 'engagementRate'].map((name) => ({ name })),
         limit: 1000,
@@ -371,6 +382,8 @@ async function syncSite(env, secret, s) {
         const v = r.dateValue || r.dimensionValues[0].value;
         const date = `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`;
         const m = r.metricValues.map((x) => Number(x.value) || 0);
+        const o = old.get(date);
+        if (o && ['users', 'sessions', 'views', 'key_events', 'engagement'].every((k, i) => same(o[k], m[i]))) continue;
         stmts.push(env.DB.prepare(
           `INSERT INTO g_daily (host, date, users, sessions, views, key_events, engagement) VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(host, date) DO UPDATE SET users = excluded.users, sessions = excluded.sessions, views = excluded.views,
@@ -380,9 +393,8 @@ async function syncSite(env, secret, s) {
     } catch (e) { errors.push(`GA4：${e.message}`); }
     // 每天的渠道分组会话数（存成 JSON），首次补一年
     try {
-      const cs = s.ch_at ? start : ymd(Date.now() - CHANNEL_DAYS * DAY);
       const d = await gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${s.ga4_property}:runReport`, {
-        dateRanges: [{ startDate: cs, endDate: end }],
+        dateRanges: [{ startDate: chStart, endDate: end }],
         dimensions: [{ name: 'date' }, { name: 'sessionDefaultChannelGroup' }],
         metrics: [{ name: 'sessions' }],
         limit: 25000,
@@ -394,24 +406,30 @@ async function syncSite(env, secret, s) {
         if (!byDay.has(date)) byDay.set(date, {});
         byDay.get(date)[ch] = Number(r.metricValues[0].value) || 0;
       }
+      const norm = (o) => JSON.stringify(Object.fromEntries(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : 1))));
       for (const [date, ch] of byDay) {
+        const val = norm(ch), o = old.get(date)?.channels;
+        if (o && (() => { try { return norm(JSON.parse(o)) === val; } catch { return false; } })()) continue;
         stmts.push(env.DB.prepare('INSERT INTO g_daily (host, date, channels) VALUES (?, ?, ?) ON CONFLICT(host, date) DO UPDATE SET channels = excluded.channels')
-          .bind(s.host, date, JSON.stringify(ch)));
+          .bind(s.host, date, val));
       }
-      stmts.push(env.DB.prepare('UPDATE g_sites SET ch_at = ? WHERE host = ?').bind(Date.now(), s.host));
+      if (!s.ch_at) stmts.push(env.DB.prepare('UPDATE g_sites SET ch_at = ? WHERE host = ?').bind(Date.now(), s.host));
     } catch (e) { errors.push(`GA4 渠道：${e.message}`); }
   }
   if (s.gsc_site) {
     try {
       const d = await gfetch(env, secret, s.gsc_acct, `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(s.gsc_site)}/searchAnalytics/query`, {
-        startDate: start, endDate: end, dimensions: ['date'], rowLimit: 1000, dataState: 'all',
+        startDate: scStart, endDate: end, dimensions: ['date'], rowLimit: 1000, dataState: 'all',
       });
       for (const r of d.rows || []) {
+        const m = [r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0];
+        const o = old.get(r.keys[0]);
+        if (o && ['clicks', 'impressions', 'ctr', 'position'].every((k, i) => same(o[k], m[i]))) continue;
         stmts.push(env.DB.prepare(
           `INSERT INTO g_daily (host, date, clicks, impressions, ctr, position) VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(host, date) DO UPDATE SET clicks = excluded.clicks, impressions = excluded.impressions,
              ctr = excluded.ctr, position = excluded.position`
-        ).bind(s.host, r.keys[0], r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0));
+        ).bind(s.host, r.keys[0], ...m));
       }
     } catch (e) { errors.push(`GSC：${e.message}`); }
   }
@@ -434,13 +452,24 @@ async function syncSite(env, secret, s) {
         }
         for (const [k] of part) users[k] ??= 0;
       }
-      stmts.push(env.DB.prepare('UPDATE g_sites SET users = ? WHERE host = ?').bind(JSON.stringify(users), s.host));
+      const val = JSON.stringify(Object.fromEntries(Object.entries(users).sort(([a], [b]) => (a < b ? -1 : 1))));
+      let prevVal = '';
+      try { prevVal = s.users ? JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(s.users)).sort(([a], [b]) => (a < b ? -1 : 1)))) : ''; } catch {}
+      if (val !== prevVal) stmts.push(env.DB.prepare('UPDATE g_sites SET users = ? WHERE host = ?').bind(val, s.host));
     } catch (e) { errors.push(`GA4 用户：${e.message}`); }
   }
-  stmts.push(env.DB.prepare('UPDATE g_sites SET synced_at = ?, error = ? WHERE host = ?').bind(Date.now(), errors.join('；'), s.host));
+  // 有数据变化时更新版本号，站点列表的缓存据此失效（没变化就继续用缓存）
+  const err = errors.join('；');
+  if (stmts.length || err !== (s.error || '')) stmts.push(gVerStmt(env));
+  stmts.push(env.DB.prepare('UPDATE g_sites SET synced_at = ?, error = ? WHERE host = ?').bind(Date.now(), err, s.host));
   for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
   return errors;
 }
+
+// Google 数据版本号：每日数据、站点对应关系、区间用户数变了就更新
+const gVerStmt = (env) => env.DB.prepare(
+  "INSERT INTO settings (key, value, updated_at) VALUES ('g_ver', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+).bind(String(Date.now()), Date.now());
 
 // 一次最多同步 limit 个站点（每个约 3 个请求），按最久未同步优先；返回剩余待同步数。
 // cutoff：同步时间早于它的站点才同步（默认 6 小时前）；手动“全部同步”时传入开始同步的时刻
@@ -517,10 +546,11 @@ export function ranges(days) {
   return { from, to, pfrom, pto };
 }
 
-// 站点列表缓存 5 分钟；数据版本（Google 同步时间、访问汇总进度、短链改动、账号数）变了就重算
+// 站点列表缓存 5 分钟；数据版本（Google 数据版本、访问汇总进度、短链改动、账号数）变了就重算。
+// 其中按天汇总 Google 数据的部分最耗读取，单独按 Google 数据版本缓存，访问汇总每小时推进时不用重读
 export async function sitesList(env, days) {
   const v = await env.DB.prepare(`SELECT
-      (SELECT COALESCE(MAX(synced_at), 0) || ':' || COUNT(*) FROM g_sites) AS g,
+      COALESCE((SELECT value FROM settings WHERE key = 'g_ver'), '0') || ':' || (SELECT COUNT(*) FROM g_sites) AS g,
       (SELECT value FROM settings WHERE key = 'agg_mark') AS a,
       (SELECT COALESCE(MAX(updated_at), 0) || ':' || COUNT(*) FROM links) AS l,
       (SELECT COALESCE(MAX(updated_at), 0) || ':' || COUNT(*) FROM link_targets) AS t,
@@ -529,7 +559,7 @@ export async function sitesList(env, days) {
   const key = `sites|${days}|${ranges(days).to}|${v.g}|${v.a}|${v.l}|${v.t}|${v.n}|${v.tv || 0}`;
   const hit = await env.DB.prepare('SELECT v, at FROM g_cache WHERE k = ?').bind(key).first();
   if (hit && hit.at > Date.now() - 300000) return JSON.parse(hit.v);
-  const out = await sitesListRaw(env, days);
+  const out = await sitesListRaw(env, days, v.g);
   const body = JSON.stringify(out);
   // D1 单个值最大 2 MB；站点多、区间长时结果可能很大，超过 1.5 MB 就不缓存
   if (body.length < 1.5e6) {
@@ -539,22 +569,47 @@ export async function sitesList(env, days) {
   return out;
 }
 
-async function sitesListRaw(env, days) {
+// 每个站点区间内的 Google 数据汇总和每日序列；按 Google 数据版本缓存（最长一天）
+async function sitesDaily(env, days, ver) {
   const { from, to, pfrom, pto } = ranges(days);
-  const [sites, rows] = await Promise.all([
-    env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email FROM g_sites s
-      LEFT JOIN g_accounts a ON a.id = s.ga4_acct LEFT JOIN g_accounts b ON b.id = s.gsc_acct ORDER BY s.host`).all().then((r) => r.results),
-    env.DB.prepare('SELECT * FROM g_daily WHERE date >= ? AND date <= ?').bind(pfrom, to).all().then((r) => r.results),
-  ]);
+  const key = `sitesd|${days}|${to}|${ver}`;
+  const hit = await env.DB.prepare('SELECT v FROM g_cache WHERE k = ? AND at > ?').bind(key, Date.now() - DAY).first();
+  if (hit) return JSON.parse(hit.v);
+  const rows = (await env.DB.prepare('SELECT * FROM g_daily WHERE date >= ? AND date <= ?').bind(pfrom, to).all()).results;
   const byHost = new Map();
   for (const r of rows) { if (!byHost.has(r.host)) byHost.set(r.host, []); byHost.get(r.host).push(r); }
+  const out = {};
+  for (const [host, rs] of byHost) {
+    out[host] = {
+      cur: sumRange(rs, from, to), prev: hasPrev(days) ? sumRange(rs, pfrom, pto) : { ga: null, gsc: null },
+      // 每日：n 会话、c 搜索点击、u 用户（按天）、i 搜索展示；prevSpark 是上一周期每天的会话
+      spark: rs.filter((r) => r.date >= from).sort((a, b) => (a.date < b.date ? -1 : 1))
+        .map((r) => ({ k: r.date, n: r.sessions ?? 0, c: r.clicks ?? 0, u: r.users ?? 0, i: r.impressions ?? 0 })),
+      prevSpark: hasPrev(days) ? rs.filter((r) => r.date >= pfrom && r.date <= pto).map((r) => ({ k: r.date, n: r.sessions ?? 0 })) : [],
+    };
+  }
+  const body = JSON.stringify(out);
+  if (body.length < 1.5e6) {
+    await env.DB.prepare('INSERT INTO g_cache (k, v, at) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v, at = excluded.at')
+      .bind(key, body, Date.now()).run().catch(() => {});
+  }
+  return out;
+}
+
+async function sitesListRaw(env, days, ver) {
+  const [sites, daily] = await Promise.all([
+    env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email FROM g_sites s
+      LEFT JOIN g_accounts a ON a.id = s.ga4_acct LEFT JOIN g_accounts b ON b.id = s.gsc_acct ORDER BY s.host`).all().then((r) => r.results),
+    sitesDaily(env, days, ver),
+  ]);
   const hostSet = new Set(sites.map((s) => s.host));
   const tagRows = (await env.DB.prepare('SELECT host, tag FROM site_tags ORDER BY tag').all()).results;
   const tagsOf = new Map();
   for (const t of tagRows) { if (!tagsOf.has(t.host)) tagsOf.set(t.host, []); tagsOf.get(t.host).push(t.tag); }
   const [sl, sf] = await Promise.all([siteLinks(env, hostSet, days).catch(() => new Map()), siteSources(env, hostSet, days).catch(() => new Map())]);
+  const EMPTY = { cur: { ga: null, gsc: null }, prev: { ga: null, gsc: null }, spark: [], prevSpark: [] };
   return sites.map((s) => {
-    const rs = byHost.get(s.host) || [];
+    const g = daily[s.host] || EMPTY;
     const users = s.users ? JSON.parse(s.users) : {};
     return {
       host: s.host, chReady: !!s.ch_at, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '' } : null,
@@ -564,11 +619,7 @@ async function sitesListRaw(env, days) {
       links: sl.get(s.host) || [],          // 跳转到这个站点的短链
       linksFrom: sf.get(s.host) || [],      // 从这个站点点出的短链
       linksFromVisitors: sf.visitors?.get(s.host) ?? null,   // 这些点击来自多少位访客（去重）
-      cur: sumRange(rs, from, to), prev: hasPrev(days) ? sumRange(rs, pfrom, pto) : { ga: null, gsc: null },
-      // 每日：n 会话、c 搜索点击、u 用户（按天）、i 搜索展示；prevSpark 是上一周期每天的会话
-      spark: rs.filter((r) => r.date >= from).sort((a, b) => (a.date < b.date ? -1 : 1))
-        .map((r) => ({ k: r.date, n: r.sessions ?? 0, c: r.clicks ?? 0, u: r.users ?? 0, i: r.impressions ?? 0 })),
-      prevSpark: hasPrev(days) ? rs.filter((r) => r.date >= pfrom && r.date <= pto).map((r) => ({ k: r.date, n: r.sessions ?? 0 })) : [],
+      cur: g.cur, prev: g.prev, spark: g.spark, prevSpark: g.prevSpark,
     };
   });
 }

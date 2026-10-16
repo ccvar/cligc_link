@@ -534,6 +534,7 @@ async function authedApi(request, env, url, cred) {
     const days = Number(body.days) || 0;
     if (![0, 60, 90, 180, 365].includes(days)) return json({ error: '保留天数只能是 60、90、180、365 或永久' }, 400);
     await setSetting(env, 'retention_days', String(days));
+    await env.DB.prepare("DELETE FROM settings WHERE key = 'clicks_count'").run();
     return json(await retentionInfo(env));
   }
   if (path === '/api/recent' && method === 'GET') {
@@ -2198,13 +2199,20 @@ async function shareView(request, env, ctx, url) {
   return json1 ? text(JSON.stringify(rep, null, 2), 200, 'application/json; charset=utf-8', dl) : text(google.reportMarkdown(rep), 200, undefined, dl);
 }
 
+// 访问明细条数要扫整张表，一天最多数一次（存在 settings）；最早一条走 ts 索引，只读一行
 async function retentionInfo(env) {
-  const [days, st, raw] = await Promise.all([
+  const [days, st, first, cnt] = await Promise.all([
     getSetting(env, 'retention_days'),
     aggState(env),
-    env.DB.prepare('SELECT COUNT(*) AS n, MIN(ts) AS first FROM clicks').first(),
+    env.DB.prepare('SELECT ts FROM clicks ORDER BY ts LIMIT 1').first('ts'),
+    getSetting(env, 'clicks_count'),
   ]);
-  return { days: Number(days?.value) || 0, count: raw.n || 0, first: raw.first || null, aggregated: st.mark || null };
+  let count = Number(cnt?.value);
+  if (!cnt || Date.now() - cnt.updated_at > DAY) {
+    count = (await env.DB.prepare('SELECT COUNT(*) AS n FROM clicks').first('n')) || 0;
+    await setSetting(env, 'clicks_count', String(count));
+  }
+  return { days: Number(days?.value) || 0, count, first: first || null, aggregated: st.mark || null };
 }
 
 async function recentClicks(env, bots, linkId = 0) {
