@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "test": "node --test test/*.test.js",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create cligc-link",
     "deploy:prod": "wrangler deploy -c wrangler.prod.toml"

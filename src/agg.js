@@ -2,7 +2,7 @@
 // 统计页面不再每次扫描全部访问明细，而是读汇总表：
 //   agg_h  每小时 · 每个短链 · 真人 / 机器 的访问次数（趋势、今日、活跃时段）
 //   agg_d  每天 · 每个短链 · 真人 / 机器 · 维度值 的访问次数（来源、国家、设备……）
-//   agg_uv 每天 · 每个短链（0 = 全部短链）· 真人 / 机器 的独立访客（HyperLogLog 估算，误差约 4%）
+//   agg_uv 每天 · 每个短链（0 = 全部短链）· 真人 / 机器 的独立访客（HyperLogLog 估算，误差约 5%）
 //   agg_suv 每天 · 每个短链 · 每个来源 的真人独立访客（同样是 HyperLogLog；访客少时用稀疏格式省空间），用于“从站点点出的短链”去重
 // 汇总进度记在 settings.agg_mark（整点毫秒），之后的访问直接读原始明细，统计始终实时。
 // “天”按 settings.agg_tz（分钟偏移）划分，取自首次统计请求的浏览器时区。
@@ -51,7 +51,7 @@ export function hllParse(s) {
   for (const p of s.slice(1).split(',')) { if (!p) continue; const [i, v] = p.split('.'); reg[Number(i)] = Number(v); }
   return reg;
 }
-function hllPack(reg) {
+export function hllPack(reg) {
   const nz = [];
   for (let i = 0; i < M; i++) if (reg[i]) nz.push(`${i}.${reg[i]}`);
   return nz.length <= 60 ? 's' + nz.join(',') : hllEncode(reg);

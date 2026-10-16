@@ -608,6 +608,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .tbl-wrap thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line); border-bottom: 0; }
 .hero .acts { display: flex; gap: 8px; }
 .builder { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
+.b-pick { margin-bottom: 10px; }
+.b-pick[hidden] { display: none; }
+.b-pick .combo-btn { color: var(--accent); }
+.b-pick .combo-btn .nm { max-width: none; }
 @media (max-width: 760px) { .builder { grid-template-columns: 1fr; } }
 .blist { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .blist .b { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); min-width: 0; animation: rise .35s var(--ease-out) both; }
@@ -674,6 +678,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .chi.mfa { background: var(--good-bg); color: var(--good); }
 .chi.trk { background: var(--accent-2); color: var(--accent); }
 .chi-sm { width: 28px; height: 28px; margin-right: 2px; border-radius: 8px; flex: none; }
+#n-seo[hidden] { display: none; }
 .n-use-b { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
 .n-use-b > label { font-size: 13px; font-weight: 600; }
 .n-use-b .hint a { color: var(--accent); }
@@ -723,7 +728,13 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .ai-st { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .ai-st b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-st span { font-size: 12px; color: var(--muted); }
-.chi.chi.brand { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }   /* 品牌色标志放在白底上，暗色模式也保持白底 */
+.ai-st .hr-more { font-size: 12px; }
+.ai-ag { display: inline-flex; gap: 4px; margin-left: 6px; }
+.ai-ag i { font-style: normal; font-size: 11px; padding: 1px 6px; border-radius: 5px; background: color-mix(in srgb, var(--violet) 12%, transparent); color: var(--violet); }
+.dialog.ai-v { width: min(640px, calc(100vw - 32px)); }
+.ai-vl { max-height: 60vh; overflow: auto; margin: 4px 0 16px; }
+.ai-vl .ell { max-width: 200px; }
+.chi.chi.brand { background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }   /* 品牌标志放在面板底色上（浅色模式为白底） */
 .set-h { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--text); }
 .chi.use { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .use-steps { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 13px; color: var(--text-2); line-height: 1.7; }
@@ -1130,9 +1141,24 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .g-connect .card-b { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 48px 24px; }
 .g-connect h2 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.02em; }
 .g-connect p { margin: 0; max-width: 520px; color: var(--text-2); line-height: 1.8; }
-.g-logo { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: #fff; box-shadow: inset 0 0 0 1px var(--line), var(--shadow-1, 0 1px 2px rgba(0,0,0,.05)); }
-.g-rng { margin-left: 8px; }
+.g-logo { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-1, 0 1px 2px rgba(0,0,0,.05)); }
+.g-rng { }
 .g-lf .combo-btn .nm { max-width: 12em; }
+.gtg { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 6px; border: 0; font: inherit; font-size: 11.5px;
+  background: color-mix(in srgb, var(--teal) 13%, transparent); color: color-mix(in srgb, var(--teal) 75%, var(--text)); white-space: nowrap; }
+.gtg small { font-size: 10.5px; opacity: .7; }
+.gtg button { border: 0; background: none; padding: 0; color: inherit; cursor: pointer; display: grid; opacity: .6; }
+.gtg button:hover { opacity: 1; }
+.gtg.sm-t { height: 17px; font-size: 10.5px; padding: 0 5px; }
+button.gtg { cursor: pointer; }
+.g-tags { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-left: 10px; }
+.g-tags .hr-more { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; }
+.dialog.tag-d { width: min(440px, calc(100vw - 32px)); }
+.tag-d .input { width: 100%; }
+.tg-sug { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tg-list { display: grid; gap: 6px; margin-bottom: 16px; max-height: 50vh; overflow: auto; }
+.tg-r { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 9px; background: var(--sunken); }
+.tag-d .row { margin-top: 18px; }
 .g-rng .combo-btn .nm { max-width: none; }
 .g-sync { width: 36px; height: 36px; color: var(--text-2); }
 .g-sync.busy svg { animation: spin .9s linear infinite; }
@@ -1224,6 +1250,7 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .gsl-t th { white-space: nowrap; }
 #lk-gs { display: grid; gap: 20px; }
 #lk-gs:empty { display: none; }
+.g-empty.sm-e { border-top: 1px solid var(--line-2); padding: 14px 20px; }
 .g-empty code { font-family: var(--mono); font-size: 11.5px; padding: 1px 5px; border-radius: 5px; background: var(--sunken); }
 .gsl-t .ell { min-width: 110px; max-width: 260px; }
 .tbl.gt { table-layout: fixed; }
@@ -1336,6 +1363,7 @@ const I = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>',
   fold: '<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',
+  tag: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   up: '<path d="M7 17 17 7M8 7h9v9"/>',
   down: '<path d="M7 7l10 10M17 8v9H8"/>',
   phone: '<rect x="6.5" y="2" width="11" height="20" rx="2.5"/><path d="M11 18h2"/>',
@@ -2714,7 +2742,7 @@ function toLocalInput(ts) {
 
 function openDrawer(link, onDone) {
   const isNew = !link;
-  link = link || { slug: '', target_url: '', title: '', note: '', enabled: 1, pass_query: 0, expires_at: null };
+  link = link || { slug: '', target_url: '', title: '', note: '', enabled: 1, pass_query: 0, utm: 0, expires_at: null };
   const ov = document.createElement('div'); ov.className = 'ov';
   const dr = document.createElement('form'); dr.className = 'drawer'; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-modal', 'true');
   dr.innerHTML = `
@@ -2734,6 +2762,8 @@ function openDrawer(link, onDone) {
         <span class="switch"><input type="checkbox" name="enabled" ${link.enabled ? 'checked' : ''}><span class="t"></span></span></label>
       <label class="opt"><div class="tx"><b>透传参数</b><span class="hint">把短链上的 ?xxx 参数带到目标地址（src 除外）</span></div>
         <span class="switch"><input type="checkbox" name="pass_query" ${link.pass_query ? 'checked' : ''}><span class="t"></span></span></label>
+      <label class="opt"><div class="tx"><b>转化追踪</b><span class="hint">跳转时加上 utm_source=cligc 等参数，在“目标站点”里看到达会话和关键事件（GA4）；目标地址已有 utm 参数时不改动</span></div>
+        <span class="switch"><input type="checkbox" name="utm" ${link.utm ? 'checked' : ''}><span class="t"></span></span></label>
       <div class="err" role="alert"></div>
     </div>
     <div class="df">
@@ -2778,7 +2808,7 @@ function openDrawer(link, onDone) {
     if (target && !/^https?:\/\//i.test(target)) target = 'https://' + target;
     const body = {
       target_url: target, slug: String(f.get('slug')).trim(), title: f.get('title'), note: f.get('note'),
-      enabled: f.get('enabled') === 'on', pass_query: f.get('pass_query') === 'on',
+      enabled: f.get('enabled') === 'on', pass_query: f.get('pass_query') === 'on', utm: f.get('utm') === 'on',
       expires_at: f.get('expires_at') ? new Date(f.get('expires_at')).getTime() : null,
     };
     if (isNew && bothEmpty()) { dr.querySelector('.err').textContent = '请填写短链后缀或默认推广地址'; dSlug.focus(); return; }
@@ -2803,23 +2833,37 @@ async function linkSitesCard(token, id) {
   const site = (x) => `<td><div class="gh mono">${esc(x.host)}</div><div class="sm gm">${x.ga4 ? `<span class="gico">${BRAND.ga(13)}</span>` : ''}${x.gsc ? `<span class="gico">${BRAND.gsc(13)}</span>` : ''}</div></td>`;
   const gaCells = (x) => `<td class="num">${x.cur.ga ? num(x.cur.ga.sessions) : '—'}${x.cur.ga && x.prev.ga ? gDelta(x.cur.ga.sessions, x.prev.ga.sessions) : ''}</td>
     <td class="num">${x.cur.gsc ? num(x.cur.gsc.clicks) : '—'}${x.cur.gsc && x.prev.gsc ? gDelta(x.cur.gsc.clicks, x.prev.gsc.clicks) : ''}</td>`;
-  const card = (title, sub, head, rows) => `<section class="card rv"><div class="card-h"><h3>${title}</h3><span class="sp"></span><span class="sub">${sub}</span></div>
-    <div class="scroll"><table class="tbl gt gsl-t"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  const card = (title, sub, head, rows, foot = '') => `<section class="card rv"><div class="card-h"><h3>${title}</h3><span class="sp"></span><span class="sub">${sub}</span></div>
+    <div class="scroll"><table class="tbl gt gsl-t"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>${foot}</section>`;
+  // 转化追踪：到站会话 / 到达率 / 关键事件
+  const conv = (x, l) => {
+    const c = x.conversion;
+    if (!d.utm) return '';
+    if (!x.ga4) return '<td class="num sm" colspan="3">未关联 GA4</td>';
+    if (!c || c.error) return `<td class="num sm" colspan="3"${c?.error ? ` data-tipf-always data-tipf="${esc(c.error)}"` : ''}>暂时读取不到</td>`;
+    return `<td class="num">${num(c.sessions)}</td><td class="num">${l?.human ? pctText(Math.min(1, c.sessions / l.human)) : '—'}</td><td class="num">${num(c.keyEvents)}</td>`;
+  };
   box.innerHTML = (d.sources?.length ? card('来源站点', `从这些站点点进这个短链 · 最近 28 天，截至 ${d.ranges.to}`,
-      '<th>站点</th><th class="r">从该站点的真人点击</th><th class="r"><span data-tipf-always data-tipf="按 IP 去重（估算，误差约 4%）">访客</span></th><th class="r"><span data-tipf-always data-tipf="真人点击 ÷ 站点会话">点出率</span></th><th class="r">站点会话</th><th class="r">搜索点击</th>',
+      '<th>站点</th><th class="r">从该站点的真人点击</th><th class="r"><span data-tipf-always data-tipf="按 IP 去重（估算，误差约 5%）">访客</span></th><th class="r"><span data-tipf-always data-tipf="真人点击 ÷ 站点会话">点出率</span></th><th class="r">站点会话</th><th class="r">搜索点击</th>',
       d.sources.map((x) => { const l = x.linksFrom[0], ses = x.cur.ga?.sessions;
         return `<tr data-href="#/site/${encodeURIComponent(x.host)}" tabindex="0">${site(x)}
           <td class="num">${num(l.human)}${gDelta(l.human, l.prevHuman)}</td><td class="num">${l.visitors != null ? num(l.visitors) : '—'}</td><td class="num">${ses ? pct1(l.human / ses) : '—'}</td>${gaCells(x)}</tr>`; }).join('')) : '')
     + (d.targets?.length ? card('目标站点', `这个短链跳转到的站点 · 最近 28 天`,
-      '<th>站点</th><th>跳转去向</th><th class="r"><span data-tipf-always data-tipf="这个短链跳转到该站点的真人访问次数">短链点击</span></th><th class="r">站点会话</th><th class="r">搜索点击</th>',
+      `<th>站点</th><th>跳转去向</th><th class="r"><span data-tipf-always data-tipf="这个短链跳转到该站点的真人访问次数">短链点击</span></th>${d.utm
+        ? '<th class="r"><span data-tipf-always data-tipf="GA4 里来源为 cligc、广告系列为这个短链后缀的会话">到站会话</span></th><th class="r"><span data-tipf-always data-tipf="到站会话 ÷ 短链真人点击；访客没加载完页面就离开、或屏蔽了 GA4 时不会计入">到达率</span></th><th class="r">关键事件</th>' : ''}<th class="r">站点会话</th><th class="r">搜索点击</th>`,
       d.targets.map((x) => { const l = x.links[0];
         return `<tr data-href="#/site/${encodeURIComponent(x.host)}" tabindex="0">${site(x)}
           <td><div class="ell">${esc((l?.routes || []).map(routeLabel).join(' · ') || '—')}</div></td>
-          <td class="num">${l ? num(l.human) : '—'}${l ? gDelta(l.human, l.prevHuman) : ''}</td>${gaCells(x)}</tr>`; }).join('')) : '');
+          <td class="num">${l ? num(l.human) : '—'}${l ? gDelta(l.human, l.prevHuman) : ''}</td>${conv(x, l)}${gaCells(x)}</tr>`; }).join(''),
+      d.utm ? '' : `<div class="g-empty sm-e"><span class="g-empty-i">${ic('chart', 16)}</span><div><b>想看这个短链带来了多少到站会话和转化？</b>
+        <span>在短链设置里开启“转化追踪”，跳转时会带上 utm 参数，GA4 里就能按短链统计到站会话和关键事件</span></div>
+        <button type="button" class="btn sm" data-edit-utm>${ic('edit', 14)}开启</button></div>`) : '');
   box.querySelectorAll('tr[data-href]').forEach((tr) => {
     const go = () => { location.hash = tr.dataset.href; };
     tr.onclick = go; tr.onkeydown = (e) => { if (e.key === 'Enter') go(); };
   });
+  const eu = box.querySelector('[data-edit-utm]');
+  if (eu) eu.onclick = () => document.getElementById('edit')?.click();
 }
 
 async function renderLink(token, id) {
@@ -2847,7 +2891,7 @@ async function renderLink(token, id) {
             ${copyBtn(url, 'btn sm', '复制')}
             <a class="btn sm ghost icon" href="${esc(url)}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 15)}</a></div>
           ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}<button type="button" class="hr-more" data-panel-open="rules">按地区分流 ${ic('chev', 12)}</button></div>`}
-          <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}</div>
+          <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.utm ? ' · 转化追踪' : ''}</div>
           ${link.note ? `<div class="hero-note" title="${esc(link.note)}">${esc(link.note)}</div>` : ''}
         </div>
         <div class="acts">
@@ -3003,8 +3047,9 @@ function fillLinkPanel(dr, kind, link, s) {
       <button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
     <div class="db">${isRules ? rulesCard(link, s) : `<div class="builder">
       <div>
+        <div class="combo b-pick" id="b-pick" hidden></div>
         <textarea class="textarea" id="sites" rows="5" placeholder="每行一个站点名，例如：&#10;zhihu&#10;weibo&#10;forum-a" aria-label="站点名"></textarea>
-        <div class="hint" style="margin-top:8px">会生成 <code>?src=站点名</code> 的链接，统计里“来源”会按它归类，不受对方网站设置影响。</div>
+        <div class="hint" style="margin-top:8px">会生成 <code>?src=站点名</code> 的链接，统计里“来源”会按它归类，不受对方网站设置影响。用站点域名（如 gaterar.com）时，“站点”页能自动把点击算到这个站点。</div>
       </div>
       <div class="blist" id="blist"></div>
       <div class="tipbox wide">${ic('info', 16)}<div>
@@ -3035,6 +3080,24 @@ function fillLinkPanel(dr, kind, link, s) {
   sites.oninput = build;
   build();
   setTimeout(() => sites.focus(), 250);
+  // 从 Google 站点列表添加（连接了 Google 时才显示）
+  const pick = document.getElementById('b-pick');
+  api('/google/hosts').then((d) => {
+    if (!d.items?.length || !pick.isConnected) return;
+    pick.hidden = false;
+    const hosts = d.items.map((x) => x.host), names = new Map(d.items.map((x) => [x.host, x.name]));
+    const has = () => new Set(sites.value.split(/[\n,，]/).map((v) => v.trim()).filter(Boolean));
+    dropdown(pick, {
+      value: null, aria: '从站点列表添加', search: '搜索站点', empty: '没有匹配的站点', minWidth: 280, maxWidth: 360,
+      groups: (q) => [[q ? '' : `站点 · 共 ${hosts.length} 个`, hosts.filter((h) => !q || h.includes(q) || (names.get(h) || '').toLowerCase().includes(q))]],
+      button: () => `${ic('plus', 14)}<span class="nm">从站点列表添加</span>`,
+      option: (h, q) => `<span class="ot"><span class="mono">${hl(h, q)}</span>${has().has(h) ? '<small>已添加</small>' : ''}</span>`,
+      onChange: (h) => {
+        if (!has().has(h)) sites.value = (sites.value.trim() ? sites.value.trim() + '\n' : '') + h;
+        build();
+      },
+    });
+  }).catch(() => {});
 }
 
 
@@ -3339,7 +3402,7 @@ function openRuleDrawer(link, rule) {
 }
 
 // ---------------------------------------------------------------- 站点（GA4 + Search Console）
-const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), acct: '', link: '' };
+const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), acct: '', link: '', tag: '' };
 const pctD = (a, b) => (b ? (a - b) / b : null);
 const gDelta = (a, b, inverse = false) => {
   const d = pctD(a, b);
@@ -3348,6 +3411,7 @@ const gDelta = (a, b, inverse = false) => {
   return `<span class="gd ${Math.abs(d) < 0.005 ? '' : good ? 'up' : 'down'}">${up ? '↑' : '↓'}${Math.abs(d * 100) >= 100 ? Math.round(Math.abs(d * 100)) : Math.abs(d * 100).toFixed(1)}%</span>`;
 };
 const pct1 = (x) => `${(x * 100).toFixed(1)}%`;
+const tzLabelOf = (m) => `UTC${m >= 0 ? '+' : '−'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + String(Math.abs(m) % 60).padStart(2, '0') : ''}`;
 const gKc = (label, v, delta, sub = '', tip = '', extra = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b>${extra.startsWith('<svg') ? `<span class="kc-sp">${extra}</span>` : ''}</div>${extra && !extra.startsWith('<svg') ? extra : ''}${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
 // 跳转去向的文字：默认地址 / 地区规则的国家
 const routeLabel = (r) => (r.rule ? (r.countries || '').split(',').filter(Boolean).map((c) => country(c)).join('、') || '地区规则' : '默认地址');
@@ -3468,7 +3532,7 @@ function googleLinkFilter(root, items, onFilter) {
     for (const l of x.linksFrom) by.get(String(l.id)).total += l.human;
   }
   const ids = [...by.keys()].sort((a, b) => by.get(b).total - by.get(a).total);
-  if (gState.link && gState.link !== 'any' && !by.has(gState.link)) gState.link = '';
+  if (gState.link && gState.link !== 'any' && !by.has(gState.link)) { gState.link = ''; onFilter(); }
   const anyN = items.filter((x) => x.linksFrom.length + x.links.length).length;
   dropdown(root, {
     value: gState.link, aria: '按短链筛选', search: ids.length > 8 ? '搜索短链或标题' : '', empty: '没有匹配的短链', minWidth: 260, maxWidth: 340,
@@ -3613,12 +3677,15 @@ function renderShares(box, list, onState) {
   const items = list.items || [];
   box.innerHTML = items.length ? `<div class="ai-sl">${items.map((s) => `<div class="ai-si${s.expired ? ' off' : ''}">
       <div class="ai-st"><b data-tipf-always data-tipf="${esc(s.hosts.join('、'))}">${esc(shareName(s))}</b>
-        <span>${SHARE_RANGES.find(([v]) => v === s.days)?.[1] || ''} · 创建于 ${fmtTime(s.createdAt)} · ${shareExpText(s)} · 打开 ${num(s.views)} 次${s.lastView ? `（最近 ${ago(s.lastView)}）` : ''}</span></div>
+        <span>${SHARE_RANGES.find(([v]) => v === s.days)?.[1] || ''} · 创建于 ${fmtTime(s.createdAt)} · ${shareExpText(s)} ·
+          ${s.views ? `<button type="button" class="hr-more" data-views="${esc(s.token)}">打开 ${num(s.views)} 次${s.lastView ? `（最近 ${ago(s.lastView)}）` : ''}</button>` : '还没有被打开'}
+          ${s.agents?.length ? `<span class="ai-ag">${s.agents.slice(0, 4).map((a) => `<i>${esc(a.agent)} ${a.n}</i>`).join('')}</span>` : ''}</span></div>
       ${s.expired ? '' : `<button type="button" class="btn sm ghost" data-prompt="${esc(s.token)}">${ic('copy', 14)}提示词</button>${copyBtn(s.url, 'btn sm ghost icon', '')}`}
       <button type="button" class="btn sm ghost icon danger-t" data-del="${esc(s.token)}" data-tip="${s.expired ? '删除' : '撤销'}" aria-label="撤销">${ic('trash', 15)}</button></div>`).join('')}</div>
     <p class="hint" style="margin-top:10px">撤销后链接立即失效。新链接在 <a href="#/sites">站点</a> 页或站点详情页右上角的“AI 分析”生成。</p>`
     : `<p class="set-p">还没有生成过分析链接。到 <a href="#/sites">站点</a> 页点右上角的“AI 分析”，选择站点后生成一个链接，发给 AI 就能让它分析这些站点的 SEO。</p>`;
   box.querySelectorAll('[data-prompt]').forEach((b) => (b.onclick = () => copy(sharePrompt(items.find((s) => s.token === b.dataset.prompt)), '提示词已复制', b)));
+  box.querySelectorAll('[data-views]').forEach((b) => (b.onclick = () => shareViewsDialog(items.find((s) => s.token === b.dataset.views))));
   box.querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => {
     const s = items.find((x) => x.token === b.dataset.del);
     const ok = await confirmDialog({ title: s.expired ? '删除这个链接？' : '撤销这个分析链接？', text: `${shareName(s)}：撤销后链接立即失效，已经拿到链接的人（包括 AI）将无法再打开。`, ok: s.expired ? '删除' : '撤销', danger: true });
@@ -3630,8 +3697,142 @@ function renderShares(box, list, onState) {
     } catch (ex) { toast(ex.message, 'bad'); }
   }));
 }
+// 打开记录：时间、工具（按 User-Agent 识别）、国家、IP
+async function shareViewsDialog(s) {
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const d = document.createElement('div'); d.className = 'dialog ai-v'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+  const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  ov.onclick = close;
+  document.addEventListener('keydown', onKey);
+  d.innerHTML = `<h3>打开记录</h3><p>${esc(shareName(s))} · 最近 200 次</p><div class="ai-vl">${skel(160)}</div>
+    <div class="row"><button type="button" class="btn" data-no>关闭</button></div>`;
+  d.querySelector('[data-no]').onclick = close;
+  document.body.append(ov, d);
+  try {
+    const { items } = await api(`/shares/${s.token}/views`);
+    d.querySelector('.ai-vl').innerHTML = items.length ? `<table class="tbl gt"><thead><tr><th>时间</th><th>来自</th><th>国家 / 地区</th><th>IP</th></tr></thead>
+      <tbody>${items.map((v) => `<tr><td class="sm" data-tipf-always data-tipf="${esc(fmtTime(v.at))}">${ago(v.at)}</td>
+        <td><div class="ell" data-tipf-always data-tipf="${esc(v.ua || '没有 User-Agent')}">${esc(v.agent || '未知')}${v.status === 429 ? ' <span class="gtag bad">被限流</span>' : ''}</div></td>
+        <td>${v.country ? country(v.country) : '—'}</td><td class="mono sm">${esc(v.ip || '—')}</td></tr>`).join('')}</tbody></table>`
+      : `<div class="empty">${ic('inbox')}还没有打开记录（记录功能上线之前的打开不在这里）</div>`;
+  } catch (ex) { d.querySelector('.ai-vl').innerHTML = `<div class="bulk-bad">${esc(ex.message)}</div>`; }
+}
+
 const sharesPill = (l) => { const n = (l.items || []).filter((s) => !s.expired).length; return `<span class="pill ${n ? 'on' : 'off'}">${n ? `${n} 个有效` : '无'}</span>`; };
 const sharesSummary = (l) => { const n = (l.items || []).filter((s) => !s.expired).length; return n ? `${n} 个有效链接，可随时撤销` : '生成只读链接发给 AI，让它分析站点 SEO'; };
+
+// ---------------------------------------------------------------- 站点分组
+// 输入分组名的对话框：可以点已有分组快速选择
+function tagDialog({ title, text, tags = [], ok = '确定', value = '' }) {
+  return new Promise((resolve) => {
+    const ov = document.createElement('div'); ov.className = 'ov';
+    const d = document.createElement('form'); d.className = 'dialog tag-d'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+    d.innerHTML = `<h3>${esc(title)}</h3>${text ? `<p>${text}</p>` : ''}
+      <input class="input" id="tg-in" maxlength="40" placeholder="分组名，如：交易所、新闻站、主力站" value="${esc(value)}" autocomplete="off" required>
+      ${tags.length ? `<div class="tg-sug">${tags.map((t) => `<button type="button" class="gtg" data-t="${esc(t.tag)}">${esc(t.tag)}<small>${t.n}</small></button>`).join('')}</div>` : ''}
+      <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary">${esc(ok)}</button></div>`;
+    const done = (v) => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+    const onKey = (e) => { if (e.key === 'Escape') done(null); };
+    ov.onclick = () => done(null);
+    d.querySelector('[data-no]').onclick = () => done(null);
+    d.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { d.querySelector('#tg-in').value = b.dataset.t; d.querySelector('#tg-in').focus(); }));
+    d.onsubmit = (e) => { e.preventDefault(); const v = d.querySelector('#tg-in').value.trim(); if (v) done(v); };
+    document.addEventListener('keydown', onKey);
+    document.body.append(ov, d);
+    setTimeout(() => d.querySelector('#tg-in').select(), 30);
+  });
+}
+
+// 管理分组：改名 / 删除
+async function tagManageDialog(onDone) {
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const d = document.createElement('div'); d.className = 'dialog tag-d'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+  const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); onDone(); };
+  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.dialog:not(.tag-d)')) close(); };
+  ov.onclick = close;
+  document.addEventListener('keydown', onKey);
+  document.body.append(ov, d);
+  const draw = async () => {
+    const { tags } = await api('/google/tags');
+    d.innerHTML = `<h3>管理分组</h3><p>改名时如果填了已有的分组名，两个分组会合并。删除分组不会删除站点。</p>
+      <div class="tg-list">${tags.map((t) => `<div class="tg-r"><span class="gtg">${esc(t.tag)}</span><span class="hint">${t.n} 个站点</span><span class="sp"></span>
+        <button type="button" class="btn sm ghost" data-ren="${esc(t.tag)}">${ic('edit', 14)}改名</button>
+        <button type="button" class="btn sm ghost danger-t" data-drop="${esc(t.tag)}">${ic('trash', 14)}删除</button></div>`).join('') || '<div class="hint">还没有分组</div>'}</div>
+      <div class="row"><button type="button" class="btn" data-no>完成</button></div>`;
+    d.querySelector('[data-no]').onclick = close;
+    d.querySelectorAll('[data-ren]').forEach((b) => (b.onclick = async () => {
+      const to = await tagDialog({ title: `把“${b.dataset.ren}”改名为`, value: b.dataset.ren, ok: '改名' });
+      if (!to || to === b.dataset.ren) return;
+      try { await api('/google/tags', { method: 'PUT', body: { tag: b.dataset.ren, rename: to } }); toast('已改名'); draw(); } catch (ex) { toast(ex.message, 'bad'); }
+    }));
+    d.querySelectorAll('[data-drop]').forEach((b) => (b.onclick = async () => {
+      const ok = await confirmDialog({ title: `删除分组“${b.dataset.drop}”？`, text: '只删除分组，站点本身不受影响。', ok: '删除', danger: true });
+      if (!ok) return;
+      try { await api('/google/tags', { method: 'PUT', body: { tag: b.dataset.drop, drop: true } }); toast('已删除分组'); draw(); } catch (ex) { toast(ex.message, 'bad'); }
+    }));
+  };
+  draw();
+}
+
+// 列表上方的分组筛选；底部是“给当前筛选的站点加分组”和“管理分组”
+function googleTagFilter(root, items, onFilter, getRows) {
+  const count = new Map();
+  for (const x of items) for (const t of x.tags) count.set(t, (count.get(t) || 0) + 1);
+  const tags = [...count.keys()].sort();
+  const none = items.filter((x) => !x.tags.length).length;
+  // 选中的分组已经不存在（被删除或改名）：恢复成全部，并重新筛选
+  if (gState.tag && (gState.tag === '+none' ? false : !count.has(gState.tag))) { gState.tag = ''; onFilter(); }
+  const ADD = '+add', MANAGE = '+manage';
+  const init = () => dropdown(root, {
+    value: gState.tag, aria: '按分组筛选', search: tags.length > 8 ? '搜索分组' : '', empty: '没有匹配的分组', minWidth: 240, maxWidth: 320,
+    groups: (q) => q ? [['', tags.filter((t) => t.toLowerCase().includes(q))]]
+      : [['', ['']], ...(tags.length ? [['分组', [...tags, '+none']]] : []), ['', [ADD, ...(tags.length ? [MANAGE] : [])]]],
+    button: (v) => `${ic('tag', 14)}<span class="nm">${!v ? '全部分组' : v === '+none' ? '未分组' : esc(v)}</span>`,
+    option: (v, q) => v === ADD ? `<span class="ot g-op g-sep">${ic('plus', 14)}给当前筛选的 ${getRows().length} 个站点加分组…</span>`
+      : v === MANAGE ? `<span class="ot g-op">${ic('edit', 14)}管理分组…</span>`
+      : !v ? `<span class="ot">全部分组<small>${items.length} 个站点</small></span>`
+      : v === '+none' ? `<span class="ot">未分组<small>${none} 个</small></span>`
+      : `<span class="ot">${hl(v, q)}<small>${count.get(v)} 个</small></span>`,
+    onChange: async (v) => {
+      if (v === ADD || v === MANAGE) {
+        init();
+        if (v === MANAGE) return tagManageDialog(() => renderSites(routeToken));
+        const rows = getRows();
+        if (!rows.length) return toast('当前筛选没有站点', 'bad');
+        const tag = await tagDialog({ title: '加到分组', text: `把当前筛选的 <b>${rows.length}</b> 个站点加到分组（已在分组里的不受影响）。可以先搜索或用其他筛选条件选出站点。`,
+          tags: tags.map((t) => ({ tag: t, n: count.get(t) })), ok: '加入分组' });
+        if (!tag) return;
+        try {
+          await api('/google/tags', { method: 'PUT', body: { tag, hosts: rows.map((x) => x.host) } });
+          toast(`已把 ${rows.length} 个站点加到“${tag}”`); renderSites(routeToken);
+        } catch (ex) { toast(ex.message, 'bad'); }
+        return;
+      }
+      gState.tag = v; onFilter();
+    },
+  });
+  init();
+}
+
+// 站点详情：分组标签（可删除、可添加）
+function siteTagsBar(host, tags, onChange) {
+  return `<span class="g-tags" id="g-tags">${tags.map((t) => `<span class="gtg">${esc(t)}<button type="button" data-untag="${esc(t)}" aria-label="移出分组 ${esc(t)}">${ic('x', 11)}</button></span>`).join('')}
+    <button type="button" class="hr-more" id="g-tag-add">${ic('plus', 12)}分组</button></span>`;
+}
+function bindSiteTags(host, onChange) {
+  const box = document.getElementById('g-tags');
+  if (!box) return;
+  box.querySelectorAll('[data-untag]').forEach((b) => (b.onclick = async () => {
+    try { await api('/google/tags', { method: 'PUT', body: { tag: b.dataset.untag, hosts: [host], remove: true } }); onChange(); } catch (ex) { toast(ex.message, 'bad'); }
+  }));
+  document.getElementById('g-tag-add').onclick = async () => {
+    const { tags } = await api('/google/tags').catch(() => ({ tags: [] }));
+    const tag = await tagDialog({ title: `把 ${host} 加到分组`, tags, ok: '加入' });
+    if (!tag) return;
+    try { await api('/google/tags', { method: 'PUT', body: { tag, hosts: [host] } }); onChange(); } catch (ex) { toast(ex.message, 'bad'); }
+  };
+}
 
 // 标题后面的账号下拉：按账号筛选站点；底部是添加账号、管理账号
 function googleAcctPicker(root, accts, items, onFilter) {
@@ -3676,6 +3877,29 @@ const BRAND = {
     <path fill="#F38020" d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268z"/>
     <path fill="#FBAD41" d="M19.2656 11.2813c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"/></svg>`,
 };
+
+// 导出站点列表（当前的筛选和排序），带 BOM 方便 Excel 打开中文
+function exportSitesCsv(rows, d) {
+  const cell = (v) => { const t = v == null ? '' : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const r2 = (v) => (v == null ? '' : Math.round(v * 100) / 100);
+  const head = ['站点', 'GA4 媒体资源', 'Search Console', '用户', '上期用户', '会话', '上期会话', '关键事件', '互动率',
+    '搜索点击', '上期搜索点击', '展示', '上期展示', '点击率', '平均排名', '短链点击（真人）', '短链访客', '点出率'];
+  const lines = [head.join(',')];
+  for (const x of rows) {
+    const ga = x.cur.ga, pg = x.prev.ga, sc = x.cur.gsc, ps = x.prev.gsc;
+    const lh = x.linksFrom.reduce((a, l) => a + l.human, 0);
+    lines.push([x.host, x.ga4?.name || '', x.gsc || '', x.users, x.prevUsers, ga?.sessions, pg?.sessions, ga?.keyEvents, ga ? r2(ga.engagement * 100) + '%' : '',
+      sc?.clicks, ps?.clicks, sc?.impressions, ps?.impressions, sc ? r2(sc.ctr * 100) + '%' : '', sc?.impressions ? r2(sc.position) : '',
+      lh || '', x.linksFromVisitors ?? '', ga?.sessions && lh ? r2((lh / ga.sessions) * 100) + '%' : ''].map(cell).join(','));
+  }
+  const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sites-${d.ranges.from}_${d.ranges.to}.csv`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast(`已导出 ${rows.length} 个站点`);
+}
 
 // 打开设置页并展开某一项
 function goSettings(id) { store.set('set:open', id); location.hash = '#/settings'; }
@@ -3761,15 +3985,15 @@ async function renderSites(token) {
   if (token !== routeToken) return;
   const accts = st.accounts || [], many = accts.length > 1, bad = accts.some((a) => a.error);
   if (gState.acct && !accts.some((a) => a.id === gState.acct)) gState.acct = '';
-  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden><span></span></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="立即同步" aria-label="立即同步">${ic('refresh', 17)}</button>`, true)}
+  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden><span></span></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="立即同步" aria-label="立即同步">${ic('refresh', 17)}</button>`, true)}
     ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<span>${esc(st.error)}</span><span class="sp"></span><button type="button" class="btn sm" id="g-re">重新连接</button></div>` : ''}
     ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
     <section class="card kstrip gs rv" id="g-sum"></section>
     <section class="card rv">
-      <div class="lh"><div class="search">${ic('search')}<input class="input" id="g-q" placeholder="搜索域名或 GA4 名称" value="${esc(gState.q)}" aria-label="搜索站点"><button type="button" class="s-clear" id="g-qx" aria-label="清除搜索" ${gState.q ? '' : 'hidden'}>${ic('x', 14)}</button></div>${gRangeBar()}<div class="combo g-lf" id="g-lf"></div><span class="sp"></span>
+      <div class="lh"><div class="search">${ic('search')}<input class="input" id="g-q" placeholder="搜索域名或 GA4 名称" value="${esc(gState.q)}" aria-label="搜索站点"><button type="button" class="s-clear" id="g-qx" aria-label="清除搜索" ${gState.q ? '' : 'hidden'}>${ic('x', 14)}</button></div>${gRangeBar()}<div class="combo g-lf" id="g-lf"></div><div class="combo g-lf" id="g-tf"></div><span class="sp"></span>
         <div class="seg" id="g-sort">${[['sessions', '按会话'], ['clicks', '按搜索点击'], ['growth', '按增长', '按用户比上一周期增加的人数排序'], ['host', '按域名']].map(([k, l, tip]) => `<button data-s="${k}" class="${k === gState.sort ? 'on' : ''}"${tip ? ` data-tip="${tip}"` : ''}>${l}</button>`).join('')}</div></div>
       <div id="g-list"></div>
-      <div class="pager"><span><span id="g-cnt">${d.items.length} 个站点</span> · 统计到 ${d.ranges.to}（截至昨天；Search Console 数据通常延迟 2–3 天）${st.lastSync ? ` · 同步于 ${ago(st.lastSync)}` : ''}</span></div>
+      <div class="pager"><span><span id="g-cnt">${d.items.length} 个站点</span> · 统计到 ${d.ranges.to}（截至昨天；Search Console 数据通常延迟 2–3 天<span data-tipf-always data-tipf="Google 数据按 UTC 自然日统计，短链点击按后台时区（${tzLabelOf(TZ)}）的自然日统计，日期边界可能相差几个小时">；短链按本地日期</span>）${st.lastSync ? ` · 同步于 ${ago(st.lastSync)}` : ''}</span></div>
     </section>`;
   reveal(page);
   bindGRange(() => renderSites(routeToken));
@@ -3830,7 +4054,7 @@ async function renderSites(token) {
       gKc('搜索展示', num(imp), hasP ? gDelta(imp, pimp) : '', pos != null ? `平均排名 ${pos.toFixed(1)}${hasP && ppos != null ? ` ${gDelta(pos, ppos, true)}` : ''}` : '暂无搜索数据',
         'Search Console 的展示次数；平均排名按展示加权，数字越小越靠前', kpiSpark(sImp, '#0ea5e9')),
       gKc('短链点击', num(lh), hasP ? gDelta(lh, lph) : '', lids ? `${lv ? `${num(lv)} 位访客 · ` : ''}${lids} 个短链${ses ? ` · 点出率 ${pct1(lh / ses)}` : ''}` : '这些站点还没有点出的短链',
-        '从这些站点点出去的短链真人点击：按短链访问的来源（src 参数或 Referer 域名）匹配站点。访客按 IP 去重（估算，误差约 4%），多个站点的访客直接相加。点出率 = 短链点击 ÷ 会话', sLnk.some(Boolean) ? kpiSpark(sLnk, 'var(--amber)') : ''),
+        '从这些站点点出去的短链真人点击：按短链访问的来源（src 参数或 Referer 域名）匹配站点。访客按 IP 去重（估算，误差约 5%），多个站点的访客直接相加。点出率 = 短链点击 ÷ 会话', sLnk.some(Boolean) ? kpiSpark(sLnk, 'var(--amber)') : ''),
     ].join('');
     fitNums(document.getElementById('g-sum'));
   };
@@ -3838,6 +4062,7 @@ async function renderSites(token) {
     const q = gState.q.toLowerCase();
     const rows = d.items.filter((x) => (!q || x.host.includes(q) || (x.ga4?.name || '').toLowerCase().includes(q))
       && (!gState.acct || x.ga4?.acct === gState.acct || x.gscAcct === gState.acct)
+      && (!gState.tag || (gState.tag === '+none' ? !x.tags.length : x.tags.includes(gState.tag)))
       && (!gState.link || (gState.link === 'any' ? x.linksFrom.length + x.links.length > 0
         : x.linksFrom.some((l) => String(l.id) === gState.link) || x.links.some((l) => String(l.id) === gState.link))));
     // 按增长：用户比上一周期增加的人数（绝对值，避免小站点百分比虚高）；没有上一周期时按用户数
@@ -3854,7 +4079,7 @@ async function renderSites(token) {
         const ga = x.cur.ga, pg = x.prev.ga, sc = x.cur.gsc, ps = x.prev.gsc;
         return `<tr data-host="${esc(x.host)}" tabindex="0">
           <td><div class="gh">${esc(x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host)}</div>
-            <div class="sm gm">${x.ga4
+            <div class="sm gm">${x.tags.length ? `${x.tags.slice(0, 2).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}${x.tags.length > 2 ? `<span class="gtg sm-t" data-tipf-always data-tipf="${esc(x.tags.join('、'))}">+${x.tags.length - 2}</span>` : ''}` : ''}${x.ga4
               ? `<span class="gico" data-tipf-always data-tipf="${esc(`Google Analytics 4：${x.ga4.account} / ${x.ga4.name}（${x.ga4.property}）${many ? ` · 来自 ${x.ga4.email}` : ''}`)}">${BRAND.ga(14)}</span><span class="gnm">${esc(x.ga4.name)}</span>`
               : `<span class="gico off" data-tipf-always data-tipf="未关联 Google Analytics 4">${BRAND.ga(14)}</span>`}${x.gsc
               ? `<span class="gico" data-tipf-always data-tipf="${esc(`Search Console：${x.gsc}${many ? ` · 来自 ${x.gscEmail}` : ''}`)}">${BRAND.gsc(14)}</span>`
@@ -3907,8 +4132,10 @@ async function renderSites(token) {
     } catch (err) { toast(err.message, 'bad'); prog.hidden = true; }
   };
   syncBtn.onclick = () => sync();
+  document.getElementById('g-csv').onclick = () => exportSitesCsv(lastRows, d);
   googleAcctPicker(document.getElementById('g-acct'), accts, d.items, draw);
   googleLinkFilter(document.getElementById('g-lf'), d.items, draw);
+  googleTagFilter(document.getElementById('g-tf'), d.items, draw, () => lastRows);
   // AI 分析：默认勾选当前筛选的站点（按会话从多到少）
   const siteItems = (rows) => rows.map((x) => ({ host: x.host, sessions: x.cur.ga?.sessions || 0 }))
     .sort((a, b) => b.sessions - a.sessions);
@@ -3929,9 +4156,9 @@ function siteLinksCard(d) {
   const slug = (l) => `<td><div class="mono">/${esc(l.slug)}</div>${l.title ? `<div class="sm ell" data-tipf="${esc(l.title)}">${esc(l.title)}</div>` : ''}</td>`;
   const fromCard = `<section class="card rv">
     <div class="card-h"><h3>站点上的推广短链</h3><span class="sp"></span>
-      <span class="sub">${from.length ? `${from.length} 个短链 · ${G_LABEL()}真人点击 ${num(fromTotal)}${d.linksFromVisitors ? ` · <span data-tipf-always data-tipf="按 IP 去重（估算，误差约 4%）">${num(d.linksFromVisitors)} 位访客</span>` : ''}${ses ? ` · 点出率 <b data-tipf-always data-tipf="短链真人点击 ÷ 站点会话">${pct1(fromTotal / ses)}</b>` : ''}` : '按短链访问的来源（src 参数或 Referer）匹配'}</span></div>
+      <span class="sub">${from.length ? `${from.length} 个短链 · ${G_LABEL()}真人点击 ${num(fromTotal)}${d.linksFromVisitors ? ` · <span data-tipf-always data-tipf="按 IP 去重（估算，误差约 5%）">${num(d.linksFromVisitors)} 位访客</span>` : ''}${ses ? ` · 点出率 <b data-tipf-always data-tipf="短链真人点击 ÷ 站点会话">${pct1(fromTotal / ses)}</b>` : ''}` : '按短链访问的来源（src 参数或 Referer）匹配'}</span></div>
     ${from.length ? `<div class="scroll"><table class="tbl gt gsl-t">
-      <thead><tr><th>短链</th><th>来源标识</th><th class="r">真人点击</th><th class="r"><span data-tipf-always data-tipf="按 IP 去重（估算，误差约 4%）">访客</span></th><th class="r">含机器</th><th class="r">占比</th></tr></thead>
+      <thead><tr><th>短链</th><th>来源标识</th><th class="r">真人点击</th><th class="r"><span data-tipf-always data-tipf="按 IP 去重（估算，误差约 5%）">访客</span></th><th class="r">含机器</th><th class="r">占比</th></tr></thead>
       <tbody>${from.map((l) => `<tr data-href="#/link/${l.id}" tabindex="0">${slug(l)}
         <td><div class="ell sm" data-tipf="${esc(l.sources.join('、'))}">${esc(l.sources.join('、'))}</div></td>
         <td class="num">${num(l.human)}${hasP ? gDelta(l.human, l.prevHuman) : ''}</td>
@@ -3961,7 +4188,9 @@ async function renderSite(token, host) {
   // GA4 汇总优先用现查结果（含区间去重用户数）；现查失败时退回到已同步的每日数据
   const fromDaily = (x) => (x ? { users: null, newUsers: null, sessions: x.sessions, views: x.views, keyEvents: x.keyEvents, engagement: x.engagement, duration: null } : null);
   const ga = d.ga?.totals?.cur || fromDaily(d.cur.ga), gp = d.ga?.totals?.prev || fromDaily(d.prev.ga), sc = d.cur.gsc, sp = d.prev.gsc;
-  const kc = (label, v, delta, sub = '') => `<div class="kc"><div class="kc-h"><span class="l">${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b></div>${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
+  // GA4 指标来自实时查询（用户数按区间去重）；列表页用每天同步的数据相加，数字可能略有差异
+  const LIVE = 'GA4 实时查询的区间数据（用户按整个区间去重）；站点列表用每天同步的数据相加，两边数字可能略有差异';
+  const kc = (label, v, delta, sub = '') => `<div class="kc"><div class="kc-h"><span class="l"${['用户', '会话', '浏览量', '关键事件'].includes(label) && d.ga?.totals ? ` data-tipf-always data-tipf="${LIVE}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b></div>${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
   const title = host.startsWith('ga4-') ? d.ga4?.name || host : host;
 
   // 每日序列（缺的日期补 0），上一周期按序号对齐
@@ -3996,8 +4225,9 @@ async function renderSite(token, host) {
         <div class="meta g-src">
           <span class="gico${d.ga4 ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.ga4 ? `Google Analytics 4：${d.ga4.account} / ${d.ga4.name}（${d.ga4.property}）${d.ga4.email ? ` · ${d.ga4.email}` : ''}` : '未关联 Google Analytics 4')}">${BRAND.ga(15)}</span>
           <span class="gico${d.gsc ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.gsc ? `Search Console：${d.gsc}${d.gscEmail ? ` · ${d.gscEmail}` : ''}` : '未关联 Search Console')}">${BRAND.gsc(15)}</span>
-          ${d.syncedAt ? `<span class="g-si" data-tipf-always data-tipf="${esc(fmtTime(d.syncedAt))}">${ic('refresh', 13)}同步于 ${ago(d.syncedAt)}</span>` : ''}</div>
-      </div><div class="acts"><button class="btn" id="g-ai1">${ic('ai', 15)}AI 分析</button>${gRangeBar()}</div></section>
+          ${d.syncedAt ? `<span class="g-si" data-tipf-always data-tipf="${esc(fmtTime(d.syncedAt))}">${ic('refresh', 13)}同步于 ${ago(d.syncedAt)}</span>` : ''}
+          ${siteTagsBar(host, d.tags || [])}</div>
+      </div><div class="acts"><button class="btn ghost g-ai" id="g-ai1">${ic('ai', 15)}AI 分析</button>${gRangeBar()}</div></section>
       ${d.errors?.length || d.error ? `<div class="bulk-bad">${ic('info', 15)}<div>${[d.error, ...(d.errors || [])].filter(Boolean).map(esc).join('<br>')}</div></div>` : ''}
       <section class="card kstrip gk rv">
         ${kc('用户', ga?.users != null ? num(ga.users) : '—', ga?.users != null && gp?.users != null ? gDelta(ga.users, gp.users) : '', ga?.newUsers != null ? `新用户 ${num(ga.newUsers)}` : d.ga4 ? '暂时无法读取' : '未关联 GA4')}
@@ -4032,6 +4262,7 @@ async function renderSite(token, host) {
   const page = document.getElementById('page');
   reveal(page);
   bindGRange(() => renderSite(routeToken, host));
+  bindSiteTags(host, () => renderSite(routeToken, host));
   document.getElementById('g-ai1').onclick = () => shareDialog([{ host, sessions: d.cur.ga?.sessions || 0 }], [host]);
   page.querySelectorAll('.gsl-t tr[data-href]').forEach((tr) => {
     const go = () => { location.hash = tr.dataset.href; };
@@ -4398,6 +4629,7 @@ async function renderNotify(token) {
           </div>
         </div>
       </section>
+      <section class="card rv" id="n-seo" hidden></section>
       <section class="card rv" id="n-use"></section>
       <div class="sec-row rv"><h2 class="sec-t">推送渠道</h2><span class="hint">参数只需配置一次，之后用开关控制是否推送</span></div>
       <div class="grid2" id="chans"></div>
@@ -4426,6 +4658,7 @@ async function renderNotify(token) {
     const body = {
       reports: Object.fromEntries(['daily', 'weekly', 'monthly'].map((k) => [k, page.querySelector(`[name=r-${k}]`).checked])),
       usage: { ...st.usage, ...(patch.usage || {}) },
+      seo: { ...st.seo, ...(patch.seo || {}) },
       hour: hourBox.value, tz: TZ,
       tg: { ...st.tg, ...(patch.tg || {}) },
       email: { ...st.email, ...(patch.email || {}) },
@@ -4472,10 +4705,45 @@ async function renderNotify(token) {
     };
   };
 
+  // 每周 SEO 变化（连接了 Google 才显示）
+  const renderSeo = () => {
+    const box = document.getElementById('n-seo'), g = st.seo;
+    box.hidden = !st.googleConnected;
+    if (!st.googleConnected) return;
+    const anyCh = st.tg.enabled || st.email.enabled;
+    box.innerHTML = `<div class="card-h"><span class="chi brand chi-sm">${BRAND.gsc(16)}</span><h3>每周 SEO 变化</h3>
+        <span class="sub">每周一推送：点击涨跌最多的站点、跌出前 10 / 接近前 10 的搜索词</span><span class="sp"></span>
+        <label class="switch"><input type="checkbox" id="s-on" ${g.enabled ? 'checked' : ''} aria-label="开启每周 SEO 变化"><span class="t"></span></label></div>
+      <div class="card-b n-use-b"><label>范围</label><div class="combo" id="s-tag"></div>
+        <span class="hint">在“发送时间”推送；Search Console 数据延迟约 3 天，搜索对比用 3–9 天前的一周${anyCh ? '' : '（目前没有开启的渠道）'}</span><span class="sp" style="flex:1"></span>
+        <a class="btn sm ghost" href="/api/notify/preview?kind=seo" target="_blank" rel="noopener">${ic('ext', 14)}预览</a>
+        <button type="button" class="btn sm ghost" id="s-test" ${anyCh ? '' : 'disabled'}>${ic('send', 14)}发送测试</button></div>`;
+    box.querySelector('#s-on').onchange = async (e) => {
+      try { await persist({ seo: { enabled: e.target.checked } }); toast(e.target.checked ? '每周 SEO 变化已开启' : '每周 SEO 变化已关闭'); }
+      catch (ex) { e.target.checked = !e.target.checked; toast(ex.message, 'bad'); }
+    };
+    const tags = st.tags || [];
+    dropdown(box.querySelector('#s-tag'), {
+      value: g.tag || '', aria: '范围', minWidth: 200,
+      groups: () => [['', ['', ...tags.map((t) => t.tag)]]],
+      button: (v) => `${ic('tag', 14)}<span class="nm">${v ? esc(v) : '全部站点'}</span>`,
+      option: (v) => `<span class="ot">${v ? esc(v) : '全部站点'}${v ? `<small>${tags.find((t) => t.tag === v)?.n || 0} 个</small>` : ''}</span>`,
+      onChange: async (v) => { try { await persist({ seo: { tag: v } }); toast('已保存'); } catch (ex) { toast(ex.message, 'bad'); } },
+    });
+    box.querySelector('#s-test').onclick = async (e) => {
+      const btn = e.currentTarget; btn.disabled = true;
+      try {
+        for (const ch of ['tg', 'email']) if (st[ch].enabled) await api('/notify/test', { method: 'POST', body: { channel: ch, kind: 'seo' } });
+        toast('测试已发送');
+      } catch (ex) { toast(ex.message, 'bad'); } finally { btn.disabled = false; }
+    };
+  };
+
   const renderStatus = () => {
     renderUse();
+    renderSeo();
     document.getElementById('nstat').innerHTML = st.status ? `<div class="nstat ${st.status.ok ? 'ok' : 'bad'}">${ic(st.status.ok ? 'check' : 'alert', 15)}
-      上次推送：${fmtTime(st.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报', usage: '用量预警' }[st.status.kind] || ''}${st.status.ok ? ' · 发送成功' : ` · 失败：${esc(st.status.error)}`}</div>` : '';
+      上次推送：${fmtTime(st.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报', usage: '用量预警', seo: '每周 SEO 变化' }[st.status.kind] || ''}${st.status.ok ? ' · 发送成功' : ` · 失败：${esc(st.status.error)}`}</div>` : '';
   };
 
   function renderChannels() {

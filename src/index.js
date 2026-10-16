@@ -4,6 +4,7 @@ import SCHEMA_SQL from '../schema.sql';
 import { renderSVG } from 'uqr';
 import { EmailMessage } from 'cloudflare:email';
 import * as google from './google.js';
+import { classifyVisit, parseUA, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, backfillSourceUv, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
 const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
@@ -39,7 +40,7 @@ export default {
       }
       if (path === '/_fb' && request.method === 'POST') return await recordFallback(request, env);
       if (path === '/t.js') return await trackerScript(env, url);
-      if (path.startsWith('/r/')) return await shareView(env, url);
+      if (path.startsWith('/r/')) return await shareView(request, env, ctx, url);
       if (path === '/robots.txt') {
         // 短链不需要被收录；/r/ 是给 AI 读的分析报告，要允许 AI 工具抓取（报告本身带 noindex，不会被搜索引擎收录）
         return new Response('User-agent: *\nAllow: /r/\nDisallow: /\n', { headers: { 'content-type': 'text/plain' } });
@@ -106,6 +107,8 @@ async function migrate(env) {
   if (!tcols.includes('fallbacks')) {
     await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN fallbacks INTEGER NOT NULL DEFAULT 0').run();
   }
+  const lcols = (await env.DB.prepare('PRAGMA table_info(links)').all()).results.map((c) => c.name);
+  if (!lcols.includes('utm')) await env.DB.prepare('ALTER TABLE links ADD COLUMN utm INTEGER NOT NULL DEFAULT 0').run();
   const gcols = (await env.DB.prepare('PRAGMA table_info(g_sites)').all()).results.map((c) => c.name);
   for (const c of ['ga4_acct', 'gsc_acct']) {
     if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`).run();
@@ -163,7 +166,7 @@ async function handleRedirect(request, env, ctx, url) {
   if (!SLUG_RE.test(slug)) return notFound();
 
   const link = await env.DB.prepare(
-    'SELECT id, target_url, enabled, pass_query, expires_at FROM links WHERE slug = ?'
+    'SELECT id, slug, target_url, enabled, pass_query, utm, expires_at FROM links WHERE slug = ?'
   ).bind(slug).first();
   if (!link || !link.enabled) return notFound();
   if (link.expires_at && link.expires_at < Date.now()) return new Response('Link expired', { status: 410 });
@@ -181,10 +184,18 @@ async function handleRedirect(request, env, ctx, url) {
   if (!raw) return notConfigured();
 
   const withQuery = (u) => {
-    if (!link.pass_query) return u;
+    if (!link.pass_query && !link.utm) return u;
     const t = new URL(u);
-    for (const [k, v] of url.searchParams) {
-      if (k !== 'src') t.searchParams.set(k, v);
+    if (link.pass_query) {
+      for (const [k, v] of url.searchParams) {
+        if (k !== 'src') t.searchParams.set(k, v);
+      }
+    }
+    // 转化追踪：目标地址（含透传后）没有任何 utm 参数时才加，不覆盖已有的
+    if (link.utm && ![...t.searchParams.keys()].some((k) => k.startsWith('utm_'))) {
+      t.searchParams.set('utm_source', 'cligc');
+      t.searchParams.set('utm_medium', 'shortlink');
+      t.searchParams.set('utm_campaign', link.slug);
     }
     return t.toString();
   };
@@ -296,111 +307,6 @@ async function logClick(request, env, linkId, url, ruleId) {
   ]);
 }
 
-// ---------------------------------------------------------------- 访客类型：真人 / 爬虫 / 可疑
-
-// 云服务商 / 机房的运营商名称。Cloudflare、Akamai 不算：iCloud 私密中继、WARP 的真人用户也走它们
-const DC_RE = /collyer quay|aceville|amazon|aws|google llc|google cloud|microsoft|azure|digitalocean|linode|hetzner|ovh|vultr|choopa|alibaba|aliyun|tencent|huawei cloud|oracle|scaleway|contabo|leaseweb|m247|datacamp|zenlayer|ucloud|kingsoft cloud|hostinger|ionos|g-core|gcore|psychz|quadranet|colocrossing|hostwinds|kamatera|upcloud|netcup|racknerd|dmit|it7 networks|frantech|buyvm|clouvider|servers\.com|hosting|data ?cent(er|re)|dedicated server|vps/i;
-const BOT_NAMES = [
-  ['googlebot', 'Googlebot'], ['bingbot', 'Bingbot'], ['baiduspider', '百度蜘蛛'], ['yandex', 'Yandex'], ['bytespider', '字节跳动'],
-  ['sogou', '搜狗蜘蛛'], ['360spider', '360 蜘蛛'], ['petalbot', '华为 Petal'], ['applebot', 'Applebot'], ['gptbot', 'GPTBot'],
-  ['facebookexternalhit', 'Facebook 预览'], ['twitterbot', 'X 预览'], ['telegrambot', 'Telegram 预览'], ['whatsapp', 'WhatsApp 预览'],
-  ['slackbot', 'Slack 预览'], ['discordbot', 'Discord 预览'], ['linkedinbot', 'LinkedIn 预览'], ['semrush', 'Semrush'], ['ahrefs', 'Ahrefs'],
-  ['curl', 'curl'], ['wget', 'wget'], ['python', 'Python 脚本'], ['go-http', 'Go 脚本'], ['headless', '无头浏览器'], ['node-fetch', 'Node 脚本'],
-];
-
-// 常见云服务商的 ASN。运营商名称不可靠（如腾讯云新加坡登记为“6 COLLYER QUAY”），按 ASN 识别更准
-const DC_ASN = new Map([
-  [132203, '腾讯云'], [45090, '腾讯云'], [133478, '腾讯云'], [45102, '阿里云'], [37963, '阿里云'], [24429, '阿里云'],
-  [136907, '华为云'], [55990, '华为云'], [137718, '火山引擎'], [396986, '字节跳动'], [38365, '百度云'], [59019, '金山云'], [135377, 'UCloud'],
-  [16509, 'AWS'], [14618, 'AWS'], [8987, 'AWS'], [15169, 'Google'], [396982, 'Google Cloud'], [19527, 'Google'],
-  [8075, 'Microsoft Azure'], [8068, 'Microsoft'], [14061, 'DigitalOcean'], [63949, 'Linode'], [20473, 'Vultr'], [16276, 'OVH'],
-  [24940, 'Hetzner'], [31898, 'Oracle Cloud'], [51167, 'Contabo'], [12876, 'Scaleway'], [60781, 'Leaseweb'], [28753, 'Leaseweb'],
-  [9009, 'M247'], [21859, 'Zenlayer'], [212238, 'Datacamp'], [36352, 'ColoCrossing'], [62904, 'Eonix'],
-]);
-
-// 说中文的国家 / 地区；中文访客出现在其他地区，多半是经 VPN / 代理访问
-const ZH_REGIONS = new Set(['CN', 'HK', 'MO', 'TW', 'SG', 'MY']);
-
-/**
- * 访客类型：
- * - bot：User-Agent 自报为爬虫 / 工具
- * - suspect：强信号（缺语言信息、高频、过旧 TLS）命中一条；或弱信号两条以上；
- *   或机房 IP 再加任一机器特征
- * - human：其余。机房 IP 但浏览器特征完整的，算“真人 · 经代理”（proxy = 1），
- *   VPN、机场节点大多架在机房里
- */
-function classifyVisit({ ua, hasLang, lang, country, asnOrg, asn, recent, secFetch, tls, http }) {
-  const s = (ua || '').toLowerCase();
-  if (!s) return { kind: 'bot', reason: '没有 User-Agent', proxy: 0 };
-  if (parseUA(ua).bot) {
-    const hit = BOT_NAMES.find(([k]) => s.includes(k));
-    return { kind: 'bot', reason: hit ? hit[1] : '自报为爬虫 / 工具', proxy: 0 };
-  }
-  let dc = '';
-  if (DC_ASN.has(asn)) dc = `${DC_ASN.get(asn)}（AS${asn}）`;
-  else if (asnOrg && DC_RE.test(asnOrg) && !/cloudflare|akamai/i.test(asnOrg)) dc = asnOrg;
-
-  const strong = [], weak = [];
-  if (!hasLang) strong.push('没有语言信息（Accept-Language）');
-  if (recent >= 5) strong.push(`同一 IP 1 分钟内第 ${recent} 次访问`);
-  if (/^TLSv1(\.[01])?$/.test(tls || '')) strong.push(`过旧的 ${tls}`);
-  // 以下只有新记录才有，补算旧记录时为 undefined
-  if (secFetch === false) {
-    const chrome = /(?:chrome|chromium)\/(\d+)/.exec(s), ff = /firefox\/(\d+)/.exec(s);
-    if ((chrome && +chrome[1] >= 80 && !/crios/.test(s)) || (ff && +ff[1] >= 90 && !/fxios/.test(s))) weak.push('自称新版浏览器，却缺少浏览器请求头');
-  }
-  if (/^HTTP\/1/.test(http || '')) weak.push(`使用 ${http}`);
-  // 自称很旧的系统 / 浏览器版本：真实设备很少停留在这些版本，脚本却常拿来伪装
-  const ios = /iphone os (\d+)[_.](\d+)(?:[_.](\d+))?/.exec(s);
-  const cr = !/edg|opr|samsung/.test(s) && /chrome\/(\d+)/.exec(s);
-  if (ios && +ios[1] < 15) weak.push(`自称旧版系统 iOS ${ios.slice(1).filter(Boolean).join('.')}`);
-  else if (cr && +cr[1] < 100) weak.push(`自称旧版浏览器 Chrome ${cr[1]}`);
-
-  if (dc) {
-    // 机房 IP：有任一机器特征算可疑；浏览器特征完整（HTTP/2 或 3）算经代理的真人；
-    // 旧记录没有协议信息，无法区分，仍按可疑处理
-    if (strong.length || weak.length || !/^HTTP\/[23]/.test(http || '')) {
-      return { kind: 'suspect', reason: [`机房 IP · ${dc}`, ...strong, ...weak].join('；'), proxy: 0 };
-    }
-    return { kind: 'human', reason: `经 VPN / 代理 · ${dc}`, proxy: 1 };
-  }
-  if (strong.length || weak.length >= 2) return { kind: 'suspect', reason: [...strong, ...weak].join('；'), proxy: 0 };
-  // 中文访客出现在非中文地区：多半经 VPN / 代理（只作提示，不影响真人判定）
-  if (/^zh\b/i.test(lang || '') && country && !ZH_REGIONS.has(country)) {
-    return { kind: 'human', reason: [`可能经 VPN / 代理 · 中文访客，IP 在 ${country}`, ...weak].join('；'), proxy: 1 };
-  }
-  return { kind: 'human', reason: weak.join('；'), proxy: 0 };
-}
-
-function parseUA(ua) {
-  const s = ua.toLowerCase();
-  const bot = /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|preview|curl|wget|python|go-http|node-fetch|axios|headless|monitor|scan|lighthouse/.test(s);
-  let browser = 'Other';
-  if (/micromessenger/.test(s)) browser = 'WeChat';
-  else if (/qq\//.test(s) || /mqqbrowser/.test(s)) browser = 'QQ';
-  else if (/edg\//.test(s)) browser = 'Edge';
-  else if (/opr\/|opera/.test(s)) browser = 'Opera';
-  else if (/samsungbrowser/.test(s)) browser = 'Samsung';
-  else if (/ucbrowser/.test(s)) browser = 'UC';
-  else if (/firefox|fxios/.test(s)) browser = 'Firefox';
-  else if (/chrome|crios/.test(s)) browser = 'Chrome';
-  else if (/safari/.test(s)) browser = 'Safari';
-
-  let os = 'Other';
-  if (/iphone|ipad|ipod/.test(s)) os = 'iOS';
-  else if (/android/.test(s)) os = 'Android';
-  else if (/windows/.test(s)) os = 'Windows';
-  else if (/mac os x|macintosh/.test(s)) os = 'macOS';
-  else if (/linux/.test(s)) os = 'Linux';
-
-  let device = 'Desktop';
-  if (bot) device = 'Bot';
-  else if (/ipad|tablet/.test(s) || (/android/.test(s) && !/mobile/.test(s))) device = 'Tablet';
-  else if (/mobi|iphone|android/.test(s)) device = 'Mobile';
-
-  return { browser, os, device, bot };
-}
-
 // ---------------------------------------------------------------- 后台 API
 
 async function handleApi(request, env, url) {
@@ -425,6 +331,12 @@ async function handleApi(request, env, url) {
   if (path === '/api/notify' && method === 'GET') return json(await notifyForClient(env));
   if (path === '/api/notify' && method === 'PUT') return saveNotify(request, env, url);
   if (path === '/api/notify/test' && method === 'POST') return testNotify(request, env);
+  if (path === '/api/notify/preview' && method === 'GET' && url.searchParams.get('kind') === 'seo') {
+    const cfg = { ...(await getNotify(env)), base: url.origin };
+    const dg = await google.seoDigest(env, await sessionSecret(env), cfg.seo.tag).catch(() => null);
+    const html = dg ? buildSeoDigest(cfg, dg).html : '<p style="font-family:sans-serif;padding:24px">没有可用的站点数据（还没连接 Google，或这个分组里没有站点）。</p>';
+    return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  }
   if (path === '/api/notify/preview' && method === 'GET') {
     const kind = KIND_NAME[url.searchParams.get('kind')] ? url.searchParams.get('kind') : 'daily';
     const report = await buildReport(env, { ...(await getNotify(env)), base: url.origin }, kind, Date.now());
@@ -447,6 +359,11 @@ async function handleApi(request, env, url) {
   if (path.startsWith('/api/google/')) return googleApi(request, env, url);
   if (path === '/api/shares' && method === 'GET') return json(await listShares(env, url));
   if (path === '/api/shares' && method === 'POST') return createShare(request, env, url);
+  if (path.startsWith('/api/shares/') && path.endsWith('/views') && method === 'GET') {
+    const token = path.slice('/api/shares/'.length, -'/views'.length);
+    const rows = (await env.DB.prepare('SELECT at, ip, country, ua, agent, status FROM share_views WHERE token = ? ORDER BY at DESC LIMIT 200').bind(token).all()).results;
+    return json({ items: rows });
+  }
   if (path.startsWith('/api/shares/') && path.endsWith('/warm') && method === 'POST') {
     // 预先生成报告（不计入打开次数），AI 第一次打开时直接读缓存
     const row = await env.DB.prepare('SELECT * FROM shares WHERE token = ?').bind(path.slice('/api/shares/'.length, -'/warm'.length)).first();
@@ -457,6 +374,7 @@ async function handleApi(request, env, url) {
   }
   if (path.startsWith('/api/shares/') && method === 'DELETE') {
     await env.DB.prepare("DELETE FROM g_cache WHERE k = ?").bind(`ai-report|${path.slice('/api/shares/'.length)}`).run();
+    await env.DB.prepare('DELETE FROM share_views WHERE token = ?').bind(path.slice('/api/shares/'.length)).run();
     await env.DB.prepare('DELETE FROM shares WHERE token = ?').bind(path.slice('/api/shares/'.length)).run();
     return json({ ok: true });
   }
@@ -936,6 +854,7 @@ async function validateLinkInput(body, env, currentId) {
   if (body.note !== undefined) out.note = cut(String(body.note), 2000);
   if (body.enabled !== undefined) out.enabled = body.enabled ? 1 : 0;
   if (body.pass_query !== undefined) out.pass_query = body.pass_query ? 1 : 0;
+  if (body.utm !== undefined) out.utm = body.utm ? 1 : 0;
   if (body.expires_at !== undefined) {
     out.expires_at = body.expires_at ? Number(body.expires_at) : null;
     if (out.expires_at !== null && !Number.isFinite(out.expires_at)) return { error: '过期时间不合法' };
@@ -955,11 +874,11 @@ async function createLink(request, env) {
 
   const now = Date.now();
   const row = await env.DB.prepare(
-    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, expires_at, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?) RETURNING *`
+    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, utm, expires_at, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *`
   ).bind(
     data.slug, data.target_url || '', data.title || '', data.note || '',
-    data.enabled ?? 1, data.pass_query ?? 0, data.expires_at ?? null, now, now
+    data.enabled ?? 1, data.pass_query ?? 0, data.utm ?? 0, data.expires_at ?? null, now, now
   ).first();
   return json(row, 201);
 }
@@ -977,9 +896,9 @@ async function duplicateLink(request, env, id) {
 
   const now = Date.now();
   const row = await env.DB.prepare(
-    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, expires_at, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?) RETURNING *`
-  ).bind(data.slug, src.target_url, data.title, src.note, src.enabled, src.pass_query, src.expires_at, now, now).first();
+    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, utm, expires_at, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *`
+  ).bind(data.slug, src.target_url, data.title, src.note, src.enabled, src.pass_query, src.utm || 0, src.expires_at, now, now).first();
   await env.DB.prepare(
     `INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at)
      SELECT ?, countries, url, note, fallback, ?, ? FROM link_targets WHERE link_id = ? ORDER BY id`
@@ -1258,29 +1177,6 @@ async function overview(env, url) {
 // ---------------------------------------------------------------- 统计（24 小时：读原始明细）
 // 一次取出本期和上一期的明细（24 小时 + 上一个 24 小时），在内存里算出全部统计，
 // 代替原来每个指标各查一次（每次都要扫一遍同样的行）。结果与逐条 SQL 统计一致。
-
-const RAW_COLS = 'link_id, ts, ip, is_bot, kind, proxy, reason, source, referer_host, utm_source, utm_campaign, country, city, device, browser, os, asn, asn_org, rule_id';
-
-// 计数工具：按 key 计数（可同时统计不重复 IP），排序取前 limit 个
-function tally(rows, key, limit = Infinity) {
-  const m = new Map();
-  for (const r of rows) { const k = key(r); m.set(k, (m.get(k) || 0) + 1); }
-  return [...m].map(([k, n]) => ({ k, n })).sort((a, b) => b.n - a.n).slice(0, limit);
-}
-const uniq = (rows, key = (r) => r.ip) => new Set(rows.map(key)).size;
-// 与 SQL 里 strftime('%Y-%m-%d %H:00', (ts + tz * 60000) / 1000, 'unixepoch') 相同
-const hourKey = (ts, tzMin) => { const s = new Date(Math.floor((ts + tzMin * 60000) / 1000) * 1000).toISOString(); return `${s.slice(0, 10)} ${s.slice(11, 13)}:00`; };
-const dateKey = (ts, tzMin) => new Date(Math.floor((ts + tzMin * 60000) / 1000) * 1000).toISOString().slice(0, 10);
-// 按时间桶：n 次数、u 不重复 IP，按 k 排序
-function buckets(rows, keyOf, withUv = true) {
-  const m = new Map();
-  for (const r of rows) {
-    const k = keyOf(r.ts);
-    if (!m.has(k)) m.set(k, { k, n: 0, ips: withUv ? new Set() : null });
-    const b = m.get(k); b.n++; if (withUv) b.ips.add(r.ip);
-  }
-  return [...m.values()].sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0)).map((b) => (withUv ? { k: b.k, n: b.n, u: b.ips.size } : { k: b.k, n: b.n }));
-}
 
 async function rawRows(env, from, linkId) {
   return (await env.DB.prepare(`SELECT ${RAW_COLS} FROM clicks WHERE ts >= ? ${linkId ? 'AND link_id = ?' : ''}`)
@@ -1599,38 +1495,6 @@ async function cfUsage(env, force) {
   return u.configured && u.days?.length ? { ...u, forecast: usageForecast(u) } : u;
 }
 
-const CF_LIMITS = { paid: { rowsRead: 25e9, rowsWritten: 5e7, requests: 1e7 }, free: { rowsRead: 5e6, rowsWritten: 1e5, requests: 1e5 } };
-const CF_NAMES = { rowsRead: 'D1 读取行数', rowsWritten: 'D1 写入行数', requests: 'Worker 请求' };
-
-// 按目前速度推算到期末（付费版：本月底；免费版：今天结束，UTC）。
-// 付费版用最近 7 个完整日的日均 × 剩余天数，比本月平均更能反映最近的变化；没有历史时按本月已用 ÷ 已过时间。
-function usageForecast(u, now = Date.now()) {
-  const paid = u.plan === 'paid';
-  const cur = paid ? u.month : (u.days || []).find((d) => d.date === u.today);
-  if (!cur) return null;
-  const L = CF_LIMITS[paid ? 'paid' : 'free'];
-  const d = new Date(now), y = d.getUTCFullYear(), m = d.getUTCMonth();
-  const start = paid ? Date.UTC(y, m, 1) : Date.UTC(y, m, d.getUTCDate());
-  const end = paid ? Date.UTC(y, m + 1, 1) : start + 86400000;
-  const elapsed = Math.min(1, Math.max(0, (now - start) / (end - start)));
-  const recent = (u.days || []).filter((x) => x.date < u.today).slice(-7);
-  const items = Object.keys(L).map((k) => {
-    const used = cur[k] || 0;
-    let proj, rate;   // rate：每毫秒用量
-    if (paid && recent.length >= 3) {
-      rate = recent.reduce((a, x) => a + (x[k] || 0), 0) / recent.length / 86400000;
-      proj = used + rate * (end - now);
-    } else {
-      rate = now > start ? used / (now - start) : 0;
-      proj = elapsed > 0.02 ? used / elapsed : used;
-    }
-    // 预计用完包含额度的时间（还没用完、且按目前速度会在期末前用完）
-    const runOut = used < L[k] && rate > 0 && proj > L[k] ? Math.round(now + (L[k] - used) / rate) : null;
-    return { k, name: CF_NAMES[k], used, limit: L[k], ratio: used / L[k], proj: Math.round(proj), projRatio: proj / L[k], runOut };
-  });
-  return { paid, period: paid ? u.today.slice(0, 7) : u.today, end, elapsed, items };
-}
-
 async function cfUsageRaw(env, force) {
   const cf = await cfCreds(env);
   if (!cf) return { configured: false };
@@ -1762,7 +1626,17 @@ async function googleApi(request, env, url) {
     }
     const days = google.RANGE_DAYS.includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 28;
     if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days) });
-    if (path === '/api/google/link') return json({ days, ranges: google.ranges(days), ...(await google.linkSites(env, Number(url.searchParams.get('id')) || 0, days)) });
+    if (path === '/api/google/tags' && method === 'GET') return json({ tags: await google.tagsList(env) });
+    if (path === '/api/google/tags' && method === 'PUT') {
+      const r = await google.tagsUpdate(env, await request.json().catch(() => ({})));
+      return r.error ? json(r, 400) : json(r);
+    }
+    if (path === '/api/google/hosts') {
+      // 只要域名列表（投放链接里选站点用），不查统计数据
+      const rows = (await env.DB.prepare("SELECT host, ga4_name FROM g_sites WHERE host LIKE '%.%' ORDER BY host").all()).results;
+      return json({ items: rows.map((r) => ({ host: r.host, name: r.ga4_name || '' })) });
+    }
+    if (path === '/api/google/link') return json({ days, ranges: google.ranges(days), ...(await google.linkSites(env, Number(url.searchParams.get('id')) || 0, days, secret)) });
     if (path === '/api/google/site') {
       const d = await google.siteDetail(env, secret, String(url.searchParams.get('host') || ''), days);
       return d.error ? json(d, 404) : json(d);
@@ -1805,7 +1679,11 @@ const shareOut = (r, origin) => ({
 
 async function listShares(env, url) {
   const rows = (await env.DB.prepare('SELECT * FROM shares ORDER BY created_at DESC').all()).results;
-  return { items: rows.map((r) => shareOut(r, url.origin)) };
+  // 每个链接被哪些工具打开过（去重）
+  const ag = (await env.DB.prepare("SELECT token, agent, COUNT(*) AS n FROM share_views WHERE status = 200 GROUP BY token, agent").all()).results;
+  const by = new Map();
+  for (const a of ag) { if (!by.has(a.token)) by.set(a.token, []); by.get(a.token).push({ agent: a.agent || '未知', n: a.n }); }
+  return { items: rows.map((r) => ({ ...shareOut(r, url.origin), agents: (by.get(r.token) || []).sort((a, b) => b.n - a.n) })) };
 }
 
 async function createShare(request, env, url) {
@@ -1837,8 +1715,26 @@ async function shareReport(env, secret, row, force = false) {
   return rep;
 }
 
+// 常见 AI 工具的抓取 User-Agent
+const AI_AGENTS = [
+  [/ChatGPT-User|OAI-SearchBot|GPTBot|OpenAI/i, 'ChatGPT'], [/Claude-User|Claude-SearchBot|ClaudeBot|Anthropic/i, 'Claude'],
+  [/Perplexity/i, 'Perplexity'], [/Google-Extended|Gemini|Google-CloudVertexBot/i, 'Gemini'], [/Bytespider|Doubao/i, '豆包'],
+  [/DeepSeek/i, 'DeepSeek'], [/kimi|Moonshot/i, 'Kimi'], [/MistralAI/i, 'Mistral'], [/cohere/i, 'Cohere'], [/YouBot/i, 'You.com'],
+  [/bot|crawler|spider|curl|wget|python|go-http|node-fetch|axios/i, '程序 / 爬虫'],
+];
+const agentOf = (ua) => (AI_AGENTS.find(([re]) => re.test(ua || '')) || [, ''])[1];
+
+// 记一条打开记录，每个链接只留最近 200 条
+async function logShareView(request, env, token, status) {
+  const ua = request.headers.get('user-agent') || '';
+  await env.DB.prepare('INSERT INTO share_views (token, at, ip, country, ua, agent, status) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(token, Date.now(), request.headers.get('cf-connecting-ip') || '', request.cf?.country || '', cut(ua, 300), agentOf(ua) || (ua ? '浏览器' : ''), status).run();
+  await env.DB.prepare('DELETE FROM share_views WHERE token = ? AND id NOT IN (SELECT id FROM share_views WHERE token = ? ORDER BY at DESC LIMIT 200)')
+    .bind(token, token).run();
+}
+
 // 公开的只读报告：/r/<token>（Markdown），?format=json 为结构化数据，?download=1 下载文件
-async function shareView(env, url) {
+async function shareView(request, env, ctx, url) {
   const text = (body, status = 200, type = 'text/markdown; charset=utf-8', extra = {}) => new Response(body, {
     status, headers: { 'content-type': type, 'x-robots-tag': 'noindex, nofollow', 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', ...extra },
   });
@@ -1849,8 +1745,12 @@ async function shareView(env, url) {
   // 限流：每个链接每小时最多 60 次
   const hour = Math.floor(Date.now() / 3600000);
   const n = row.hour === hour ? row.hour_n + 1 : 1;
-  if (n > SHARE_PER_HOUR) return text('访问太频繁，请稍后再试。', 429, 'text/plain; charset=utf-8', { 'retry-after': '600' });
+  if (n > SHARE_PER_HOUR) {
+    ctx.waitUntil(logShareView(request, env, row.token, 429).catch(() => {}));
+    return text('访问太频繁，请稍后再试。', 429, 'text/plain; charset=utf-8', { 'retry-after': '600' });
+  }
   await env.DB.prepare('UPDATE shares SET views = views + 1, last_view = ?, hour = ?, hour_n = ? WHERE token = ?').bind(Date.now(), hour, n, row.token).run();
+  ctx.waitUntil(logShareView(request, env, row.token, 200).catch(() => {}));
   const secret = await sessionSecret(env);
   if (!(await google.googleConfigured(env, secret))) return text('站点数据暂时不可用：Google 集成未配置。', 503, 'text/plain; charset=utf-8');
   const rep = await shareReport(env, secret, row);
@@ -1887,6 +1787,7 @@ const MASK = '••••';
 const NOTIFY_DEFAULT = {
   reports: { daily: true, weekly: true, monthly: false },
   usage: { enabled: false, threshold: 80 },   // Cloudflare 用量预警
+  seo: { enabled: false, tag: '' },           // 每周 SEO 变化（tag：只看某个分组）
   hour: 9, tz: 480, base: '',
   tg: { enabled: false, token: '', chat: '' },
   email: { enabled: false, provider: 'resend', key: '', from: '', to: '' },
@@ -1899,6 +1800,7 @@ async function getNotify(env) {
     ...NOTIFY_DEFAULT, ...v,
     reports: { ...NOTIFY_DEFAULT.reports, ...(v.reports || {}) },
     usage: { ...NOTIFY_DEFAULT.usage, ...(v.usage || {}) },
+    seo: { ...NOTIFY_DEFAULT.seo, ...(v.seo || {}) },
     tg: { ...NOTIFY_DEFAULT.tg, ...(v.tg || {}) },
     email: { ...NOTIFY_DEFAULT.email, ...(v.email || {}) },
   };
@@ -1916,6 +1818,8 @@ async function notifyForClient(env) {
     status: st ? JSON.parse(st.value) : null,
     cloudflareEmail: !!env.EMAIL,
     cfConfigured: !!(await cfCreds(env)),
+    googleConnected: !!(await env.DB.prepare('SELECT COUNT(*) AS n FROM g_accounts').first('n').catch(() => 0)),
+    tags: (await env.DB.prepare('SELECT tag, COUNT(*) AS n FROM site_tags GROUP BY tag ORDER BY tag').all().catch(() => ({ results: [] }))).results,
   };
 }
 
@@ -1927,6 +1831,10 @@ async function saveNotify(request, env, url) {
   const tz = Number(body.tz);
   const next = {
     reports: { daily: !!body.reports?.daily, weekly: !!body.reports?.weekly, monthly: !!body.reports?.monthly },
+    seo: {
+      enabled: body.seo ? !!body.seo.enabled : cur.seo.enabled,
+      tag: body.seo ? cut(String(body.seo.tag || '').trim(), 40) : cur.seo.tag,
+    },
     usage: {
       enabled: body.usage ? !!body.usage.enabled : cur.usage.enabled,
       threshold: [70, 80, 90].includes(Number(body.usage?.threshold)) ? Number(body.usage.threshold) : cur.usage.threshold,
@@ -1958,7 +1866,11 @@ async function testNotify(request, env) {
   const body = await request.json().catch(() => ({}));
   const cfg = await getNotify(env);
   let report;
-  if (body.kind === 'usage') {
+  if (body.kind === 'seo') {
+    const dg = await google.seoDigest(env, await sessionSecret(env), cfg.seo.tag).catch((e) => ({ error: e.message }));
+    if (!dg || dg.error) return json({ error: dg?.error || '没有可用的站点数据（还没连接 Google，或这个分组里没有站点）' }, 400);
+    report = buildSeoDigest(cfg, dg, true);
+  } else if (body.kind === 'usage') {
     const u = await cfUsage(env, true);
     if (!u.configured) return json({ error: '还没有配置 Cloudflare 凭据，请先在 设置 → Cloudflare 用量 中填写' }, 400);
     if (!u.forecast) return json({ error: '暂时读取不到用量数据' }, 400);
@@ -1990,8 +1902,15 @@ async function runNotifications(env, now = Date.now()) {
   if (cfg.reports.daily && last.daily !== today) kinds.push('daily');
   if (cfg.reports.weekly && local.getUTCDay() === 1 && last.weekly !== today) kinds.push('weekly');
   if (cfg.reports.monthly && local.getUTCDate() === 1 && last.monthly !== today) kinds.push('monthly');
+  if (cfg.seo.enabled && local.getUTCDay() === 1 && last.seo !== today) kinds.push('seo');
   for (const kind of kinds) {
-    const report = await buildReport(env, cfg, kind, now);
+    let report;
+    if (kind === 'seo') {
+      const dg = await google.seoDigest(env, await sessionSecret(env), cfg.seo.tag).catch(() => null);
+      last.seo = today;
+      if (!dg) { await setSetting(env, 'notify_last', JSON.stringify(last)); continue; }
+      report = buildSeoDigest(cfg, dg);
+    } else report = await buildReport(env, cfg, kind, now);
     const errors = [];
     if (cfg.tg.enabled) await sendTelegram(cfg.tg, report.tg).catch((e) => errors.push(e.message));
     if (cfg.email.enabled) await sendEmail(env, cfg.email, report).catch((e) => errors.push(e.message));
@@ -2025,6 +1944,42 @@ async function runUsageAlert(env) {
   sent.keys.push(...fresh.map((i) => `${i.k}|${level(i)}`));
   await setSetting(env, 'notify_usage', JSON.stringify(sent));
   await setSetting(env, 'notify_status', JSON.stringify({ at: Date.now(), kind: 'usage', ok: !errors.length, error: errors.join('；') }));
+}
+
+// 每周 SEO 变化
+function buildSeoDigest(cfg, g, test = false) {
+  const nf = new Intl.NumberFormat('en-US'), n = (v) => nf.format(Math.round(v || 0));
+  const h = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const chg = (a, b) => (!b ? (a ? '新增' : '持平') : `${a >= b ? '↑' : '↓'} ${Math.abs(((a - b) / b) * 100).toFixed(0)}%`);
+  const md = (s) => s.slice(5).replace('-', '/');
+  const t = g.totals;
+  const title = `${test ? '【测试】' : ''}每周 SEO 变化${g.tag ? ` · ${g.tag}` : ''} · 搜索点击 ${chg(t.clicks, t.prevClicks)}`;
+  const admin = cfg.base ? `${cfg.base}/admin#/sites` : '';
+  const site = (x) => `${x.host}：${n(x.prevClicks)} → ${n(x.clicks)}（${x.clicks - x.prevClicks >= 0 ? '+' : ''}${n(x.clicks - x.prevClicks)}）${x.position != null && x.prevPosition != null ? ` · 排名 ${x.prevPosition.toFixed(1)} → ${x.position.toFixed(1)}` : ''}`;
+  const sections = [
+    ['📉 点击下滑最多', g.drops.map(site)],
+    ['📈 点击增长最多', g.gains.map(site)],
+    ['⚠️ 跌出前 10 的搜索词', g.fellOut.map((x) => `${x.q}（${x.host}）：排名 ${x.from.toFixed(1)} → ${x.to.toFixed(1)}，上周展示 ${n(x.impressions)}`)],
+    ['🎯 接近前 10 的搜索词', g.near.map((x) => `${x.q}（${x.host}）：排名 ${x.position.toFixed(1)}，展示 ${n(x.impressions)}`)],
+  ].filter(([, items]) => items.length);
+  const head = [
+    `${g.sites} 个站点 · 搜索 ${md(g.range.from)}–${md(g.range.to)} 对比上一周（Search Console 数据延迟约 3 天），会话 ${md(g.gaRange.from)}–${md(g.gaRange.to)}`,
+    `搜索点击 ${n(t.clicks)}（${chg(t.clicks, t.prevClicks)}） · 展示 ${n(t.impressions)}（${chg(t.impressions, t.prevImpressions)}） · 会话 ${n(t.sessions)}（${chg(t.sessions, t.prevSessions)}）`,
+  ];
+  const tg = [`🔎 <b>${h(title)}</b>`, ...head.map(h), '',
+    ...sections.flatMap(([k, items]) => [`<b>${h(k)}</b>`, ...items.map((x) => `• ${h(x)}`), '']),
+    sections.length ? '' : '这一周没有明显的变化。',
+    admin ? `<a href="${h(admin)}">查看站点 →</a>` : ''].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n').trim();
+  const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #e3e6ec;border-radius:16px"><tr><td style="padding:28px">
+<div style="font-size:13px;color:#868e9e">cligc link · 每周 SEO 变化${test ? '（测试）' : ''}</div>
+<h1 style="margin:6px 0 10px;font-size:20px;color:#0b1020">${h(title.replace('【测试】', ''))}</h1>
+${head.map((x) => `<p style="margin:0 0 6px;font-size:13px;color:#454d5e">${h(x)}</p>`).join('')}
+${sections.map(([k, items]) => `<h3 style="margin:22px 0 8px;font-size:14px;color:#0b1020">${h(k)}</h3>${items.map((x) => `<div style="font-size:13px;color:#454d5e;padding:4px 0;border-bottom:1px solid #f0f1f4">${h(x)}</div>`).join('')}`).join('')}
+${sections.length ? '' : '<p style="margin:20px 0 0;color:#868e9e">这一周没有明显的变化。</p>'}
+${admin ? `<p style="margin:24px 0 0"><a href="${h(admin)}" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#0b1020;color:#fff;text-decoration:none;font-size:14px">查看站点</a></p>` : ''}
+</td></tr></table></body></html>`;
+  return { title, tg, html, text: tg.replace(/<[^>]+>/g, '') };
 }
 
 function buildUsageAlert(cfg, u, hot, test = false) {

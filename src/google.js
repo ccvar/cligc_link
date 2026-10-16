@@ -487,7 +487,29 @@ export function ranges(days) {
   return { from, to, pfrom, pto };
 }
 
+// 站点列表缓存 5 分钟；数据版本（Google 同步时间、访问汇总进度、短链改动、账号数）变了就重算
 export async function sitesList(env, days) {
+  const v = await env.DB.prepare(`SELECT
+      (SELECT COALESCE(MAX(synced_at), 0) || ':' || COUNT(*) FROM g_sites) AS g,
+      (SELECT value FROM settings WHERE key = 'agg_mark') AS a,
+      (SELECT COALESCE(MAX(updated_at), 0) || ':' || COUNT(*) FROM links) AS l,
+      (SELECT COALESCE(MAX(updated_at), 0) || ':' || COUNT(*) FROM link_targets) AS t,
+      (SELECT COUNT(*) FROM g_accounts) AS n,
+      (SELECT value FROM settings WHERE key = 'tags_ver') AS tv`).first();
+  const key = `sites|${days}|${ranges(days).to}|${v.g}|${v.a}|${v.l}|${v.t}|${v.n}|${v.tv || 0}`;
+  const hit = await env.DB.prepare('SELECT v, at FROM g_cache WHERE k = ?').bind(key).first();
+  if (hit && hit.at > Date.now() - 300000) return JSON.parse(hit.v);
+  const out = await sitesListRaw(env, days);
+  const body = JSON.stringify(out);
+  // D1 单个值最大 2 MB；站点多、区间长时结果可能很大，超过 1.5 MB 就不缓存
+  if (body.length < 1.5e6) {
+    await env.DB.prepare('INSERT INTO g_cache (k, v, at) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v, at = excluded.at')
+      .bind(key, body, Date.now()).run().catch(() => {});
+  }
+  return out;
+}
+
+async function sitesListRaw(env, days) {
   const { from, to, pfrom, pto } = ranges(days);
   const [sites, rows] = await Promise.all([
     env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email FROM g_sites s
@@ -497,6 +519,9 @@ export async function sitesList(env, days) {
   const byHost = new Map();
   for (const r of rows) { if (!byHost.has(r.host)) byHost.set(r.host, []); byHost.get(r.host).push(r); }
   const hostSet = new Set(sites.map((s) => s.host));
+  const tagRows = (await env.DB.prepare('SELECT host, tag FROM site_tags ORDER BY tag').all()).results;
+  const tagsOf = new Map();
+  for (const t of tagRows) { if (!tagsOf.has(t.host)) tagsOf.set(t.host, []); tagsOf.get(t.host).push(t.tag); }
   const [sl, sf] = await Promise.all([siteLinks(env, hostSet, days).catch(() => new Map()), siteSources(env, hostSet, days).catch(() => new Map())]);
   return sites.map((s) => {
     const rs = byHost.get(s.host) || [];
@@ -505,6 +530,7 @@ export async function sitesList(env, days) {
       host: s.host, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '' } : null,
       gsc: s.gsc_site || null, gscAcct: s.gsc_acct || '', gscEmail: s.gsc_email || '', syncedAt: s.synced_at || null, error: s.error || '',
       users: users[days] ?? null, prevUsers: hasPrev(days) ? users[`p${days}`] ?? null : null,
+      tags: tagsOf.get(s.host) || [],
       links: sl.get(s.host) || [],          // 跳转到这个站点的短链
       linksFrom: sf.get(s.host) || [],      // 从这个站点点出的短链
       linksFromVisitors: sf.visitors?.get(s.host) ?? null,   // 这些点击来自多少位访客（去重）
@@ -517,19 +543,47 @@ export async function sitesList(env, days) {
   });
 }
 
+// ---------------------------------------------------------------- 站点分组
+export async function tagsList(env) {
+  return (await env.DB.prepare('SELECT tag, COUNT(*) AS n FROM site_tags GROUP BY tag ORDER BY tag').all()).results;
+}
+// 批量加 / 去掉分组；rename：把一个分组改名（合并到已有分组也可以）
+export async function tagsUpdate(env, b) {
+  const tag = String(b.tag || '').trim().slice(0, 40);
+  const hosts = (Array.isArray(b.hosts) ? b.hosts : []).map(String).slice(0, 1000);
+  const stmts = [];
+  if (b.rename) {
+    const to = String(b.rename).trim().slice(0, 40);
+    if (!tag || !to) return { error: '分组名不能为空' };
+    stmts.push(env.DB.prepare('INSERT OR IGNORE INTO site_tags (host, tag) SELECT host, ? FROM site_tags WHERE tag = ?').bind(to, tag),
+      env.DB.prepare('DELETE FROM site_tags WHERE tag = ? AND tag != ?').bind(tag, to));
+  } else if (b.drop) {
+    stmts.push(env.DB.prepare('DELETE FROM site_tags WHERE tag = ?').bind(tag));
+  } else {
+    if (!tag) return { error: '请填写分组名' };
+    if (!hosts.length) return { error: '没有选中站点' };
+    for (const h of hosts) stmts.push(b.remove
+      ? env.DB.prepare('DELETE FROM site_tags WHERE host = ? AND tag = ?').bind(h, tag)
+      : env.DB.prepare('INSERT OR IGNORE INTO site_tags (host, tag) VALUES (?, ?)').bind(h, tag));
+  }
+  for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
+  await setSetting(env, 'tags_ver', String(Date.now()));   // 让站点列表缓存失效
+  return { ok: true, tags: await tagsList(env) };
+}
+
 // ---------------------------------------------------------------- 短链 ↔ 站点
 // 按短链的跳转去向（默认地址、各条地区规则）的域名匹配站点：域名相同，或是站点的子域名。
 // 点击数读访问汇总 agg_d 里按规则（dim = 'rule'）的数据，所以一条短链的不同去向会分别算到各自的站点。
 
 // 找域名对应的站点：a.b.example.com → b.example.com → example.com
-function matchHost(host, hosts) {
+export function matchHost(host, hosts) {
   for (let h = host; h && h.includes('.'); h = h.slice(h.indexOf('.') + 1)) if (hosts.has(h)) return h;
   return null;
 }
 
 // 访问来源 → 站点：来源是域名时按域名（含子域名、忽略 www.）匹配；
 // 是不带点的名字（如 ?src=gaterar）时，只有一个站点的主名称与它相同才算
-function sourceSite(k, hosts, labels) {
+export function sourceSite(k, hosts, labels) {
   const v = String(k || '').trim().toLowerCase().replace(/^www\./, '');
   if (!v || v === '(direct)') return null;
   if (v.includes('.')) return matchHost(v, hosts);
@@ -641,16 +695,40 @@ async function siteLinks(env, hosts, days) {
 }
 
 // 一条短链指向的站点（短链详情页用）：每个去向匹配到的站点及其区间数据
-export async function linkSites(env, linkId, days) {
-  const l = await env.DB.prepare('SELECT target_url FROM links WHERE id = ?').bind(linkId).first();
+export async function linkSites(env, linkId, days, secret) {
+  const l = await env.DB.prepare('SELECT slug, target_url, utm FROM links WHERE id = ?').bind(linkId).first();
   if (!l) return { targets: [], sources: [] };
   const urls = [l.target_url, ...(await env.DB.prepare('SELECT url FROM link_targets WHERE link_id = ?').bind(linkId).all()).results.map((r) => r.url)].filter(Boolean);
   const list = await sitesList(env, days);
   const hosts = new Set(list.map((x) => x.host));
   const want = new Set(urls.map((u) => matchHost(siteHost(u), hosts)).filter(Boolean));
   const pick = (x) => ({ ...x, links: (x.links || []).filter((e) => e.id === linkId), linksFrom: (x.linksFrom || []).filter((e) => e.id === linkId) });
+  const targets = list.filter((x) => want.has(x.host)).map(pick);
+  // 转化追踪：GA4 里来源为 cligc、广告系列为这个短链后缀的会话
+  if (l.utm && secret) {
+    const { from, to } = ranges(days);
+    await Promise.all(targets.map(async (x) => {
+      const s = await env.DB.prepare('SELECT ga4_property, ga4_acct FROM g_sites WHERE host = ?').bind(x.host).first();
+      if (!s?.ga4_property) return;
+      try {
+        x.conversion = await cached(env, `conv|${s.ga4_property}|${l.slug}|${days}|${to}`, 3600000, async () => {
+          const d = await gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${s.ga4_property}:runReport`, {
+            dateRanges: [{ startDate: from, endDate: to }],
+            metrics: ['sessions', 'engagedSessions', 'keyEvents', 'totalUsers'].map((name) => ({ name })),
+            dimensionFilter: { andGroup: { expressions: [
+              { filter: { fieldName: 'sessionSource', stringFilter: { matchType: 'EXACT', value: 'cligc' } } },
+              { filter: { fieldName: 'sessionCampaignName', stringFilter: { matchType: 'EXACT', value: l.slug } } },
+            ] } },
+          });
+          const m = (d.rows?.[0]?.metricValues || []).map((v) => Number(v.value) || 0);
+          return { sessions: m[0] || 0, engaged: m[1] || 0, keyEvents: m[2] || 0, users: m[3] || 0 };
+        });
+      } catch (e) { x.conversion = { error: e.message }; }
+    }));
+  }
   return {
-    targets: list.filter((x) => want.has(x.host)).map(pick),
+    utm: !!l.utm,
+    targets,
     sources: list.filter((x) => x.linksFrom.some((e) => e.id === linkId)).map(pick).sort((a, b) => b.linksFrom[0].human - a.linksFrom[0].human),
   };
 }
@@ -679,6 +757,7 @@ export async function siteDetail(env, secret, host, days) {
     cur: sumRange(rows, from, to), prev: hasPrev(days) ? sumRange(rows, pfrom, pto) : { ga: null, gsc: null }, errors: [],
     links: (await siteLinks(env, new Set([host]), days).catch(() => new Map())).get(host) || [],
     linksFrom: [],
+    tags: (await env.DB.prepare('SELECT tag FROM site_tags WHERE host = ? ORDER BY tag').bind(host).all()).results.map((r) => r.tag),
   };
   // 来源匹配要用全部站点（不带点的 src 名称需要确认只对应一个站点）
   const all = new Set((await env.DB.prepare('SELECT host FROM g_sites').all()).results.map((r) => r.host));
@@ -741,7 +820,7 @@ export async function siteDetail(env, secret, host, days) {
 
 // 各排名的大致点击率（行业经验值），用来判断“点击率偏低”
 const CTR_CURVE = [0, 0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018];
-const expectedCtr = (pos) => (pos < 1 ? 0.28 : pos <= 10 ? CTR_CURVE[Math.round(pos)] : pos <= 20 ? 0.01 : 0.003);
+export const expectedCtr = (pos) => (pos < 1 ? 0.28 : pos <= 10 ? CTR_CURVE[Math.round(pos)] : pos <= 20 ? 0.01 : 0.003);
 
 export async function aiReport(env, secret, hosts, days, sections, hide) {
   const { from, to, pfrom, pto } = ranges(days);
@@ -1017,4 +1096,57 @@ export function reportMarkdown(r) {
   }
   L.push('---', '', '_本报告由 cligc link 生成，只读；链接过期或被撤销后无法访问。_');
   return L.join('\n');
+}
+
+// ---------------------------------------------------------------- 每周 SEO 变化（通知用）
+// Search Console 数据通常延迟 2–3 天，搜索对比用“3–9 天前 vs 再往前 7 天”，避免把还没出来的数据当成下滑；
+// 会话用最近 7 天 vs 上一个 7 天。搜索词变化只查展示最多的 10 个站点，省接口调用。
+export async function seoDigest(env, secret, tag) {
+  const d = (n) => ymd(Date.now() - n * DAY);
+  const S = { from: d(9), to: d(3), pfrom: d(16), pto: d(10) }, G = { from: d(7), to: d(1), pfrom: d(14), pto: d(8) };
+  let sites = (await env.DB.prepare('SELECT * FROM g_sites').all()).results;
+  if (tag) {
+    const set = new Set((await env.DB.prepare('SELECT host FROM site_tags WHERE tag = ?').bind(tag).all()).results.map((r) => r.host));
+    sites = sites.filter((s) => set.has(s.host));
+  }
+  if (!sites.length) return null;
+  const rows = (await env.DB.prepare('SELECT * FROM g_daily WHERE date >= ? AND date <= ?').bind(S.pfrom, G.to).all()).results;
+  const by = new Map();
+  for (const r of rows) { if (!by.has(r.host)) by.set(r.host, []); by.get(r.host).push(r); }
+  const list = sites.map((s) => {
+    const rs = by.get(s.host) || [];
+    const sc = sumRange(rs, S.from, S.to).gsc, ps = sumRange(rs, S.pfrom, S.pto).gsc;
+    const ga = sumRange(rs, G.from, G.to).ga, pg = sumRange(rs, G.pfrom, G.pto).ga;
+    return { s, host: s.host, clicks: sc?.clicks ?? null, prevClicks: ps?.clicks ?? null, impressions: sc?.impressions ?? null, prevImpressions: ps?.impressions ?? null,
+      position: sc?.impressions ? sc.position : null, prevPosition: ps?.impressions ? ps.position : null, sessions: ga?.sessions ?? null, prevSessions: pg?.sessions ?? null };
+  });
+  const sum = (k) => list.reduce((a, x) => a + (x[k] || 0), 0);
+  const withSc = list.filter((x) => x.clicks != null && x.prevClicks != null);
+  const change = (x) => x.clicks - x.prevClicks;
+  const drops = withSc.filter((x) => change(x) <= -3).sort((a, b) => change(a) - change(b)).slice(0, 5);
+  const gains = withSc.filter((x) => change(x) >= 3).sort((a, b) => change(b) - change(a)).slice(0, 5);
+  // 搜索词：展示最多的 10 个站点
+  const top = list.filter((x) => x.s.gsc_site && x.impressions).sort((a, b) => b.impressions - a.impressions).slice(0, 10);
+  const fellOut = [], near = [];
+  for (const x of top) {
+    try {
+      const q = (start, end) => gfetch(env, secret, x.s.gsc_acct, `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(x.s.gsc_site)}/searchAnalytics/query`,
+        { startDate: start, endDate: end, dimensions: ['query'], rowLimit: 250, dataState: 'all' }).then((r) => r.rows || []);
+      const [cur, prev] = await Promise.all([q(S.from, S.to), q(S.pfrom, S.pto)]);
+      const pm = new Map(prev.map((r) => [r.keys[0], r]));
+      for (const r of cur) {
+        const p = pm.get(r.keys[0]);
+        // 跌出前 10：按上一周的展示衡量这个词有多重要（跌出去之后本周展示自然会变少）
+        if (p && p.position <= 10 && r.position > 10 && p.impressions >= 20) fellOut.push({ host: x.host, q: r.keys[0], from: p.position, to: r.position, impressions: p.impressions });
+        if (r.position > 10 && r.position <= 15 && r.impressions >= 30) near.push({ host: x.host, q: r.keys[0], position: r.position, impressions: r.impressions });
+      }
+    } catch {}
+  }
+  return {
+    range: S, gaRange: G, sites: list.length, tag: tag || '',
+    totals: { clicks: sum('clicks'), prevClicks: sum('prevClicks'), impressions: sum('impressions'), prevImpressions: sum('prevImpressions'), sessions: sum('sessions'), prevSessions: sum('prevSessions') },
+    drops, gains,
+    fellOut: fellOut.sort((a, b) => b.impressions - a.impressions).slice(0, 8),
+    near: near.sort((a, b) => b.impressions - a.impressions).slice(0, 8),
+  };
 }

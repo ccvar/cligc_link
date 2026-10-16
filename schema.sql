@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS links (
   note        TEXT NOT NULL DEFAULT '',
   enabled     INTEGER NOT NULL DEFAULT 1,
   pass_query  INTEGER NOT NULL DEFAULT 0,  -- 是否把短链上的查询参数透传给目标地址
+  utm         INTEGER NOT NULL DEFAULT 0,  -- 转化追踪：跳转时加上 utm_source=cligc&utm_medium=shortlink&utm_campaign=<后缀>
   expires_at  INTEGER,                     -- 过期时间（毫秒时间戳），NULL 为永久
   clicks      INTEGER NOT NULL DEFAULT 0,
   last_click  INTEGER,
@@ -160,4 +161,22 @@ CREATE TABLE IF NOT EXISTS shares (
   last_view   INTEGER,
   hour        INTEGER NOT NULL DEFAULT 0,   -- 限流：当前小时序号和本小时访问次数
   hour_n      INTEGER NOT NULL DEFAULT 0
+);
+-- AI 分析链接的打开记录（每个链接保留最近 200 条）
+CREATE TABLE IF NOT EXISTS share_views (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  token    TEXT NOT NULL,
+  at       INTEGER NOT NULL,
+  ip       TEXT NOT NULL DEFAULT '',
+  country  TEXT NOT NULL DEFAULT '',
+  ua       TEXT NOT NULL DEFAULT '',
+  agent    TEXT NOT NULL DEFAULT '',          -- 识别出的 AI 工具，如 ChatGPT、Claude
+  status   INTEGER NOT NULL DEFAULT 200
+);
+CREATE INDEX IF NOT EXISTS idx_share_views ON share_views(token, at);
+-- 站点分组（标签）：单独存放，Google 重新发现站点时不受影响
+CREATE TABLE IF NOT EXISTS site_tags (
+  host  TEXT NOT NULL,
+  tag   TEXT NOT NULL,
+  PRIMARY KEY (host, tag)
 );
