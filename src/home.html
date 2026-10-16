@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cligc link · 开源的短链接与访问分析</title>
+<script>
+// 语言：?lang=en / ?lang=zh 或右上角切换（和后台共用设置），否则跟随浏览器；英文时先加载翻译脚本
+(function () {
+  var l, q = (location.search.match(/[?&]lang=(en|zh)\b/) || [])[1];
+  try { l = q || JSON.parse(localStorage.getItem('sl:lang')); if (q) localStorage.setItem('sl:lang', JSON.stringify(q)); } catch (e) {}
+  if (l !== 'zh' && l !== 'en') l = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
+  window.LANG = l;
+  if (l === 'en') document.write('<script src="/i18n/home.en.js"><\/script>');
+})();
+</script>
 <meta name="description" content="cligc link 是免费开源、可自托管的短链接服务，运行在 Cloudflare Workers + D1 上：按国家 / 地区分流、来源追踪、实时访问分析，接入 GA4 与 Search Console 看清每个站点的 SEO，还能一键生成给 AI 分析的报告链接。">
 <meta property="og:title" content="cligc link · 每一次点击，都去对的地方">
 <meta property="og:description" content="免费开源、可自托管的短链接服务。按地区分流、来源追踪、实时分析，几分钟部署到 Cloudflare。">
@@ -185,6 +195,7 @@ h2 { margin: 18px 0 0; font-size: clamp(32px, 4.4vw, 56px); line-height: 1.08; l
 h2 .mute { color: var(--muted); }
 .sec-h { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .7fr); gap: 48px; align-items: end; margin-bottom: 56px; }
 .nb { white-space: nowrap; }
+html[lang="en"] .nb { white-space: normal; }
 .sec-h p { margin: 0; color: var(--text-2); font-size: 17px; text-wrap: pretty; }
 
 /* ---- 后台预览 ---- */
@@ -534,6 +545,99 @@ footer a:hover { color: var(--text); }
 .ufb.bad s, .ufb.bad i { background: #e5484d; }
 .ufb.bad + em { color: #e5484d; }
 
+/* ==================================================================== 分流、检查、运维 */
+.rules .rr .f.dv { display: grid; place-items: center; color: var(--violet); }
+.rules .rr .f.dv svg { width: 18px; height: 18px; }
+.t-ab, .t-hc { grid-column: span 3; }
+/* A/B 分流 */
+.abt { margin-top: 22px; display: grid; gap: 6px; }
+.abt-bar { display: flex; gap: 3px; height: 30px; margin-bottom: 8px; }
+.abt-bar i { flex: 0 0 0; display: grid; place-items: center; border-radius: 8px; background: var(--c); color: #fff; font: 650 12px/1 var(--sans); font-style: normal; white-space: nowrap; overflow: hidden;
+  transition: flex-basis 1.1s var(--ease); }
+.reveal.in .abt-bar i { flex-basis: calc(var(--w) - 2px); }
+.abt-h, .abt-r { display: grid; grid-template-columns: 22px minmax(0, 1fr) 56px 64px; gap: 10px; align-items: center; font-size: 12.5px; }
+.abt-h span { white-space: nowrap; }
+.abt-h { color: var(--muted); font-size: 11.5px; padding: 0 10px; }
+.abt-h span:nth-child(n+3), .abt-r b, .abt-r em { text-align: right; }
+.abt-r { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); opacity: 0; transform: translateY(6px);
+  transition: opacity .6s var(--ease), transform .6s var(--ease); transition-delay: calc(var(--n) * 110ms + 300ms); }
+.reveal.in .abt-r { opacity: 1; transform: none; }
+.abt-r .ak { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; background: var(--c); color: #fff; font-weight: 700; font-size: 11px; }
+.abt-r code { font: 12px var(--mono); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abt-r b { font-weight: 650; font-variant-numeric: tabular-nums; }
+.abt-r em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+.abt-r.best { border-color: color-mix(in srgb, var(--good) 40%, var(--line)); background: color-mix(in srgb, var(--good) 7%, var(--bg)); }
+.abt-r.best em { color: var(--good); font-weight: 650; }
+/* 目标页检查 */
+.hcd { margin-top: 22px; display: grid; gap: 6px; }
+.hcr { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 12.5px;
+  opacity: 0; transform: translateY(6px); transition: opacity .6s var(--ease), transform .6s var(--ease); transition-delay: calc(var(--n) * 110ms + 300ms); }
+.reveal.in .hcr { opacity: 1; transform: none; }
+.hcr i, .syr i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 18%, transparent); }
+.hcr i.bad { background: #e5484d; box-shadow: 0 0 0 3px color-mix(in srgb, #e5484d 18%, transparent); animation: hcBlink 1.6s var(--ease-io) infinite; }
+@keyframes hcBlink { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, #e5484d 8%, transparent); } }
+.hcr code { font: 12px var(--mono); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hcr span { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hcr.down { border-color: color-mix(in srgb, #e5484d 35%, var(--line)); background: color-mix(in srgb, #e5484d 6%, var(--bg)); }
+.hcr.down span { color: #e5484d; }
+.hcm { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 10px 12px; border-radius: 12px 12px 12px 4px; background: color-mix(in srgb, var(--accent) 9%, var(--bg)); font-size: 12.5px; color: var(--text-2);
+  opacity: 0; transition: opacity .6s var(--ease) .9s; }
+.reveal.in .hcm { opacity: 1; }
+.hcm svg { width: 15px; height: 15px; color: var(--accent); flex: none; }
+.hcm b { font-family: var(--mono); font-weight: 600; color: var(--text); }
+/* 运维与安全 */
+.t-log { grid-column: span 4; display: flex; flex-direction: column; }
+.t-dv, .t-sys { grid-column: span 2; }
+.t-kb { grid-column: span 4; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 32px; align-items: center; }
+.lgd { margin-top: 22px; display: grid; gap: 8px; }
+.lge { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg); font-size: 13px;
+  opacity: 0; transform: translateY(8px); transition: opacity .6s var(--ease), transform .6s var(--ease); transition-delay: calc(var(--n) * 130ms + 250ms); }
+.reveal.in .lge { opacity: 1; transform: none; }
+.lge.rv > div { opacity: .6; }
+.lgi { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--sunken); color: var(--text-2); }
+.lgi svg { width: 15px; height: 15px; }
+.lge b { font-weight: 650; }
+.lgc { margin-top: 4px; color: var(--text-2); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lgc s { color: var(--muted); }
+.lge small { display: block; margin-top: 4px; color: var(--muted); font-size: 11.5px; }
+.lgu, .lgt { align-self: center; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 8px; white-space: nowrap; }
+.lgu { border: 1px solid var(--line); background: var(--panel); color: var(--text-2); }
+.lgt { background: var(--sunken); color: var(--muted); font-weight: 550; }
+.dvd { margin-top: 20px; display: grid; gap: 6px; }
+.dvr { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 12.5px; }
+.dvr svg { width: 17px; height: 17px; color: var(--muted); }
+.dvr b { font-weight: 600; display: block; }
+.dvr small { color: var(--muted); font-size: 11.5px; }
+.dvr .pill { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px; color: var(--good); background: var(--good-bg); white-space: nowrap; }
+.dvr .out { font-size: 11.5px; padding: 3px 8px; border-radius: 7px; border: 1px solid var(--line); color: var(--text-2); white-space: nowrap; }
+.dvr.cur { background: var(--panel); }
+.syd { margin-top: 20px; display: grid; gap: 4px; }
+.syr { display: grid; grid-template-columns: 8px auto minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 10px; border-radius: 9px; background: var(--bg); font-size: 12.5px;
+  opacity: 0; transform: translateX(-6px); transition: opacity .5s var(--ease), transform .5s var(--ease); transition-delay: calc(var(--n) * 100ms + 250ms); }
+.reveal.in .syr { opacity: 1; transform: none; }
+.syr b { font-weight: 600; white-space: nowrap; }
+.syr span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.syr i.warn { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 20%, transparent); }
+.syr.warn { background: color-mix(in srgb, var(--amber) 10%, var(--bg)); }
+.kbd { border-radius: 16px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 24px 60px -30px rgba(11,16,32,.35); overflow: hidden; }
+.kbq { display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 16px; border-bottom: 1px solid var(--line-2); color: var(--muted); font-size: 14px; }
+.kbq svg { width: 17px; height: 17px; }
+.kbq .kbt { flex: 1; color: var(--text); font-weight: 500; }
+.kbq .kbt::after { content: ''; display: inline-block; width: 1.5px; height: 1em; margin-left: 1px; vertical-align: -2px; background: var(--accent); animation: kbCaret 1s steps(1) infinite; }
+@keyframes kbCaret { 50% { opacity: 0; } }
+.kbq kbd, .kbl span { font: 600 11px/1 var(--sans); padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
+.kbi { display: flex; align-items: center; gap: 10px; height: 42px; margin: 6px; padding: 0 12px; border-radius: 10px; font-size: 13.5px; color: var(--text-2); }
+.kbi svg { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.kbi b { font-weight: 600; color: var(--text); font-family: var(--mono); font-size: 13px; }
+.kbi mark { background: none; color: var(--accent-ink); font-weight: 750; }
+.kbi small { color: var(--muted); font-size: 12px; }
+.kbi.on { background: var(--accent-2); }
+.kbi.on svg { color: var(--accent-ink); }
+.kbl { display: flex; gap: 6px; padding: 10px 16px; border-top: 1px solid var(--line-2); background: var(--bg); }
+.kbl span.on { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); background: var(--accent-2); }
+.nav .lang { gap: 6px; padding: 0 11px; }
+.nav .lang svg { width: 15px; height: 15px; }
+
 /* ==================================================================== 响应式 */
 @media (max-width: 1080px) {
   .hero-grid { grid-template-columns: 1fr; gap: 64px; }
@@ -543,6 +647,8 @@ footer a:hover { color: var(--text); }
   .t-ana, .t-src { grid-column: span 3; }
   .t-st { grid-column: span 6; grid-row: auto; }
   .t-out, .t-ai2 { grid-column: span 3; }
+  .t-log, .t-kb { grid-column: span 6; }
+  .t-dv, .t-sys { grid-column: span 3; }
   .sec-h { grid-template-columns: 1fr; gap: 18px; }
   .deploy, .faq { grid-template-columns: 1fr; gap: 48px; }
 }
@@ -560,6 +666,8 @@ footer a:hover { color: var(--text); }
   .t-bot > div:first-child { order: 2; }
   .t-seo, .t-cv, .t-out, .t-ai2 { grid-column: span 6; }
   .t-uf { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .t-ab, .t-hc, .t-log, .t-dv, .t-sys { grid-column: span 6; grid-row: auto; }
+  .t-kb { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .app { grid-template-columns: 1fr; } .app-side { display: none; }
   .row2 { grid-template-columns: 1fr; }
   .steps { grid-template-columns: 1fr; gap: 40px; }
@@ -582,7 +690,9 @@ footer a:hover { color: var(--text); }
   .route-b { padding: 16px; }
   .kp { grid-template-columns: repeat(2, 1fr); }
   .bento { grid-template-columns: 1fr; }
-  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt, .t-trk, .t-bot, .t-st, .t-out, .t-ai2, .t-seo, .t-cv, .t-uf { grid-column: auto; }
+  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt, .t-trk, .t-bot, .t-st, .t-out, .t-ai2, .t-seo, .t-cv, .t-uf, .t-ab, .t-hc, .t-log, .t-dv, .t-sys, .t-kb { grid-column: auto; }
+  .lgc { white-space: normal; }
+  .nav .lang span { display: none; }
   .sth, .str { grid-template-columns: minmax(0, 1.6fr) 1fr 70px; }
   .sth span:nth-child(3), .sth span:nth-child(4), .str > span:nth-child(3), .str > span:nth-child(4) { display: none; }
   .ufr { grid-template-columns: 76px minmax(0, 1fr); }
@@ -623,9 +733,10 @@ footer a:hover { color: var(--text); }
       cligc <em>link</em>
     </a>
     <nav class="links" aria-label="页面导航">
-      <a href="#product">产品</a><a href="#features">功能</a><a href="#sites">站点与 SEO</a><a href="#deploy">部署</a><a href="#faq">常见问题</a>
+      <a href="#product">产品</a><a href="#features">功能</a><a href="#sites">站点与 SEO</a><a href="#ops">运维与安全</a><a href="#deploy">部署</a><a href="#faq">常见问题</a>
     </nav>
     <span class="sp"></span>
+    <button type="button" class="btn sm lang notranslate" id="lang" aria-label="Switch language / 切换语言"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span id="lang-t">EN</span></button>
     <a class="btn sm gh" href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">
       <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       <span class="gh-t">Star on GitHub</span>
@@ -641,7 +752,7 @@ footer a:hover { color: var(--text); }
       <div>
         <a class="pill rise" style="--d:0" href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener"><b>开源</b>免费 · MIT · 运行在 Cloudflare Workers<svg class="i arr" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         <h1><span class="l rise" style="--d:1">每一次点击，</span><span class="l rise grad" style="--d:2">都去对的地方。</span></h1>
-        <p class="lead rise" style="--d:3">cligc link 是开源、可自托管的短链接服务。同一个链接，按访客所在国家 / 地区送往不同的落地页，并清楚记录每一次点击来自哪里。</p>
+        <p class="lead rise" style="--d:3">cligc link 是开源、可自托管的短链接服务。同一个链接，按访客所在国家 / 地区和设备送往不同的落地页，还能按比例做 A/B 测试，并清楚记录每一次点击来自哪里。</p>
         <div class="cta rise" style="--d:4">
           <a class="btn ink lg" href="https://deploy.workers.cloudflare.com/?url=https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">
             <svg class="cf-logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="#F38020" d="M16.5 16.8c.2-.6.1-1.1-.2-1.5-.3-.3-.7-.5-1.2-.6l-8.9-.1c-.1 0-.1 0-.2-.1v-.1c0-.1.1-.1.2-.2l9-.1c1.1 0 2.2-.9 2.6-2l.5-1.4v-.2C17.7 8.2 15.4 6.3 12.7 6.3c-2.5 0-4.6 1.6-5.4 3.8-.5-.4-1.2-.6-1.9-.5-1.2.1-2.2 1.1-2.3 2.3 0 .3 0 .6.1.9-2 .1-3.5 1.7-3.5 3.7 0 .2 0 .4.1.5 0 .1.1.1.1.1h16.4c.1 0 .2-.1.2-.2l.1-.1z"/><path fill="#FAAE40" d="M19.4 11.2h-.2c-.1 0-.1.1-.2.1l-.3 1.2c-.2.6-.1 1.1.2 1.5.3.3.7.5 1.2.6l1.9.1c.1 0 .1 0 .2.1v.1c0 .1-.1.1-.2.2l-2 .1c-1.1 0-2.2.9-2.6 2l-.1.4c0 .1 0 .1.1.1h6.8c.1 0 .1 0 .1-.1.1-.4.2-.9.2-1.3 0-2.8-2.3-5.1-5-5.1"/></svg>
@@ -744,14 +855,15 @@ footer a:hover { color: var(--text); }
       <div class="bento">
         <article class="tile t-geo reveal" id="geo">
           <span class="tag">// geo routing</span>
-          <h3>按国家 / 地区分流</h3>
-          <p>同一个短链接，中国访客去国内落地页，北美访客去英文站，其他地区走默认地址。规则可视化配置，香港、澳门、台湾可单独设置。</p>
+          <h3>按国家 / 地区和设备分流</h3>
+          <p>同一个短链接，中国访客去国内落地页，北美访客去英文站，iPhone 用户直接去 App Store，其他走默认地址。国家和设备可以组合，优先级清楚；香港、澳门、台湾可单独设置。</p>
           <div class="rules">
             <div class="src"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>go.example.com/spring</div>
-            <div class="rr"><span class="f">🇨🇳</span><span>中国大陆</span><code>shop.example.cn/spring</code><em>58%</em></div>
-            <div class="rr"><span class="f">🇺🇸</span><span>美国 · 加拿大</span><code>example.com/us/spring</code><em>24%</em></div>
-            <div class="rr"><span class="f">🇪🇺</span><span>欧盟</span><code>example.com/eu/spring</code><em>11%</em></div>
-            <div class="rr"><span class="f">🌐</span><span>其他地区</span><code>example.com/spring</code><em>7%</em></div>
+            <div class="rr"><span class="f dv"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg></span><span>iOS · 所有地区</span><code>apps.apple.com/app/spring</code><em>21%</em></div>
+            <div class="rr"><span class="f">🇨🇳</span><span>中国大陆</span><code>shop.example.cn/spring</code><em>46%</em></div>
+            <div class="rr"><span class="f">🇺🇸</span><span>美国 · 加拿大</span><code>example.com/us/spring</code><em>19%</em></div>
+            <div class="rr"><span class="f">🇪🇺</span><span>欧盟</span><code>example.com/eu/spring</code><em>9%</em></div>
+            <div class="rr"><span class="f">🌐</span><span>其他地区</span><code>example.com/spring</code><em>5%</em></div>
           </div>
         </article>
         <article class="tile t-ana reveal" style="--d:1">
@@ -811,6 +923,29 @@ footer a:hover { color: var(--text); }
               <div class="tgm">📊 <b>cligc link 日报 · 10 月 14 日</b><br>访问 <b>1,284</b>（↑ 12%）　独立访客 <b>963</b><br><span class="tgs">热门短链</span>1. <code>/spring</code> — 512<br>2. <code>/app</code> — 301</div>
             </div>
             <div class="tgc"><span>Telegram</span><span>邮件</span><span>日报 / 周报 / 月报</span></div>
+          </div>
+        </article>
+        <article class="tile t-ab reveal" id="abt">
+          <span class="tag">// a/b testing</span>
+          <h3>A/B 测试，按比例分流</h3>
+          <p>默认地址或任意一条规则都能分成几个版本，按比例分配；同一位访客总是去同一个版本。配合转化追踪，在 GA4 里直接对比转化。</p>
+          <div class="abt" aria-hidden="true">
+            <div class="abt-bar"><i style="--w:50%;--c:var(--accent)">A 50%</i><i style="--w:30%;--c:var(--violet)">B 30%</i><i style="--w:20%;--c:var(--teal)">C 20%</i></div>
+            <div class="abt-h"><span></span><span>落地页</span><span>点击</span><span>转化率</span></div>
+            <div class="abt-r" style="--n:0"><span class="ak" style="--c:var(--accent)">A</span><code>example.com/spring</code><b>1,204</b><em>3.1%</em></div>
+            <div class="abt-r best" style="--n:1"><span class="ak" style="--c:var(--violet)">B</span><code>example.com/spring-b</code><b>718</b><em>4.6%</em></div>
+            <div class="abt-r" style="--n:2"><span class="ak" style="--c:var(--teal)">C</span><code>example.com/spring-c</code><b>476</b><em>2.4%</em></div>
+          </div>
+        </article>
+        <article class="tile t-hc reveal" style="--d:1" id="hct">
+          <span class="tag">// health checks</span>
+          <h3>目标页挂了，第一时间知道</h3>
+          <p>每小时检查短链的目标地址，连续两次打不开就推送到 Telegram 或邮箱，恢复后再通知；对方拦截机器访问不算故障。</p>
+          <div class="hcd" aria-hidden="true">
+            <div class="hcr" style="--n:0"><i class="ok"></i><code>example.com/spring</code><span>200 · 182 ms</span></div>
+            <div class="hcr down" style="--n:1"><i class="bad"></i><code>shop.example.cn/d11</code><span>404 · 连续 2 次</span></div>
+            <div class="hcr" style="--n:2"><i class="ok"></i><code>apps.apple.com/app/spring</code><span>200 · 240 ms</span></div>
+            <div class="hcm"><svg class="i" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg><span>⚠️ 目标页打不开 · <b>/d11</b> 返回 404</span></div>
           </div>
         </article>
         <article class="tile t-trk reveal" id="trk">
@@ -927,15 +1062,73 @@ footer a:hover { color: var(--text); }
     </div>
   </section>
 
+  <!-- ================================================================ 运维与安全 -->
+  <section class="sec" id="ops">
+    <div class="wrap">
+      <div class="sec-h">
+        <div class="reveal"><div class="label"><b>04</b> 运维与安全</div><h2><span class="nb">改错了能撤销，</span><span class="mute nb">出问题先知道。</span></h2></div>
+        <p class="reveal" style="--d:1">每次修改都有记录，可以一键撤销；登录设备和后台任务的状态一目了然。⌘K 随时跳转，界面支持中文和英文。</p>
+      </div>
+      <div class="bento">
+        <article class="tile t-log reveal">
+          <span class="tag">// change history</span>
+          <h3>每次修改都有记录，一键撤销</h3>
+          <p>谁在什么时候改了默认地址、跳转规则、A/B 比例或启用状态，都记在短链的修改记录里，保留一年。改错了点“撤销”就能改回去；之后又被改过的不会被误撤销。</p>
+          <div class="lgd" aria-hidden="true">
+            <div class="lge" style="--n:0"><span class="lgi"><svg class="i" viewBox="0 0 24 24"><path d="M6 3v6a6 6 0 0 0 6 6 6 6 0 0 1 6 6"/><path d="M18 3v6a6 6 0 0 1-6 6"/></svg></span>
+              <div><b>开始 A/B 分流：默认地址</b><div class="lgc">比例：<s>不分流</s> → A 50% · B 30% · C 20%</div><small>3 分钟前 · Chrome · macOS</small></div><span class="lgu">撤销</span></div>
+            <div class="lge" style="--n:1"><span class="lgi"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
+              <div><b>修改默认地址</b><div class="lgc">默认地址：<s>example.com/spring</s> → example.com/spring-2</div><small>2 小时前 · Safari · iOS</small></div><span class="lgu">撤销</span></div>
+            <div class="lge rv" style="--n:2"><span class="lgi"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span>
+              <div><b>删除跳转规则：🇯🇵 日本</b><div class="lgc">原来跳到：<s>example.jp/spring</s></div><small>昨天 · Chrome · Windows</small></div><span class="lgt">已撤销</span></div>
+          </div>
+        </article>
+        <article class="tile t-dv reveal" style="--d:1">
+          <span class="tag">// sessions</span>
+          <h3>登录设备，一目了然</h3>
+          <p>每次登录记一台设备：浏览器、IP、地区、最近使用时间。不认识的设备可以单独退出，或一键退出其他所有设备。</p>
+          <div class="dvd" aria-hidden="true">
+            <div class="dvr cur"><svg class="i" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><div><b>Chrome · macOS</b><small>🇨🇳 上海 · 正在使用</small></div><span class="pill">当前设备</span></div>
+            <div class="dvr"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg><div><b>Safari · iOS</b><small>🇯🇵 东京 · 2 小时前</small></div><span class="out">退出</span></div>
+          </div>
+        </article>
+        <article class="tile t-sys reveal">
+          <span class="tag">// system status</span>
+          <h3>后台任务有没有在跑</h3>
+          <p>定时任务、访问汇总、Google 同步、推送渠道、目标页检查放在一页，哪一步出错、耗时多少都看得到；定时任务停了会在概览页提醒。</p>
+          <div class="syd" aria-hidden="true">
+            <div class="syr" style="--n:0"><i class="ok"></i><b>定时任务</b><span>刚刚运行，耗时 3.6 秒</span></div>
+            <div class="syr" style="--n:1"><i class="ok"></i><b>Google 同步</b><span>69 个站点 · 1 小时前</span></div>
+            <div class="syr warn" style="--n:2"><i class="warn"></i><b>推送通知</b><span>还没有开启推送渠道</span></div>
+            <div class="syr" style="--n:3"><i class="ok"></i><b>目标页检查</b><span>18 个地址都能打开</span></div>
+          </div>
+        </article>
+        <article class="tile t-kb reveal" style="--d:1">
+          <div>
+            <span class="tag">// command palette · i18n</span>
+            <h3>⌘K 随时跳转，中英文界面</h3>
+            <p>按 ⌘K（Windows 上是 Ctrl K）搜索短链、站点和设置项，回车直达。后台默认跟随浏览器语言，可以随时切换中文 / English。</p>
+          </div>
+          <div class="kbd" aria-hidden="true">
+            <div class="kbq"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="kbt">spr</span><kbd>⌘K</kbd></div>
+            <div class="kbi on"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><b>/<mark>spr</mark>ing</b><small>春季活动 · 知乎</small></div>
+            <div class="kbi"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><b><mark>spr</mark>ingshop.com</b><small>站点</small></div>
+            <div class="kbl"><span class="on">中文</span><span>English</span></div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
   <!-- ================================================================ 流程 -->
   <section class="sec" id="how">
     <div class="wrap">
       <div class="sec-h">
-        <div class="reveal"><div class="label"><b>04</b> 工作方式</div><h2><span class="nb">三步，</span><span class="mute nb">从链接到洞察。</span></h2></div>
+        <div class="reveal"><div class="label"><b>05</b> 工作方式</div><h2><span class="nb">三步，</span><span class="mute nb">从链接到洞察。</span></h2></div>
       </div>
       <div class="steps" id="steps">
         <div class="step" style="--d:0"><div class="n">01</div><h3>创建短链</h3><p>自定义后缀或自动生成。可以先建短链、之后再填推广地址，并设置有效期和参数透传。</p></div>
-        <div class="step" style="--d:1"><div class="n">02</div><h3>配置跳转规则</h3><p>设置默认地址，再为不同国家 / 地区指定落地页。同一个国家只属于一条规则，永远不会冲突。</p></div>
+        <div class="step" style="--d:1"><div class="n">02</div><h3>配置跳转规则</h3><p>设置默认地址，再按国家 / 地区、设备指定落地页，或按比例做 A/B 测试。同一类规则不会重叠，优先级清楚。</p></div>
         <div class="step" style="--d:2"><div class="n">03</div><h3>投放并分析</h3><p>为每个渠道生成投放链接，在后台实时查看来源、地区、设备，以及每条规则的命中情况。</p></div>
       </div>
     </div>
@@ -945,7 +1138,7 @@ footer a:hover { color: var(--text); }
   <section class="sec" id="deploy">
     <div class="wrap deploy">
       <div class="reveal">
-        <div class="label"><b>05</b> 部署</div>
+        <div class="label"><b>06</b> 部署</div>
         <h2><span class="nb">五分钟，</span><span class="mute nb">拥有自己的短链服务。</span></h2>
         <p class="d">一键部署会自动创建 Worker 和数据库；也可以用命令行手动部署。数据完全保存在你自己的 Cloudflare 账号中。</p>
         <ul class="checks">
@@ -965,7 +1158,7 @@ footer a:hover { color: var(--text); }
   <!-- ================================================================ FAQ -->
   <section class="sec" id="faq">
     <div class="wrap faq">
-      <div class="reveal"><div class="label"><b>06</b> 常见问题</div><h2><span class="nb">你可能</span><span class="mute nb">想知道。</span></h2>
+      <div class="reveal"><div class="label"><b>07</b> 常见问题</div><h2><span class="nb">你可能</span><span class="mute nb">想知道。</span></h2>
         <p class="ask">没找到答案？<a href="https://github.com/ccvar/cligc_link/issues" target="_blank" rel="noopener">在 GitHub 提问<svg class="i" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></svg></a></p></div>
       <div class="qa reveal" style="--d:1" id="qa">
         <div class="q"><button aria-expanded="false">真的免费吗？<span class="pm" aria-hidden="true"></span></button>
@@ -982,6 +1175,14 @@ footer a:hover { color: var(--text); }
           <div class="a"><div><p>不会。VPN 和代理节点大多架在机房里，但只有“机房 IP + 机器特征”（如缺少浏览器请求头、过旧的系统版本、HTTP/1.1）才会被判为可疑；浏览器特征完整的访问仍算真人，并标记为“经代理”。中文访客出现在非中文地区时也会提示“可能经代理”。后台能看到真人里有多少是经代理来的。住宅代理和手机热点无法识别，会被当作普通访问。</p></div></div></div>
         <div class="q"><button aria-expanded="false">地区链接在某些网络打不开怎么办？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>给地区规则打开“打不开时回退到默认地址”。命中规则的访客会先在自己的网络里检测这个地址能否连通，能打开就直接跳过去（通常只多 0.2–1 秒），连不上就改去默认地址；后台会统计每条规则的回退次数。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">A/B 测试是怎么分流的？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>给默认地址或任意一条跳转规则打开 A/B 分流，加上几个版本并设定比例。按访客 IP 分配，同一位访客总是去同一个版本，反复点击也不会来回跳。后台对比各版本的命中数；开启转化追踪后，跳转会带上 utm_content=ab-a、ab-b……，在 GA4 里就能对比各版本的会话和关键事件。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">目标页打不开，会提醒我吗？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>会。定时任务每小时分批检查已启用短链的所有目标地址，连续两次返回 404、5xx 或超时才算打不开，推送到 Telegram 或邮箱，恢复后再通知一次。对方用 403 或人机验证拦截检查请求时只标记“无法验证”，不算故障。短链列表会标出“目标异常”，详情页可以手动检查。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">改错了跳转地址能恢复吗？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>能。每个短链都有修改记录：默认地址、跳转规则、A/B 比例、启用状态等每次修改都会记下修改前后的内容、时间和操作的设备，保留一年。点“撤销”即可改回去；如果之后又被改过，会提示你手动处理，避免把新的修改覆盖掉。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">后台支持英文吗？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>支持。后台默认跟随浏览器语言，也可以在“设置 → 界面语言”或登录页切换中文 / English；这个首页右上角也能切换。统计报告、推送消息和 AI 分析报告目前仍是中文。</p></div></div></div>
         <div class="q"><button aria-expanded="false">接入 Google Analytics 和 Search Console 要给什么权限？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>只申请只读权限（analytics.readonly、webmasters.readonly），不会改动你的任何设置。用的是你自己在 Google Cloud 创建的 OAuth 客户端，刷新令牌加密后保存在你自己的 D1 数据库里，可以随时断开；可以连接多个 Google 账号，所有站点按域名合并显示。</p></div></div></div>
         <div class="q"><button aria-expanded="false">发给 AI 的分析链接安全吗？<span class="pm" aria-hidden="true"></span></button>
@@ -1204,7 +1405,7 @@ footer a:hover { color: var(--text); }
   const termb = $('#termb');
   termb.innerHTML = CMDS.map(([t, cmd]) => cmd
     ? `<div class="tl"><span class="p">$</span><code data-full="${esc(t)}"></code><button class="copy" data-copy="${esc(t)}" aria-label="复制命令">${copyIc}</button></div>`
-    : `<div class="tl c"><code data-full="${esc(t)}"></code></div>`).join('');
+    : `<div class="tl c"><code data-full="${esc(window.T ? T(t) : t)}"></code></div>`).join('');
   const codes = [...termb.querySelectorAll('code')];
   const fill = () => codes.forEach((c) => { c.textContent = c.dataset.full; c.classList.remove('typing'); });
   if (REDUCED) fill();
@@ -1218,6 +1419,30 @@ footer a:hover { color: var(--text); }
       c.classList.remove('typing');
     }
   });
+
+  /* ---------------------------------------------------------------- 语言切换 */
+  $('#lang-t').textContent = window.LANG === 'en' ? '中文' : 'EN';
+  $('#lang').addEventListener('click', () => {
+    try { localStorage.setItem('sl:lang', JSON.stringify(window.LANG === 'en' ? 'zh' : 'en')); } catch {}
+    history.replaceState(null, '', location.pathname + location.hash);
+    location.reload();
+  });
+
+  /* ---------------------------------------------------------------- ⌘K 演示：输入、结果轮换 */
+  const KQ = window.LANG === 'en'
+    ? [['spr', '/<mark>spr</mark>ing', 'Spring campaign · Reddit', '<mark>spr</mark>ingshop.com'], ['bf', '/<mark>bf</mark>24', 'Black Friday promo', '<mark>bf</mark>.example.com'], ['two', '<mark>Two</mark>-step verification', 'Settings', 'Signed-in devices']]
+    : [['spr', '/<mark>spr</mark>ing', '春季活动 · 知乎', '<mark>spr</mark>ingshop.com'], ['d11', '/<mark>d11</mark>', '双十一主推', '<mark>d11</mark>.example.com'], ['设置', '两步验证', '设置', '登录设备']];
+  const kbt = document.querySelector('.kbt'), kbi = document.querySelectorAll('.kbi');
+  let ki = 0;
+  const kbTick = async () => {
+    const [q, a, as, b] = KQ[ki]; ki = (ki + 1) % KQ.length;
+    for (let i = kbt.textContent.length; i >= 0; i--) { kbt.textContent = kbt.textContent.slice(0, i); await new Promise((r) => setTimeout(r, 40)); }
+    for (let i = 1; i <= q.length; i++) { kbt.textContent = q.slice(0, i); await new Promise((r) => setTimeout(r, 110)); }
+    kbi[0].querySelector('b').innerHTML = a; kbi[0].querySelector('small').textContent = as;
+    kbi[1].querySelector('b').innerHTML = b; kbi[1].querySelector('small').textContent = ki === 0 ? as : window.LANG === 'en' ? 'Site' : '站点';
+  };
+  const kb = document.querySelector('.t-kb');
+  if (kb && !REDUCED) kb.addEventListener('enter', () => setInterval(() => { if (!document.hidden) kbTick(); }, 3200));
 
   /* ---------------------------------------------------------------- FAQ 手风琴 */
   document.querySelectorAll('#qa .q button').forEach((b) => b.addEventListener('click', () => {

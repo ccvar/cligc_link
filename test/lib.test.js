@@ -67,3 +67,40 @@ test('用量预测：免费版按今天已过时间推算到今天结束', () =>
   assert.equal(f.paid, false);
   assert.equal(f.items.find((x) => x.k === 'rowsRead').proj, 4e6);
 });
+
+import { deviceKey, pickRule } from '../src/lib.js';
+
+test('设备识别：iOS / Android / 电脑 / 其他', () => {
+  const k = (ua) => deviceKey(parseUA(ua));
+  assert.equal(k('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148'), 'ios');
+  assert.equal(k('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36'), 'android');
+  assert.equal(k(CHROME), 'desktop');
+  assert.equal(k('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36'), 'desktop');
+  assert.equal(k('curl/8.4.0'), 'other');
+});
+
+test('跳转规则：国家 + 设备 > 只按设备 > 只按国家，都不命中走默认', () => {
+  const rules = [
+    { id: 1, countries: ['CN'], devices: [], url: 'cn' },
+    { id: 2, countries: [], devices: ['ios'], url: 'appstore' },
+    { id: 3, countries: ['CN'], devices: ['android'], url: 'cn-apk' },
+  ];
+  const go = (c, d) => pickRule(rules, c, d)?.url || 'default';
+  assert.equal(go('CN', 'android'), 'cn-apk');    // 国家 + 设备都命中
+  assert.equal(go('CN', 'ios'), 'appstore');      // 只按设备优先于只按国家
+  assert.equal(go('CN', 'desktop'), 'cn');
+  assert.equal(go('US', 'ios'), 'appstore');
+  assert.equal(go('US', 'android'), 'default');
+  assert.equal(go('US', 'desktop'), 'default');
+});
+
+import { pickArm } from '../src/lib.js';
+
+test('A/B 分流：同一访客总是同一个地址，整体接近设定比例', () => {
+  assert.equal(pickArm([50, 50], '1.2.3.4|7|0'), pickArm([50, 50], '1.2.3.4|7|0'));
+  const n = [0, 0, 0];
+  for (let i = 0; i < 20000; i++) n[pickArm([50, 30, 20], `10.0.${i >> 8}.${i & 255}|7|0`)]++;
+  assert.ok(Math.abs(n[0] / 20000 - 0.5) < 0.02 && Math.abs(n[1] / 20000 - 0.3) < 0.02 && Math.abs(n[2] / 20000 - 0.2) < 0.02, n.join(','));
+  assert.equal(pickArm([0, 0], 'x'), 0);
+  assert.equal(pickArm([0, 10], 'x'), 1);
+});

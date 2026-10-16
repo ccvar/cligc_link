@@ -6,6 +6,15 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#f4f5f7">
 <title>cligc 短链</title>
+<script>
+// 界面语言：手动选过的优先，否则跟随浏览器；英文时先加载翻译脚本，页面渲染前就生效
+(function () {
+  var l; try { l = JSON.parse(localStorage.getItem('sl:lang')); } catch (e) {}
+  if (l !== 'zh' && l !== 'en') l = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
+  window.LANG = l;
+  if (l === 'en') document.write('<script src="/admin/i18n.en.js"><\/script>');
+})();
+</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234b83ff'/%3E%3Cstop offset='1' stop-color='%231f4fd1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M10.5 21.5 21.5 10.5M13.5 10.5h8v8' stroke='%23fff' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 /* ================================================================ tokens */
@@ -673,6 +682,69 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .rule .rh .bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); transform-origin: left; animation: grow .9s var(--ease-out) both .2s; }
 .rule.def .rh .bar i { background: var(--faint); }
 .rule .acts { display: flex; gap: 2px; justify-content: flex-end; width: 66px; }
+.hc-d { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; flex: none; vertical-align: 1px; background: var(--faint); cursor: default; }
+.hc-d.ok { background: var(--good); } .hc-d.down { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-bg); } .hc-d.blocked { background: var(--amber); }
+.hc-p { margin-left: 6px; }
+.lrow .c-status { display: flex; flex-wrap: wrap; gap: 4px; }
+.hc-i { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+#hc-run.busy svg { animation: spin .9s linear infinite; }
+.devs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.dv { display: grid; justify-items: start; gap: 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; font: inherit; }
+.dv svg { color: var(--muted); }
+.dv b { font-size: 13px; font-weight: 600; }
+.dv span { font-size: 11.5px; color: var(--muted); }
+.dv.on { border-color: var(--accent); background: var(--accent-2); box-shadow: 0 0 0 3px var(--accent-2); }
+.dv.on svg { color: var(--accent); }
+.chip.dev { display: inline-flex; align-items: center; gap: 4px; background: color-mix(in srgb, var(--violet) 12%, transparent); color: color-mix(in srgb, var(--violet) 80%, var(--text)); }
+.rp-pr { display: flex; align-items: center; gap: 6px; padding: 10px var(--cp) 0; }
+/* A/B 分流 */
+.btn.icon.on { color: var(--accent-ink); background: var(--accent-2); }
+.ab { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.ab-r { display: grid; grid-template-columns: 20px 38px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.ab-r a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ab-r a:hover { color: var(--accent-ink); }
+.ab-k { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; background: var(--c, var(--accent)); }
+.ab-r:nth-child(1) .ab-k { --c: var(--accent); } .ab-r:nth-child(2) .ab-k { --c: var(--violet); } .ab-r:nth-child(3) .ab-k { --c: var(--teal); } .ab-r:nth-child(4) .ab-k { --c: var(--warn); } .ab-r:nth-child(5) .ab-k { --c: #e11d48; }
+.ab-w { font-variant-numeric: tabular-nums; color: var(--muted); }
+.ab-n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ab-n b { color: var(--text); font-weight: 650; }
+.ab-chip { display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px; margin-left: 6px; border-radius: 5px; font-size: 11px; font-weight: 600; flex: none;
+  background: color-mix(in srgb, var(--violet) 12%, transparent); color: color-mix(in srgb, var(--violet) 80%, var(--text)); white-space: nowrap; }
+.abd-bar { display: flex; height: 26px; border-radius: 8px; overflow: hidden; gap: 2px; margin-bottom: 16px; }
+.abd-bar i { display: grid; place-items: center; min-width: 0; transition: flex .25s var(--ease-out); }
+.abd-bar b { font-size: 11.5px; font-weight: 650; color: #fff; white-space: nowrap; overflow: hidden; padding: 0 4px; }
+.abd { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.abd-r { display: grid; grid-template-columns: 22px minmax(0, 1fr) 96px 34px; gap: 10px; align-items: start; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.abd-r .ab-k { width: 22px; height: 22px; margin-top: 7px; }
+.abd-u { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.abd-o { height: 36px; display: flex; align-items: center; font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abd-u .hint { margin-top: -6px; }
+.abd-w { position: relative; display: flex; flex-direction: column; gap: 4px; }
+.abd-w .input { padding-right: 8px; text-align: right; }
+.abd-w span { font-size: 11.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.abd-w span::before { content: '占 '; }
+.input.sm { height: 30px; font-size: 12.5px; }
+.abd-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.abd-acts .hint { margin-left: auto; }
+/* 修改记录 */
+.lg { display: flex; flex-direction: column; }
+.lg-e { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 14px 0; border-top: 1px solid var(--line-2); }
+.lg-e:first-child { border-top: 0; padding-top: 4px; }
+.lg-e.rv-d .lg-b { opacity: .62; }
+.lg-i { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: var(--sunken); color: var(--text-2); }
+.lg-h { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13.5px; }
+.lg-h b { font-weight: 600; }
+.lg-t { height: 19px; padding: 0 7px; border-radius: 5px; display: inline-flex; align-items: center; font-size: 11px; font-weight: 550; background: var(--sunken); color: var(--muted); }
+.lg-c { display: grid; grid-template-columns: auto minmax(0, max-content) 12px minmax(0, 1fr); align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; color: var(--text-2); }
+.lg-c:not(:has(svg)) { grid-template-columns: auto minmax(0, 1fr); }
+.lg-c svg { color: var(--faint); }
+.lg-f { color: var(--muted); white-space: nowrap; }
+.lg-f::after { content: '：'; }
+.lg-o, .lg-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-o { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent); }
+.lg-m { margin-top: 6px; font-size: 12px; color: var(--muted); }
+#lg-more { padding-top: 12px; }
+.sim .seg.sm button { font-size: 12px; padding: 0 10px; height: 26px; }
 .rules .none { padding: 18px var(--cp); border-top: 1px solid var(--line-2); display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
 .sim { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px var(--cp); border-top: 1px solid var(--line-2); background: var(--panel-2); border-radius: 0 0 var(--r-lg) var(--r-lg); font-size: 13px; color: var(--text-2); }
 .sim .combo { flex: none; }
@@ -694,6 +766,31 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .n-use-b { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
 .n-use-b > label { font-size: 13px; font-weight: 600; }
 .n-use-b .hint a { color: var(--accent); }
+.chi.sys { background: color-mix(in srgb, var(--good) 13%, transparent); color: var(--good); }
+.chi.lang { background: color-mix(in srgb, var(--teal) 13%, transparent); color: var(--teal); }
+.lang-t { display: flex; align-items: center; gap: 5px; margin: 16px auto 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+.lang-t:hover { color: var(--text); }
+.chi.dev { background: color-mix(in srgb, var(--violet) 13%, transparent); color: var(--violet); }
+.ses { display: flex; flex-direction: column; margin: 4px 0 16px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.ses-r { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--line-2); }
+.ses-r:first-child { border-top: 0; }
+.ses-r.cur { background: var(--panel-2); }
+.ses-i { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--sunken); color: var(--text-2); }
+.ses-n { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.ses-n b { font-weight: 600; }
+.ses-m { margin-top: 3px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill.bad-p { color: var(--bad); background: var(--bad-bg); }
+.sys-l { display: grid; gap: 6px; max-width: 820px; }
+.sys-r { display: grid; grid-template-columns: 22px 110px minmax(0, 1fr); gap: 10px; align-items: start; padding: 9px 12px; border-radius: 10px; background: var(--sunken); font-size: 13px; }
+.sys-r b { font-weight: 600; }
+.sys-r > span:last-child { color: var(--text-2); line-height: 1.55; }
+.sys-i { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--good); margin-top: -1px; }
+.sys-r.warn .sys-i { background: var(--amber); } .sys-r.bad .sys-i { background: var(--bad); }
+.sys-r.bad { background: var(--bad-bg); }
+@media (max-width: 640px) { .sys-r { grid-template-columns: 22px minmax(0, 1fr); } .sys-r > span:last-child { grid-column: 2; } }
+.sys-steps { display: flex; flex-wrap: wrap; gap: 6px; font-family: var(--mono); font-size: 11.5px; }
+.sys-steps span { padding: 3px 8px; border-radius: 6px; background: var(--sunken); color: var(--text-2); }
+.sys-steps span.bad { background: var(--bad-bg); color: var(--bad); }
 .chi.ai { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
 .g-ai { height: 36px; }
 .g-ai svg, .ai-d h3 svg { color: var(--violet); }
@@ -1046,6 +1143,8 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 }
 #range button { white-space: nowrap; }
 .hr-u { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hr-a { display: flex; align-items: center; min-width: 0; }
+.hr-a a { min-width: 0; }
 .hr-u a { min-width: 0; }
 .hr-u .hr-more, .hero .target .hr-more { flex: none; }
 .hero .target .hr-more { margin-left: 6px; }
@@ -1089,7 +1188,8 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .pop .oi mark { background: none; color: var(--accent-ink); font-weight: 650; }
 .sim .res { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
 .sim .res b { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sim .res .tag { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.sim .res .tag { font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex-shrink: 3; }
+.sim .res b { min-width: 4.5em; }
 @media (max-width: 760px) {
   .rule { grid-template-columns: 38px minmax(0, 1fr) auto; padding: 14px 16px; } .rule .rh { display: none; }
   .sim { padding: 14px 16px; } .sim .combo { flex: 1; min-width: 0; } .sim .res { flex-basis: 100%; }
@@ -1131,11 +1231,43 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .rp-u span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rp-def .rp-c { color: var(--text-2); }
 .rb { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 6px; background: var(--accent-2); color: var(--accent-ink); font-size: 11.5px; font-weight: 550; white-space: nowrap; flex: none; font-family: var(--sans); }
+.rb.ab-rb { background: color-mix(in srgb, var(--violet) 12%, transparent); color: color-mix(in srgb, var(--violet) 80%, var(--text)); }
 .rb svg { width: 12px; height: 12px; }
 .rb[hidden] { display: none; }
 
 /* ================================================================ overlay */
 .ov { position: fixed; inset: 0; background: rgba(13,19,33,.32); backdrop-filter: blur(2px); z-index: 30; animation: fade .2s var(--ease) both; }
+/* ⌘K */
+.kbar-b { display: flex; align-items: center; gap: 11px; height: 42px; margin: 0 0 14px; padding: 0 10px 0 12px; border: 0; border-radius: 10px; background: none;
+  color: var(--text-2); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .15s, color .15s; width: 100%; }
+.kbar-b svg.i { width: 18px; height: 18px; stroke-width: 1.8; }
+.kbar-b:hover { color: var(--text); background: rgba(13,19,33,.04); }
+.kbar-b kbd { opacity: .7; transition: opacity .15s; }
+.kbar-b:hover kbd { opacity: 1; }
+.kbar-b span { flex: 1; text-align: left; }
+kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel-2);
+  font: 600 11px/1 var(--sans); color: var(--muted); }
+.shell.mini .kbar-b { width: 42px; height: 42px; padding: 0; justify-content: center; margin: 22px 0 -14px; }
+.shell.mini .kbar-b span, .shell.mini .kbar-b kbd { display: none; }
+.kbar-ov { z-index: 60; }
+.kbar { position: fixed; z-index: 61; top: 14vh; left: 50%; width: min(620px, calc(100vw - 32px)); transform: translateX(-50%); background: var(--panel); border-radius: 16px;
+  box-shadow: 0 0 0 1px var(--line), 0 30px 80px -20px rgba(13,19,33,.45); overflow: hidden; animation: kbar-in .18s var(--ease-out) both; }
+@keyframes kbar-in { from { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(.985); } }
+.kbar-q { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 56px; border-bottom: 1px solid var(--line-2); color: var(--muted); }
+.kbar-q input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15.5px; color: var(--text); }
+.kbar-l { max-height: min(56vh, 440px); overflow-y: auto; padding: 6px; overscroll-behavior: contain; }
+.kbar-g { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--faint); }
+.kbar-i { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border-radius: 9px; font-size: 13.5px; color: var(--text-2); cursor: pointer; }
+.kbar-i svg { color: var(--muted); flex: none; }
+.kbar-i.on { background: var(--accent-2); color: var(--text); }
+.kbar-i.on svg { color: var(--accent-ink); }
+.kbar-t { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.kbar-s { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12.5px; }
+.kbar-i mark { background: none; color: var(--accent-ink); font-weight: 700; }
+.kbar-e { padding: 28px; text-align: center; color: var(--muted); font-size: 13px; }
+.kbar-f { display: flex; gap: 16px; padding: 9px 16px; border-top: 1px solid var(--line-2); background: var(--panel-2); font-size: 11.5px; color: var(--muted); }
+.kbar-f span { display: inline-flex; align-items: center; gap: 4px; }
+@media (max-width: 900px) { .kbar-b { display: none; } .kbar { top: 10vh; } .kbar-f { display: none; } }
 .drawer { position: fixed; top: 8px; right: 8px; bottom: 8px; width: min(460px, calc(100vw - 16px)); background: var(--panel); z-index: 31; box-shadow: var(--shadow-3); border-radius: 18px;
   display: flex; flex-direction: column; animation: slide .35s var(--ease-out) both; overflow: hidden; }
 @keyframes slide { from { transform: translateX(32px); opacity: 0; } }
@@ -1436,6 +1568,9 @@ const I = {
   route: '<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/>',
   chev: '<path d="m6 9 6 6 6-6"/>',
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  split: '<path d="M6 3v6a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6"/><path d="M18 3v6a6 6 0 0 1-6 6"/><path d="m3 6 3-3 3 3"/><path d="m15 6 3-3 3 3"/>',
+  history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
+  cmd: '<path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/>',
 };
 const ic = (n, s) => `<svg class="i" viewBox="0 0 24 24"${s ? ` style="width:${s}px;height:${s}px"` : ''} aria-hidden="true">${I[n]}</svg>`;
@@ -1450,7 +1585,11 @@ const copyBtn = (text, cls = 'btn ghost icon', label = '') =>
 
 // ---------------------------------------------------------------- utils
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const nf = new Intl.NumberFormat('zh-CN');
+const EN = window.LANG === 'en';
+const setLang = (l) => { try { localStorage.setItem('sl:lang', JSON.stringify(l)); } catch {} location.reload(); };
+// 不经过页面显示的文字（复制到剪贴板、导出文件、对话框）手动翻译
+const T = (s) => (EN && window.T ? window.T(s) : s);
+const nf = new Intl.NumberFormat(EN ? 'en-US' : 'zh-CN');
 const num = (n) => nf.format(Math.round(n || 0));
 const shortUrl = (slug) => `${ORIGIN}/${slug}`;
 const shortDisp = (slug) => `${HOST}/${slug}`;
@@ -1482,7 +1621,7 @@ function ago(ts) {
   return ymd(new Date(ts));
 }
 let regionNames;
-try { regionNames = new Intl.DisplayNames(['zh-CN'], { type: 'region' }); } catch {}
+try { regionNames = new Intl.DisplayNames([EN ? 'en' : 'zh-CN'], { type: 'region' }); } catch {}
 function country(code) {
   if (!code || code.length !== 2 || code === 'XX' || code === 'T1') return code || '未知';
   return `${flag(code)}  ${cname(code)}`.trim();
@@ -1508,7 +1647,43 @@ function countryChips(codes, n = 6) {
   const shown = codes.slice(0, n).map((c) => `<span class="chip" title="${esc(c)}">${`${flag(c)} ${esc(cname(c))}`.trim()}</span>`).join('');
   return shown + (codes.length > n ? `<span class="chip more" title="${esc(codes.slice(n).map(cname).join('、'))}">+${codes.length - n}</span>` : '');
 }
-const ruleText = (t) => t ? t.countries.slice(0, 3).map((c) => `${flag(c)} ${cname(c)}`.trim()).join('、') + (t.countries.length > 3 ? ` 等 ${t.countries.length} 个` : '') : '默认地址';
+// 目标页检查结果的小圆点：绿 = 能打开，红 = 打不开，灰 = 无法验证 / 还没检查
+function healthDot(h) {
+  if (!h) return '';
+  const t = h.state === 'ok' ? `能打开（HTTP ${h.status}，${h.ms} ms）` : h.state === 'down' ? `打不开：${h.error}（从 ${fmtTime(h.since)} 开始）` : h.state === 'blocked' ? `无法验证：${h.error}` : '还没检查';
+  return `<span class="hc-d ${h.state}" data-tipf-always data-tipf="${esc(`${t} · 检查于 ${ago(h.checkedAt)}`)}"></span>`;
+}
+
+// 跳转规则里的设备
+const DEVN = { ios: 'iOS', android: 'Android', desktop: '电脑' };
+const devText = (ds) => (ds || []).map((d) => DEVN[d] || d).join(' / ');
+const ruleText = (t) => {
+  if (!t) return '默认地址';
+  const cs = t.countries.length ? t.countries.slice(0, 3).map((c) => `${flag(c)} ${cname(c)}`.trim()).join('、') + (t.countries.length > 3 ? ` 等 ${t.countries.length} 个` : '') : '';
+  const ds = devText(t.devices);
+  return ds && cs ? `${ds} · ${cs}` : ds ? `${ds}（所有地区）` : cs;
+};
+// 和服务端一致：同时指定国家和设备的优先，其次只按设备，再次只按国家
+const pickRuleJs = (rules, country, device) => rules
+  .filter((r) => (r.countries.length || (r.devices || []).length) && (!r.countries.length || r.countries.includes(country)) && (!(r.devices || []).length || r.devices.includes(device)))
+  .sort((a, b) => ((b.countries.length && b.devices?.length ? 3 : b.devices?.length ? 2 : 1) - (a.countries.length && a.devices?.length ? 3 : a.devices?.length ? 2 : 1)) || a.id - b.id)[0] || null;
+
+// A/B 分流：parent = 0 为默认地址，否则为规则 ID；原地址是 A，分流地址按顺序是 B、C……
+const ARM = ['A', 'B', 'C', 'D', 'E'];
+const armsOf = (link, parent) => (parent ? link.targets.find((t) => t.id === parent)?.arms : link.arms) || [];
+const splitOf = (link, parent) => {
+  const arms = armsOf(link, parent);
+  if (!arms.length) return null;
+  const r = parent ? link.targets.find((t) => t.id === parent) : null;
+  const all = [{ id: parent, url: r ? r.url : link.target_url, weight: r ? r.weight : link.ab_weight }, ...arms];
+  const sum = all.reduce((a, x) => a + x.weight, 0) || 1;
+  return all.map((x, i) => ({ ...x, k: ARM[i], pct: Math.round((x.weight / sum) * 100) }));
+};
+const splitText = (sp) => sp.map((x) => `${x.k} ${x.pct}%`).join(' · ');
+const abChip = (link, parent) => {
+  const sp = splitOf(link, parent);
+  return sp ? `<span class="ab-chip" data-tipf-always data-tipf="${esc(sp.map((x) => `${x.k} ${x.pct}% → ${bareUrl(x.url)}`).join('\n'))}">${ic('split', 11)}A/B · ${sp.length}</span>` : '';
+};
 
 const DEV = { Mobile: ['手机', 'phone'], Desktop: ['电脑', 'desk'], Tablet: ['平板', 'tab'], Bot: ['爬虫', 'bot'] };
 const devName = (k) => (DEV[k] || [k || '未知'])[0];
@@ -1598,7 +1773,7 @@ function confirmDialog({ title, text, ok = '确定', danger = false }) {
 function duplicateDialog(src, onDone) {
   const ov = document.createElement('div'); ov.className = 'ov';
   const d = document.createElement('form'); d.className = 'dialog dup'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
-  const what = [src.target_url && '推广地址', src.rules && `${src.rules} 条地区规则`, '有效期等设置'].filter(Boolean).join('、');
+  const what = [src.target_url && '推广地址', src.rules && `${src.rules} 条跳转规则`, src.arms && 'A/B 分流', '有效期等设置'].filter(Boolean).join('、');
   d.innerHTML = `<h3>复制短链</h3>
     <p>复制 <b class="mono">/${esc(src.slug)}</b> 的${esc(what)}，生成一个新短链。访问记录不会复制。</p>
     <div class="field"><label for="dup-s">新短链后缀</label>
@@ -1747,6 +1922,7 @@ function shell(active, inner) {
         <button class="collapse" id="fold" data-tip="收起 / 展开侧栏" data-tip-at="bottom" aria-label="收起或展开侧栏">${ic('fold', 15)}</button>
       </div>
       <div class="product"><b>短链与访问统计</b><span>推广链接追踪后台</span></div>
+      <button type="button" class="kbar-b" id="kbar-b" data-tip="搜索短链、站点和设置" data-tip-at="right" aria-label="搜索和快速跳转">${ic('search')}<span>搜索</span><kbd>${IS_MAC ? '⌘' : 'Ctrl '}K</kbd></button>
       <div class="nav-label">工作台</div>
       <nav class="nav">
         <a href="#/" class="${active === 'home' ? 'on' : ''}" data-tip="概览" data-tip-at="right">${ic('home')}<span>概览</span></a>
@@ -1763,6 +1939,7 @@ function shell(active, inner) {
     </aside>
     <main class="main"><div class="wrap" id="page">${inner}</div></main>
   </div>`;
+  document.getElementById('kbar-b').onclick = openKbar;
   document.getElementById('fold').onclick = () => {
     const el = document.querySelector('.shell');
     el.classList.toggle('mini');
@@ -1780,6 +1957,7 @@ function shell(active, inner) {
     const m = document.createElement('div');
     m.className = 'menu'; m.setAttribute('role', 'menu');
     m.innerHTML = `<div class="menu-h">${esc(HOST)}</div>
+      <button role="menuitem" data-a="search">${ic('search', 16)}搜索、跳转</button>
       <button role="menuitem" data-a="settings">${ic('gear', 16)}设置</button>
       <hr><button role="menuitem" data-a="out" class="danger">${ic('out', 16)}退出登录</button>`;
     const r = acct.getBoundingClientRect();
@@ -1795,7 +1973,7 @@ function shell(active, inner) {
       const b = ev.target.closest('button');
       if (!b) return;
       close();
-      ({ settings: () => { location.hash = '#/settings'; }, out: logout })[b.dataset.a]();
+      ({ search: openKbar, settings: () => { location.hash = '#/settings'; }, out: logout })[b.dataset.a]();
     };
   };
 }
@@ -2282,7 +2460,9 @@ function renderLogin() {
     ${TS_ON ? '<div class="ts" id="ts"><div class="ts-ph">' + ic('pulse', 14) + '正在加载人机验证…</div></div>' : ''}
     <div class="err" id="err" style="margin:8px 0" role="alert"></div>
     <button class="btn primary" style="width:100%;height:46px;font-size:15px">登录</button>
+    <button type="button" class="lang-t notranslate" id="lang-t">${ic('globe', 13)}${EN ? '中文' : 'English'}</button>
   </form></div>`;
+  document.getElementById('lang-t').onclick = () => setLang(EN ? 'zh' : 'en');
   const pw = document.getElementById('pw'), err = document.getElementById('err');
   pw.focus();
 
@@ -2293,7 +2473,7 @@ function renderLogin() {
       if (!box) return;
       box.innerHTML = '';
       widget = ts.render(box, {
-        sitekey: TS_KEY, theme: 'auto', language: 'zh-cn', size: 'flexible',
+        sitekey: TS_KEY, theme: 'auto', language: EN ? 'en' : 'zh-cn', size: 'flexible',
         callback: (t) => { token = t; err.textContent = ''; },
         'expired-callback': () => { token = ''; },
         'error-callback': () => { token = ''; err.textContent = '人机验证出错，请刷新页面重试'; },
@@ -2531,6 +2711,7 @@ async function renderHome(token) {
   countUp(root);
   setupCard(root, token);
   homeSitesCard(root, token);
+  cronBanner(root, token);
   mountChart(document.getElementById('ch-home'), series, [
     { id: 'n', key: 'n', label: '访问次数', color: 'var(--accent)', type: 'area' },
     { id: 'u', key: 'u', label: '独立访客', color: 'var(--violet)', type: 'line' },
@@ -2582,6 +2763,17 @@ async function homeSitesCard(root, token) {
 }
 
 // 概览页顶部的“开始使用”清单：全部完成或点了“不再显示”后不再出现
+// 概览页：定时任务超过 3 小时没运行（汇总、同步、通知都会停）时在顶部提示
+async function cronBanner(root, token) {
+  const st = await api('/status').catch(() => null);
+  if (!st?.cron || token !== routeToken || st.now - st.cron.at < 3 * 3600000) return;
+  const el = document.createElement('div');
+  el.className = 'nstat bad rv';
+  el.innerHTML = `${ic('alert', 15)}<span>定时任务已经 ${ago(st.cron.at).replace('前', '')}没有运行了：访问汇总、Google 同步和通知都会暂停。</span><span class="sp" style="flex:1"></span><a class="btn sm" href="#/settings" data-acc="sys">查看系统状态</a>`;
+  el.querySelector('a').onclick = () => store.set('set:open', 'sys');
+  root.prepend(el);
+}
+
 async function setupCard(root, token) {
   if (store.get('setup:hide', false)) return;
   const st = await api('/setup').catch(() => null);
@@ -2656,12 +2848,12 @@ async function renderLinks(token, opts = {}) {
     <div class="lrow ${listState.flash === l.id ? 'flash' : ''}${listState.sel.has(l.id) ? ' sel-r' : ''}" data-go="${l.id}" tabindex="0">
       <div class="c-main"><label class="lck" aria-label="选择 ${esc(l.slug)}"><input type="checkbox" data-sel="${l.id}" ${listState.sel.has(l.id) ? 'checked' : ''}></label><div style="min-width:0">
         <div class="su">${esc(shortDisp(l.slug))}${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}${(l.tags || []).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}</div>
-        <div class="tg">${l.rules ? `<span class="rb has-pop" tabindex="0">${ic('globe')}${l.rules} 条地区规则${rulePop(l)}</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
+        <div class="tg">${l.rules ? `<span class="rb has-pop" tabindex="0">${ic('route')}${l.rules} 条跳转规则${rulePop(l)}</span>` : ''}${l.arms ? `<span class="rb ab-rb" data-tipf-always data-tipf="${esc(`按比例分到 ${l.arms} 个额外版本（A/B 测试）`)}">${ic('split')}A/B</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
       </div></div>
       <div class="c-spark">${sparkline(l.spark)}</div>
       <div class="num c-clicks">${num(l.clicks)}</div>
       <div class="tm c-last" title="${esc(fmtTime(l.last_click))}">${ago(l.last_click)}</div>
-      <div class="c-status">${statusPill(l)}</div>
+      <div class="c-status">${statusPill(l)}${l.down?.length ? `<span class="pill bad-p hc-p" data-tipf-always data-tipf="${esc(l.down.map((x) => `${x.url}：${x.error}`).join('\n'))}">目标异常</span>` : ''}</div>
       <div class="acts">
         ${copyBtn(shortUrl(l.slug))}
         <button class="btn ghost icon" data-tip="复制短链" aria-label="复制短链" data-dup="${l.id}">${ic('dup')}</button>
@@ -2833,9 +3025,9 @@ function bindLinksChrome() {
 
 // 列表里“N 条地区规则”的悬停浮层：每条规则的国家和跳转地址
 function rulePop(l) {
-  const list = l.ruleList || [];
+  const list = (l.ruleList || []).filter((r) => !r.ab);
   if (!list.length) return '';
-  const row = (r) => `<div class="rp-r"><div class="rp-c">${r.countries.slice(0, 4).map((c) => `${flag(c)} ${esc(cname(c))}`.trim()).join('、')}${r.countries.length > 4 ? ` 等 ${r.countries.length} 个` : ''}</div>
+  const row = (r) => `<div class="rp-r"><div class="rp-c">${r.devices?.length ? `${esc(devText(r.devices))}${r.countries.length ? ' · ' : '（所有地区）'}` : ''}${r.countries.slice(0, 4).map((c) => `${flag(c)} ${esc(cname(c))}`.trim()).join('、')}${r.countries.length > 4 ? ` 等 ${r.countries.length} 个` : ''}</div>
     <div class="rp-u">${ic('arrow', 12)}<span>${esc(r.url)}</span></div></div>`;
   return `<span class="rb-pop" role="tooltip">${list.map(row).join('')}
     <div class="rp-r rp-def"><div class="rp-c">其他地区</div><div class="rp-u">${ic('arrow', 12)}<span>${l.target_url ? esc(l.target_url) : '未设置默认地址'}</span></div></div></span>`;
@@ -2902,7 +3094,7 @@ function openBulkReplace(onDone) {
     go.textContent = `替换 ${num(d.total)} 处`;
     go.disabled = !ti.value.trim() || !!d.invalid;
     res.innerHTML = `
-      <div class="bulk-stat"><div><b>${num(d.links)}</b><span>个默认地址</span></div><div><b>${num(d.rules)}</b><span>条地区规则</span></div><div><b>${num(d.affected)}</b><span>个短链受影响</span></div></div>
+      <div class="bulk-stat"><div><b>${num(d.links)}</b><span>个默认地址</span></div><div><b>${num(d.rules)}</b><span>条规则 / 分流地址</span></div><div><b>${num(d.affected)}</b><span>个短链受影响</span></div></div>
       ${d.invalid ? `<div class="bulk-bad">${ic('info', 15)}替换后 /${esc(d.invalid.slug)} 的地址不合法：<code>${esc(d.invalid.to)}</code></div>` : ''}
       <div class="bulk-list">${d.items.map((x) => `<div class="bi">
         <div class="bi-h"><span class="mono">/${esc(x.slug)}</span><span class="bi-t">${x.type === 'link' ? '默认地址' : esc(ruleText(x))}</span></div>
@@ -2937,7 +3129,7 @@ function openBulkReplace(onDone) {
     if (mode === 'exact' && !/^https?:\/\//i.test(to)) to = 'https://' + to;
     const ok = await confirmDialog({
       title: `替换 ${num(last.total)} 处地址？`,
-      text: `会修改 ${last.affected} 个短链：${last.links} 个默认地址、${last.rules} 条地区规则。替换后立即生效，之后的访问都会跳到新地址。`,
+      text: `会修改 ${last.affected} 个短链：${last.links} 个默认地址、${last.rules} 条规则 / 分流地址。替换后立即生效，之后的访问都会跳到新地址。`,
       ok: '确认替换',
     });
     if (!ok) return;
@@ -3107,7 +3299,24 @@ async function renderLink(token, id) {
     };
   };
   setTimeout(bindLinkTags, 0);
+  // 立即检查目标页
+  setTimeout(() => {
+    const b = document.getElementById('hc-run');
+    if (!b) return;
+    b.onclick = async () => {
+      b.disabled = true; b.classList.add('busy');
+      try {
+        const r = await api(`/links/${link.id}/check`, { method: 'POST' });
+        const bad = r.results.filter((x) => x.state === 'down');
+        toast(bad.length ? `${bad.length} 个目标地址打不开：${bad[0].error}` : `${r.results.length} 个目标地址检查完毕`, bad.length ? 'bad' : 'ok');
+        route();
+      } catch (ex) { toast(ex.message, 'bad'); b.disabled = false; b.classList.remove('busy'); }
+    };
+  }, 0);
   const url = shortUrl(link.slug);
+  // 访问明细里的 A/B 版本：分流地址 ID → 版本
+  const dest = new Map();
+  for (const p of [0, ...link.targets.map((t) => t.id)]) (splitOf(link, p) || []).slice(1).forEach((x) => dest.set(x.id, { ...x, parent: p ? link.targets.find((t) => t.id === p) : null }));
   const pages = Math.max(1, Math.ceil(c.total / c.size));
   const hourMax = Math.max(1, ...s.hourly.map((h) => h.n));
   const hourMap = new Map(s.hourly.map((h) => [h.k, h.n]));
@@ -3123,14 +3332,15 @@ async function renderLink(token, id) {
           <div class="short">${esc(shortDisp(link.slug))}
             ${copyBtn(url, 'btn sm', '复制')}
             <a class="btn sm ghost icon" href="${esc(url)}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 15)}</a></div>
-          ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}<button type="button" class="hr-more" data-panel-open="rules">按地区分流 ${ic('chev', 12)}</button></div>`}
-          <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.utm ? ' · 转化追踪' : ''}${siteTagsBar('', link.tags || [])}</div>
+          ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>${healthDot(link.health?.[link.target_url])}${abChip(link, 0)}` : '<span class="warn">未设置默认推广地址</span>'}<button type="button" class="hr-more" data-panel-open="rules">${link.arms?.length ? 'A/B 分流' : '按地区 / 设备分流'} ${ic('chev', 12)}</button></div>`}
+          <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.utm ? ' · 转化追踪' : ''}${link.target_url || link.targets.length ? ` · <button type="button" class="hr-more" id="hc-run">${ic('refresh', 12)}检查目标页</button>` : ''}${siteTagsBar('', link.tags || [])}</div>
           ${link.note ? `<div class="hero-note" title="${esc(link.note)}">${esc(link.note)}</div>` : ''}
         </div>
         <div class="acts">
           <button class="btn" data-panel-open="rules">${ic('route')}跳转规则${link.targets.length ? `<span class="cnt">${link.targets.length}</span>` : ''}</button>
           <button class="btn" data-panel-open="builder">${ic('link')}投放链接</button>
           <button class="btn" id="edit">${ic('edit')}编辑</button>
+          <button class="btn icon" data-panel-open="log" data-tip="修改记录" aria-label="修改记录">${ic('history')}</button>
           <a class="btn icon" href="/api/links/${link.id}/export" data-tip="导出 CSV" aria-label="导出 CSV">${ic('dl')}</a>
         </div>
       </section>
@@ -3222,7 +3432,11 @@ async function renderLink(token, id) {
             <td><div data-tipf="${esc(r.source + (r.utm_campaign ? ' · ' + r.utm_campaign : ''))}">${esc(r.source)}${r.utm_campaign ? `<span class="sm"> · ${esc(r.utm_campaign)}</span>` : ''}</div>
               <div class="sm"><span data-tipf="${esc(fmtTime(r.ts))}" data-tipf-always>${ago(r.ts)} · ${shortTime(r.ts)}</span></div></td>
             <td><div>${esc(country(r.country))}</div><div class="sm" data-tipf="${esc([r.region, r.city].filter(Boolean).join(' · '))}">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
-            <td>${(() => { const t = link.targets.find((x) => x.id === r.rule_id); return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '地区规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (bareUrl(link.target_url) || '—'))}</div>`; })()}</td>
+            <td>${(() => {
+              const arm = r.rule_id && dest.get(r.rule_id);
+              if (arm && arm.k) return `<div>A/B 版本 ${arm.k}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(arm.url)}">${esc(arm.parent ? ruleText(arm.parent) : '默认地址')} · ${esc(bareUrl(arm.url))}</div>`;
+              const t = link.targets.find((x) => x.id === r.rule_id);
+              return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '跳转规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (bareUrl(link.target_url) || '—'))}</div>`; })()}</td>
             <td data-tipf="${esc(r.ua)}" data-tipf-always><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r, false)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div>${(r.kind && r.kind !== 'human') || r.proxy ? (r.reason ? `<div class="kr ${r.kind === 'human' ? 'proxy' : r.kind} ell" data-tipf="${esc(r.reason)}">${esc(r.reason)}</div>` : '') : ''}</td>
             <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:200px" data-tipf-always data-tipf="${esc([r.asn ? 'AS' + r.asn : '', r.asn_org].filter(Boolean).join(' · '))}">${esc(r.asn_org || '—')}</div></td>
             <td class="ell" data-tipf="${esc(r.referer)}">${r.referer ? esc(bareUrl(r.referer)) : '<span class="sm">—</span>'}</td>
@@ -3273,10 +3487,11 @@ function openLinkPanel(kind, link, s) {
 }
 
 function fillLinkPanel(dr, kind, link, s) {
+  if (kind === 'log') return fillLogPanel(dr, link);
   const isRules = kind === 'rules';
   dr.innerHTML = `
     <div class="dh"><div style="flex:1;min-width:0"><h2>${isRules ? '跳转规则' : '按站点生成投放链接'}</h2>
-      <div class="hint">${isRules ? `按访问者所在国家 / 地区跳到不同地址 · 命中数为最近 ${rangeLabel()}` : '每个站点用不同链接，来源统计更准'}</div></div>
+      <div class="hint">${isRules ? `按访问者所在国家 / 地区或设备跳到不同地址 · 命中数为最近 ${rangeLabel()}` : '每个站点用不同链接，来源统计更准'}</div></div>
       <button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
     <div class="db">${isRules ? rulesCard(link, s) : `<div class="builder">
       <div>
@@ -3442,7 +3657,7 @@ function dropdown(root, o) {
 
 // 国家 / 地区下拉框（可搜索中文名或代码）
 function countryCombo(root, value, onChange) {
-  const rest = ISO.filter((c) => !COMMON.includes(c)).sort((a, b) => cname(a).localeCompare(cname(b), 'zh'));
+  const rest = ISO.filter((c) => !COMMON.includes(c)).sort((a, b) => cname(a).localeCompare(cname(b), EN ? 'en' : 'zh'));
   return dropdown(root, {
     value, onChange, aria: '选择国家或地区', search: '搜索国家或代码', empty: '没有匹配的国家 / 地区',
     groups: (q) => (q ? [['', ISO.filter((c) => c.toLowerCase().includes(q) || cname(c).toLowerCase().includes(q))]] : [['常用', COMMON], ['全部', rest]]),
@@ -3455,41 +3670,57 @@ function rulesCard(link, s) {
   const hits = new Map((s.targets || []).map((x) => [x.k, x.n]));
   const total = Math.max(1, s.summary.total);
   const max = Math.max(1, ...(s.targets || []).map((x) => x.n));
-  const hitCell = (id, fallbacks) => {
-    const n = hits.get(id) || 0;
+  const hitCell = (id, fallbacks, parent) => {
+    // 有 A/B 分流时，这个去向的命中数是各版本之和
+    const n = (splitOf(link, parent) || [{ id }]).reduce((a, x) => a + (hits.get(x.id) || 0), 0);
     return `<div class="rh"><b>${num(n)}</b>次 · ${Math.round((n / total) * 100)}%<div class="bar"><i style="width:${(n / max) * 100}%"></i></div>${
       fallbacks != null ? `<div class="fbn ${fallbacks ? 'has' : ''}" title="累计回退到默认地址的次数">已回退 ${num(fallbacks)} 次</div>` : ''}</div>`;
   };
+  // A/B 各版本：比例、地址、实际命中
+  const abRows = (parent) => {
+    const sp = splitOf(link, parent);
+    const sum = sp.reduce((a, x) => a + (hits.get(x.id) || 0), 0);
+    return `<div class="ab">${sp.map((x) => {
+      const n = hits.get(x.id) || 0;
+      return `<div class="ab-r"><span class="ab-k">${x.k}</span><span class="ab-w" data-tipf-always data-tipf="设定比例">${x.pct}%</span>
+        <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" data-tipf="${esc(x.url)}">${esc(bareUrl(x.url))}</a>${healthDot(link.health?.[x.url])}
+        <span class="ab-n" data-tipf-always data-tipf="实际分到的访问（最近 ${esc(rangeLabel())}）"><b>${num(n)}</b>${sum ? ` · ${Math.round((n / sum) * 100)}%` : ''}</span></div>`;
+    }).join('')}</div>`;
+  };
   const rows = link.targets.map((t) => `
     <div class="rule">
-      <span class="ri">${(t.countries.length === 1 && flag(t.countries[0])) || ic('globe', 18)}</span>
+      <span class="ri">${t.devices?.length ? ic(t.devices.includes('desktop') && t.devices.length === 1 ? 'desk' : 'phone', 18) : (t.countries.length === 1 && flag(t.countries[0])) || ic('globe', 18)}</span>
       <div style="min-width:0">
-        <div class="rc">${countryChips(t.countries)}${t.note ? `<span class="rn" title="备注">${esc(t.note)}</span>` : ''}${t.fallback
+        <div class="rc">${(t.devices || []).map((d) => `<span class="chip dev">${ic(d === 'desktop' ? 'desk' : 'phone', 12)}${DEVN[d]}</span>`).join('')}${t.countries.length ? countryChips(t.countries) : t.devices?.length ? '<span class="chip def">所有地区</span>' : ''}${t.note ? `<span class="rn" title="备注">${esc(t.note)}</span>` : ''}${t.fallback
           ? `<span class="tag-fb" title="访客打不开这个地址时，自动改去默认地址">${ic('undo', 12)}打不开时回退</span>` : ''}</div>
-        <div class="ru">${ic('arrow', 13)}<a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.url)}">${esc(t.url)}</a></div>
+        ${splitOf(link, t.id) ? abRows(t.id) : `<div class="ru">${ic('arrow', 13)}<a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.url)}">${esc(t.url)}</a></div>`}
       </div>
-      ${hitCell(t.id, t.fallback ? t.fallbacks : null)}
-      <div class="acts"><button class="btn ghost icon" data-tip="编辑规则" aria-label="编辑规则" data-rule="${t.id}">${ic('edit')}</button>
+      ${hitCell(t.id, t.fallback ? t.fallbacks : null, t.id)}
+      <div class="acts"><button class="btn ghost icon${t.arms?.length ? ' on' : ''}" data-tip="A/B 分流" aria-label="A/B 分流" data-split="${t.id}">${ic('split')}</button>
+        <button class="btn ghost icon" data-tip="编辑规则" aria-label="编辑规则" data-rule="${t.id}">${ic('edit')}</button>
         <button class="btn ghost icon" data-tip="删除规则" aria-label="删除规则" data-rdel="${t.id}">${ic('trash')}</button></div>
     </div>`).join('');
   const def = `
     <div class="rule def">
       <span class="ri">${ic('globe', 18)}</span>
       <div style="min-width:0">
-        <div class="rc"><span class="chip def">${link.targets.length ? '其他所有地区' : '所有地区'}</span><span class="tag-def">默认</span></div>
-        <div class="ru">${ic('arrow', 13)}${link.target_url
+        <div class="rc"><span class="chip def">${link.targets.length ? '其他所有访问' : '所有访问'}</span><span class="tag-def">默认</span></div>
+        ${splitOf(link, 0) ? abRows(0) : `<div class="ru">${ic('arrow', 13)}${link.target_url
           ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer" title="${esc(link.target_url)}">${esc(link.target_url)}</a>`
-          : `<span class="warn">未设置，${link.targets.length ? '未命中规则的' : '所有'}访问会显示“链接暂不可用”</span>`}</div>
+          : `<span class="warn">未设置，${link.targets.length ? '未命中规则的' : '所有'}访问会显示“链接暂不可用”</span>`}</div>`}
       </div>
-      ${hitCell(0)}
-      <div class="acts"><button class="btn ${link.target_url ? 'ghost icon' : 'sm'}" ${link.target_url ? 'data-tip="设置默认地址" aria-label="设置默认地址"' : ''} data-rdef>${link.target_url ? ic('edit') : `${ic('plus', 14)}设置`}</button></div>
+      ${hitCell(0, null, 0)}
+      <div class="acts">${link.target_url ? `<button class="btn ghost icon${link.arms?.length ? ' on' : ''}" data-tip="A/B 分流" aria-label="A/B 分流" data-split="0">${ic('split')}</button>` : ''}<button class="btn ${link.target_url ? 'ghost icon' : 'sm'}" ${link.target_url ? 'data-tip="设置默认地址" aria-label="设置默认地址"' : ''} data-rdef>${link.target_url ? ic('edit') : `${ic('plus', 14)}设置`}</button></div>
     </div>`;
   return `<div id="rules">
-    <div class="rules-bar"><span class="sub">按访问者所在国家 / 地区跳到不同地址 · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
-      <button class="btn sm primary" id="radd">${ic('plus', 14)}添加地区规则</button></div>
-    <div class="rules">${rows || `<div class="none">${ic('route', 18)}还没有地区规则，所有访问都会跳到默认地址。可以为中国、港澳台、北美等地区分别设置推广地址。</div>`}${def}</div>
+    <div class="rules-bar"><span class="sub">按访问者所在国家 / 地区或设备跳到不同地址 · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
+      <button class="btn sm primary" id="radd">${ic('plus', 14)}添加跳转规则</button></div>
+    <div class="rules">${rows || `<div class="none">${ic('route', 18)}还没有跳转规则，所有访问都会跳到默认地址。可以为中国、港澳台、北美等地区分别设置推广地址，或让 iOS / Android / 电脑访客去不同的地址（如 App Store、Google Play）。</div>`}${def}</div>
+    ${link.arms?.length || link.targets.some((t) => t.arms?.length) ? '' : `<div class="hint rp-pr">${ic('split', 13)}想比较几个落地页的效果？点 ${ic('split', 13)} 按比例把访问分到几个地址（A/B 测试）。</div>`}
+    ${link.targets.length > 1 && link.targets.some((t) => t.devices?.length) ? `<div class="hint rp-pr">${ic('info', 13)}同时命中多条时：同时指定国家和设备的规则优先，其次只按设备的，再次只按国家的。</div>` : ''}
     <div class="sim"><span>如果访客来自</span>
-      <div class="combo" id="sim"></div>
+      <div class="combo" id="sim"></div><span>，用</span>
+      <div class="seg sm" id="simd">${[['desktop', '电脑'], ['ios', 'iOS'], ['android', 'Android']].map(([k, l]) => `<button type="button" data-d="${k}">${l}</button>`).join('')}</div>
       <span class="res" id="simres"></span></div>
   </div>`;
 }
@@ -3510,10 +3741,11 @@ function bindFold(fold, key, onOpen) {
 // 顶部信息卡：地区规则 + 默认地址，一行一条
 function heroRoutes(link) {
   const MAX = 4;
-  const url = (u) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u)}</a>` : '<span class="warn">未设置，会显示“链接暂不可用”</span>';
-  const rows = link.targets.slice(0, MAX).map((t) => `<div class="hr-r"><span class="hr-c" title="${esc(t.countries.map(cname).join("、"))}">${esc(ruleText(t))}</span>${ic('arrow', 13)}${url(t.url)}</div>`).join('');
+  // 地址和检查状态点包在一起，占网格里的同一格
+  const url = (u, parent) => u ? `<span class="hr-a"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u)}</a>${healthDot(link.health?.[u])}${abChip(link, parent)}</span>` : '<span class="warn">未设置，会显示“链接暂不可用”</span>';
+  const rows = link.targets.slice(0, MAX).map((t) => `<div class="hr-r"><span class="hr-c" title="${esc(t.countries.map(cname).join("、"))}">${esc(ruleText(t))}</span>${ic('arrow', 13)}${url(t.url, t.id)}</div>`).join('');
   const more = link.targets.length > MAX ? `<button type="button" class="hr-more" data-panel-open="rules">还有 ${link.targets.length - MAX} 条规则 ${ic('chev', 12)}</button>` : '';
-  return `<div class="hroutes">${rows}${more}<div class="hr-r def"><span class="hr-c">其他地区</span>${ic('arrow', 13)}<span class="hr-u">${url(link.target_url)}<button type="button" class="hr-more" data-panel-open="rules">管理规则 ${ic('chev', 12)}</button></span></div></div>`;
+  return `<div class="hroutes">${rows}${more}<div class="hr-r def"><span class="hr-c">其他地区</span>${ic('arrow', 13)}<span class="hr-u">${url(link.target_url, 0)}<button type="button" class="hr-more" data-panel-open="rules">管理规则 ${ic('chev', 12)}</button></span></div></div>`;
 }
 
 function bindRules(link) {
@@ -3521,22 +3753,34 @@ function bindRules(link) {
   if (!card) return;
 
   const res = card.querySelector('#simres');
+  let simDev = store.get('simd', 'desktop'), simC = store.get('sim', 'CN');
   const simulate = (c) => {
-    const t = link.targets.find((x) => x.countries.includes(c));
+    simC = c;
+    const t = pickRuleJs(link.targets, c, simDev);
     const url = t ? t.url : link.target_url;
-    res.innerHTML = url
-      ? `<span>会跳到</span><b title="${esc(url)}">${esc(url)}</b><span class="tag">${!t ? '（默认地址）' : t.fallback && link.target_url ? '（命中地区规则，打不开时回退到默认地址）' : '（命中地区规则）'}</span>`
+    const sp = url && splitOf(link, t ? t.id : 0);
+    res.innerHTML = sp
+      ? `<span>会按比例分到</span><b data-tipf="${esc(sp.map((x) => `${x.k} ${x.pct}% → ${x.url}`).join('\n'))}">${sp.length} 个地址</b><span class="tag">（A/B 分流 · ${esc(splitText(sp))}）</span>`
+      : url
+      ? `<span>会跳到</span><b title="${esc(url)}">${esc(url)}</b><span class="tag">${!t ? '（默认地址）' : t.fallback && link.target_url ? '（命中跳转规则，打不开时回退到默认地址）' : '（命中跳转规则）'}</span>`
       : '<span>会看到</span><b class="warn">“链接暂不可用”</b><span class="tag">（未设置默认地址）</span>';
   };
   const start = store.get('sim', 'CN');
   countryCombo(card.querySelector('#sim'), start, (c) => { store.set('sim', c); simulate(c); });
+  const sd = card.querySelector('#simd');
+  sd.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.d === simDev);
+    b.onclick = () => { simDev = b.dataset.d; store.set('simd', simDev); sd.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); segThumb(sd); simulate(simC); };
+  });
+  segThumb(sd);
   simulate(start);
   card.querySelector('#radd').onclick = () => openRuleDrawer(link, null);
   card.querySelector('[data-rdef]').onclick = () => openDrawer(link, (saved) => saved ? route() : null);
   card.querySelectorAll('[data-rule]').forEach((b) => (b.onclick = () => openRuleDrawer(link, link.targets.find((t) => t.id == b.dataset.rule))));
+  card.querySelectorAll('[data-split]').forEach((b) => (b.onclick = () => openSplitDrawer(link, Number(b.dataset.split))));
   card.querySelectorAll('[data-rdel]').forEach((b) => (b.onclick = async () => {
     const t = link.targets.find((x) => x.id == b.dataset.rdel);
-    const ok = await confirmDialog({ title: '删除这条规则？', text: `${ruleText(t)} 的访问之后会跳到默认地址。已有的访问记录会保留。`, ok: '删除', danger: true });
+    const ok = await confirmDialog({ title: '删除这条规则？', text: `${ruleText(t)} 的访问之后会跳到默认地址${t.arms?.length ? '，这条规则的 A/B 分流也会一起删除' : ''}。已有的访问记录会保留，可以在“修改记录”里撤销。`, ok: '删除', danger: true });
     if (!ok) return;
     await api(`/links/${link.id}/targets/${t.id}`, { method: 'DELETE' });
     toast('规则已删除');
@@ -3547,21 +3791,34 @@ function bindRules(link) {
 function openRuleDrawer(link, rule) {
   const isNew = !rule;
   const selected = new Set(rule ? rule.countries : []);
-  // 其他规则已占用的国家
+  const devs = new Set(rule ? rule.devices || [] : []);
+  // 其他规则已占用的国家：只和同一类规则冲突（只按国家 / 国家 + 设备），设备也有交集时才算占用
   const taken = new Map();
-  link.targets.forEach((t, i) => { if (!rule || t.id !== rule.id) t.countries.forEach((c) => taken.set(c, `规则 ${i + 1}`)); });
+  const calcTaken = () => {
+    taken.clear();
+    link.targets.forEach((t, i) => {
+      if (rule && t.id === rule.id) return;
+      const sameKind = !!(t.devices || []).length === !!devs.size;
+      const devOver = !devs.size || (t.devices || []).some((d) => devs.has(d));
+      if (sameKind && devOver && t.countries.length) t.countries.forEach((c) => taken.set(c, `规则 ${i + 1}`));
+    });
+  };
+  calcTaken();
 
   const ov = document.createElement('div'); ov.className = 'ov';
   const dr = document.createElement('form'); dr.className = 'drawer'; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-modal', 'true');
   dr.innerHTML = `
-    <div class="dh"><h2>${isNew ? '添加地区规则' : '编辑地区规则'}</h2><button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
+    <div class="dh"><h2>${isNew ? '添加跳转规则' : '编辑跳转规则'}</h2><button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
     <div class="db">
-      <div class="field"><label>国家 / 地区</label>
+      <div class="field"><label>设备 <span class="hint" style="font-weight:400">可选，不选表示所有设备</span></label>
+        <div class="devs" id="devs">${[['ios', 'iOS', 'phone', 'iPhone / iPad'], ['android', 'Android', 'phone', '安卓手机和平板'], ['desktop', '电脑', 'desk', 'Windows / macOS / Linux']].map(([k, l, i, d]) =>
+          `<button type="button" class="dv${devs.has(k) ? ' on' : ''}" data-dv="${k}">${ic(i, 16)}<b>${l}</b><span>${d}</span></button>`).join('')}</div></div>
+      <div class="field"><label>国家 / 地区 <span class="hint" style="font-weight:400" id="c-opt">${devs.size ? '可选，不选表示所有地区' : ''}</span></label>
         <div class="sel" id="sel"></div>
         <div class="groups" style="margin-top:10px">${GROUPS.map(([n, cs], i) => `<button type="button" data-g="${i}">+ ${n}</button>`).join('')}</div>
         <div class="psearch">${ic('search')}<input class="input" id="ps" placeholder="搜索国家、地区或代码，如 日本 / JP" autocomplete="off"></div>
         <div class="plist" id="pl"></div>
-        <div class="hint" style="margin-top:6px">按访问者 IP 所在的国家 / 地区匹配。同一个国家只能属于一条规则。</div></div>
+        <div class="hint" style="margin-top:6px">按访问者 IP 所在的国家 / 地区匹配。同一类规则里，一个国家只能属于一条。</div></div>
       <div class="field"><label for="r-u">跳转到</label>
         <input class="input" id="r-u" name="url" required placeholder="https://b.com/promo-cn" value="${esc(rule ? rule.url : '')}"></div>
       <div class="field"><label for="r-n">备注 <span class="hint" style="font-weight:400">可选</span></label>
@@ -3602,11 +3859,17 @@ function openRuleDrawer(link, rule) {
       const hit = ISO.filter((c) => c.toLowerCase().includes(q) || cname(c).toLowerCase().includes(q));
       pl.innerHTML = hit.length ? hit.map(row).join('') : '<div class="empty" style="padding:20px">没有匹配的国家 / 地区</div>';
     } else {
-      const rest = ISO.filter((c) => !COMMON.includes(c)).sort((a, b) => cname(a).localeCompare(cname(b), 'zh'));
+      const rest = ISO.filter((c) => !COMMON.includes(c)).sort((a, b) => cname(a).localeCompare(cname(b), EN ? 'en' : 'zh'));
       pl.innerHTML = `<div class="grp">常用</div>${COMMON.map(row).join('')}<div class="grp">全部</div>${rest.map(row).join('')}`;
     }
     pl.querySelectorAll('input').forEach((i) => (i.onchange = () => { i.checked ? selected.add(i.value) : selected.delete(i.value); renderSel(); }));
   };
+  dr.querySelectorAll('[data-dv]').forEach((b) => (b.onclick = () => {
+    devs.has(b.dataset.dv) ? devs.delete(b.dataset.dv) : devs.add(b.dataset.dv);
+    b.classList.toggle('on', devs.has(b.dataset.dv));
+    dr.querySelector('#c-opt').textContent = devs.size ? '可选，不选表示所有地区' : '';
+    calcTaken(); renderList();
+  }));
   dr.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => {
     const skipped = GROUPS[b.dataset.g][1].filter((c) => taken.has(c));
     GROUPS[b.dataset.g][1].forEach((c) => { if (!taken.has(c)) selected.add(c); });
@@ -3620,17 +3883,180 @@ function openRuleDrawer(link, rule) {
   dr.onsubmit = async (e) => {
     e.preventDefault();
     const err = dr.querySelector('.err');
-    if (!selected.size) { err.textContent = '请至少选择一个国家 / 地区'; return; }
+    if (!selected.size && !devs.size) { err.textContent = '请至少选择一个国家 / 地区或设备'; return; }
     let url = dr.querySelector('#r-u').value.trim();
     if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
     const btn = dr.querySelector('.df .primary'); btn.disabled = true;
     try {
       await api(`/links/${link.id}/targets${isNew ? '' : '/' + rule.id}`, {
-        method: isNew ? 'POST' : 'PUT', body: { countries: [...selected], url, note: dr.querySelector('#r-n').value, fallback: dr.querySelector('#r-fb').checked },
+        method: isNew ? 'POST' : 'PUT', body: { countries: [...selected], devices: [...devs], url, note: dr.querySelector('#r-n').value, fallback: dr.querySelector('#r-fb').checked },
       });
       close(); toast(isNew ? '规则已添加' : '规则已保存');
       route();
     } catch (ex) { err.textContent = ex.message; btn.disabled = false; }
+  };
+}
+
+// ---------------------------------------------------------------- 修改记录
+const LOG_FIELD = { slug: '后缀', target_url: '默认地址', title: '标题', note: '备注', enabled: '状态', pass_query: '透传参数', utm: '转化追踪', expires_at: '过期时间' };
+const logVal = (f, v) => {
+  if (f === 'enabled') return v ? '启用' : '停用';
+  if (f === 'pass_query' || f === 'utm') return v ? '开' : '关';
+  if (f === 'expires_at') return v ? fmtTime(v) : '永久';
+  if (f === 'slug') return v ? '/' + v : '—';
+  return v === '' || v == null ? '（空）' : String(v);
+};
+const logPair = (label, a, b) => `<div class="lg-c"><span class="lg-f">${esc(label)}</span><span class="lg-o" data-tipf="${esc(a)}">${esc(a)}</span>${ic('arrow', 12)}<span class="lg-n" data-tipf="${esc(b)}">${esc(b)}</span></div>`;
+function logEntry(e, link) {
+  const d = e.data || {};
+  const ruleName = (snap) => {
+    const cur = snap && link.targets.find((t) => t.id === snap.id);
+    return snap?.countries || snap?.devices ? ruleText({ countries: snap.countries || [], devices: snap.devices || [] }) : cur ? ruleText(cur) : '跳转规则';
+  };
+  const splitTxt = (st, url) => (st.arms?.length ? splitText([{ weight: st.weight }, ...st.arms].map((x, i, all) => ({ k: ARM[i], pct: Math.round((x.weight / (all.reduce((a, y) => a + y.weight, 0) || 1)) * 100) }))) : '不分流');
+  let icon = 'edit', title = '', body = '';
+  if (e.action === 'create') { icon = 'plus'; title = d.from ? `从 /${esc(d.from)} 复制创建` : '创建短链'; body = d.target_url ? `<div class="lg-c"><span class="lg-f">默认地址</span><span class="lg-n" data-tipf="${esc(d.target_url)}">${esc(d.target_url)}</span></div>` : ''; }
+  else if (e.action === 'update') {
+    const ch = Object.entries(d.changes || {});
+    title = ch.length === 1 && ch[0][0] === 'enabled' ? (ch[0][1][1] ? '启用短链' : '停用短链') : `修改${ch.map(([f]) => LOG_FIELD[f] || f).join('、')}`;
+    if (ch.length === 1 && ch[0][0] === 'enabled') icon = ch[0][1][1] ? 'check' : 'x';
+    body = ch.filter(([f]) => f !== 'enabled' || ch.length > 1).map(([f, [a, b]]) => logPair(LOG_FIELD[f] || f, logVal(f, a), logVal(f, b))).join('');
+  } else if (e.action === 'rule.add') { icon = 'route'; title = `添加跳转规则：${esc(ruleName(d.after))}`; body = `<div class="lg-c"><span class="lg-f">跳到</span><span class="lg-n" data-tipf="${esc(d.after.url)}">${esc(d.after.url)}</span></div>`; }
+  else if (e.action === 'rule.del') { icon = 'trash'; title = `删除跳转规则：${esc(ruleName(d.before))}`; body = `<div class="lg-c"><span class="lg-f">原来跳到</span><span class="lg-o" data-tipf="${esc(d.before.url)}">${esc(d.before.url)}</span></div>`; }
+  else if (e.action === 'rule.edit') {
+    icon = 'route'; title = `修改跳转规则：${esc(ruleName(d.after))}`;
+    const b = d.before, a = d.after, rows = [];
+    if (b.url !== a.url) rows.push(logPair('地址', b.url, a.url));
+    if (b.countries && JSON.stringify(b.countries) !== JSON.stringify(a.countries)) rows.push(logPair('国家 / 地区', b.countries.map(cname).join('、') || '所有地区', a.countries.map(cname).join('、') || '所有地区'));
+    if (b.devices && JSON.stringify(b.devices) !== JSON.stringify(a.devices)) rows.push(logPair('设备', devText(b.devices) || '所有设备', devText(a.devices) || '所有设备'));
+    if (b.note !== undefined && b.note !== a.note) rows.push(logPair('备注', b.note || '（空）', a.note || '（空）'));
+    if (b.fallback !== undefined && b.fallback !== a.fallback) rows.push(logPair('打不开时回退', b.fallback ? '开' : '关', a.fallback ? '开' : '关'));
+    body = rows.join('');
+  } else if (e.action === 'split') {
+    icon = 'split';
+    const where = d.parent ? ruleName(link.targets.find((t) => t.id === d.parent) || { id: d.parent }) : '默认地址';
+    title = `${!d.before.arms?.length ? '开始' : !d.after.arms?.length ? '取消' : '调整'} A/B 分流：${esc(where)}`;
+    body = logPair('比例', splitTxt(d.before), splitTxt(d.after))
+      + (d.after.arms || []).filter((x) => !(d.before.arms || []).some((y) => y.id === x.id && y.url === x.url)).map((x) => `<div class="lg-c"><span class="lg-f">新版本</span><span class="lg-n" data-tipf="${esc(x.url)}">${esc(x.url)}</span></div>`).join('');
+  }
+  const via = d.revertOf ? `<span class="lg-t">撤销操作</span>` : d.via === 'replace' ? '<span class="lg-t">批量替换</span>' : d.via === 'bulk' ? '<span class="lg-t">批量操作</span>' : '';
+  const who = [e.browser, e.os].filter((x) => x && x !== 'Other' && x !== 'Unknown').join(' · ') + (e.ip ? ` · ${e.ip}` : '');
+  const canUndo = !e.reverted && !d.revertOf && e.action !== 'create';
+  return `<div class="lg-e${e.reverted ? ' rv-d' : ''}"><span class="lg-i">${ic(icon, 14)}</span>
+    <div class="lg-b"><div class="lg-h"><b>${title}</b>${via}${e.reverted ? '<span class="lg-t">已撤销</span>' : ''}</div>${body}
+      <div class="lg-m"><span data-tipf-always data-tipf="${esc(fmtTime(e.at))}">${ago(e.at)}</span>${who ? ` · <span>${esc(who)}</span>` : ''}</div></div>
+    ${canUndo ? `<button type="button" class="btn sm ghost" data-undo="${e.id}">${ic('undo', 13)}撤销</button>` : ''}</div>`;
+}
+async function fillLogPanel(dr, link) {
+  dr.innerHTML = `
+    <div class="dh"><div style="flex:1;min-width:0"><h2>修改记录</h2><div class="hint">谁在什么时候改了地址、规则和设置，保留一年；可以撤销之后没有再被改过的修改</div></div>
+      <button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
+    <div class="db"><div class="lg" id="lg-list">${skel(64, 4)}</div><div id="lg-more"></div></div>`;
+  dr.querySelector('[data-close]').onclick = dr._close;
+  const box = dr.querySelector('#lg-list'), more = dr.querySelector('#lg-more');
+  let items = [];
+  const load = async (before) => {
+    const r = await api(`/links/${link.id}/log${before ? '?before=' + before : ''}`);
+    if (!dr.isConnected) return;
+    items = before ? [...items, ...r.items] : r.items;
+    box.innerHTML = items.length ? items.map((e) => logEntry(e, link)).join('') : `<div class="empty">${ic('history')}还没有修改记录。之后修改地址、规则或设置都会记在这里。</div>`;
+    more.innerHTML = r.more ? `<button type="button" class="btn sm" id="lg-next">加载更早的记录</button>` : '';
+    if (r.more) more.querySelector('#lg-next').onclick = () => load(items.at(-1).id);
+    box.querySelectorAll('[data-undo]').forEach((b) => (b.onclick = async () => {
+      const ok = await confirmDialog({ title: '撤销这条修改？', text: '会改回修改前的内容，撤销本身也会记一条记录。', ok: '撤销' });
+      if (!ok) return;
+      b.disabled = true;
+      try { await api(`/links/${link.id}/log/${b.dataset.undo}/revert`, { method: 'POST', body: {} }); toast('已撤销'); route(); }
+      catch (ex) { toast(ex.message, 'bad'); b.disabled = false; }
+    }));
+  };
+  load().catch((ex) => { box.innerHTML = `<div class="empty">${ic('alert')}${esc(ex.message)}</div>`; });
+}
+
+// ---------------------------------------------------------------- A/B 分流
+function openSplitDrawer(link, parent) {
+  const rule = parent ? link.targets.find((t) => t.id === parent) : null;
+  const primary = rule ? rule.url : link.target_url;
+  const had = armsOf(link, parent).length > 0;
+  let pw = (rule ? rule.weight : link.ab_weight) || 50;
+  const arms = had ? armsOf(link, parent).map((a) => ({ id: a.id, url: a.url, weight: a.weight, note: a.note })) : [{ url: '', weight: 50, note: '' }];
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const dr = document.createElement('form'); dr.className = 'drawer'; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-modal', 'true');
+  dr.innerHTML = `
+    <div class="dh"><div style="flex:1;min-width:0"><h2>A/B 分流</h2>
+      <div class="hint">${esc(rule ? ruleText(rule) : link.targets.length ? '其他所有访问（默认地址）' : '所有访问')}按比例分到几个地址</div></div>
+      <button type="button" class="btn ghost icon" data-close aria-label="关闭">${ic('x')}</button></div>
+    <div class="db">
+      <div class="abd-bar" id="abd-bar"></div>
+      <div class="abd" id="abd"></div>
+      <div class="abd-acts"><button type="button" class="btn sm" id="abd-add">${ic('plus', 14)}添加一个版本</button>
+        <button type="button" class="btn sm ghost" id="abd-eq">平均分配</button><span class="hint">最多 5 个版本，比例填相对数值即可</span></div>
+      <div class="tipbox" style="margin-top:18px">${ic('info', 16)}<div>
+        <b>同一位访客总是去同一个版本</b>按访客 IP 分配，反复点击不会在几个页面之间来回跳。各版本的命中数在“跳转规则”里对比。
+        ${link.utm ? '已开启转化追踪：跳转会带上 <code>utm_content=ab-a</code>、<code>ab-b</code>……，在 GA4 里按“会话手动广告内容”对比各版本的会话和关键事件。'
+          : '在“编辑”里打开<b>转化追踪</b>后，跳转会带上 <code>utm_content=ab-a</code>、<code>ab-b</code>……，可以在 GA4 里对比各版本的转化。'}
+      </div></div>
+      <div class="err" role="alert"></div>
+    </div>
+    <div class="df">
+      ${had ? '<button type="button" class="btn ghost danger-t" id="abd-off">取消分流</button>' : ''}<span class="sp"></span>
+      <button type="button" class="btn" data-close>取消</button>
+      <button class="btn primary">${had ? '保存' : '开始分流'}</button>
+    </div>`;
+  const close = () => { ov.remove(); dr.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape' && [...document.querySelectorAll('.drawer')].pop() === dr && !document.querySelector('.dialog')) close(); };
+  document.addEventListener('keydown', onKey);
+  ov.onclick = close;
+  dr.querySelectorAll('[data-close]').forEach((b) => (b.onclick = close));
+  document.body.append(ov, dr);
+
+  const list = dr.querySelector('#abd'), bar = dr.querySelector('#abd-bar');
+  const COLORS = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--warn)', 'var(--rose, #e11d48)'];
+  const drawBar = () => {
+    const ws = [pw, ...arms.map((a) => Number(a.weight) || 0)], sum = ws.reduce((x, y) => x + y, 0) || 1;
+    bar.innerHTML = ws.map((w, i) => `<i style="flex:${w || 0.001};background:${COLORS[i]}" data-tipf-always data-tipf="${ARM[i]} · ${Math.round((w / sum) * 100)}%"><b>${ARM[i]} ${Math.round((w / sum) * 100)}%</b></i>`).join('');
+    list.querySelectorAll('[data-pct]').forEach((el) => (el.textContent = `${Math.round((ws[Number(el.dataset.pct)] / sum) * 100)}%`));
+    dr.querySelector('#abd-add').disabled = arms.length >= 4;
+  };
+  const draw = () => {
+    list.innerHTML = `
+      <div class="abd-r"><span class="ab-k" style="--c:${COLORS[0]}">A</span>
+        <div class="abd-u"><div class="abd-o" data-tipf="${esc(primary)}">${esc(primary)}</div><div class="hint">原地址${rule ? '（规则里设置）' : '（默认地址）'}</div></div>
+        <label class="abd-w"><input class="input" type="number" min="1" max="100" value="${pw}" data-w="-1" aria-label="A 的比例"><span data-pct="0"></span></label><span class="abd-x"></span></div>
+      ${arms.map((a, i) => `<div class="abd-r"><span class="ab-k" style="--c:${COLORS[i + 1]}">${ARM[i + 1]}</span>
+        <div class="abd-u"><input class="input" placeholder="https://b.com/landing-${ARM[i + 1].toLowerCase()}" value="${esc(a.url)}" data-u="${i}" aria-label="${ARM[i + 1]} 的地址" required>
+          <input class="input sm" placeholder="备注，如：新版落地页（可选）" value="${esc(a.note || '')}" data-n="${i}" aria-label="${ARM[i + 1]} 的备注"></div>
+        <label class="abd-w"><input class="input" type="number" min="1" max="100" value="${a.weight}" data-w="${i}" aria-label="${ARM[i + 1]} 的比例"><span data-pct="${i + 1}"></span></label>
+        <button type="button" class="btn ghost icon" data-rm="${i}" data-tip="删除这个版本" aria-label="删除 ${ARM[i + 1]}">${ic('trash')}</button></div>`).join('')}`;
+    list.querySelectorAll('[data-w]').forEach((el) => (el.oninput = () => {
+      const v = Math.max(0, Math.min(100, Number(el.value) || 0));
+      if (el.dataset.w === '-1') pw = v; else arms[Number(el.dataset.w)].weight = v;
+      drawBar();
+    }));
+    list.querySelectorAll('[data-u]').forEach((el) => (el.oninput = () => (arms[Number(el.dataset.u)].url = el.value)));
+    list.querySelectorAll('[data-n]').forEach((el) => (el.oninput = () => (arms[Number(el.dataset.n)].note = el.value)));
+    list.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { arms.splice(Number(b.dataset.rm), 1); if (!arms.length) arms.push({ url: '', weight: 50, note: '' }); draw(); }));
+    drawBar();
+  };
+  dr.querySelector('#abd-add').onclick = () => { arms.push({ url: '', weight: Math.max(1, Math.round(100 / (arms.length + 2))), note: '' }); draw(); list.querySelector(`[data-u="${arms.length - 1}"]`).focus(); };
+  dr.querySelector('#abd-eq').onclick = () => { pw = 50; arms.forEach((a) => (a.weight = 50)); draw(); };
+  draw();
+  setTimeout(() => list.querySelector('[data-u="0"]')?.focus(), 30);
+  const save = async (body, msg) => {
+    const btn = dr.querySelector('.df .primary'); btn.disabled = true;
+    try { await api(`/links/${link.id}/split`, { method: 'PUT', body }); close(); toast(msg); route(); }
+    catch (ex) { dr.querySelector('.err').textContent = ex.message; btn.disabled = false; }
+  };
+  const off = dr.querySelector('#abd-off');
+  if (off) off.onclick = async () => {
+    const ok = await confirmDialog({ title: '取消 A/B 分流？', text: '之后所有访问都去原地址（A）。各版本已有的访问记录会保留，可以在“修改记录”里撤销。', ok: '取消分流', danger: true });
+    if (ok) save({ parent, weight: 0, arms: [] }, '已取消分流');
+  };
+  dr.onsubmit = (e) => {
+    e.preventDefault();
+    const body = { parent, weight: pw, arms: arms.map((a) => ({ ...a, url: /^https?:\/\//i.test(a.url.trim()) ? a.url.trim() : 'https://' + a.url.trim() })) };
+    if ([pw, ...arms.map((a) => a.weight)].some((w) => !(w >= 1 && w <= 100))) { dr.querySelector('.err').textContent = '每个版本的比例都要在 1–100 之间'; return; }
+    save(body, had ? '分流已保存' : '已开始 A/B 分流');
   };
 }
 
@@ -3647,7 +4073,12 @@ const pct1 = (x) => `${(x * 100).toFixed(1)}%`;
 const tzLabelOf = (m) => `UTC${m >= 0 ? '+' : '−'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + String(Math.abs(m) % 60).padStart(2, '0') : ''}`;
 const gKc = (label, v, delta, sub = '', tip = '', extra = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b>${extra.startsWith('<svg') ? `<span class="kc-sp">${extra}</span>` : ''}</div>${extra && !extra.startsWith('<svg') ? extra : ''}${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
 // 跳转去向的文字：默认地址 / 地区规则的国家
-const routeLabel = (r) => (r.rule ? (r.countries || '').split(',').filter(Boolean).map((c) => country(c)).join('、') || '地区规则' : '默认地址');
+const routeLabel = (r) => {
+  if (!r.rule) return '默认地址';
+  const cs = (r.countries || '').split(',').filter(Boolean).map((c) => country(c)).join('、');
+  const ds = devText((r.devices || '').split(',').filter(Boolean));
+  return [ds, cs].filter(Boolean).join(' · ') || '跳转规则';
+};
 // 时间范围：截至昨天；365 天的上一周期超出回填范围，不做环比
 const G_LABEL = () => (G_RANGES.find(([d]) => d === gState.days)?.[1] || '') ;
 const G_RANGES = [[7, '最近 7 天'], [14, '最近 14 天'], [28, '最近 28 天'], [90, '最近 3 个月'], [180, '最近 6 个月'], [365, '最近 12 个月']];
@@ -3788,7 +4219,16 @@ const SHARE_SECTIONS = [['search', '搜索表现与机会', '搜索词、页面�
   ['traffic', '流量质量', 'GA4 渠道、来源 / 媒介、着陆页、互动率'], ['links', '推广短链', '跳转到这些站点的短链及点击']];
 
 // 给 AI 的提示词（附上链接）
-const sharePrompt = (s) => `请先打开并完整阅读这份网站数据报告：${s.url}
+const sharePrompt = (s) => EN ? `Please open and read this website data report in full: ${s.url}
+
+You are a senior SEO and growth consultant. The report contains Google Search Console, GA4 and promo short link data for ${s.hosts.length > 1 ? `${s.hosts.length} sites` : s.hosts[0]} (${T(SHARE_RANGES.find(([d]) => d === s.days)?.[1] || s.days + ' 天')}, compared with the previous period of the same length; the report itself is in Chinese). Please answer in English:
+1. ${s.hosts.length > 1 ? 'Compare the sites side by side first, then for each one, ' : ''}summarize overall performance and the most obvious problems;
+2. List the 5 things most worth doing first, sorted by "expected gain / difficulty", each with the data behind it;
+3. For the "position 4–20" and "low CTR" queries, give concrete title, description and content suggestions;
+4. Analyze the quality of traffic channels and landing pages (engagement rate, key events) and point out pages to improve;
+5. If any queries or pages are declining, analyze likely causes and give troubleshooting steps.
+
+If you can't open the link, tell me directly and I'll upload the report file instead.` : `请先打开并完整阅读这份网站数据报告：${s.url}
 
 你是资深的 SEO 与增长顾问。报告里是 ${s.hosts.length > 1 ? `${s.hosts.length} 个站点` : s.hosts[0]} 的 Google Search Console、GA4 和推广短链数据（${SHARE_RANGES.find(([d]) => d === s.days)?.[1] || s.days + ' 天'}，并与上一个同长度周期对比）。请：
 1. ${s.hosts.length > 1 ? '先横向对比各站点，再分别' : ''}总结整体表现和最明显的问题；
@@ -4128,8 +4568,8 @@ function exportSitesCsv(rows, d) {
   const cell = (v) => { const t = v == null ? '' : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
   const r2 = (v) => (v == null ? '' : Math.round(v * 100) / 100);
   const head = ['站点', 'GA4 媒体资源', 'Search Console', '用户', '上期用户', '会话', '上期会话', '关键事件', '互动率',
-    '搜索点击', '上期搜索点击', '展示', '上期展示', '点击率', '平均排名', '短链点击（真人）', '短链访客', '点出率'];
-  const lines = [head.join(',')];
+    '搜索点击', '上期搜索点击', '展示', '上期展示', '点击率', '平均排名', '短链点击（真人）', '短链访客', '点出率'].map(T);
+  const lines = [head.map(cell).join(',')];
   for (const x of rows) {
     const ga = x.cur.ga, pg = x.prev.ga, sc = x.cur.gsc, ps = x.prev.gsc;
     const lh = x.linksFrom.reduce((a, l) => a + l.human, 0);
@@ -4145,6 +4585,50 @@ function exportSitesCsv(rows, d) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   toast(`已导出 ${rows.length} 个站点`);
 }
+
+// ---------------------------------------------------------------- 系统状态
+// 每一项：ok / warn / bad + 说明；定时任务超过 3 小时没跑算异常
+function sysChecks(st) {
+  const H = 3600000, now = st.now, c = st.cron;
+  const out = [];
+  const steps = c?.steps || {};
+  const failed = Object.entries(steps).filter(([, v]) => !v.ok);
+  const NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', notify: '推送通知', usage: '用量预警', health: '目标页检查' };
+  out.push(!c ? { lv: 'warn', t: '定时任务', d: '还没有运行记录（部署后每小时整点运行一次）' }
+    : now - c.at > 3 * H ? { lv: 'bad', t: '定时任务', d: `上次运行在 ${ago(c.at)}，超过 3 小时没有运行，请检查 wrangler.toml 里的 [triggers] crons` }
+    : failed.length ? { lv: 'bad', t: '定时任务', d: `${ago(c.at)}运行，${failed.map(([k, v]) => `${NAME[k] || k}失败：${v.error}`).join('；')}` }
+    : { lv: 'ok', t: '定时任务', d: `${ago(c.at)}运行，耗时 ${(c.ms / 1000).toFixed(1)} 秒，${Object.keys(steps).length} 个步骤都正常` });
+  out.push(!st.aggMark ? { lv: 'warn', t: '访问汇总', d: '还没有汇总过（有访问后自动开始）' }
+    : now - st.aggMark > 3 * H ? { lv: 'warn', t: '访问汇总', d: `汇总到 ${fmtTime(st.aggMark)}，落后 ${Math.round((now - st.aggMark) / H)} 小时（之后的访问实时读取，统计不受影响）` }
+    : { lv: 'ok', t: '访问汇总', d: `已汇总到 ${fmtTime(st.aggMark)}，之后的访问实时读取` });
+  const g = st.google;
+  if (g.accounts) {
+    out.push(g.accountErrors.length ? { lv: 'bad', t: 'Google 账号', d: g.accountErrors.map((a) => `${maskEmail(a.email)}：${a.error}`).join('；') }
+      : { lv: 'ok', t: 'Google 账号', d: `${g.accounts} 个账号授权正常` });
+    out.push(g.pending ? { lv: 'warn', t: 'Google 同步', d: `${g.sites} 个站点，还有 ${g.pending} 个在同步中（每小时同步 10 个，也可以在“站点”页立即同步）` }
+      : g.siteErrors ? { lv: 'warn', t: 'Google 同步', d: `${g.siteErrors} 个站点上次同步出错，到“站点”页查看` }
+      : { lv: 'ok', t: 'Google 同步', d: `${g.sites} 个站点，最近同步于 ${g.lastSync ? ago(g.lastSync) : '—'}` });
+  }
+  const n = st.notify;
+  out.push(!n.channels.length ? { lv: 'warn', t: '推送通知', d: '没有开启推送渠道，报告和提醒不会发送' }
+    : n.last && !n.last.ok ? { lv: 'bad', t: '推送通知', d: `上次推送失败：${n.last.error}` }
+    : { lv: 'ok', t: '推送通知', d: `渠道：${n.channels.join('、')}${n.last ? `，上次推送 ${ago(n.last.at)}` : ''}` });
+  if (st.health) out.push(!st.health.urls ? { lv: 'warn', t: '目标页检查', d: '还没有检查过（定时任务每小时检查一批）' }
+    : st.health.down ? { lv: 'bad', t: '目标页检查', d: `${st.health.down} 个目标地址打不开，到“短链”页查看标红的短链` }
+    : { lv: 'ok', t: '目标页检查', d: `${st.health.urls} 个目标地址都能打开，最近检查于 ${ago(st.health.last)}` });
+  out.push(st.usage.configured ? { lv: 'ok', t: 'Cloudflare 用量', d: st.usage.alert ? '已配置，用量预警已开启' : '已配置（用量预警未开启，可以在“通知”页开启）' }
+    : { lv: 'warn', t: 'Cloudflare 用量', d: '没有填写凭据，看不到账户用量' });
+  if (!st.backfillDone && st.aggMark) out.push({ lv: 'warn', t: '访客回填', d: '按来源的独立访客正在回填旧数据，几个小时内完成' });
+  return out;
+}
+const sysLevel = (st) => { const c = sysChecks(st); return c.some((x) => x.lv === 'bad') ? 'bad' : c.some((x) => x.lv === 'warn') ? 'warn' : 'ok'; };
+const sysPill = (st) => ({ ok: '<span class="pill on">正常</span>', warn: '<span class="pill exp">注意</span>', bad: '<span class="pill bad-p">异常</span>' }[sysLevel(st)]);
+const sysSummary = (st) => {
+  const c = sysChecks(st), bad = c.filter((x) => x.lv === 'bad'), warn = c.filter((x) => x.lv === 'warn');
+  return bad.length ? `${bad.map((x) => x.t).join('、')}异常` : warn.length ? `${warn.length} 项需要注意：${warn.map((x) => x.t).join('、')}` : `定时任务、汇总${st.google.accounts ? '、Google 同步' : ''}都正常`;
+};
+const sysBody = (st) => `<div class="sys-l">${sysChecks(st).map((x) => `<div class="sys-r ${x.lv}"><span class="sys-i">${ic(x.lv === 'ok' ? 'check' : 'alert', 13)}</span><b>${x.t}</b><span>${esc(x.d)}</span></div>`).join('')}</div>
+  ${st.cron ? `<details class="wz-more" style="margin-top:12px"><summary>上次定时任务的各个步骤</summary><div class="sys-steps">${Object.entries(st.cron.steps).map(([k, v]) => `<span class="${v.ok ? '' : 'bad'}">${esc(k)} · ${v.ok ? `${v.ms} ms` : esc(v.error)}</span>`).join('')}</div></details>` : ''}`;
 
 // 打开设置页并展开某一项
 function goSettings(id) { store.set('set:open', id); location.hash = '#/settings'; }
@@ -4528,8 +5012,9 @@ async function renderSite(token, host) {
 async function renderSettings(token) {
   const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证、来源追踪和第三方集成</div></div></header>`;
   shell('settings', `${head}<div class="acc">${skel(76, 3)}</div>`);
-  const [mfa, trk, ret, use, goo, shr] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'),
-    api('/usage').catch((e) => ({ configured: true, errors: [e.message], days: [] })), api('/google/status').catch(() => ({ configured: false })), api('/shares').catch(() => ({ items: [] }))]);
+  const [mfa, trk, ret, use, goo, shr, sys, ses] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'),
+    api('/usage').catch((e) => ({ configured: true, errors: [e.message], days: [] })), api('/google/status').catch(() => ({ configured: false })), api('/shares').catch(() => ({ items: [] })), api('/status').catch(() => null),
+    api('/sessions').catch(() => ({ items: [] }))]);
   if (token !== routeToken) return;
   const item = (id, icon, cls, title, sub, status, body) => `
     <section class="card rv fold acc-i" data-acc="${id}">
@@ -4558,11 +5043,16 @@ async function renderSettings(token) {
           <li>${ic('check', 14)}手机丢失可在 Cloudflare 账号下用命令关闭（见 README）</li>
         </ul>
         <button class="btn ${mfa.enabled ? 'danger' : 'primary'}" id="mfa-btn">${ic('shield', 15)}${mfa.enabled ? '关闭两步验证' : '开启两步验证'}</button>`)}
+      ${item('dev', 'desk', 'dev', '登录设备', sessionsSummary(ses), sessionsPill(ses), '')}
       ${item('trk', 'search', 'trk', '来源追踪', '识别访客从哪个搜索引擎进入推广页', pill(trk.enabled), '')}
       ${item('goo', 'google', 'goo brand', 'Google 集成', googleSummary(goo), googlePill(goo), '')}
       ${goo.connected || shr.items.length ? item('ai', 'ai', 'ai', 'AI 分析链接', sharesSummary(shr), sharesPill(shr), '') : ''}
       ${item('use', 'cloudflare', 'use brand', 'Cloudflare 用量', usageSummary(use), usagePill(use), '')}
+      ${sys ? item('sys', 'pulse', 'sys', '系统状态', sysSummary(sys), sysPill(sys), sysBody(sys)) : ''}
       ${item('ret', 'inbox', 'ret', '数据保留', '访问明细保存多久；统计数据长期保留', `<span class="pill on">${ret.days ? ret.days + ' 天' : '永久'}</span>`, '')}
+      ${item('lang', 'globe', 'lang', '界面语言', '后台显示的语言，默认跟随浏览器', `<span class="pill on notranslate">${EN ? 'English' : '中文'}</span>`, `
+        <div class="seg notranslate" id="lang-seg"><button type="button" data-l="zh">中文</button><button type="button" data-l="en">English</button></div>
+        <p class="set-p" style="margin-top:12px">只影响后台界面；统计报告、推送和 AI 分析报告仍是中文。</p>`)}
     </div>`;
   const page = document.getElementById('page');
   reveal(page);
@@ -4584,6 +5074,10 @@ async function renderSettings(token) {
   const pwf = document.getElementById('pwf');
   bindPasswordForm(pwf, '', () => { pwf.reset(); pwf.querySelector('.pwm').dataset.n = ''; pwf.querySelector('#p-tip').textContent = '至少 8 位，建议混合字母、数字和符号'; pwf.querySelector('button.primary').disabled = false; });
   document.getElementById('mfa-btn').onclick = () => openMfaDialog(() => route());
+  renderSessions(document.getElementById('acc-dev'), ses, (d) => {
+    page.querySelector('[data-st="dev"]').innerHTML = sessionsPill(d);
+    page.querySelector('[data-sub="dev"]').innerHTML = sessionsSummary(d);
+  });
   renderTracking(document.getElementById('acc-trk'), trk, (on) => { page.querySelector('[data-st="trk"]').innerHTML = pill(on); });
   renderGoogleSettings(document.getElementById('acc-goo'), goo, (g) => {
     page.querySelector('[data-st="goo"]').innerHTML = googlePill(g);
@@ -4598,12 +5092,58 @@ async function renderSettings(token) {
     page.querySelector('[data-st="use"]').innerHTML = usagePill(u);
     page.querySelector('[data-sub="use"]').innerHTML = usageSummary(u);
   });
+  const ls = document.getElementById('lang-seg');
+  ls.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.l === (EN ? 'en' : 'zh')); b.onclick = () => b.dataset.l !== (EN ? 'en' : 'zh') && setLang(b.dataset.l); });
+  setTimeout(() => segThumb(ls), 0);
   renderRetention(document.getElementById('acc-ret'), ret, (days) => { page.querySelector('[data-st="ret"]').innerHTML = `<span class="pill on">${days ? days + ' 天' : '永久'}</span>`; });
+}
+
+// ---------------------------------------------------------------- 登录设备
+const sessionsPill = (d) => `<span class="pill ${d.items.length > 1 ? 'on' : 'off'}">${d.items.length} 台</span>`;
+const sessionsSummary = (d) => {
+  const others = d.items.filter((x) => !x.current);
+  if (!others.length) return '只有当前设备登录着';
+  const last = others[0];
+  return `另有 ${others.length} 台设备登录着，最近一台 ${esc(ago(last.seen_at))}使用`;
+};
+function renderSessions(box, d, onState) {
+  const name = (x) => [x.browser, x.os].filter((v) => v && v !== 'Other' && v !== 'Unknown').join(' · ') || '未知设备';
+  const where = (x) => [x.ip, [x.country ? country(x.country) : '', x.city].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+  const draw = () => {
+    const others = d.items.filter((x) => !x.current);
+    box.innerHTML = `<p class="set-p">每次登录记一台设备，登录有效期 7 天。发现不认识的设备，可以让它退出，并尽快修改密码。</p>
+      <div class="ses">${d.items.map((x) => `<div class="ses-r${x.current ? ' cur' : ''}">
+        <span class="ses-i">${ic(x.device === 'Mobile' ? 'phone' : x.device === 'Tablet' ? 'tab' : 'desk', 17)}</span>
+        <div class="ses-b"><div class="ses-n"><b>${esc(name(x))}</b>${x.current ? '<span class="pill on">当前设备</span>' : ''}</div>
+          <div class="ses-m"><span data-tipf-always data-tipf="${esc(x.ua || '')}">${esc(where(x)) || '—'}</span></div>
+          <div class="ses-m"><span data-tipf-always data-tipf="${esc(fmtTime(x.created_at))}">登录于 ${esc(ago(x.created_at))}</span> · ${x.current ? '正在使用' : `<span data-tipf-always data-tipf="${esc(fmtTime(x.seen_at))}">最近使用 ${esc(ago(x.seen_at))}</span>`}</div></div>
+        ${x.current ? '' : `<button type="button" class="btn sm" data-out="${esc(x.id)}">${ic('out', 14)}退出</button>`}
+      </div>`).join('')}</div>
+      ${others.length ? `<button type="button" class="btn danger" id="ses-all">${ic('out', 15)}退出其他所有设备</button>` : ''}`;
+    box.querySelectorAll('[data-out]').forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      try {
+        await api(`/sessions/${b.dataset.out}`, { method: 'DELETE' });
+        d = { items: d.items.filter((x) => x.id !== b.dataset.out) }; draw(); onState(d); toast('这台设备已退出登录');
+      } catch (ex) { toast(ex.message, 'bad'); b.disabled = false; }
+    }));
+    const all = box.querySelector('#ses-all');
+    if (all) all.onclick = async () => {
+      const ok = await confirmDialog({ title: '退出其他所有设备？', text: `其他 ${others.length} 台设备需要重新输入密码才能登录。当前设备不受影响。`, ok: '全部退出', danger: true });
+      if (!ok) return;
+      try {
+        const r = await api('/sessions/others', { method: 'DELETE' });
+        d = { items: d.items.filter((x) => x.current) }; draw(); onState(d); toast(`已退出 ${r.n} 台设备`);
+      } catch (ex) { toast(ex.message, 'bad'); }
+    };
+  };
+  draw();
 }
 
 // ---------------------------------------------------------------- Cloudflare 用量
 const FREE_LIMITS = { rowsRead: 5e6, rowsWritten: 1e5, requests: 1e5, storage: 5e9 };
-const wan = (n) => (n >= 1e8 ? `${+(n / 1e8).toFixed(2)} 亿` : n >= 1e4 ? `${+(n / 1e4).toFixed(1)} 万` : num(n));
+const wan = (n) => (EN ? (n >= 1e9 ? `${+(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${+(n / 1e3).toFixed(1)}K` : num(n))
+  : n >= 1e8 ? `${+(n / 1e8).toFixed(2)} 亿` : n >= 1e4 ? `${+(n / 1e4).toFixed(1)} 万` : num(n));
 const bytes = (b) => (b >= 1e9 ? `${+(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${+(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
 const usagePill = (u) => !u.configured ? '<span class="pill off">未配置</span>'
   : u.plan === 'paid' ? '<span class="pill on">付费版</span>' : u.plan === 'free' ? '<span class="pill on">免费版</span>' : '<span class="pill off">套餐未知</span>';
@@ -4875,6 +5415,7 @@ async function renderNotify(token) {
           </div>
         </div>
       </section>
+      <section class="card rv" id="n-hc"></section>
       <section class="card rv" id="n-seo" hidden></section>
       <section class="card rv" id="n-use"></section>
       <div class="sec-row rv" id="n-chans"><h2 class="sec-t">推送渠道</h2><span class="hint">参数只需配置一次，之后用开关控制是否推送</span></div>
@@ -4905,6 +5446,7 @@ async function renderNotify(token) {
       reports: Object.fromEntries(['daily', 'weekly', 'monthly'].map((k) => [k, page.querySelector(`[name=r-${k}]`).checked])),
       usage: { ...st.usage, ...(patch.usage || {}) },
       seo: { ...st.seo, ...(patch.seo || {}) },
+      health: { ...st.health, ...(patch.health || {}) },
       hour: hourBox.value, tz: TZ,
       tg: { ...st.tg, ...(patch.tg || {}) },
       email: { ...st.email, ...(patch.email || {}) },
@@ -4985,9 +5527,22 @@ async function renderNotify(token) {
     };
   };
 
+  const renderHc = () => {
+    const box = document.getElementById('n-hc');
+    box.innerHTML = `<div class="card-h"><span class="chi chi-sm hc-i">${ic('pulse', 16)}</span><h3>目标页异常提醒</h3>
+        <span class="sub">每小时检查一批短链的目标地址，连续 2 次打不开或恢复时推送；对方拦截自动访问（403 / 人机验证）不算打不开</span><span class="sp"></span>
+        <label class="switch"><input type="checkbox" id="h-on" ${st.health?.enabled !== false ? 'checked' : ''} aria-label="开启目标页异常提醒"><span class="t"></span></label></div>
+      <div class="card-b n-use-b"><span class="hint">检查从 Cloudflare 节点发出，只对部分地区开放的地址可能误报。短链列表里会标出“目标异常”，详情页可以手动检查。</span></div>`;
+    box.querySelector('#h-on').onchange = async (e) => {
+      try { await persist({ health: { enabled: e.target.checked } }); toast(e.target.checked ? '目标页异常提醒已开启' : '目标页异常提醒已关闭'); }
+      catch (ex) { e.target.checked = !e.target.checked; toast(ex.message, 'bad'); }
+    };
+  };
+
   const renderStatus = () => {
     renderUse();
     renderSeo();
+    renderHc();
     // 没有开启任何渠道时，上面的开关都不会真的发送：在顶部提示
     const w = document.getElementById('nwarn');
     w.innerHTML = st.tg.enabled || st.email.enabled ? '' : `<div class="nstat warn">${ic('alert', 15)}<span>还没有开启推送渠道，下面的报告和提醒都不会发送。</span>
@@ -4995,7 +5550,7 @@ async function renderNotify(token) {
     const go = document.getElementById('n-go');
     if (go) go.onclick = () => document.getElementById('n-chans').scrollIntoView({ behavior: 'smooth', block: 'start' });
     document.getElementById('nstat').innerHTML = st.status ? `<div class="nstat ${st.status.ok ? 'ok' : 'bad'}">${ic(st.status.ok ? 'check' : 'alert', 15)}
-      上次推送：${fmtTime(st.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报', usage: '用量预警', seo: '每周 SEO 变化' }[st.status.kind] || ''}${st.status.ok ? ' · 发送成功' : ` · 失败：${esc(st.status.error)}`}</div>` : '';
+      上次推送：${fmtTime(st.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报', usage: '用量预警', seo: '每周 SEO 变化', health: '目标页提醒' }[st.status.kind] || ''}${st.status.ok ? ' · 发送成功' : ` · 失败：${esc(st.status.error)}`}</div>` : '';
   };
 
   function renderChannels() {
@@ -5194,6 +5749,88 @@ addEventListener('resize', () => document.querySelectorAll('.seg').forEach(segTh
     });
   }, { passive: true });
 }
+
+// ---------------------------------------------------------------- ⌘K：搜索短链、站点、设置，快速跳转
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const KBAR_SETTINGS = [['pw', 'key', '修改密码'], ['mfa', 'shield', '两步验证'], ['dev', 'desk', '登录设备'], ['trk', 'search', '来源追踪'], ['goo', 'globe', 'Google 集成'],
+  ['ai', 'ai', 'AI 分析链接'], ['use', 'chart', 'Cloudflare 用量'], ['sys', 'pulse', '系统状态'], ['ret', 'inbox', '数据保留']];
+let kbarSites = null;
+function openKbar() {
+  if (document.querySelector('.kbar')) return;
+  const ov = document.createElement('div'); ov.className = 'ov kbar-ov';
+  const d = document.createElement('div'); d.className = 'kbar'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', '搜索和快速跳转');
+  d.innerHTML = `<div class="kbar-q">${ic('search', 17)}<input id="kbar-in" placeholder="搜索短链、站点、设置，或输入命令" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="kbar-l"><kbd>Esc</kbd></div>
+    <div class="kbar-l" id="kbar-l" role="listbox"></div>
+    <div class="kbar-f"><span><kbd>↑</kbd><kbd>↓</kbd>选择</span><span><kbd>↵</kbd>打开</span><span><kbd>Esc</kbd>关闭</span></div>`;
+  const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey, true); };
+  const input = d.querySelector('input'), list = d.querySelector('#kbar-l');
+  let items = [], sel = 0, seq = 0, linkHits = [];
+  const go = (it) => { close(); it.run(); };
+  const pageCmds = [
+    { g: '页面', icon: 'home', t: '概览', k: 'overview home gailan', run: () => (location.hash = '#/') },
+    { g: '页面', icon: 'link', t: '短链', k: 'links duanlian', run: () => (location.hash = '#/links') },
+    { g: '页面', icon: 'globe', t: '站点', k: 'sites seo google zhandian', run: () => (location.hash = '#/sites') },
+    { g: '页面', icon: 'bell', t: '通知', k: 'notify telegram email tongzhi', run: () => (location.hash = '#/notify') },
+    { g: '页面', icon: 'gear', t: '设置', k: 'settings shezhi', run: () => (location.hash = '#/settings') },
+    { g: '操作', icon: 'plus', t: '新建短链', k: 'new create xinjian', run: () => (location.hash = '#/links?new') },
+    { g: '操作', icon: 'globe', t: EN ? '中文界面' : 'English', sub: EN ? 'Switch to Chinese' : '切换到英文界面', k: 'language lang yuyan english chinese zhongwen', run: () => setLang(EN ? 'zh' : 'en') },
+    { g: '操作', icon: 'out', t: '退出登录', k: 'logout signout tuichu', run: () => document.getElementById('logout')?.click() },
+    ...KBAR_SETTINGS.map(([id, icon, t]) => ({ g: '设置', icon, t, k: id, run: () => { store.set('set:open', id); location.hash === '#/settings' ? route() : (location.hash = '#/settings'); } })),
+  ];
+  const match = (it, q) => !q || it.t.toLowerCase().includes(q) || (it.k || '').includes(q) || (it.sub || '').toLowerCase().includes(q);
+  const draw = () => {
+    const q = input.value.trim().toLowerCase();
+    const sites = (kbarSites || []).filter((x) => q && (x.host.includes(q) || (x.name || '').toLowerCase().includes(q))).slice(0, 6)
+      .map((x) => ({ g: '站点', icon: 'globe', t: x.host, sub: x.name && x.name !== x.host ? x.name : '', run: () => (location.hash = '#/site/' + encodeURIComponent(x.host)) }));
+    items = [...linkHits, ...sites, ...pageCmds.filter((it) => match(it, q))];
+    sel = Math.min(sel, Math.max(0, items.length - 1));
+    let lastG = '';
+    list.innerHTML = items.length ? items.map((it, i) => {
+      const head = it.g !== lastG ? `<div class="kbar-g">${it.g}</div>` : '';
+      lastG = it.g;
+      return `${head}<div class="kbar-i${i === sel ? ' on' : ''}" role="option" aria-selected="${i === sel}" data-i="${i}">${ic(it.icon, 15)}<span class="kbar-t">${hl(it.t, q)}</span>${it.sub ? `<span class="kbar-s">${hl(it.sub, q)}</span>` : ''}${it.badge || ''}</div>`;
+    }).join('') : `<div class="kbar-e">没有找到“${esc(input.value.trim())}”</div>`;
+    list.querySelectorAll('[data-i]').forEach((el) => {
+      el.onmousemove = () => { if (sel !== Number(el.dataset.i)) { sel = Number(el.dataset.i); list.querySelectorAll('.kbar-i').forEach((x) => x.classList.toggle('on', x === el)); } };
+      el.onclick = () => go(items[Number(el.dataset.i)]);
+    });
+    list.querySelector('.kbar-i.on')?.scrollIntoView({ block: 'nearest' });
+  };
+  // 短链：输入时按后缀、标题、地址搜索；没输入时显示最近访问的
+  let timer;
+  const searchLinks = () => {
+    clearTimeout(timer);
+    const my = ++seq, q = input.value.trim();
+    timer = setTimeout(async () => {
+      const r = await api(`/links?size=6&${q ? 'q=' + encodeURIComponent(q) : 'sort=last_click'}`).catch(() => ({ items: [] }));
+      if (my !== seq || !d.isConnected) return;
+      linkHits = r.items.map((l) => ({ g: q ? '短链' : '最近访问的短链', icon: 'link', t: '/' + l.slug, sub: l.title || bareUrl(l.target_url),
+        badge: l.enabled ? '' : '<span class="pill off">已停用</span>', run: () => (location.hash = '#/link/' + l.id) }));
+      draw();
+    }, q ? 140 : 0);
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % Math.max(1, items.length);
+      draw();
+    } else if (e.key === 'Enter' && items[sel]) { e.preventDefault(); go(items[sel]); }
+  };
+  input.oninput = () => { sel = 0; draw(); searchLinks(); };
+  ov.onclick = close;
+  document.addEventListener('keydown', onKey, true);
+  document.body.append(ov, d);
+  input.focus();
+  draw(); searchLinks();
+  if (!kbarSites) api('/google/hosts').then((r) => { kbarSites = r.items || []; if (d.isConnected) draw(); }).catch(() => { kbarSites = []; });
+}
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k' && document.querySelector('.shell')) {
+    e.preventDefault();
+    document.querySelector('.kbar') ? document.querySelector('.kbar-ov').click() : openKbar();
+  }
+});
 
 // 列表页的 "/" 快捷键聚焦搜索
 document.addEventListener('keydown', (e) => {

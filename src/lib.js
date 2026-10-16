@@ -106,6 +106,37 @@ export function parseUA(ua) {
   return { browser, os, device, bot };
 }
 
+// 跳转规则里的设备：ios / android / desktop（Windows、macOS、Linux 电脑），其他为 other
+export const DEVICES = ['ios', 'android', 'desktop'];
+export function deviceKey(p) {
+  if (p.os === 'iOS') return 'ios';
+  if (p.os === 'Android') return 'android';
+  if (['Windows', 'macOS', 'Linux'].includes(p.os) && p.device === 'Desktop') return 'desktop';
+  return 'other';
+}
+
+// 选出命中的跳转规则：同时指定国家和设备的优先，其次只指定设备，再次只指定国家；都不命中返回 null（走默认地址）
+export function pickRule(rules, country, device) {
+  const hit = (r) => (!r.countries.length || r.countries.includes(country)) && (!r.devices.length || r.devices.includes(device));
+  const rank = (r) => (r.countries.length && r.devices.length ? 3 : r.devices.length ? 2 : 1);
+  return rules.filter((r) => (r.countries.length || r.devices.length) && hit(r)).sort((a, b) => rank(b) - rank(a) || a.id - b.id)[0] || null;
+}
+
+// A/B 分流：按比例选一个地址。seed 相同（同一访客 + 同一去向）总是选中同一个，访客反复点也不会在几个页面间来回跳
+export function pickArm(weights, seed) {
+  const ws = weights.map((w) => Math.max(0, Number(w) || 0));
+  const total = ws.reduce((a, b) => a + b, 0);
+  if (!total) return 0;
+  let h = 0x811c9dc5;
+  const str = String(seed);
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15;
+  let x = ((h >>> 0) / 4294967296) * total;
+  for (let i = 0; i < ws.length; i++) { if (x < ws[i]) return i; x -= ws[i]; }
+  return ws.length - 1;
+}
+export const ARM_NAMES = ['A', 'B', 'C', 'D', 'E'];
+
 // ---------------------------------------------------------------- 24 小时统计：内存计数工具
 
 export const RAW_COLS = 'link_id, ts, ip, is_bot, kind, proxy, reason, source, referer_host, utm_source, utm_campaign, country, city, device, browser, os, asn, asn_org, rule_id';

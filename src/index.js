@@ -1,11 +1,43 @@
 import ADMIN_HTML from './admin.html';
 import HOME_HTML from './home.html';
 import SCHEMA_SQL from '../schema.sql';
+import ADMIN_EN from './i18n/admin.en.json';
+import HOME_EN from './i18n/home.en.json';
+import { installI18n } from './i18n/client.js';
 import { renderSVG } from 'uqr';
 import { EmailMessage } from 'cloudflare:email';
 import * as google from './google.js';
-import { classifyVisit, parseUA, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast } from './lib.js';
+import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, backfillSourceUv, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
+
+// 后台页面的 ETag（按内容算 FNV-1a 哈希，同一个实例里只算一次）
+// 英文界面：词典 + 翻译脚本，按需加载（中文界面不下载）
+const I18N_JS = {};
+function i18nScript(name) {
+  if (!I18N_JS[name]) {
+    const dict = name === 'home' ? HOME_EN : ADMIN_EN;
+    // 打包工具会给函数包上 __name(...)，浏览器里没有这个函数，补一个空实现
+    const body = `var __name = (f) => f;\n(${installI18n.toString()})(${JSON.stringify(dict)});`;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < body.length; i++) { h ^= body.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    I18N_JS[name] = { body, etag: `"i${(h >>> 0).toString(36)}${body.length.toString(36)}"` };
+  }
+  return I18N_JS[name];
+}
+function i18nResponse(request, name) {
+  const { body, etag } = i18nScript(name);
+  const headers = { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache', etag };
+  if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers });
+  return new Response(body, { headers });
+}
+let adminTag = null;
+function adminEtag(html) {
+  if (adminTag && adminTag.len === html.length) return adminTag.v;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < html.length; i++) { h ^= html.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  adminTag = { len: html.length, v: `"a${(h >>> 0).toString(36)}${html.length.toString(36)}"` };
+  return adminTag.v;
+}
 
 const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
 // 回退检测：访客浏览器内探测地区地址的超时时间
@@ -27,6 +59,8 @@ export default {
 
     try {
       // 首页和 robots.txt 不需要数据库，其余请求先确保表已创建
+      if (path === '/i18n/home.en.js') return i18nResponse(request, 'home');
+      if (path === '/admin/i18n.en.js') return i18nResponse(request, 'admin');
       if (path !== '/' && path !== '' && path !== '/robots.txt') await ensureSchema(env);
       if (path === '/admin' || path === '/admin/' || path.startsWith('/api/')) {
         if (env.ADMIN_HOST && url.hostname !== env.ADMIN_HOST) return notFound();
@@ -34,9 +68,11 @@ export default {
         // 所以不走登录校验，改由签名的 state（只有已登录的后台才能生成，10 分钟有效）保护
         if (path === '/api/google/callback') return await googleCallback(env, url);
         if (path.startsWith('/api/')) return await handleApi(request, env, url);
-        return new Response(ADMIN_HTML.replace('__TURNSTILE_SITEKEY__', env.TURNSTILE_SITEKEY || ''), {
-          headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
-        });
+        // 后台页面按内容生成 ETag：浏览器每次都来确认，没变就返回 304，不用重新下载整个页面
+        const html = ADMIN_HTML.replace('__TURNSTILE_SITEKEY__', env.TURNSTILE_SITEKEY || '');
+        const etag = adminEtag(html);
+        if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { etag, 'cache-control': 'no-cache' } });
+        return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', etag } });
       }
       if (path === '/_fb' && request.method === 'POST') return await recordFallback(request, env);
       if (path === '/t.js') return await trackerScript(env, url);
@@ -60,22 +96,66 @@ export default {
 
   // 定时任务（wrangler.toml 中每小时整点触发）：到了设定时间发送日报 / 周报 / 月报
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runNotifications(env, event.scheduledTime).catch((e) => console.error('notify failed', e)));
-    ctx.waitUntil(runUsageAlert(env).catch((e) => console.error('usage alert failed', e)));
-    ctx.waitUntil((async () => {
-      await ensureSchema(env);
-      await aggregate(env);
-      // 按来源的独立访客：一次性回填旧数据（先于清理明细，每次最多 5 批）
-      for (let i = 0; i < 5; i++) if ((await backfillSourceUv(env).catch((e) => { console.error('suv backfill failed', e); return { done: true }; })).done) break;
-      await pruneClicks(env);
-      await env.DB.prepare('DELETE FROM login_guard WHERE at < ? AND until < ?').bind(Date.now() - 7 * DAY, Date.now()).run();
-      // Google 接口缓存和 AI 报告缓存：只用 1 小时，两天前的清掉
-      await env.DB.prepare('DELETE FROM g_cache WHERE at < ?').bind(Date.now() - 2 * DAY).run();
-      const gsec = await sessionSecret(env);
-      if (await google.googleConfigured(env, gsec)) await google.syncBatch(env, gsec, { limit: 10 }).catch((e) => console.error('google sync failed', e));
-    })().catch((e) => console.error('aggregate / prune failed', e)));
+    ctx.waitUntil(runCron(env, event.scheduledTime));
   },
 };
+
+// ---------------------------------------------------------------- 系统状态（后台“设置 → 系统状态”）
+async function systemStatus(env) {
+  const get = async (k) => (await getSetting(env, k))?.value ?? null;
+  const parse = (v) => { try { return v ? JSON.parse(v) : null; } catch { return null; } };
+  const [cron, mark, suv, nstat, n, accts, sites, cf] = await Promise.all([
+    get('cron_status').then(parse), get('agg_mark'), get('suv_mark'), get('notify_status').then(parse), getNotify(env),
+    env.DB.prepare('SELECT email, error, found_at FROM g_accounts').all().then((r) => r.results).catch(() => []),
+    env.DB.prepare('SELECT COUNT(*) AS n, MAX(synced_at) AS last, SUM(synced_at = 0) AS pending, SUM(error != \'\') AS errors FROM g_sites').first().catch(() => null),
+    cfCreds(env),
+  ]);
+  const health = await env.DB.prepare(
+    `SELECT COUNT(*) AS n, SUM(state = 'down') AS down, MAX(checked_at) AS last FROM url_health WHERE url IN (
+       SELECT target_url FROM links WHERE enabled = 1 AND target_url != ''
+       UNION SELECT t.url FROM link_targets t JOIN links l ON l.id = t.link_id WHERE l.enabled = 1)`
+  ).first().catch(() => null);
+  return {
+    now: Date.now(), cron, aggMark: Number(mark) || null, backfillDone: suv === 'done',
+    google: { accounts: accts.length, accountErrors: accts.filter((a) => a.error).map((a) => ({ email: a.email, error: a.error })), sites: sites?.n || 0, lastSync: sites?.last || null, pending: sites?.pending || 0, siteErrors: sites?.errors || 0 },
+    notify: { channels: [n.tg.enabled && 'Telegram', n.email.enabled && '邮件'].filter(Boolean), last: nstat },
+    usage: { configured: !!cf, alert: !!n.usage.enabled },
+    health: health ? { urls: health.n || 0, down: health.down || 0, last: health.last || null } : null,
+  };
+}
+
+// ---------------------------------------------------------------- 定时任务
+// 每一步单独计时、单独捕获错误（一步失败不影响后面的步骤），结果记在 settings.cron_status，后台“系统状态”里显示
+async function runCron(env, at = Date.now()) {
+  const t0 = Date.now(), steps = {};
+  const step = async (name, fn) => {
+    const s0 = Date.now();
+    try { const info = await fn(); steps[name] = { ok: true, ms: Date.now() - s0, ...(info && typeof info === 'object' ? { info } : {}) }; }
+    catch (e) { console.error(`cron ${name} failed`, e); steps[name] = { ok: false, ms: Date.now() - s0, error: String(e?.message || e).slice(0, 300) }; }
+  };
+  await step('schema', () => ensureSchema(env));
+  await step('aggregate', async () => { const st = await aggregate(env); return { mark: st?.mark || null }; });
+  // 按来源的独立访客：一次性回填旧数据（先于清理明细，每次最多 5 批）
+  await step('backfill', async () => { let r = { done: true }; for (let i = 0; i < 5; i++) { r = await backfillSourceUv(env); if (r.done) break; } return { done: !!r.done }; });
+  await step('prune', async () => ({ deleted: await pruneClicks(env) }));
+  await step('cleanup', async () => {
+    await env.DB.prepare('DELETE FROM login_guard WHERE at < ? AND until < ?').bind(Date.now() - 7 * DAY, Date.now()).run();
+    // Google 接口缓存和 AI 报告缓存：只用 1 小时，两天前的清掉
+    await env.DB.prepare('DELETE FROM g_cache WHERE at < ?').bind(Date.now() - 2 * DAY).run();
+    // 过期的登录设备、一年前的修改记录
+    await env.DB.prepare('DELETE FROM sessions WHERE exp < ?').bind(Date.now()).run();
+    await env.DB.prepare('DELETE FROM link_log WHERE at < ?').bind(Date.now() - 365 * DAY).run();
+  });
+  await step('google', async () => {
+    const gsec = await sessionSecret(env);
+    if (!(await google.googleConfigured(env, gsec))) return { skipped: true };
+    return await google.syncBatch(env, gsec, { limit: 10 });
+  });
+  await step('health', () => runHealthChecks(env));
+  await step('notify', () => runNotifications(env, at));
+  await step('usage', () => runUsageAlert(env));
+  await setSetting(env, 'cron_status', JSON.stringify({ at: t0, ms: Date.now() - t0, steps })).catch(() => {});
+}
 
 // ---------------------------------------------------------------- 首次运行自动建表
 
@@ -104,11 +184,17 @@ async function migrate(env) {
   if (!tcols.includes('fallback')) {
     await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN fallback INTEGER NOT NULL DEFAULT 0').run();
   }
+  if (!tcols.includes('devices')) {
+    await env.DB.prepare("ALTER TABLE link_targets ADD COLUMN devices TEXT NOT NULL DEFAULT ''").run();
+  }
   if (!tcols.includes('fallbacks')) {
     await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN fallbacks INTEGER NOT NULL DEFAULT 0').run();
   }
+  if (!tcols.includes('ab_of')) await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN ab_of INTEGER NOT NULL DEFAULT -1').run();
+  if (!tcols.includes('weight')) await env.DB.prepare('ALTER TABLE link_targets ADD COLUMN weight INTEGER NOT NULL DEFAULT 0').run();
   const lcols = (await env.DB.prepare('PRAGMA table_info(links)').all()).results.map((c) => c.name);
   if (!lcols.includes('utm')) await env.DB.prepare('ALTER TABLE links ADD COLUMN utm INTEGER NOT NULL DEFAULT 0').run();
+  if (!lcols.includes('ab_weight')) await env.DB.prepare('ALTER TABLE links ADD COLUMN ab_weight INTEGER NOT NULL DEFAULT 0').run();
   const gcols = (await env.DB.prepare('PRAGMA table_info(g_sites)').all()).results.map((c) => c.name);
   for (const c of ['ga4_acct', 'gsc_acct']) {
     if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`).run();
@@ -166,21 +252,28 @@ async function handleRedirect(request, env, ctx, url) {
   if (!SLUG_RE.test(slug)) return notFound();
 
   const link = await env.DB.prepare(
-    'SELECT id, slug, target_url, enabled, pass_query, utm, expires_at FROM links WHERE slug = ?'
+    'SELECT id, slug, target_url, enabled, pass_query, utm, expires_at, ab_weight FROM links WHERE slug = ?'
   ).bind(slug).first();
   if (!link || !link.enabled) return notFound();
   if (link.expires_at && link.expires_at < Date.now()) return new Response('Link expired', { status: 410 });
 
-  // 按访问者所在国家 / 地区匹配跳转规则，未命中则用默认地址
+  // 按访问者所在国家 / 地区和设备匹配跳转规则（两者都指定的优先），未命中则用默认地址
   const country = request.cf?.country || '';
-  let rule = null;
-  if (country) {
-    rule = await env.DB.prepare(
-      `SELECT id, url, fallback FROM link_targets WHERE link_id = ? AND (',' || countries || ',') LIKE ?`
-    ).bind(link.id, `%,${country},%`).first();
+  const device = deviceKey(parseUA(request.headers.get('user-agent') || ''));
+  const all = (await env.DB.prepare('SELECT id, url, fallback, countries, devices, ab_of, weight FROM link_targets WHERE link_id = ?').bind(link.id).all()).results
+    .map((r) => ({ ...r, countries: r.countries.split(',').filter(Boolean), devices: (r.devices || '').split(',').filter(Boolean) }));
+  const rules = all.filter((r) => r.ab_of < 0);
+  const rule = rules.length ? pickRule(rules, country, device) : null;
+  // A/B 分流：命中的去向（规则或默认地址）有分流地址时，按比例选一个；同一访客总是去同一个
+  const arms = all.filter((r) => r.ab_of === (rule ? rule.id : 0)).sort((a, b) => a.id - b.id);
+  let arm = null, armIdx = -1;
+  if (arms.length && (rule || link.target_url)) {
+    const ip = request.headers.get('cf-connecting-ip') || '';
+    armIdx = pickArm([rule ? rule.weight : link.ab_weight, ...arms.map((a) => a.weight)], ip ? `${ip}|${link.id}|${rule ? rule.id : 0}` : Math.random());
+    arm = armIdx > 0 ? arms[armIdx - 1] : null;
   }
-  const ruleId = rule ? rule.id : 0;
-  const raw = rule ? rule.url : link.target_url;
+  const ruleId = arm ? arm.id : rule ? rule.id : 0;
+  const raw = arm ? arm.url : rule ? rule.url : link.target_url;
   if (!raw) return notConfigured();
 
   const withQuery = (u) => {
@@ -196,6 +289,8 @@ async function handleRedirect(request, env, ctx, url) {
       t.searchParams.set('utm_source', 'cligc');
       t.searchParams.set('utm_medium', 'shortlink');
       t.searchParams.set('utm_campaign', link.slug);
+      // 参与 A/B 分流时标出是哪个版本，在 GA4 里按 utm_content 对比转化
+      if (armIdx >= 0) t.searchParams.set('utm_content', `ab-${ARM_NAMES[armIdx].toLowerCase()}`);
     }
     return t.toString();
   };
@@ -316,11 +411,23 @@ async function handleApi(request, env, url) {
   if (path === '/api/login' && method === 'POST') return login(request, env);
   if (path === '/api/login/2fa' && method === 'POST') return loginSecondStep(request, env);
   if (path === '/api/logout' && method === 'POST') {
+    const sid = sessionToken(request).split('.')[1];
+    if (sid) await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(sid).run();
     return json({ ok: true }, 200, { 'set-cookie': sessionCookie('', 0) });
   }
 
   const cred = await authedCredential(request, env);
   if (!cred) return json({ error: 'unauthorized' }, 401);
+  const res = await authedApi(request, env, url, cred);
+  if (!cred.renew) return res;
+  const out = new Response(res.body, res);
+  out.headers.append('set-cookie', cred.renew);
+  return out;
+}
+
+async function authedApi(request, env, url, cred) {
+  const path = url.pathname;
+  const method = request.method;
   if (method !== 'GET' && !(request.headers.get('content-type') || '').includes('application/json')) {
     return json({ error: 'content-type must be application/json' }, 415);
   }
@@ -349,6 +456,18 @@ async function handleApi(request, env, url) {
     return json(await trackingInfo(env, url));
   }
   if (path === '/api/2fa' && method === 'GET') return json({ enabled: !!cred.totp, since: cred.totp?.at || null });
+  if (path === '/api/sessions' && method === 'GET') return json(await listSessions(env, cred));
+  if (path === '/api/sessions/others' && method === 'DELETE') {
+    const r = await env.DB.prepare('DELETE FROM sessions WHERE id != ?').bind(cred.sid).run();
+    return json({ ok: true, n: r.meta.changes || 0 });
+  }
+  if (path.startsWith('/api/sessions/') && method === 'DELETE') {
+    const sid = path.slice('/api/sessions/'.length);
+    if (sid === cred.sid) return json({ error: '不能在这里退出当前设备，请用“退出登录”' }, 400);
+    await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(sid).run();
+    return json({ ok: true });
+  }
+  if (path === '/api/status' && method === 'GET') return json(await systemStatus(env));
   // 概览页的“开始使用”清单：各项是否已完成（只读设置，不请求外部接口）
   if (path === '/api/setup' && method === 'GET') {
     const n = await getNotify(env);
@@ -429,9 +548,25 @@ async function handleApi(request, env, url) {
     const tid = t[2] ? Number(t[2]) : null;
     if (!tid && method === 'POST') return saveTarget(request, env, linkId, null);
     if (tid && method === 'PUT') return saveTarget(request, env, linkId, tid);
-    if (tid && method === 'DELETE') return deleteTarget(env, linkId, tid);
+    if (tid && method === 'DELETE') return deleteTarget(request, env, linkId, tid);
   }
+  const sp = path.match(/^\/api\/links\/(\d+)\/split$/);
+  if (sp && method === 'PUT') return saveSplit(request, env, Number(sp[1]));
+  const lg = path.match(/^\/api\/links\/(\d+)\/log(?:\/(\d+)\/revert)?$/);
+  if (lg && !lg[2] && method === 'GET') return json(await listLog(env, Number(lg[1]), url));
+  if (lg && lg[2] && method === 'POST') return revertLog(request, env, Number(lg[1]), Number(lg[2]));
 
+  // 立即检查这个短链的目标地址
+  const hc = path.match(/^\/api\/links\/(\d+)\/check$/);
+  if (hc && method === 'POST') {
+    const id = Number(hc[1]);
+    const l = await env.DB.prepare('SELECT target_url FROM links WHERE id = ?').bind(id).first();
+    if (!l) return json({ error: 'not found' }, 404);
+    const urls = [...new Set([l.target_url, ...(await loadAllTargets(env, id)).map((t) => t.url)].filter(Boolean))];
+    const res = await Promise.all(urls.map((u) => probeUrl(u)));
+    for (let i = 0; i < urls.length; i++) await saveHealth(env, urls[i], res[i]);
+    return json({ results: urls.map((u, i) => ({ url: u, ...res[i] })), health: Object.fromEntries(await healthOf(env, urls)) });
+  }
   const dup = path.match(/^\/api\/links\/(\d+)\/duplicate$/);
   if (dup && method === 'POST') return duplicateLink(request, env, Number(dup[1]));
 
@@ -497,7 +632,7 @@ async function login(request, env) {
     return json({ need2fa: true, ticket: `${exp}.${await hmac(secret, `mfa|${exp}|${cred.stamp}`)}` });
   }
   return json({ ok: true, mustChange: cred.source === 'default' }, 200,
-    { 'set-cookie': sessionCookie(await issueToken(secret, cred), SESSION_TTL / 1000) });
+    { 'set-cookie': sessionCookie(await issueToken(env, request, secret, cred), SESSION_TTL / 1000) });
 }
 
 // 登录第二步：校验动态码
@@ -516,7 +651,7 @@ async function loginSecondStep(request, env) {
     return json({ error: (await mfaFail(env)) || '动态码不正确' }, 401);
   }
   return json({ ok: true, mustChange: false }, 200,
-    { 'set-cookie': sessionCookie(await issueToken(secret, cred), SESSION_TTL / 1000) });
+    { 'set-cookie': sessionCookie(await issueToken(env, request, secret, cred), SESSION_TTL / 1000) });
 }
 
 // ---------------------------------------------------------------- 两步验证（TOTP，RFC 6238）
@@ -545,8 +680,7 @@ async function totpEnable(request, env, cred) {
   await setSetting(env, 'totp', JSON.stringify({ secret: pending.value, at: Date.now(), last: step }));
   await env.DB.prepare("DELETE FROM settings WHERE key = 'totp_pending'").run();
   // 开启后其他会话全部失效，当前浏览器换发新会话
-  const fresh = await credential(env);
-  return json({ ok: true }, 200, { 'set-cookie': sessionCookie(await issueToken(await sessionSecret(env), fresh), SESSION_TTL / 1000) });
+  return json({ ok: true }, 200, { 'set-cookie': await keepOnlyThisSession(env, request, cred) });
 }
 
 async function totpDisable(request, env, cred) {
@@ -562,8 +696,7 @@ async function totpDisable(request, env, cred) {
     return json({ error: (await mfaFail(env)) || '动态码不正确' }, 400);
   }
   await env.DB.prepare("DELETE FROM settings WHERE key = 'totp'").run();
-  const fresh = await credential(env);
-  return json({ ok: true }, 200, { 'set-cookie': sessionCookie(await issueToken(await sessionSecret(env), fresh), SESSION_TTL / 1000) });
+  return json({ ok: true }, 200, { 'set-cookie': await keepOnlyThisSession(env, request, cred) });
 }
 
 // 校验动态码并记录已用的时间片，同一个码不能重复使用
@@ -650,8 +783,7 @@ async function changePassword(request, env, cred) {
 
   await setSetting(env, 'admin_password', JSON.stringify(await hashPassword(next)));
   // 密码变化后，旧会话全部失效；给当前浏览器换发新会话
-  const fresh = await credential(env);
-  return json({ ok: true }, 200, { 'set-cookie': sessionCookie(await issueToken(secret, fresh), SESSION_TTL / 1000) });
+  return json({ ok: true }, 200, { 'set-cookie': await keepOnlyThisSession(env, request, cred) });
 }
 
 /**
@@ -674,22 +806,63 @@ async function credential(env) {
   return { source: 'default', stamp: `default${mfa}`, totp, verify: (pw, secret) => safeEqual(pw, DEFAULT_PASSWORD, secret) };
 }
 
-async function issueToken(secret, cred) {
-  const exp = Date.now() + SESSION_TTL;
-  return `${exp}.${await hmac(secret, `${exp}|${cred.stamp}`)}`;
+// 会话令牌：过期时间.会话 ID.签名。会话 ID 对应 sessions 表里的一台登录设备，删掉那一行该设备即退出
+async function issueToken(env, request, secret, cred, sid = null) {
+  const now = Date.now(), exp = now + SESSION_TTL;
+  if (sid) {
+    await env.DB.prepare('UPDATE sessions SET exp = ? WHERE id = ?').bind(exp, sid).run();
+  } else {
+    sid = toHex(crypto.getRandomValues(new Uint8Array(12)));
+    const cf = request.cf || {};
+    await env.DB.prepare('INSERT INTO sessions (id, created_at, seen_at, exp, ip, country, city, ua) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(sid, now, now, exp, loginIp(request), cf.country || '', cut(cf.city || '', 80), cut(request.headers.get('user-agent') || '', 300)).run();
+  }
+  return `${exp}.${sid}.${await hmac(secret, `${exp}|${sid}|${cred.stamp}`)}`;
 }
 
-// 已登录则返回当前密码信息，否则返回 null
+// 密码或两步验证变了：其他设备全部退出，当前设备换发新令牌（会话 ID 不变）
+async function keepOnlyThisSession(env, request, cred) {
+  await env.DB.prepare('DELETE FROM sessions WHERE id != ?').bind(cred.sid || '').run();
+  return sessionCookie(await issueToken(env, request, await sessionSecret(env), await credential(env), cred.sid), SESSION_TTL / 1000);
+}
+
+const sessionToken = (request) => ((request.headers.get('cookie') || '').match(/(?:^|;\s*)sl_session=([^;]+)/) || [])[1] || '';
+
+// 已登录则返回当前密码信息（带上会话 ID），否则返回 null
 async function authedCredential(request, env) {
-  const cookie = request.headers.get('cookie') || '';
-  const m = cookie.match(/(?:^|;\s*)sl_session=([^;]+)/);
-  if (!m) return null;
-  const [exp, sig] = m[1].split('.');
-  if (!exp || !sig || Number(exp) < Date.now()) return null;
+  const parts = sessionToken(request).split('.');
+  const exp = parts[0];
+  if (!exp || Number(exp) < Date.now() || parts.length < 2) return null;
   const secret = await sessionSecret(env);
   const cred = await credential(env);
-  return (await safeEqual(sig, await hmac(secret, `${exp}|${cred.stamp}`), secret)) ? cred : null;
+  // 旧版令牌（没有会话 ID）：校验通过后补登记为一台设备，并换发新令牌
+  if (parts.length === 2) {
+    if (!(await safeEqual(parts[1], await hmac(secret, `${exp}|${cred.stamp}`), secret))) return null;
+    const token = await issueToken(env, request, secret, cred);
+    cred.sid = token.split('.')[1];
+    cred.renew = sessionCookie(token, SESSION_TTL / 1000);
+    return cred;
+  }
+  const [, sid, sig] = parts;
+  if (!(await safeEqual(sig, await hmac(secret, `${exp}|${sid}|${cred.stamp}`), secret))) return null;
+  const row = await env.DB.prepare('SELECT seen_at FROM sessions WHERE id = ?').bind(sid).first();
+  if (!row) return null;
+  // 最近使用时间最多 5 分钟写一次，省写入
+  if (Date.now() - row.seen_at > 5 * 60000) {
+    const cf = request.cf || {};
+    await env.DB.prepare('UPDATE sessions SET seen_at = ?, ip = ?, country = ?, city = ? WHERE id = ?')
+      .bind(Date.now(), loginIp(request), cf.country || '', cut(cf.city || '', 80), sid).run();
+  }
+  cred.sid = sid;
+  return cred;
 }
+
+// 登录设备列表
+async function listSessions(env, cred) {
+  const rows = (await env.DB.prepare('SELECT id, created_at, seen_at, exp, ip, country, city, ua FROM sessions WHERE exp > ? ORDER BY seen_at DESC').bind(Date.now()).all()).results;
+  return { items: rows.map((r) => ({ ...r, current: r.id === cred.sid, ...pick(parseUA(r.ua), ['browser', 'os', 'device']) })) };
+}
+const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
 
 // 会话签名密钥：优先用 SESSION_SECRET，未设置时首次运行自动生成并保存
 let cachedSecret = null;
@@ -894,6 +1067,7 @@ async function createLink(request, env) {
     data.slug, data.target_url || '', data.title || '', data.note || '',
     data.enabled ?? 1, data.pass_query ?? 0, data.utm ?? 0, data.expires_at ?? null, now, now
   ).first();
+  await addLog(env, request, row.id, 'create', { slug: row.slug, target_url: row.target_url });
   return json(row, 201);
 }
 
@@ -913,11 +1087,20 @@ async function duplicateLink(request, env, id) {
     `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, utm, expires_at, created_at, updated_at)
      VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *`
   ).bind(data.slug, src.target_url, data.title, src.note, src.enabled, src.pass_query, src.utm || 0, src.expires_at, now, now).first();
-  await env.DB.prepare(
-    `INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at)
-     SELECT ?, countries, url, note, fallback, ?, ? FROM link_targets WHERE link_id = ? ORDER BY id`
-  ).bind(row.id, now, now, id).run();
+  // 规则和 A/B 分流地址一起复制：先复制规则，再把分流地址挂到新规则上
+  if (src.ab_weight) await env.DB.prepare('UPDATE links SET ab_weight = ? WHERE id = ?').bind(src.ab_weight, row.id).run();
+  const old = (await env.DB.prepare('SELECT * FROM link_targets WHERE link_id = ? ORDER BY id').bind(id).all()).results;
+  const ids = new Map([[0, 0]]);
+  for (const t of [...old.filter((t) => t.ab_of < 0), ...old.filter((t) => t.ab_of >= 0)]) {
+    if (t.ab_of >= 0 && !ids.has(t.ab_of)) continue;
+    const r = await env.DB.prepare(
+      `INSERT INTO link_targets (link_id, countries, devices, url, note, fallback, ab_of, weight, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+    ).bind(row.id, t.countries, t.devices || '', t.url, t.note, t.fallback, t.ab_of < 0 ? -1 : ids.get(t.ab_of), t.weight || 0, now, now).first();
+    if (t.ab_of < 0) ids.set(t.id, r.id);
+  }
   await env.DB.prepare('INSERT OR IGNORE INTO link_tags (link_id, tag) SELECT ?, tag FROM link_tags WHERE link_id = ?').bind(row.id, id).run();
+  await addLog(env, request, row.id, 'create', { slug: row.slug, target_url: row.target_url, from: src.slug });
   return json(row, 201);
 }
 
@@ -963,9 +1146,11 @@ async function bulkReplace(request, env) {
   if (bad) return json({ error: `替换后 /${bad.slug} 的地址不合法：${bad.to}` }, 400);
 
   const now = Date.now();
-  const stmts = items.map((x) => (x.type === 'link'
-    ? env.DB.prepare('UPDATE links SET target_url = ?, updated_at = ? WHERE id = ?').bind(normalizeUrl(x.to), now, x.id)
-    : env.DB.prepare('UPDATE link_targets SET url = ?, updated_at = ? WHERE id = ?').bind(normalizeUrl(x.to), now, x.id)));
+  const stmts = items.flatMap((x) => (x.type === 'link'
+    ? [env.DB.prepare('UPDATE links SET target_url = ?, updated_at = ? WHERE id = ?').bind(normalizeUrl(x.to), now, x.id),
+      logStmt(env, request, x.id, 'update', { changes: { target_url: [x.from, normalizeUrl(x.to)] }, via: 'replace' })]
+    : [env.DB.prepare('UPDATE link_targets SET url = ?, updated_at = ? WHERE id = ?').bind(normalizeUrl(x.to), now, x.id),
+      logStmt(env, request, x.link_id, 'rule.edit', { before: { id: x.id, url: x.from }, after: { id: x.id, url: normalizeUrl(x.to) }, via: 'replace' })]));
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
   return json({ ...summary, done: true });
 }
@@ -974,14 +1159,23 @@ async function updateLink(request, env, id) {
   const body = await request.json().catch(() => ({}));
   const { error, data } = await validateLinkInput(body, env, id);
   if (error) return json({ error }, 400);
-  const keys = Object.keys(data);
-  if (!keys.length) return json({ error: '没有要更新的字段' }, 400);
-  data.updated_at = Date.now();
+  if (!Object.keys(data).length) return json({ error: '没有要更新的字段' }, 400);
+  const r = await applyLinkUpdate(env, request, id, data);
+  return r.row ? json(r.row) : json({ error: 'not found' }, 404);
+}
+
+// 更新短链字段并记下改了什么（只记真正变化的字段）
+async function applyLinkUpdate(env, request, id, data, extra = {}) {
+  const before = await env.DB.prepare('SELECT * FROM links WHERE id = ?').bind(id).first();
+  if (!before) return {};
   const cols = Object.keys(data);
   const row = await env.DB.prepare(
-    `UPDATE links SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ? RETURNING *`
-  ).bind(...cols.map((c) => data[c]), id).first();
-  return row ? json(row) : json({ error: 'not found' }, 404);
+    `UPDATE links SET ${cols.map((c) => `${c} = ?`).join(', ')}, updated_at = ? WHERE id = ? RETURNING *`
+  ).bind(...cols.map((c) => data[c]), Date.now(), id).first();
+  const changes = Object.fromEntries(cols.filter((c) => LOG_FIELDS.includes(c) && before[c] !== row[c]).map((c) => [c, [before[c], row[c]]]));
+  let logId = null;
+  if (Object.keys(changes).length) logId = await addLog(env, request, id, 'update', { changes, ...extra });
+  return { row, logId };
 }
 
 async function deleteLink(env, id) {
@@ -990,6 +1184,7 @@ async function deleteLink(env, id) {
     env.DB.prepare('DELETE FROM clicks WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM link_targets WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM link_tags WHERE link_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM link_log WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM links WHERE id = ?').bind(id),
   ]);
   return json({ ok: true });
@@ -1016,7 +1211,12 @@ async function bulkLinks(request, env) {
   }
   if (!ids.length) return json({ error: '没有选中短链' }, 400);
   if (b.action === 'enable' || b.action === 'disable') {
-    await env.DB.prepare(`UPDATE links SET enabled = ?, updated_at = ? WHERE id IN (${inIds})`).bind(b.action === 'enable' ? 1 : 0, now, ...ids).run();
+    const v = b.action === 'enable' ? 1 : 0;
+    const changed = (await env.DB.prepare(`SELECT id FROM links WHERE enabled != ? AND id IN (${inIds})`).bind(v, ...ids).all()).results;
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE links SET enabled = ?, updated_at = ? WHERE id IN (${inIds})`).bind(v, now, ...ids),
+      ...changed.map((r) => logStmt(env, request, r.id, 'update', { changes: { enabled: [1 - v, v] }, via: 'bulk' })),
+    ]);
   } else if (b.action === 'delete') {
     for (const id of ids) await deleteLink(env, id);
   } else if (b.action === 'tag' || b.action === 'untag') {
@@ -1033,15 +1233,21 @@ const linkTagList = async (env) => (await env.DB.prepare('SELECT tag, COUNT(*) A
 async function getLink(env, id) {
   const row = await env.DB.prepare('SELECT * FROM links WHERE id = ?').bind(id).first();
   if (!row) return json({ error: 'not found' }, 404);
-  row.targets = await loadTargets(env, id);
+  const all = await loadAllTargets(env, id);
+  row.targets = all.filter((t) => t.ab_of < 0).map((t) => ({ ...t, arms: all.filter((a) => a.ab_of === t.id) }));
+  row.arms = all.filter((a) => a.ab_of === 0);
   row.tags = (await env.DB.prepare('SELECT tag FROM link_tags WHERE link_id = ? ORDER BY tag').bind(id).all()).results.map((r) => r.tag);
+  row.health = Object.fromEntries(await healthOf(env, [row.target_url, ...all.map((t) => t.url)].filter(Boolean)));
   return json(row);
 }
 
-async function loadTargets(env, linkId) {
+// 全部去向（规则 + A/B 分流地址）
+async function loadAllTargets(env, linkId) {
   const r = await env.DB.prepare('SELECT * FROM link_targets WHERE link_id = ? ORDER BY id').bind(linkId).all();
-  return r.results.map((t) => ({ ...t, countries: t.countries.split(',').filter(Boolean) }));
+  return r.results.map((t) => ({ ...t, countries: t.countries.split(',').filter(Boolean), devices: (t.devices || '').split(',').filter(Boolean) }));
 }
+// 只有跳转规则（不含分流地址）
+const loadTargets = async (env, linkId) => (await loadAllTargets(env, linkId)).filter((t) => t.ab_of < 0);
 
 // ---------------------------------------------------------------- 地区跳转规则
 
@@ -1049,35 +1255,198 @@ async function saveTarget(request, env, linkId, tid) {
   const link = await env.DB.prepare('SELECT id FROM links WHERE id = ?').bind(linkId).first();
   if (!link) return json({ error: '短链不存在' }, 404);
   const body = await request.json().catch(() => ({}));
+  const before = tid ? (await loadTargets(env, linkId)).find((t) => t.id === tid) : null;
+  if (tid && !before) return json({ error: 'not found' }, 404);
+  const r = await applyTarget(env, linkId, tid, body);
+  if (r.error) return json(r, 400);
+  if (!before) await addLog(env, request, linkId, 'rule.add', { after: ruleSnap(r.row) });
+  else if (JSON.stringify(ruleSnap(before)) !== JSON.stringify(ruleSnap(r.row))) await addLog(env, request, linkId, 'rule.edit', { before: ruleSnap(before), after: ruleSnap(r.row) });
+  return json(r.row, tid ? 200 : 201);
+}
 
+// 校验并保存一条跳转规则；返回 { row } 或 { error }
+async function applyTarget(env, linkId, tid, body, forceId = null) {
   const url = normalizeUrl(String(body.url || '').trim());
-  if (!url) return json({ error: '目标地址必须是合法的 http / https 地址' }, 400);
+  if (!url) return { error: '目标地址必须是合法的 http / https 地址' };
   const countries = [...new Set((Array.isArray(body.countries) ? body.countries : [])
     .map((c) => String(c).trim().toUpperCase()))];
-  if (!countries.length) return json({ error: '至少选择一个国家 / 地区' }, 400);
-  if (countries.some((c) => !/^[A-Z]{2}$/.test(c))) return json({ error: '国家代码不合法' }, 400);
+  const devices = [...new Set((Array.isArray(body.devices) ? body.devices : []).map(String))].filter((d) => DEVICES.includes(d));
+  if (!countries.length && !devices.length) return { error: '至少选择一个国家 / 地区或设备' };
+  if (countries.some((c) => !/^[A-Z]{2}$/.test(c))) return { error: '国家代码不合法' };
 
-  // 同一个国家只能出现在一条规则里
-  const others = (await loadTargets(env, linkId)).filter((t) => t.id !== tid);
-  const taken = countries.filter((c) => others.some((t) => t.countries.includes(c)));
-  if (taken.length) return json({ error: `这些国家 / 地区已在其他规则中：${taken.join('、')}`, taken }, 400);
+  // 冲突只在同一类规则之间检查（只按国家 / 只按设备 / 两者都有）：不同类按优先级匹配，不冲突
+  const kind = (t) => (t.countries.length && t.devices.length ? 'both' : t.devices.length ? 'device' : 'country');
+  const me = { countries, devices };
+  const others = (await loadTargets(env, linkId)).filter((t) => t.id !== tid && kind(t) === kind(me));
+  // 同一类里：用到的维度都有交集才算重叠（只按国家的看国家，只按设备的看设备，两者都有的两个都看）
+  const inter = (a, b) => a.some((x) => b.includes(x));
+  const clash = others.find((t) => (!countries.length || inter(t.countries, countries)) && (!devices.length || inter(t.devices, devices)));
+  if (clash) {
+    const taken = countries.filter((c) => clash.countries.includes(c));
+    const dTaken = devices.filter((d) => clash.devices.includes(d));
+    const DN = { ios: 'iOS', android: 'Android', desktop: '电脑' };
+    return { error: `和另一条规则重叠：${[...taken, ...dTaken.map((d) => DN[d])].join('、')}`, taken };
+  }
 
   const now = Date.now();
   const note = cut(String(body.note || ''), 200);
   const fallback = body.fallback ? 1 : 0;
   const row = tid
     ? await env.DB.prepare(
-      'UPDATE link_targets SET countries = ?, url = ?, note = ?, fallback = ?, updated_at = ? WHERE id = ? AND link_id = ? RETURNING *'
-    ).bind(countries.join(','), url, note, fallback, now, tid, linkId).first()
+      'UPDATE link_targets SET countries = ?, devices = ?, url = ?, note = ?, fallback = ?, updated_at = ? WHERE id = ? AND link_id = ? RETURNING *'
+    ).bind(countries.join(','), devices.join(','), url, note, fallback, now, tid, linkId).first()
     : await env.DB.prepare(
-      'INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at) VALUES (?,?,?,?,?,?,?) RETURNING *'
-    ).bind(linkId, countries.join(','), url, note, fallback, now, now).first();
-  if (!row) return json({ error: 'not found' }, 404);
-  return json({ ...row, countries }, tid ? 200 : 201);
+      `INSERT INTO link_targets (${forceId ? 'id, ' : ''}link_id, countries, devices, url, note, fallback, weight, created_at, updated_at)
+       VALUES (${forceId ? '?, ' : ''}?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+    ).bind(...(forceId ? [forceId] : []), linkId, countries.join(','), devices.join(','), url, note, fallback, Number(body.weight) || 0, now, now).first();
+  if (!row) return { error: 'not found' };
+  return { row: { ...row, countries, devices } };
 }
 
-async function deleteTarget(env, linkId, tid) {
-  await env.DB.prepare('DELETE FROM link_targets WHERE id = ? AND link_id = ?').bind(tid, linkId).run();
+async function deleteTarget(request, env, linkId, tid) {
+  const all = await loadAllTargets(env, linkId);
+  const t = all.find((x) => x.id === tid && x.ab_of < 0);
+  if (!t) return json({ ok: true });
+  const arms = all.filter((a) => a.ab_of === tid);
+  await env.DB.prepare('DELETE FROM link_targets WHERE link_id = ? AND (id = ? OR ab_of = ?)').bind(linkId, tid, tid).run();
+  await addLog(env, request, linkId, 'rule.del', { before: ruleSnap(t), arms: arms.map(armSnap), weight: t.weight });
+  return json({ ok: true });
+}
+
+// ---------------------------------------------------------------- A/B 分流
+// 一个去向（默认地址 parent = 0，或规则 parent = 规则 ID）按比例分到多个地址。
+// 原地址是 A，分流地址按顺序是 B、C……；分流地址也存在 link_targets 里（ab_of = parent），命中统计沿用规则统计。
+const MAX_ARMS = 4;
+async function saveSplit(request, env, linkId) {
+  const body = await request.json().catch(() => ({}));
+  const r = await applySplit(env, linkId, body);
+  if (r.error) return json(r, 400);
+  if (JSON.stringify(r.before) !== JSON.stringify(r.after)) await addLog(env, request, linkId, 'split', { parent: r.parent, before: r.before, after: r.after });
+  return json({ ok: true });
+}
+
+async function splitState(env, linkId, parent) {
+  const all = await loadAllTargets(env, linkId);
+  const weight = parent ? all.find((t) => t.id === parent)?.weight : (await env.DB.prepare('SELECT ab_weight FROM links WHERE id = ?').bind(linkId).first('ab_weight'));
+  return { weight: Number(weight) || 0, arms: all.filter((a) => a.ab_of === parent).map(armSnap) };
+}
+
+// body: { parent, weight, arms: [{ id?, url, weight, note }] }；arms 为空表示取消分流
+async function applySplit(env, linkId, body, keepIds = false) {
+  const link = await env.DB.prepare('SELECT id, target_url FROM links WHERE id = ?').bind(linkId).first();
+  if (!link) return { error: '短链不存在' };
+  const parent = Math.max(0, parseInt(body.parent, 10) || 0);
+  const all = await loadAllTargets(env, linkId);
+  if (parent && !all.some((t) => t.id === parent && t.ab_of < 0)) return { error: '规则不存在' };
+  if (!parent && !link.target_url) return { error: '请先设置默认地址' };
+  const arms = (Array.isArray(body.arms) ? body.arms : []).slice(0, MAX_ARMS + 1);
+  if (arms.length > MAX_ARMS) return { error: `最多再加 ${MAX_ARMS} 个分流地址` };
+  const clean = [];
+  for (const a of arms) {
+    const url = normalizeUrl(String(a.url || '').trim());
+    if (!url) return { error: '分流地址必须是合法的 http / https 地址' };
+    const w = Math.round(Number(a.weight));
+    if (!(w >= 1 && w <= 100)) return { error: '比例必须是 1–100' };
+    clean.push({ id: Number(a.id) || null, url, weight: w, note: cut(String(a.note || ''), 200) });
+  }
+  const weight = clean.length ? Math.round(Number(body.weight)) : 0;
+  if (clean.length && !(weight >= 1 && weight <= 100)) return { error: '比例必须是 1–100' };
+  const before = await splitState(env, linkId, parent);
+  const mine = new Set(all.filter((a) => a.ab_of === parent).map((a) => a.id));
+  const now = Date.now();
+  const stmts = [
+    parent ? env.DB.prepare('UPDATE link_targets SET weight = ?, updated_at = ? WHERE id = ?').bind(weight, now, parent)
+      : env.DB.prepare('UPDATE links SET ab_weight = ?, updated_at = ? WHERE id = ?').bind(weight, now, linkId),
+  ];
+  const keep = new Set(clean.filter((a) => a.id && mine.has(a.id)).map((a) => a.id));
+  for (const id of mine) if (!keep.has(id)) stmts.push(env.DB.prepare('DELETE FROM link_targets WHERE id = ?').bind(id));
+  for (const a of clean) {
+    if (a.id && mine.has(a.id)) {
+      stmts.push(env.DB.prepare('UPDATE link_targets SET url = ?, weight = ?, note = ?, updated_at = ? WHERE id = ?').bind(a.url, a.weight, a.note, now, a.id));
+    } else {
+      // 撤销时尽量用回原来的 ID，命中统计能接上
+      const reuse = keepIds && a.id && !all.some((t) => t.id === a.id);
+      stmts.push(env.DB.prepare(
+        `INSERT INTO link_targets (${reuse ? 'id, ' : ''}link_id, countries, devices, url, note, fallback, ab_of, weight, created_at, updated_at)
+         VALUES (${reuse ? '?, ' : ''}?, '', '', ?, ?, 0, ?, ?, ?, ?)`
+      ).bind(...(reuse ? [a.id] : []), linkId, a.url, a.note, parent, a.weight, now, now));
+    }
+  }
+  await env.DB.batch(stmts);
+  return { parent, before, after: await splitState(env, linkId, parent) };
+}
+
+// ---------------------------------------------------------------- 修改记录
+const LOG_FIELDS = ['slug', 'target_url', 'title', 'note', 'enabled', 'pass_query', 'utm', 'expires_at'];
+const ruleSnap = (t) => ({ id: t.id, countries: t.countries, devices: t.devices, url: t.url, note: t.note, fallback: t.fallback });
+const armSnap = (a) => ({ id: a.id, url: a.url, weight: a.weight, note: a.note });
+
+function logStmt(env, request, linkId, action, data) {
+  return env.DB.prepare('INSERT INTO link_log (link_id, at, action, data, ip, ua) VALUES (?, ?, ?, ?, ?, ?) RETURNING id')
+    .bind(linkId, Date.now(), action, JSON.stringify(data), request ? loginIp(request) : '', request ? cut(request.headers.get('user-agent') || '', 300) : '');
+}
+async function addLog(env, request, linkId, action, data) {
+  return (await logStmt(env, request, linkId, action, data).first())?.id ?? null;
+}
+
+async function listLog(env, linkId, url) {
+  const before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
+  const rows = (await env.DB.prepare('SELECT * FROM link_log WHERE link_id = ? AND id < ? ORDER BY id DESC LIMIT 31').bind(linkId, before).all()).results;
+  return {
+    items: rows.slice(0, 30).map((r) => ({ ...r, data: JSON.parse(r.data || '{}'), ...pick(parseUA(r.ua), ['browser', 'os']), ua: undefined })),
+    more: rows.length > 30,
+  };
+}
+
+// 撤销一条修改：只撤销之后没有再被改过的部分；撤销本身也记一条
+async function revertLog(request, env, linkId, logId) {
+  const e = await env.DB.prepare('SELECT * FROM link_log WHERE id = ? AND link_id = ?').bind(logId, linkId).first();
+  if (!e) return json({ error: '记录不存在' }, 404);
+  if (e.reverted) return json({ error: '这条修改已经撤销过了' }, 400);
+  const d = JSON.parse(e.data || '{}');
+  const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const conflict = () => json({ error: '之后又被修改过，不能直接撤销。可以手动改回去。' }, 409);
+  let newId = null;
+  if (e.action === 'update') {
+    const cur = await env.DB.prepare('SELECT * FROM links WHERE id = ?').bind(linkId).first();
+    if (!cur) return json({ error: '短链不存在' }, 404);
+    const back = Object.fromEntries(Object.entries(d.changes || {}).filter(([f, [, nv]]) => same(cur[f], nv)).map(([f, [ov]]) => [f, ov]));
+    if (!Object.keys(back).length) return conflict();
+    if (back.slug !== undefined) {
+      const { error } = await validateLinkInput({ slug: back.slug }, env, linkId);
+      if (error) return json({ error }, 400);
+    }
+    newId = (await applyLinkUpdate(env, request, linkId, back, { revertOf: e.id })).logId;
+  } else if (e.action === 'rule.edit') {
+    const cur = (await loadTargets(env, linkId)).find((t) => t.id === d.before.id);
+    if (!cur) return json({ error: '这条规则已经删除了' }, 409);
+    const fields = Object.keys(d.before).filter((f) => f !== 'id');
+    if (!fields.every((f) => same(cur[f], d.after[f]))) return conflict();
+    const r = await applyTarget(env, linkId, cur.id, { ...cur, ...d.before });
+    if (r.error) return json(r, 400);
+    newId = await addLog(env, request, linkId, 'rule.edit', { before: ruleSnap(cur), after: ruleSnap(r.row), revertOf: e.id });
+  } else if (e.action === 'rule.add') {
+    const cur = (await loadTargets(env, linkId)).find((t) => t.id === d.after.id);
+    if (!cur) return json({ error: '这条规则已经删除了' }, 409);
+    if (!same(ruleSnap(cur), d.after)) return conflict();
+    const arms = (await loadAllTargets(env, linkId)).filter((a) => a.ab_of === cur.id);
+    await env.DB.prepare('DELETE FROM link_targets WHERE link_id = ? AND (id = ? OR ab_of = ?)').bind(linkId, cur.id, cur.id).run();
+    newId = await addLog(env, request, linkId, 'rule.del', { before: ruleSnap(cur), arms: arms.map(armSnap), weight: cur.weight, revertOf: e.id });
+  } else if (e.action === 'rule.del') {
+    // 用原来的规则 ID 恢复，之前的命中统计能接上
+    const taken = await env.DB.prepare('SELECT 1 FROM link_targets WHERE id = ?').bind(d.before.id).first();
+    const r = await applyTarget(env, linkId, null, d.before, taken ? null : d.before.id);
+    if (r.error) return json(r, 400);
+    if (d.arms?.length) await applySplit(env, linkId, { parent: r.row.id, weight: d.weight || 50, arms: d.arms }, true);
+    newId = await addLog(env, request, linkId, 'rule.add', { after: ruleSnap(r.row), revertOf: e.id });
+  } else if (e.action === 'split') {
+    const cur = await splitState(env, linkId, d.parent);
+    if (!same(cur, d.after)) return conflict();
+    const r = await applySplit(env, linkId, { parent: d.parent, weight: d.before.weight, arms: d.before.arms }, true);
+    if (r.error) return json(r, 400);
+    newId = await addLog(env, request, linkId, 'split', { parent: d.parent, before: r.before, after: r.after, revertOf: e.id });
+  } else return json({ error: '这类记录不能撤销' }, 400);
+  await env.DB.prepare('UPDATE link_log SET reverted = ? WHERE id = ?').bind(newId || -1, e.id).run();
   return json({ ok: true });
 }
 
@@ -1111,7 +1480,8 @@ async function listLinks(env, url) {
   const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
   const [total, rows] = await Promise.all([
     env.DB.prepare(`SELECT COUNT(*) AS n FROM links ${where}`).bind(...params).first('n'),
-    env.DB.prepare(`SELECT *, (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id) AS rules
+    env.DB.prepare(`SELECT *, (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id AND t.ab_of < 0) AS rules,
+      (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id AND t.ab_of >= 0) AS arms
       FROM links ${where} ORDER BY ${order} LIMIT ${size} OFFSET ${(page - 1) * size}`)
       .bind(...params).all(),
   ]);
@@ -1142,14 +1512,20 @@ async function listLinks(env, url) {
 
     // 地区规则摘要（列表里鼠标悬停显示）
     const rules = await env.DB.prepare(
-      `SELECT link_id, countries, url FROM link_targets WHERE link_id IN (${ids.map(() => '?').join(',')}) ORDER BY id`
+      `SELECT link_id, countries, devices, url, ab_of FROM link_targets WHERE link_id IN (${ids.map(() => '?').join(',')}) ORDER BY id`
     ).bind(...ids).all();
     for (const l of items) {
       l.ruleList = rules.results.filter((r) => r.link_id === l.id)
-        .map((r) => ({ countries: r.countries.split(',').filter(Boolean), url: r.url }));
+        .map((r) => ({ countries: r.countries.split(',').filter(Boolean), devices: (r.devices || '').split(',').filter(Boolean), url: r.url, ab: r.ab_of >= 0 }));
     }
     const tg = (await env.DB.prepare(`SELECT link_id, tag FROM link_tags WHERE link_id IN (${ids.map(() => '?').join(',')}) ORDER BY tag`).bind(...ids).all()).results;
     for (const l of items) l.tags = tg.filter((t) => t.link_id === l.id).map((t) => t.tag);
+    // 目标页检查：列出打不开的地址
+    const hm = await healthOf(env, [...new Set(items.flatMap((l) => [l.target_url, ...l.ruleList.map((r) => r.url)]).filter(Boolean))]);
+    for (const l of items) {
+      const urls = [l.target_url, ...l.ruleList.map((r) => r.url)].filter(Boolean);
+      l.down = urls.filter((u) => hm.get(u)?.state === 'down').map((u) => ({ url: u, error: hm.get(u).error, since: hm.get(u).since }));
+    }
   }
   return json({ total, page, size, items, tags: await linkTagList(env) });
 }
@@ -1847,6 +2223,7 @@ const NOTIFY_DEFAULT = {
   reports: { daily: true, weekly: true, monthly: false },
   usage: { enabled: false, threshold: 80 },   // Cloudflare 用量预警
   seo: { enabled: false, tag: '' },           // 每周 SEO 变化（tag：只看某个分组）
+  health: { enabled: true },                  // 目标页打不开 / 恢复时提醒
   hour: 9, tz: 480, base: '',
   tg: { enabled: false, token: '', chat: '' },
   email: { enabled: false, provider: 'resend', key: '', from: '', to: '' },
@@ -1860,6 +2237,7 @@ async function getNotify(env) {
     reports: { ...NOTIFY_DEFAULT.reports, ...(v.reports || {}) },
     usage: { ...NOTIFY_DEFAULT.usage, ...(v.usage || {}) },
     seo: { ...NOTIFY_DEFAULT.seo, ...(v.seo || {}) },
+    health: { ...NOTIFY_DEFAULT.health, ...(v.health || {}) },
     tg: { ...NOTIFY_DEFAULT.tg, ...(v.tg || {}) },
     email: { ...NOTIFY_DEFAULT.email, ...(v.email || {}) },
   };
@@ -1890,6 +2268,7 @@ async function saveNotify(request, env, url) {
   const tz = Number(body.tz);
   const next = {
     reports: { daily: !!body.reports?.daily, weekly: !!body.reports?.weekly, monthly: !!body.reports?.monthly },
+    health: { enabled: body.health ? !!body.health.enabled : cur.health.enabled },
     seo: {
       enabled: body.seo ? !!body.seo.enabled : cur.seo.enabled,
       tag: body.seo ? cut(String(body.seo.tag || '').trim(), 40) : cur.seo.tag,
@@ -2251,4 +2630,129 @@ function notFound() {
 
 function cut(s, n) {
   return s.length > n ? s.slice(0, n) : s;
+}
+
+// ---------------------------------------------------------------- 目标页健康检查
+// 定时任务每小时检查一批目标地址（启用中的短链的默认地址和跳转规则地址），每个地址至少 6 小时查一次，刚失败的 1 小时后复查。
+// 404 / 410 / 5xx / 连接失败 / 超时连续 2 次才算“打不开”；401 / 403 / 429 和 Cloudflare 质询页算“无法验证”（对方拦截了自动访问），不报警。
+// 状态从正常变成打不开、或从打不开恢复时，推送到已开启的通知渠道。
+const HEALTH_BATCH = 25, HEALTH_EVERY = 6 * 3600000, HEALTH_RETRY = 3600000, HEALTH_TIMEOUT = 10000;
+
+async function healthUrls(env) {
+  return (await env.DB.prepare(
+    `SELECT target_url AS url FROM links WHERE enabled = 1 AND target_url != ''
+     UNION SELECT t.url FROM link_targets t JOIN links l ON l.id = t.link_id WHERE l.enabled = 1`
+  ).all()).results.map((r) => r.url);
+}
+
+// 检查一个地址，返回 { state, status, error, ms }
+async function probeUrl(url) {
+  const t0 = Date.now();
+  try {
+    const res = await fetch(url, {
+      method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(HEALTH_TIMEOUT),
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; cligc-link-healthcheck/1.0; +https://github.com/ccvar/cligc_link)', accept: 'text/html,*/*' },
+    });
+    res.body?.cancel().catch(() => {});
+    const ms = Date.now() - t0, st = res.status;
+    const challenge = res.headers.get('cf-mitigated') === 'challenge';
+    if (st < 400) return { state: 'ok', status: st, error: '', ms };
+    if (challenge || st === 401 || st === 403 || st === 429) return { state: 'blocked', status: st, error: challenge ? '对方开启了人机验证' : `HTTP ${st}（对方拒绝了自动访问）`, ms };
+    return { state: 'down', status: st, error: st === 404 || st === 410 ? `页面不存在（HTTP ${st}）` : `HTTP ${st}`, ms };
+  } catch (e) {
+    const ms = Date.now() - t0;
+    return { state: 'down', status: 0, error: e?.name === 'TimeoutError' ? `${HEALTH_TIMEOUT / 1000} 秒内没有响应` : `连接失败：${String(e?.message || e).slice(0, 120)}`, ms };
+  }
+}
+
+// 写入检查结果；返回状态变化（'down' 新打不开 / 'up' 恢复 / null）
+async function saveHealth(env, url, r) {
+  const old = await env.DB.prepare('SELECT * FROM url_health WHERE url = ?').bind(url).first();
+  const now = Date.now();
+  const fails = r.state === 'down' ? (old?.fails || 0) + 1 : 0;
+  // 连续 2 次失败才确认打不开；第一次失败先保持原状态
+  const state = r.state === 'down' ? (fails >= 2 ? 'down' : old?.state === 'down' ? 'down' : old?.state || 'unknown') : r.state;
+  const since = old && old.state === state ? old.since : now;
+  await env.DB.prepare(
+    `INSERT INTO url_health (url, state, status, error, ms, fails, checked_at, since) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(url) DO UPDATE SET state = excluded.state, status = excluded.status, error = excluded.error, ms = excluded.ms,
+       fails = excluded.fails, checked_at = excluded.checked_at, since = excluded.since`
+  ).bind(url, state, r.status, r.error, r.ms, fails, now, since).run();
+  if (state === 'down' && old?.state !== 'down') return 'down';
+  if (old?.state === 'down' && state === 'ok') return 'up';
+  return null;
+}
+
+async function runHealthChecks(env) {
+  const urls = await healthUrls(env);
+  const set = new Set(urls);
+  // 不再使用的地址：清掉记录
+  const known = (await env.DB.prepare('SELECT url, checked_at, fails FROM url_health').all()).results;
+  const gone = known.filter((r) => !set.has(r.url));
+  for (let i = 0; i < gone.length; i += 50) await env.DB.batch(gone.slice(i, i + 50).map((r) => env.DB.prepare('DELETE FROM url_health WHERE url = ?').bind(r.url)));
+  const at = new Map(known.map((r) => [r.url, r]));
+  const now = Date.now();
+  const due = urls.filter((u) => { const r = at.get(u); return !r || now - r.checked_at > (r.fails ? HEALTH_RETRY : HEALTH_EVERY) - 60000; })
+    .sort((a, b) => (at.get(a)?.checked_at || 0) - (at.get(b)?.checked_at || 0)).slice(0, HEALTH_BATCH);
+  const changes = [];
+  for (let i = 0; i < due.length; i += 5) {
+    const part = due.slice(i, i + 5);
+    const res = await Promise.all(part.map((u) => probeUrl(u)));
+    for (let j = 0; j < part.length; j++) {
+      const c = await saveHealth(env, part[j], res[j]);
+      if (c) changes.push({ url: part[j], change: c, ...res[j] });
+    }
+  }
+  if (changes.length) await notifyHealth(env, changes).catch((e) => console.error('health notify failed', e));
+  return { checked: due.length, total: urls.length, changes: changes.length };
+}
+
+// 推送：哪些地址打不开 / 恢复了，以及受影响的短链
+async function notifyHealth(env, changes) {
+  const cfg = await getNotify(env);
+  if (!cfg.health.enabled || (!cfg.tg.enabled && !cfg.email.enabled)) return;
+  const users = await healthUsers(env, changes.map((c) => c.url));
+  const h = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const down = changes.filter((c) => c.change === 'down'), up = changes.filter((c) => c.change === 'up');
+  const line = (c) => `${c.url}\n    ${c.change === 'down' ? c.error : '已恢复'} · 短链：${(users.get(c.url) || []).map((s) => '/' + s).join('、') || '—'}`;
+  const title = down.length ? `目标页打不开 · ${down.length} 个地址` : `目标页已恢复 · ${up.length} 个地址`;
+  const admin = cfg.base ? `${cfg.base}/admin#/links` : '';
+  const tg = [`${down.length ? '🚨' : '✅'} <b>${h(title)}</b>`, '',
+    ...(down.length ? ['<b>打不开</b>', ...down.map((c) => h(line(c))), ''] : []),
+    ...(up.length ? ['<b>已恢复</b>', ...up.map((c) => h(line(c))), ''] : []),
+    '检查从 Cloudflare 节点发出；只对部分地区开放的地址可能误报。', admin ? `<a href="${h(admin)}">查看短链 →</a>` : ''].filter((x) => x !== '').join('\n');
+  const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e3e6ec;border-radius:16px"><tr><td style="padding:28px">
+<div style="font-size:13px;color:#868e9e">cligc link · 目标页检查</div><h1 style="margin:6px 0 18px;font-size:20px;color:#0b1020">${h(title)}</h1>
+${changes.map((c) => `<div style="padding:12px 14px;margin-bottom:8px;border-radius:10px;background:${c.change === 'down' ? '#fff1f0' : '#ecf8f1'}">
+  <div style="font-size:13px;font-weight:600;color:#0b1020;word-break:break-all">${h(c.url)}</div>
+  <div style="font-size:12.5px;color:#454d5e;margin-top:4px">${h(c.change === 'down' ? c.error : '已恢复')} · 短链：${h((users.get(c.url) || []).map((s) => '/' + s).join('、') || '—')}</div></div>`).join('')}
+<p style="margin:14px 0 0;font-size:12.5px;color:#868e9e">检查从 Cloudflare 节点发出；只对部分地区开放的地址可能误报。</p>
+${admin ? `<p style="margin:20px 0 0"><a href="${h(admin)}" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#0b1020;color:#fff;text-decoration:none;font-size:14px">查看短链</a></p>` : ''}
+</td></tr></table></body></html>`;
+  const report = { title, tg, html, text: tg.replace(/<[^>]+>/g, '') };
+  const errors = [];
+  if (cfg.tg.enabled) await sendTelegram(cfg.tg, report.tg).catch((e) => errors.push(e.message));
+  if (cfg.email.enabled) await sendEmail(env, cfg.email, report).catch((e) => errors.push(e.message));
+  await setSetting(env, 'notify_status', JSON.stringify({ at: Date.now(), kind: 'health', ok: !errors.length, error: errors.join('；') }));
+}
+
+// 用到这些地址的短链后缀
+async function healthUsers(env, urls) {
+  if (!urls.length) return new Map();
+  const q = urls.map(() => '?').join(',');
+  const rows = (await env.DB.prepare(
+    `SELECT target_url AS url, slug FROM links WHERE target_url IN (${q})
+     UNION SELECT t.url, l.slug FROM link_targets t JOIN links l ON l.id = t.link_id WHERE t.url IN (${q})`
+  ).bind(...urls, ...urls).all()).results;
+  const m = new Map();
+  for (const r of rows) { if (!m.has(r.url)) m.set(r.url, []); if (!m.get(r.url).includes(r.slug)) m.get(r.url).push(r.slug); }
+  return m;
+}
+
+// 一个短链的目标地址的检查结果（短链列表 / 详情用）
+async function healthOf(env, urls) {
+  if (!urls.length) return new Map();
+  const rows = (await env.DB.prepare(`SELECT * FROM url_health WHERE url IN (${urls.map(() => '?').join(',')})`).bind(...urls).all().catch(() => ({ results: [] }))).results;
+  return new Map(rows.map((r) => [r.url, { state: r.state, status: r.status, error: r.error, ms: r.ms, checkedAt: r.checked_at, since: r.since }]));
 }

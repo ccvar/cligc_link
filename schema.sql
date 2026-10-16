@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS links (
   enabled     INTEGER NOT NULL DEFAULT 1,
   pass_query  INTEGER NOT NULL DEFAULT 0,  -- 是否把短链上的查询参数透传给目标地址
   utm         INTEGER NOT NULL DEFAULT 0,  -- 转化追踪：跳转时加上 utm_source=cligc&utm_medium=shortlink&utm_campaign=<后缀>
+  ab_weight   INTEGER NOT NULL DEFAULT 0,  -- 默认地址参与 A/B 分流时它自己的比例
   expires_at  INTEGER,                     -- 过期时间（毫秒时间戳），NULL 为永久
   clicks      INTEGER NOT NULL DEFAULT 0,
   last_click  INTEGER,
@@ -52,11 +53,14 @@ CREATE INDEX IF NOT EXISTS idx_clicks_ts ON clicks(ts);
 CREATE TABLE IF NOT EXISTS link_targets (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   link_id     INTEGER NOT NULL,
-  countries   TEXT NOT NULL,              -- 逗号分隔的 ISO 国家代码，如 "HK,MO,TW"
+  countries   TEXT NOT NULL,              -- 逗号分隔的 ISO 国家代码，如 "HK,MO,TW"；为空表示不限国家
+  devices     TEXT NOT NULL DEFAULT '',   -- 逗号分隔的设备：ios / android / desktop；为空表示不限设备
   url         TEXT NOT NULL,
   note        TEXT NOT NULL DEFAULT '',
   fallback    INTEGER NOT NULL DEFAULT 0, -- 1 = 访客打不开该地址时回退到默认地址
   fallbacks   INTEGER NOT NULL DEFAULT 0, -- 累计回退次数
+  ab_of       INTEGER NOT NULL DEFAULT -1, -- A/B 分流：-1 = 普通规则；0 = 默认地址的分流地址；n = 规则 n 的分流地址（沿用该规则的国家 / 设备）
+  weight      INTEGER NOT NULL DEFAULT 0, -- A/B 分流的比例（普通规则表示它自己的比例，分流地址表示该地址的比例）
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL,
   FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE
@@ -187,3 +191,39 @@ CREATE TABLE IF NOT EXISTS link_tags (
   PRIMARY KEY (link_id, tag)
 );
 CREATE INDEX IF NOT EXISTS idx_link_tags_tag ON link_tags(tag);
+-- 目标页健康检查：每个目标地址一行（默认地址和跳转规则的地址）
+CREATE TABLE IF NOT EXISTS url_health (
+  url         TEXT PRIMARY KEY,
+  state       TEXT NOT NULL DEFAULT 'unknown',   -- ok / down / blocked（对方拒绝自动访问，无法确认）/ unknown
+  status      INTEGER NOT NULL DEFAULT 0,        -- 最后一次的 HTTP 状态码，0 = 连接失败 / 超时
+  error       TEXT NOT NULL DEFAULT '',
+  ms          INTEGER NOT NULL DEFAULT 0,
+  fails       INTEGER NOT NULL DEFAULT 0,        -- 连续失败次数（连续 2 次才算打不开）
+  checked_at  INTEGER NOT NULL DEFAULT 0,
+  since       INTEGER NOT NULL DEFAULT 0         -- 当前状态从什么时候开始
+);
+
+-- 登录设备：每次登录一条，Cookie 里带会话 ID；删除即让该设备退出
+CREATE TABLE IF NOT EXISTS sessions (
+  id          TEXT PRIMARY KEY,
+  created_at  INTEGER NOT NULL,
+  seen_at     INTEGER NOT NULL,           -- 最近一次使用（最多 5 分钟更新一次）
+  exp         INTEGER NOT NULL,
+  ip          TEXT NOT NULL DEFAULT '',
+  country     TEXT NOT NULL DEFAULT '',
+  city        TEXT NOT NULL DEFAULT '',
+  ua          TEXT NOT NULL DEFAULT ''
+);
+
+-- 短链修改记录：谁在什么时候改了什么，可一键撤销
+CREATE TABLE IF NOT EXISTS link_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  link_id     INTEGER NOT NULL,
+  at          INTEGER NOT NULL,
+  action      TEXT NOT NULL,              -- create / update / rule.add / rule.edit / rule.del / split / replace / revert
+  data        TEXT NOT NULL DEFAULT '{}', -- 修改前后的内容（JSON）
+  ip          TEXT NOT NULL DEFAULT '',
+  ua          TEXT NOT NULL DEFAULT '',
+  reverted    INTEGER NOT NULL DEFAULT 0  -- 已撤销时为撤销记录的 id
+);
+CREATE INDEX IF NOT EXISTS idx_link_log_link ON link_log(link_id, at);

@@ -652,7 +652,7 @@ async function siteLinks(env, hosts, days) {
   const { from, to, pfrom } = ranges(days);
   const [links, rules, counts, daily] = await Promise.all([
     env.DB.prepare('SELECT id, slug, title, target_url FROM links').all().then((r) => r.results),
-    env.DB.prepare('SELECT id, link_id, url, countries FROM link_targets').all().then((r) => r.results),
+    env.DB.prepare('SELECT id, link_id, url, countries, devices, ab_of FROM link_targets').all().then((r) => r.results),
     env.DB.prepare(
       `SELECT link_id, k, machine, SUM(CASE WHEN day >= ? THEN n ELSE 0 END) AS cur, SUM(CASE WHEN day < ? THEN n ELSE 0 END) AS prev
        FROM agg_d WHERE dim = 'rule' AND day >= ? AND day <= ? GROUP BY link_id, k, machine`
@@ -670,8 +670,14 @@ async function siteLinks(env, hosts, days) {
   const byId = new Map(links.map((l) => [l.id, l]));
   // 每个去向：短链 + 规则 → 站点
   const routes = [];
-  for (const l of links) if (l.target_url) routes.push({ link: l, rule: '0', url: l.target_url, countries: '' });
-  for (const r of rules) if (byId.has(r.link_id)) routes.push({ link: byId.get(r.link_id), rule: String(r.id), url: r.url, countries: r.countries });
+  for (const l of links) if (l.target_url) routes.push({ link: l, rule: '0', url: l.target_url, countries: '', devices: '' });
+  // A/B 分流地址沿用所属去向（默认地址或规则）的国家 / 设备
+  const ruleById = new Map(rules.map((r) => [r.id, r]));
+  for (const r of rules) {
+    if (!byId.has(r.link_id)) continue;
+    const p = r.ab_of > 0 ? ruleById.get(r.ab_of) : r.ab_of === 0 ? null : r;
+    routes.push({ link: byId.get(r.link_id), rule: String(r.id), url: r.url, countries: p?.countries || '', devices: p?.devices || '', ab: r.ab_of >= 0, parent: r.ab_of > 0 ? r.ab_of : 0 });
+  }
   const cnt = new Map();
   for (const c of counts) {
     const key = `${c.link_id}|${c.k}`;
@@ -689,7 +695,7 @@ async function siteLinks(env, hosts, days) {
     if (!m.has(r.link.id)) m.set(r.link.id, { id: r.link.id, slug: r.link.slug, title: r.link.title, routes: [], cur: 0, human: 0, prev: 0, prevHuman: 0, daily: {} });
     const e = m.get(r.link.id), c = cnt.get(`${r.link.id}|${r.rule}`);
     for (const [day, n] of Object.entries(dayCnt.get(`${r.link.id}|${r.rule}`) || {})) e.daily[day] = (e.daily[day] || 0) + n;
-    e.routes.push({ rule: Number(r.rule), url: r.url, countries: r.countries });
+    e.routes.push({ rule: Number(r.rule), url: r.url, countries: r.countries, devices: r.devices, ...(r.ab ? { ab: true, parent: r.parent } : {}) });
     if (c) { e.cur += c.cur; e.human += c.human; e.prev += c.prev; e.prevHuman += c.prevHuman; }
   }
   return new Map([...out].map(([k, m]) => [k, [...m.values()].sort((a, b) => b.human - a.human || b.cur - a.cur)]));
@@ -860,7 +866,7 @@ export async function aiReport(env, secret, hosts, days, sections, hide) {
       site.linksFrom = (fromLinks.get(host) || []).map((l) => ({ slug: l.slug, title: l.title, humanClicks: l.human, visitors: l.visitors, allClicks: l.cur, prevHumanClicks: l.prevHuman, sources: l.sources }));
       site.linksFromVisitors = fromLinks.visitors?.get(host) ?? null;
       site.links = (links.get(host) || []).map((l) => ({ slug: l.slug, title: l.title, humanClicks: l.human, allClicks: l.cur, prevHumanClicks: l.prevHuman,
-        routes: l.routes.map((r) => ({ to: r.url, when: r.rule ? `访客来自 ${r.countries}` : '默认' })) }));
+        routes: l.routes.map((r) => ({ to: r.url, when: ((r.rule ? [r.countries && `访客来自 ${r.countries}`, r.devices && `设备 ${r.devices}`].filter(Boolean).join('，') : '') || '默认') + (r.ab ? '（A/B 分流）' : '') })) }));
     }
     return site;
   };
