@@ -360,7 +360,9 @@ export async function aggQuery(env, { days, tz, bots, linkId = 0 }) {
     const reg = hllNew();
     for (const r of uvs.values()) hllMerge(reg, r);
     addTailIps(reg, fromTs, toTs);
-    return { total: (n || 0) + tailIn(fromTs, toTs).length, unique_ips: hllCount(reg) };
+    // 独立访客是估算值（误差约 5%），访客几乎都不重复时估算可能比访问次数还大，封顶为访问次数
+    const tot = (n || 0) + tailIn(fromTs, toTs).length;
+    return { total: tot, unique_ips: Math.min(hllCount(reg), tot) };
   }
 
   // 按小时的访问次数（用于今日、活跃时段、时段分布）

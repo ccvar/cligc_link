@@ -349,6 +349,19 @@ async function handleApi(request, env, url) {
     return json(await trackingInfo(env, url));
   }
   if (path === '/api/2fa' && method === 'GET') return json({ enabled: !!cred.totp, since: cred.totp?.at || null });
+  // 概览页的“开始使用”清单：各项是否已完成（只读设置，不请求外部接口）
+  if (path === '/api/setup' && method === 'GET') {
+    const n = await getNotify(env);
+    const secret = await sessionSecret(env);
+    return json({
+      link: !!(await env.DB.prepare('SELECT 1 FROM links LIMIT 1').first()),
+      mfa: !!cred.totp,
+      google: !!(await env.DB.prepare('SELECT 1 FROM g_accounts LIMIT 1').first()),
+      googleClient: await google.googleConfigured(env, secret),
+      notify: !!(n.tg.enabled || n.email.enabled),
+      cloudflare: !!(await cfCreds(env)),
+    });
+  }
   if (path === '/api/2fa/setup' && method === 'POST') return totpSetup(request, env, cred);
   if (path === '/api/2fa/enable' && method === 'POST') return totpEnable(request, env, cred);
   if (path === '/api/2fa/disable' && method === 'POST') return totpDisable(request, env, cred);
@@ -406,6 +419,7 @@ async function handleApi(request, env, url) {
     return json({ items: await recentClicks(env, url.searchParams.get('bots') === '1', linkId) });
   }
   if (path === '/api/links' && method === 'GET') return listLinks(env, url);
+  if (path === '/api/links/bulk' && method === 'POST') return bulkLinks(request, env);
   if (path === '/api/links' && method === 'POST') return createLink(request, env);
   if (path === '/api/links/replace' && method === 'POST') return bulkReplace(request, env);
 
@@ -903,6 +917,7 @@ async function duplicateLink(request, env, id) {
     `INSERT INTO link_targets (link_id, countries, url, note, fallback, created_at, updated_at)
      SELECT ?, countries, url, note, fallback, ?, ? FROM link_targets WHERE link_id = ? ORDER BY id`
   ).bind(row.id, now, now, id).run();
+  await env.DB.prepare('INSERT OR IGNORE INTO link_tags (link_id, tag) SELECT ?, tag FROM link_tags WHERE link_id = ?').bind(row.id, id).run();
   return json(row, 201);
 }
 
@@ -974,15 +989,52 @@ async function deleteLink(env, id) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM clicks WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM link_targets WHERE link_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM link_tags WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM links WHERE id = ?').bind(id),
   ]);
   return json({ ok: true });
 }
 
+// 批量操作：启用 / 停用 / 删除 / 加分组 / 移出分组；分组改名、删除分组
+async function bulkLinks(request, env) {
+  const b = await request.json().catch(() => ({}));
+  const ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 500);
+  const tag = cut(String(b.tag || '').trim(), 40);
+  const now = Date.now();
+  const inIds = ids.map(() => '?').join(',');
+  if (b.action === 'renameTag' || b.action === 'dropTag') {
+    if (!tag) return json({ error: '分组名不能为空' }, 400);
+    const to = cut(String(b.to || '').trim(), 40);
+    if (b.action === 'renameTag') {
+      if (!to) return json({ error: '分组名不能为空' }, 400);
+      await env.DB.batch([
+        env.DB.prepare('INSERT OR IGNORE INTO link_tags (link_id, tag) SELECT link_id, ? FROM link_tags WHERE tag = ?').bind(to, tag),
+        env.DB.prepare('DELETE FROM link_tags WHERE tag = ? AND tag != ?').bind(tag, to),
+      ]);
+    } else await env.DB.prepare('DELETE FROM link_tags WHERE tag = ?').bind(tag).run();
+    return json({ ok: true, tags: await linkTagList(env) });
+  }
+  if (!ids.length) return json({ error: '没有选中短链' }, 400);
+  if (b.action === 'enable' || b.action === 'disable') {
+    await env.DB.prepare(`UPDATE links SET enabled = ?, updated_at = ? WHERE id IN (${inIds})`).bind(b.action === 'enable' ? 1 : 0, now, ...ids).run();
+  } else if (b.action === 'delete') {
+    for (const id of ids) await deleteLink(env, id);
+  } else if (b.action === 'tag' || b.action === 'untag') {
+    if (!tag) return json({ error: '请填写分组名' }, 400);
+    const st = ids.map((id) => (b.action === 'tag'
+      ? env.DB.prepare('INSERT OR IGNORE INTO link_tags (link_id, tag) VALUES (?, ?)').bind(id, tag)
+      : env.DB.prepare('DELETE FROM link_tags WHERE link_id = ? AND tag = ?').bind(id, tag)));
+    for (let i = 0; i < st.length; i += 100) await env.DB.batch(st.slice(i, i + 100));
+  } else return json({ error: '未知操作' }, 400);
+  return json({ ok: true, n: ids.length, tags: await linkTagList(env) });
+}
+const linkTagList = async (env) => (await env.DB.prepare('SELECT tag, COUNT(*) AS n FROM link_tags GROUP BY tag ORDER BY tag').all()).results;
+
 async function getLink(env, id) {
   const row = await env.DB.prepare('SELECT * FROM links WHERE id = ?').bind(id).first();
   if (!row) return json({ error: 'not found' }, 404);
   row.targets = await loadTargets(env, id);
+  row.tags = (await env.DB.prepare('SELECT tag FROM link_tags WHERE link_id = ? ORDER BY tag').bind(id).all()).results.map((r) => r.tag);
   return json(row);
 }
 
@@ -1050,8 +1102,13 @@ async function listLinks(env, url) {
   const size = Math.min(100, Math.max(1, Number(url.searchParams.get('size')) || 20));
   const order = SORTS[url.searchParams.get('sort')] || SORTS.created;
   const tz = Math.max(-840, Math.min(840, Number(url.searchParams.get('tz')) || 0));
-  const where = q ? 'WHERE slug LIKE ?1 OR target_url LIKE ?1 OR title LIKE ?1 OR note LIKE ?1' : '';
-  const params = q ? [`%${q}%`] : [];
+  // 搜索 + 按分组筛选（tag=+none 为未分组）
+  const tag = (url.searchParams.get('tag') || '').trim();
+  const conds = [], params = [];
+  if (q) { params.push(`%${q}%`); conds.push(`(slug LIKE ?${params.length} OR target_url LIKE ?${params.length} OR title LIKE ?${params.length} OR note LIKE ?${params.length})`); }
+  if (tag === '+none') conds.push('id NOT IN (SELECT link_id FROM link_tags)');
+  else if (tag) { params.push(tag); conds.push(`id IN (SELECT link_id FROM link_tags WHERE tag = ?${params.length})`); }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
   const [total, rows] = await Promise.all([
     env.DB.prepare(`SELECT COUNT(*) AS n FROM links ${where}`).bind(...params).first('n'),
     env.DB.prepare(`SELECT *, (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id) AS rules
@@ -1091,8 +1148,10 @@ async function listLinks(env, url) {
       l.ruleList = rules.results.filter((r) => r.link_id === l.id)
         .map((r) => ({ countries: r.countries.split(',').filter(Boolean), url: r.url }));
     }
+    const tg = (await env.DB.prepare(`SELECT link_id, tag FROM link_tags WHERE link_id IN (${ids.map(() => '?').join(',')}) ORDER BY tag`).bind(...ids).all()).results;
+    for (const l of items) l.tags = tg.filter((t) => t.link_id === l.id).map((t) => t.tag);
   }
-  return json({ total, page, size, items });
+  return json({ total, page, size, items, tags: await linkTagList(env) });
 }
 
 async function uniqueSlug(env) {
@@ -1349,7 +1408,7 @@ async function overviewAgg(env, url, { days, tz, bots }) {
     if (tailUv.has(day)) hllMerge(reg, tailUv.get(day));
     return hllCount(reg);
   };
-  const dailyU = daily.map((r) => ({ ...r, u: uvOf(r.k) }));
+  const dailyU = daily.map((r) => ({ ...r, u: Math.min(uvOf(r.k), r.n) }));   // 估算值封顶为当天访问次数
 
   // 活跃时段
   const heat = new Map();
@@ -1374,7 +1433,7 @@ async function overviewAgg(env, url, { days, tz, bots }) {
       for (const [key, r] of uvs) if (key.startsWith(id + '|')) hllMerge(reg, r);
       q.addTailIps(reg, start, now, id);
       const l = byId.get(id);
-      return { id, slug: l.slug, title: l.title, target_url: l.target_url, n: counts.get(id), u: hllCount(reg), last: l.last_click };
+      return { id, slug: l.slug, title: l.title, target_url: l.target_url, n: counts.get(id), u: Math.min(hllCount(reg), counts.get(id)), last: l.last_click };
     });
   }
 
@@ -1430,7 +1489,7 @@ async function linkStatsAgg(env, id, { days, tz, bots }) {
     const reg = hllNew();
     if (uvDays.has(`${id}|${r.k}`)) hllMerge(reg, uvDays.get(`${id}|${r.k}`));
     if (tailUv.has(r.k)) hllMerge(reg, tailUv.get(r.k));
-    return { ...r, u: hllCount(reg) };
+    return { ...r, u: Math.min(hllCount(reg), r.n) };   // 估算值封顶为当天访问次数
   });
   const hm = new Map();
   for (const h of hourRows) { const { h: hr } = localHourParts(h.ts, tz); hm.set(hr, (hm.get(hr) || 0) + h.n); }

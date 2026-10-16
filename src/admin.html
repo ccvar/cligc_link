@@ -87,13 +87,13 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(15,159,90,.45); } 100% { box-shadow: 0 0 0 8px rgba(15,159,90,0); } }
 @keyframes flash { from { background: var(--accent-2); } to { background: transparent; } }
-.rv { animation: rise .6s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.rv { animation: rise .35s var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 30ms); }   /* 只错开前 8 个，长页面也能很快显示完整 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
 }
 
 /* ================================================================ shell：左侧灰色侧栏 + 右侧白色主区 */
-:root { --side-w: 224px; }
+:root { --side-w: 224px; --cp: 18px; }   /* --cp：卡片左右内边距（与指标卡片一致） */
 .shell { display: grid; grid-template-columns: max(var(--side-w), calc((100% - var(--app-max)) / 2 + var(--side-w))) minmax(0, 1fr); min-height: 100vh; }
 .side { position: sticky; z-index: 6; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 28px 14px 20px calc(100% - var(--side-w) + 16px); }
 .side-head { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
@@ -144,6 +144,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 [data-tip-at="right"]::after { left: calc(100% + 10px); bottom: auto; top: 50%; transform: translate(-4px, -50%); }
 [data-tip-at="right"]:hover::after, [data-tip-at="right"]:focus-visible::after { transform: translate(0, -50%); }
 [data-tip][aria-expanded="true"]::after, [data-tip]:active::after { opacity: 0; }
+@media (hover: none) { [data-tip]::after { display: none; } }   /* 触屏用点按显示的浮动提示 */
 /* 侧栏导航只在收起时提示 */
 .shell:not(.mini) .side [data-tip-at="right"]::after { display: none; }
 @media (hover: none) { [data-tip]::after { display: none; } }
@@ -249,11 +250,11 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 
 /* ================================================================ cards & grids */
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
-.card-h { display: flex; align-items: center; gap: 10px; padding: 16px 20px 0; min-height: 52px; flex-wrap: wrap; }
+.card-h { display: flex; align-items: center; gap: 10px; padding: 14px var(--cp) 0; min-height: 0; flex-wrap: wrap; }
 .card-h h3 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -.005em; }
 .card-h .sub { color: var(--muted); font-size: 12.5px; }
 .card-h .sp { flex: 1; }
-.card-b { padding: 16px 20px 20px; }
+.card-b { padding: 14px var(--cp) 18px; }
 .stack { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
 .stack > *, .grid2 > *, .kpis > *, .g-main > *, .g3 > * { min-width: 0; }
 .grid2 { display: grid; gap: 20px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -471,7 +472,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 
 /* 热门短链表 */
 .tl { display: flex; flex-direction: column; padding-top: 8px; }
-.tl .tr { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(80px, 150px) 60px 52px 72px; gap: 16px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line-2); transition: background .15s; }
+.tl .tr { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(80px, 150px) 60px 52px 72px; gap: 16px; align-items: center; padding: 12px var(--cp); border-top: 1px solid var(--line-2); transition: background .15s; }
 .tl .tr.th { border-top: 0; color: var(--muted); font-size: 12px; padding-top: 4px; padding-bottom: 10px; }
 .tl a.tr:last-child { border-radius: 0 0 var(--r-lg) var(--r-lg); }
 .tl a.tr:hover { background: var(--panel-2); }
@@ -514,10 +515,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .result > svg.i { color: var(--good); }
 .result .u { font-family: var(--mono); font-weight: 600; color: var(--good); }
 
-.lh { padding: 14px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lh { padding: 14px var(--cp); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .lh .sp { flex: 1; }
 .lrow { display: grid; grid-template-columns: minmax(0, 1fr) 100px 76px 96px 72px 144px; gap: 16px; align-items: center;
-  padding: 14px 20px; border-top: 1px solid var(--line-2); cursor: pointer; transition: background .15s; }
+  padding: 14px var(--cp); border-top: 1px solid var(--line-2); cursor: pointer; transition: background .15s; }
 .lrow:hover { background: var(--panel-2); }
 .lrow.hd { cursor: default; color: var(--muted); font-size: 12px; padding-top: 10px; padding-bottom: 10px; background: none; }
 .lrow .su { font-family: var(--mono); font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 0; font-size: 13.5px; }
@@ -528,6 +529,16 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .lrow .tm { color: var(--muted); font-size: 12.5px; }
 .lrow .acts { display: flex; gap: 2px; justify-content: flex-end; opacity: .55; transition: opacity .15s; }
 .lrow:hover .acts, .lrow:focus-within .acts { opacity: 1; }
+.lrow .c-main { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.lrow.hd .c-main { align-items: center; }
+.lck { flex: none; display: grid; place-items: center; width: 18px; height: 20px; cursor: pointer; }
+.lck input { margin: 0; cursor: pointer; }
+.lrow.sel-r { background: var(--accent-2); }
+.lrow .su .gtg { margin-left: 2px; }
+.lbulk { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 12px 12px; padding: 10px 14px;
+  border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-3); font-size: 13px; animation: rise .2s var(--ease-out); }
+.lbulk[hidden] { display: none; }
+.lbulk .sp { flex: 1; }
 .lrow.flash { animation: flash 1.8s var(--ease) both; }
 @media (max-width: 760px) {
   .lrow { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 14px 16px; }
@@ -542,7 +553,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .pill.on { color: var(--good); background: var(--good-bg); }
 .pill.off { color: var(--muted); background: var(--sunken); }
 .pill.exp { color: var(--warn); background: var(--warn-bg); }
-.pager { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 12px 20px; border-top: 1px solid var(--line-2); color: var(--muted); font-size: 13px; }
+.pager { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 12px var(--cp); border-top: 1px solid var(--line-2); color: var(--muted); font-size: 13px; }
 .pager .g { display: flex; gap: 6px; align-items: center; }
 .search { position: relative; flex: 1; max-width: 340px; min-width: 200px; }
 .search > svg { position: absolute; left: 11px; top: 11px; color: var(--muted); }
@@ -590,8 +601,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 @media (min-width: 1201px) {
   .tbl.vt { table-layout: auto; }
   .tbl.vt th, .tbl.vt td { padding-left: 10px; padding-right: 10px; }
-  .tbl.vt th:first-child, .tbl.vt td:first-child { padding-left: 20px; }
-  .tbl.vt th:last-child, .tbl.vt td:last-child { padding-right: 20px; }
+  .tbl.vt th:first-child, .tbl.vt td:first-child { padding-left: var(--cp); }
+  .tbl.vt th:last-child, .tbl.vt td:last-child { padding-right: var(--cp); }
   .tbl.vt th:nth-child(1), .tbl.vt th:nth-child(2), .tbl.vt th:nth-child(5) { width: 1%; }
   .tbl.vt td:nth-child(1) > div { max-width: 190px !important; }
   .tbl.vt td:nth-child(2) > div { max-width: 210px !important; }
@@ -619,7 +630,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .hint { color: var(--muted); font-size: 12.5px; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-.tbl th:first-child, .tbl td:first-child { padding-left: 20px; }
+.tbl th:first-child, .tbl td:first-child { padding-left: var(--cp); }
+.tbl th:last-child, .tbl td:last-child { padding-right: var(--cp); }
 .tbl td { padding: 11px 14px; border-bottom: 1px solid var(--line-2); white-space: nowrap; vertical-align: top; }
 .tbl tbody tr { transition: background .15s; }
 .tbl tbody tr:hover { background: var(--panel-2); }
@@ -631,7 +643,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 
 /* ================================================================ 跳转规则 */
 .rules { display: flex; flex-direction: column; padding-top: 8px; }
-.rule { display: grid; grid-template-columns: 38px minmax(0, 1fr) 170px auto; gap: 16px; align-items: center; min-height: 88px; padding: 14px 20px; border-top: 1px solid var(--line-2); transition: background .15s; }
+.rule { display: grid; grid-template-columns: 38px minmax(0, 1fr) 170px auto; gap: 16px; align-items: center; min-height: 88px; padding: 14px var(--cp); border-top: 1px solid var(--line-2); transition: background .15s; }
 .rule:hover { background: var(--panel-2); }
 .rule .ri { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--accent-2); color: var(--accent-ink); font-size: 18px; line-height: 1; }
 .rule.def .ri { background: var(--sunken); color: var(--text-2); }
@@ -661,8 +673,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .rule .rh .bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); transform-origin: left; animation: grow .9s var(--ease-out) both .2s; }
 .rule.def .rh .bar i { background: var(--faint); }
 .rule .acts { display: flex; gap: 2px; justify-content: flex-end; width: 66px; }
-.rules .none { padding: 18px 20px; border-top: 1px solid var(--line-2); display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
-.sim { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 20px; border-top: 1px solid var(--line-2); background: var(--panel-2); border-radius: 0 0 var(--r-lg) var(--r-lg); font-size: 13px; color: var(--text-2); }
+.rules .none { padding: 18px var(--cp); border-top: 1px solid var(--line-2); display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
+.sim { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px var(--cp); border-top: 1px solid var(--line-2); background: var(--panel-2); border-radius: 0 0 var(--r-lg) var(--r-lg); font-size: 13px; color: var(--text-2); }
 .sim .combo { flex: none; }
 .sim .res > span:first-child { white-space: nowrap; }
 
@@ -943,11 +955,48 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .nstat { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; font-size: 13px; }
 .nstat.ok { background: var(--good-bg); color: var(--good); }
 .nstat.bad { background: var(--bad-bg); color: var(--bad); }
+.home-sites .card-h { padding-bottom: 6px; }
+.home-sites .hs-b { display: flex; align-items: center; gap: 12px 40px; flex-wrap: wrap; padding: 0 var(--cp) 13px; }
+.hs-ks { display: flex; gap: 10px 32px; flex-wrap: wrap; }
+.hs-k { display: grid; gap: 1px; }
+.hs-k span { font-size: 12px; color: var(--muted); }
+.hs-k div { display: flex; align-items: baseline; gap: 6px; }
+.hs-k b { font-size: 18px; font-weight: 680; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.hs-k .gd { font-size: 11.5px; }
+.hs-top { display: grid; gap: 0; flex: 1; min-width: 280px; max-width: 420px; margin-left: auto; }
+.hs-r { display: grid; grid-template-columns: minmax(0, 1fr) 64px 52px 54px; gap: 10px; align-items: center; padding: 3px 8px; border-radius: 7px; color: inherit; text-decoration: none; font-size: 12.5px; }
+.hs-r:hover { background: var(--sunken); }
+.hs-r .mono { font-family: var(--mono); font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hs-r b { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hs-r .gd { font-size: 11.5px; text-align: right; }
+.hs-sp { height: 18px; } .hs-sp svg { width: 100%; height: 100%; display: block; }
+@media (max-width: 760px) { .hs-top { max-width: none; margin-left: 0; } }
+.setup .card-h { gap: 12px; }
+.setup-p { width: 120px; height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
+.setup-p i { display: block; height: 100%; border-radius: 3px; background: var(--good); }
+.setup-l { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 10px; padding: 12px var(--cp) 16px; }
+@media (max-width: 1100px) { .setup-l { grid-template-columns: repeat(min(var(--n), 2), minmax(0, 1fr)); } }
+.setup-ok { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--good); }
+.setup-ok i { font-style: normal; display: inline-flex; align-items: center; gap: 3px; }
+@media (max-width: 760px) { .setup-ok { display: none; } }
+@media (max-width: 640px) { .setup-l { grid-template-columns: 1fr; } .setup-p { display: none; } }
+.setup-i { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); color: inherit; text-decoration: none; transition: border-color .15s, background .15s; }
+.setup-i:hover { border-color: var(--accent); background: var(--accent-2); }
+.setup-i > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.setup-i b { font-size: 13px; font-weight: 600; }
+.setup-i span { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.setup-i > svg { flex: none; margin-top: 2px; color: var(--muted); transform: rotate(-90deg); }
+.setup-c { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; margin-top: 1px; }
+.setup-i.ok { background: var(--panel-2); }
+.setup-i.ok .setup-c { border-color: var(--good); background: var(--good); color: #fff; }
+.setup-i.ok b { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent); }
+.nstat.warn { background: color-mix(in srgb, var(--amber) 13%, transparent); color: color-mix(in srgb, var(--amber) 70%, var(--text)); }
+#nwarn:empty, #nstat:empty { display: none; }
 
 /* 渠道卡片 */
 .sec-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 4px 0 -6px; }
 .sec-t { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
-.chcard { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; transition: border-color .2s, box-shadow .2s; }
+.chcard { padding: 16px var(--cp); display: flex; flex-direction: column; gap: 14px; transition: border-color .2s, box-shadow .2s; }
 .chcard.is-on { border-color: color-mix(in srgb, var(--good) 35%, var(--line)); }
 .chtop { display: flex; align-items: center; gap: 12px; }
 .chtop .chi { width: 38px; height: 38px; border-radius: 11px; }
@@ -980,7 +1029,7 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .fold.settled .fold-b > * { overflow: visible; }
 #rules .rsum { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-family: var(--mono); font-size: 12px; }
 #rules.open .rsum { visibility: hidden; }
-.rules-bar { display: flex; align-items: center; gap: 12px; padding: 12px 20px 14px; }
+.rules-bar { display: flex; align-items: center; gap: 12px; padding: 12px var(--cp) 14px; }
 .rules-bar .sub { margin: 0; }
 .drawer.panel { width: min(760px, calc(100vw - 16px)); }
 .drawer.panel .db { padding: 0; gap: 0; }
@@ -1161,6 +1210,8 @@ button.gtg { cursor: pointer; }
 .tag-d .row { margin-top: 18px; }
 .g-rng .combo-btn .nm { max-width: none; }
 .g-sync { width: 36px; height: 36px; color: var(--text-2); }
+.ph-acts { display: flex; align-items: center; gap: 4px; }
+.ph-acts .g-prog { margin-right: 6px; }
 .g-sync.busy svg { animation: spin .9s linear infinite; }
 .g-op { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); }
 .pop .ot > svg { color: var(--bad); margin-right: 6px; vertical-align: -2px; }
@@ -1176,10 +1227,18 @@ button.gtg { cursor: pointer; }
 .g-acc-t b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-acc-t span { font-size: 12px; color: var(--muted); }
 .g-acc-r.bad .g-acc-t span { color: var(--bad); }
-.g-prog { font-size: 12.5px; line-height: 36px; color: var(--muted); white-space: nowrap; margin-right: -18px; animation: fade .2s; }
+.g-prog { font-size: 12.5px; line-height: 36px; color: var(--muted); white-space: nowrap; animation: fade .2s; }
 .g-prog b { color: var(--accent-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .g-prog[hidden] { display: none; }
 .gl-wrap { overflow-x: auto; }
+/* 可以横向滚动时在边缘显示阴影，滚到头就消失（纯 CSS：遮罩随内容滚动，阴影固定在容器边缘） */
+.gl-wrap, .scroll {
+  background:
+    linear-gradient(to right, var(--panel) 40%, transparent) left / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--panel) 40%, transparent) right / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) left / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) right / 12px 100% no-repeat scroll;
+}
 .tbl.gl th.r, .tbl.gt th.r { text-align: right; }
 .tbl.gl td.num, .tbl.gt td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tbl.gl tbody tr { cursor: pointer; }
@@ -1239,7 +1298,7 @@ button.gtg { cursor: pointer; }
 .g-si.off { color: var(--muted); }
 .g-si.off .gico { filter: grayscale(1); opacity: .4; }
 /* 空状态：图标 + 说明 + 按钮横排 */
-.g-empty { display: flex; align-items: center; gap: 14px; padding: 18px 20px 20px; }
+.g-empty { display: flex; align-items: center; gap: 14px; padding: 14px var(--cp) 18px; }
 .g-empty-i { flex: none; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--sunken); color: var(--muted); }
 .g-empty > div { flex: 1; min-width: 0; display: grid; gap: 3px; }
 .g-empty b { font-size: 13.5px; font-weight: 600; color: var(--text); }
@@ -1250,7 +1309,7 @@ button.gtg { cursor: pointer; }
 .gsl-t th { white-space: nowrap; }
 #lk-gs { display: grid; gap: 20px; }
 #lk-gs:empty { display: none; }
-.g-empty.sm-e { border-top: 1px solid var(--line-2); padding: 14px 20px; }
+.g-empty.sm-e { border-top: 1px solid var(--line-2); padding: 14px var(--cp); }
 .g-empty code { font-family: var(--mono); font-size: 11.5px; padding: 1px 5px; border-radius: 5px; background: var(--sunken); }
 .gsl-t .ell { min-width: 110px; max-width: 260px; }
 .tbl.gt { table-layout: fixed; }
@@ -1328,7 +1387,7 @@ const store = {
   set(k, v) { try { localStorage.setItem('sl:' + k, JSON.stringify(v)); } catch {} },
 };
 const state = { days: store.get('days', 30), bots: store.get('bots', false), link: store.get('ovlink', '') };
-const listState = { q: '', page: 1, sort: store.get('sort', 'created'), flash: null };
+const listState = { q: '', page: 1, sort: store.get('sort', 'created'), flash: null, tag: '', sel: new Set() };
 const clickState = { page: 1 };
 let liveTimer = null;
 
@@ -1574,16 +1633,32 @@ function duplicateDialog(src, onDone) {
 // 浮动提示：挂在 body 上，不会被表格、省略号文本等裁剪溢出的容器截掉；样式与 data-tip 一致。
 // 默认只在文字被截断时显示，加 data-tipf-always 则总是显示
 {
-  let tip = null, cur = null;
-  const hide = () => { if (tip) tip.remove(); tip = null; cur = null; };
+  let tip = null, cur = null, timer = 0;
+  const hide = () => { if (tip) tip.remove(); tip = null; cur = null; clearTimeout(timer); };
+  // 触屏设备没有悬停：点一下显示，3 秒后或点别处时收起（data-tip 的提示也一样处理）
+  const touch = matchMedia('(hover: none)').matches;
+  if (touch) {
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest && e.target.closest('[data-tipf], [data-tip]');
+      if (!el || el === cur) { hide(); return; }
+      show(el, el.dataset.tipf || el.dataset.tip, true);
+      timer = setTimeout(hide, 3000);
+    }, true);
+  }
   document.addEventListener('mouseover', (e) => {
+    if (touch) return;
     const el = e.target.closest && e.target.closest('[data-tipf]');
     if (el === cur) return;
     hide();
     if (!el || !el.dataset.tipf) return;
     if (!el.hasAttribute('data-tipf-always') && el.scrollWidth <= el.clientWidth + 1) return;
+    show(el, el.dataset.tipf);
+  });
+  function show(el, text, force) {
+    hide();
+    if (!text || (!force && !el.isConnected)) return;
     cur = el;
-    tip = document.createElement('div'); tip.className = 'ftip'; tip.setAttribute('role', 'tooltip'); tip.textContent = el.dataset.tipf;
+    tip = document.createElement('div'); tip.className = 'ftip'; tip.setAttribute('role', 'tooltip'); tip.textContent = text;
     document.body.append(tip);
     const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
     const left = Math.min(Math.max(8, r.left + r.width / 2 - t.width / 2), innerWidth - t.width - 8);
@@ -1591,7 +1666,7 @@ function duplicateDialog(src, onDone) {
     if (top < 8) top = r.bottom + 8;
     tip.style.left = left + 'px'; tip.style.top = top + 'px';
     setTimeout(() => tip && tip.classList.add('on'), 10);
-  });
+  }
   addEventListener('scroll', hide, true);
   addEventListener('blur', hide);
 }
@@ -2454,6 +2529,8 @@ async function renderHome(token) {
     ${machinesCard(d)}`;
   reveal(root);
   countUp(root);
+  setupCard(root, token);
+  homeSitesCard(root, token);
   mountChart(document.getElementById('ch-home'), series, [
     { id: 'n', key: 'n', label: '访问次数', color: 'var(--accent)', type: 'area' },
     { id: 'u', key: 'u', label: '独立访客', color: 'var(--violet)', type: 'line' },
@@ -2476,6 +2553,63 @@ async function renderHome(token) {
 }
 
 // ---------------------------------------------------------------- links
+// 概览页：站点（GA4 + Search Console）摘要，区间跟随概览换算到最接近的站点区间
+async function homeSitesCard(root, token) {
+  if (state.link) return;   // 只看单个短链时不显示全部站点的摘要
+  const days = state.days <= 7 ? 7 : state.days <= 30 ? 28 : state.days <= 90 ? 90 : 365;
+  const d = await api('/google/sites?days=' + days).catch(() => null);
+  if (!d?.items?.length || token !== routeToken) return;
+  const S = (f) => d.items.reduce((a, x) => a + (f(x) || 0), 0);
+  const ses = S((x) => x.cur.ga?.sessions), pses = S((x) => x.prev.ga?.sessions);
+  const clk = S((x) => x.cur.gsc?.clicks), pclk = S((x) => x.prev.gsc?.clicks);
+  const imp = S((x) => x.cur.gsc?.impressions), pimp = S((x) => x.prev.gsc?.impressions);
+  const lk = S((x) => x.linksFrom.reduce((a, l) => a + l.human, 0)), plk = S((x) => x.linksFrom.reduce((a, l) => a + l.prevHuman, 0));
+  const hasP = days !== 365;
+  const top = d.items.filter((x) => x.cur.ga?.sessions).sort((a, b) => b.cur.ga.sessions - a.cur.ga.sessions).slice(0, 3);
+  const label = G_RANGES.find(([v]) => v === days)?.[1] || '';
+  const kc = (l, v, dl) => `<div class="hs-k"><span>${l}</span><div><b>${num(v)}</b>${hasP ? dl : ''}</div></div>`;
+  const el = document.createElement('section');
+  el.className = 'card rv home-sites';
+  el.innerHTML = `<div class="card-h"><h3>站点</h3><span class="sub">${d.items.length} 个站点 · ${label}（截至 ${d.ranges.to}）</span><span class="sp"></span><a class="kc-a" href="#/sites">查看全部站点 →</a></div>
+    <div class="hs-b">
+      <div class="hs-ks">${kc('会话', ses, gDelta(ses, pses))}${kc('搜索点击', clk, gDelta(clk, pclk))}${kc('搜索展示', imp, gDelta(imp, pimp))}${kc('短链点击', lk, gDelta(lk, plk))}</div>
+      <div class="hs-top">${top.map((x) => `<a class="hs-r" href="#/site/${encodeURIComponent(x.host)}"><span class="mono">${esc(x.host)}</span>
+        <span class="hs-sp">${kpiSpark(x.spark.map((p) => p.n), 'var(--accent)')}</span><b>${num(x.cur.ga.sessions)}</b>${x.prev.ga ? gDelta(x.cur.ga.sessions, x.prev.ga.sessions) : '<span></span>'}</a>`).join('')}</div>
+    </div>`;
+  // 放在指标卡片下面
+  const strip = root.querySelector('.kstrip');
+  strip ? strip.after(el) : root.prepend(el);
+}
+
+// 概览页顶部的“开始使用”清单：全部完成或点了“不再显示”后不再出现
+async function setupCard(root, token) {
+  if (store.get('setup:hide', false)) return;
+  const st = await api('/setup').catch(() => null);
+  if (!st || token !== routeToken) return;
+  const steps = [
+    ['link', '创建第一个短链', '把推广链接变成短链，统计每次访问', '#/links?new'],
+    ['mfa', '开启两步验证', '密码泄露也登不进后台', '#/settings', 'mfa'],
+    ['google', st.googleClient ? '连接 Google 账号' : '接入 Google Analytics / Search Console', '看清每个站点的访问和搜索表现', st.googleClient ? '#/sites' : '#/settings', st.googleClient ? '' : 'goo'],
+    ['notify', '配置推送渠道', '日报、每周 SEO 变化和用量预警推送到 Telegram 或邮箱', '#/notify'],
+    ['cloudflare', '填写 Cloudflare 凭据', '在后台看账户用量，快超出时提醒', '#/settings', 'use'],
+  ];
+  const done = steps.filter(([k]) => st[k]).length;
+  if (done === steps.length) return;
+  const el = document.createElement('section');
+  el.className = 'card rv setup';
+  // 只给没完成的步骤卡片；完成的收成标题里的一行“✓ …”
+  const todo = steps.filter(([k]) => !st[k]), ok = steps.filter(([k]) => st[k]);
+  el.innerHTML = `<div class="card-h"><h3>开始使用</h3><span class="sub">已完成 ${done} / ${steps.length}</span>
+      ${ok.length ? `<span class="setup-ok">${ok.map(([, t]) => `<i>${ic('check', 11)}${t}</i>`).join('')}</span>` : ''}<span class="sp"></span>
+      <div class="setup-p"><i style="width:${(done / steps.length) * 100}%"></i></div>
+      <button type="button" class="hr-more" data-hide>不再显示</button></div>
+    <div class="setup-l" style="--n:${todo.length}">${todo.map(([k, t, d, href, acc]) => `<a class="setup-i" href="${href}"${acc ? ` data-acc="${acc}"` : ''}>
+      <span class="setup-c"></span><div><b>${t}</b><span>${d}</span></div>${ic('chev', 14)}</a>`).join('')}</div>`;
+  el.querySelector('[data-hide]').onclick = () => { store.set('setup:hide', true); el.remove(); };
+  el.querySelectorAll('[data-acc]').forEach((a) => (a.onclick = () => store.set('set:open', a.dataset.acc)));
+  root.prepend(el);
+}
+
 async function renderLinks(token, opts = {}) {
   const page = document.getElementById('lpage');
   if (!page) {
@@ -2492,6 +2626,7 @@ async function renderLinks(token, opts = {}) {
         <section class="card rv" id="lpage">
           <div class="lh">
             <div class="search">${ic('search')}<input class="input" id="q" placeholder="搜索短链、目标地址、标题" value="${esc(listState.q)}" aria-label="搜索"><span class="kbd">/</span></div>
+            <div class="combo g-lf" id="ltag"></div>
             <span class="sp"></span>
             <div class="seg" id="sort">${[['created', '最新创建'], ['clicks', '访问最多'], ['last_click', '最近访问']]
               .map(([k, l]) => `<button data-s="${k}" class="${k === listState.sort ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -2499,23 +2634,30 @@ async function renderLinks(token, opts = {}) {
             <button class="btn" id="add">${ic('plus')}<span class="hide-m">高级创建</span></button>
           </div>
           <div id="lbody">${skel(280)}</div>
+          <div class="lbulk" id="lbulk" hidden></div>
         </section>
       </div>`);
     reveal(document.getElementById('page'));
     bindLinksChrome();
   }
-  const d = await api(`/links?q=${encodeURIComponent(listState.q)}&page=${listState.page}&size=20&sort=${listState.sort}&tz=${TZ}`);
+  const d = await api(`/links?q=${encodeURIComponent(listState.q)}&page=${listState.page}&size=20&sort=${listState.sort}&tz=${TZ}&tag=${encodeURIComponent(listState.tag)}`);
   if (token !== routeToken) return;
+  // 选中的分组被删除 / 改名后不存在了：恢复成全部
+  if (listState.tag && listState.tag !== '+none' && !(d.tags || []).some((t) => t.tag === listState.tag)) { listState.tag = ''; return renderLinks(token, opts); }
+  linkTagFilter(document.getElementById('ltag'), d.tags || []);
+  // 选择只针对当前页
+  const pageIds = new Set(d.items.map((l) => l.id));
+  for (const id of [...listState.sel]) if (!pageIds.has(id)) listState.sel.delete(id);
   const pages = Math.max(1, Math.ceil(d.total / d.size));
   const body = document.getElementById('lbody');
   body.innerHTML = d.items.length ? `
-    <div class="lrow hd"><span>短链 / 目标地址</span><span class="c-spark">近 14 天</span><span style="text-align:right">累计访问</span><span>最后访问</span><span>状态</span><span></span></div>
+    <div class="lrow hd"><span class="c-main"><label class="lck" aria-label="全选本页"><input type="checkbox" id="lall" ${d.items.length && d.items.every((l) => listState.sel.has(l.id)) ? 'checked' : ''}></label>短链 / 目标地址</span><span class="c-spark">近 14 天</span><span style="text-align:right">累计访问</span><span>最后访问</span><span>状态</span><span></span></div>
     ${d.items.map((l) => `
-    <div class="lrow ${listState.flash === l.id ? 'flash' : ''}" data-go="${l.id}" tabindex="0">
-      <div style="min-width:0">
-        <div class="su">${esc(shortDisp(l.slug))}${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}</div>
+    <div class="lrow ${listState.flash === l.id ? 'flash' : ''}${listState.sel.has(l.id) ? ' sel-r' : ''}" data-go="${l.id}" tabindex="0">
+      <div class="c-main"><label class="lck" aria-label="选择 ${esc(l.slug)}"><input type="checkbox" data-sel="${l.id}" ${listState.sel.has(l.id) ? 'checked' : ''}></label><div style="min-width:0">
+        <div class="su">${esc(shortDisp(l.slug))}${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}${(l.tags || []).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}</div>
         <div class="tg">${l.rules ? `<span class="rb has-pop" tabindex="0">${ic('globe')}${l.rules} 条地区规则${rulePop(l)}</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
-      </div>
+      </div></div>
       <div class="c-spark">${sparkline(l.spark)}</div>
       <div class="num c-clicks">${num(l.clicks)}</div>
       <div class="tm c-last" title="${esc(fmtTime(l.last_click))}">${ago(l.last_click)}</div>
@@ -2531,11 +2673,27 @@ async function renderLinks(token, opts = {}) {
       ${pages > 1 ? `<div class="g"><button class="btn sm" id="prev" ${listState.page <= 1 ? 'disabled' : ''}>上一页</button>
       <span class="tnum">${listState.page} / ${pages}</span>
       <button class="btn sm" id="next" ${listState.page >= pages ? 'disabled' : ''}>下一页</button></div>` : ''}</div>` : ''}`
-    : `<div class="empty" style="padding:56px">${ic(listState.q ? 'search' : 'link')}${listState.q ? `没有找到包含 “${esc(listState.q)}” 的短链` : '还没有短链，在上方粘贴一个推广链接试试'}</div>`;
+    : `<div class="empty" style="padding:56px">${ic(listState.q || listState.tag ? 'search' : 'link')}${listState.q ? `没有找到包含 “${esc(listState.q)}” 的短链` : listState.tag ? '这个分组里没有短链' : '还没有短链，在上方粘贴一个推广链接试试'}</div>`;
   listState.flash = null;
 
+  // 勾选 / 全选 / 批量操作栏
+  body.querySelectorAll('[data-sel]').forEach((c) => (c.onchange = () => {
+    const id = Number(c.dataset.sel);
+    c.checked ? listState.sel.add(id) : listState.sel.delete(id);
+    c.closest('.lrow').classList.toggle('sel-r', c.checked);
+    const all = document.getElementById('lall');
+    if (all) all.checked = d.items.every((l) => listState.sel.has(l.id));
+    bulkBar(d);
+  }));
+  const lall = document.getElementById('lall');
+  if (lall) lall.onchange = () => {
+    for (const l of d.items) lall.checked ? listState.sel.add(l.id) : listState.sel.delete(l.id);
+    body.querySelectorAll('[data-sel]').forEach((c) => { c.checked = lall.checked; c.closest('.lrow').classList.toggle('sel-r', lall.checked); });
+    bulkBar(d);
+  };
+  bulkBar(d);
   body.querySelectorAll('[data-go]').forEach((r) => {
-    r.onclick = (e) => { if (!e.target.closest('button, a')) location.hash = '#/link/' + r.dataset.go; };
+    r.onclick = (e) => { if (!e.target.closest('button, a, label')) location.hash = '#/link/' + r.dataset.go; };
     r.onkeydown = (e) => { if (e.key === 'Enter' && e.target === r) location.hash = '#/link/' + r.dataset.go; };
   });
   body.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = (e) => {
@@ -2553,6 +2711,69 @@ async function renderLinks(token, opts = {}) {
   if (prev) prev.onclick = () => { listState.page--; renderLinks(routeToken); };
   if (next) next.onclick = () => { listState.page++; renderLinks(routeToken); };
   if (opts.openNew) openDrawer(null, () => renderLinks(routeToken));
+}
+
+// 短链列表的分组筛选
+function linkTagFilter(root, tags) {
+  if (!root) return;
+  const MANAGE = '+manage';
+  dropdown(root, {
+    value: listState.tag, aria: '按分组筛选', search: tags.length > 8 ? '搜索分组' : '', empty: '没有匹配的分组', minWidth: 220, maxWidth: 300,
+    groups: (q) => q ? [['', tags.map((t) => t.tag).filter((t) => t.toLowerCase().includes(q))]]
+      : [['', ['']], ...(tags.length ? [['分组', [...tags.map((t) => t.tag), '+none']], ['', [MANAGE]]] : [])],
+    button: (v) => `${ic('tag', 14)}<span class="nm">${!v ? '全部分组' : v === '+none' ? '未分组' : esc(v)}</span>`,
+    option: (v, q) => v === MANAGE ? `<span class="ot g-op g-sep">${ic('edit', 14)}管理分组…</span>`
+      : !v ? '<span class="ot">全部分组</span>' : v === '+none' ? '<span class="ot">未分组</span>'
+      : `<span class="ot">${hl(v, q)}<small>${tags.find((t) => t.tag === v)?.n || 0} 个</small></span>`,
+    onChange: (v) => {
+      if (v === MANAGE) { linkTagFilter(root, tags); return tagManageDialog(() => renderLinks(routeToken), LINK_TAGS); }
+      listState.tag = v; listState.page = 1; listState.sel.clear(); renderLinks(routeToken);
+    },
+  });
+}
+
+// 批量操作栏：选中短链后出现
+function bulkBar(d) {
+  const bar = document.getElementById('lbulk');
+  if (!bar) return;
+  const ids = [...listState.sel];
+  bar.hidden = !ids.length;
+  if (!ids.length) { bar.innerHTML = ''; return; }
+  const chosen = d.items.filter((l) => listState.sel.has(l.id));
+  const run = async (action, extra = {}, msg = '已完成') => {
+    try { await api('/links/bulk', { method: 'POST', body: { ids, action, ...extra } }); toast(msg); listState.sel.clear(); renderLinks(routeToken); }
+    catch (ex) { toast(ex.message, 'bad'); }
+  };
+  bar.innerHTML = `<b>已选 ${ids.length} 个</b><span class="sp"></span>
+    <button type="button" class="btn sm ghost" data-a="enable">启用</button>
+    <button type="button" class="btn sm ghost" data-a="disable">停用</button>
+    <button type="button" class="btn sm ghost" data-a="tag">${ic('tag', 14)}加到分组</button>
+    ${chosen.some((l) => l.tags?.length) ? `<button type="button" class="btn sm ghost" data-a="untag">移出分组</button>` : ''}
+    <button type="button" class="btn sm ghost danger-t" data-a="delete">${ic('trash', 14)}删除</button>
+    <button type="button" class="btn sm" data-a="clear">取消选择</button>`;
+  bar.querySelectorAll('[data-a]').forEach((b) => (b.onclick = async () => {
+    const a = b.dataset.a;
+    if (a === 'clear') { listState.sel.clear(); return renderLinks(routeToken); }
+    if (a === 'enable') return run('enable', {}, `已启用 ${ids.length} 个短链`);
+    if (a === 'disable') {
+      const ok = await confirmDialog({ title: `停用 ${ids.length} 个短链？`, text: '停用后访问这些短链会返回 404，可以随时重新启用。', ok: '停用' });
+      return ok && run('disable', {}, `已停用 ${ids.length} 个短链`);
+    }
+    if (a === 'tag') {
+      const tag = await tagDialog({ title: `把 ${ids.length} 个短链加到分组`, tags: d.tags || [], ok: '加入分组' });
+      return tag && run('tag', { tag }, `已加到“${tag}”`);
+    }
+    if (a === 'untag') {
+      const own = [...new Set(chosen.flatMap((l) => l.tags || []))].map((t) => ({ tag: t, n: chosen.filter((l) => l.tags?.includes(t)).length }));
+      const tag = await tagDialog({ title: `把 ${ids.length} 个短链移出分组`, text: '点下面的分组名，或输入要移出的分组。', tags: own, ok: '移出', value: own.length === 1 ? own[0].tag : '' });
+      return tag && run('untag', { tag }, `已移出“${tag}”`);
+    }
+    if (a === 'delete') {
+      const clicks = chosen.reduce((s2, l) => s2 + (l.clicks || 0), 0);
+      const ok = await confirmDialog({ title: `删除 ${ids.length} 个短链？`, text: `会同时删除它们的跳转规则和 ${num(clicks)} 条访问记录，无法恢复。`, ok: '删除', danger: true });
+      return ok && run('delete', {}, `已删除 ${ids.length} 个短链`);
+    }
+  }));
 }
 
 function bindLinksChrome() {
@@ -2874,6 +3095,18 @@ async function renderLink(token, id) {
     api(`/links/${id}/clicks?page=${clickState.page}&size=30&bots=${state.bots ? 1 : 0}`),
   ]);
   if (token !== routeToken) return;
+  setTitle(`/${link.slug} · 短链`);
+  const bindLinkTags = () => {
+    const box = document.getElementById('g-tags');
+    if (!box) return;
+    const call = (action, tag) => api('/links/bulk', { method: 'POST', body: { ids: [link.id], action, tag } }).then(() => route()).catch((ex) => toast(ex.message, 'bad'));
+    box.querySelectorAll('[data-untag]').forEach((b) => (b.onclick = () => call('untag', b.dataset.untag)));
+    document.getElementById('g-tag-add').onclick = async () => {
+      const tag = await tagDialog({ title: `把 /${link.slug} 加到分组`, tags: await LINK_TAGS.list().catch(() => []), ok: '加入' });
+      if (tag) call('tag', tag);
+    };
+  };
+  setTimeout(bindLinkTags, 0);
   const url = shortUrl(link.slug);
   const pages = Math.max(1, Math.ceil(c.total / c.size));
   const hourMax = Math.max(1, ...s.hourly.map((h) => h.n));
@@ -2891,7 +3124,7 @@ async function renderLink(token, id) {
             ${copyBtn(url, 'btn sm', '复制')}
             <a class="btn sm ghost icon" href="${esc(url)}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 15)}</a></div>
           ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>` : '<span class="warn">未设置默认推广地址</span>'}<button type="button" class="hr-more" data-panel-open="rules">按地区分流 ${ic('chev', 12)}</button></div>`}
-          <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.utm ? ' · 转化追踪' : ''}</div>
+          <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.utm ? ' · 转化追踪' : ''}${siteTagsBar('', link.tags || [])}</div>
           ${link.note ? `<div class="hero-note" title="${esc(link.note)}">${esc(link.note)}</div>` : ''}
         </div>
         <div class="acts">
@@ -3428,7 +3661,7 @@ function bindGRange(rerender) {
     value: String(gState.days), aria: '时间范围', minWidth: 160,
     groups: () => [['', G_RANGES.map(([d]) => String(d))]],
     button: (v) => `${ic('chart', 14)}<span class="nm">${label.get(Number(v))}</span>`,
-    option: (v) => `<span class="ot">${label.get(Number(v))}${v === '365' ? '<small>不含环比</small>' : ''}</span>`,
+    option: (v) => `<span class="ot">${label.get(Number(v))}${v === '365' ? '<small>不含环比</small>' : v === '28' ? '<small>与 Google 默认一致，正好 4 个完整星期</small>' : ''}</span>`,
     onChange: (v) => { gState.days = Number(v); store.set('g:days', gState.days); rerender(); },
   });
 }
@@ -3744,8 +3977,20 @@ function tagDialog({ title, text, tags = [], ok = '确定', value = '' }) {
   });
 }
 
-// 管理分组：改名 / 删除
-async function tagManageDialog(onDone) {
+// 管理分组：改名 / 删除。src：分组的读写接口（默认是站点分组）
+const SITE_TAGS = {
+  noun: '站点',
+  list: async () => (await api('/google/tags')).tags,
+  rename: (tag, to) => api('/google/tags', { method: 'PUT', body: { tag, rename: to } }),
+  drop: (tag) => api('/google/tags', { method: 'PUT', body: { tag, drop: true } }),
+};
+const LINK_TAGS = {
+  noun: '短链',
+  list: async () => (await api('/links?size=1')).tags || [],
+  rename: (tag, to) => api('/links/bulk', { method: 'POST', body: { action: 'renameTag', tag, to } }),
+  drop: (tag) => api('/links/bulk', { method: 'POST', body: { action: 'dropTag', tag } }),
+};
+async function tagManageDialog(onDone, src = SITE_TAGS) {
   const ov = document.createElement('div'); ov.className = 'ov';
   const d = document.createElement('div'); d.className = 'dialog tag-d'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
   const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); onDone(); };
@@ -3754,9 +3999,9 @@ async function tagManageDialog(onDone) {
   document.addEventListener('keydown', onKey);
   document.body.append(ov, d);
   const draw = async () => {
-    const { tags } = await api('/google/tags');
-    d.innerHTML = `<h3>管理分组</h3><p>改名时如果填了已有的分组名，两个分组会合并。删除分组不会删除站点。</p>
-      <div class="tg-list">${tags.map((t) => `<div class="tg-r"><span class="gtg">${esc(t.tag)}</span><span class="hint">${t.n} 个站点</span><span class="sp"></span>
+    const tags = await src.list();
+    d.innerHTML = `<h3>管理分组</h3><p>改名时如果填了已有的分组名，两个分组会合并。删除分组不会删除${src.noun}。</p>
+      <div class="tg-list">${tags.map((t) => `<div class="tg-r"><span class="gtg">${esc(t.tag)}</span><span class="hint">${t.n} 个${src.noun}</span><span class="sp"></span>
         <button type="button" class="btn sm ghost" data-ren="${esc(t.tag)}">${ic('edit', 14)}改名</button>
         <button type="button" class="btn sm ghost danger-t" data-drop="${esc(t.tag)}">${ic('trash', 14)}删除</button></div>`).join('') || '<div class="hint">还没有分组</div>'}</div>
       <div class="row"><button type="button" class="btn" data-no>完成</button></div>`;
@@ -3764,12 +4009,12 @@ async function tagManageDialog(onDone) {
     d.querySelectorAll('[data-ren]').forEach((b) => (b.onclick = async () => {
       const to = await tagDialog({ title: `把“${b.dataset.ren}”改名为`, value: b.dataset.ren, ok: '改名' });
       if (!to || to === b.dataset.ren) return;
-      try { await api('/google/tags', { method: 'PUT', body: { tag: b.dataset.ren, rename: to } }); toast('已改名'); draw(); } catch (ex) { toast(ex.message, 'bad'); }
+      try { await src.rename(b.dataset.ren, to); toast('已改名'); draw(); } catch (ex) { toast(ex.message, 'bad'); }
     }));
     d.querySelectorAll('[data-drop]').forEach((b) => (b.onclick = async () => {
-      const ok = await confirmDialog({ title: `删除分组“${b.dataset.drop}”？`, text: '只删除分组，站点本身不受影响。', ok: '删除', danger: true });
+      const ok = await confirmDialog({ title: `删除分组“${b.dataset.drop}”？`, text: `只删除分组，${src.noun}本身不受影响。`, ok: '删除', danger: true });
       if (!ok) return;
-      try { await api('/google/tags', { method: 'PUT', body: { tag: b.dataset.drop, drop: true } }); toast('已删除分组'); draw(); } catch (ex) { toast(ex.message, 'bad'); }
+      try { await src.drop(b.dataset.drop); toast('已删除分组'); draw(); } catch (ex) { toast(ex.message, 'bad'); }
     }));
   };
   draw();
@@ -3951,7 +4196,7 @@ async function renderSites(token) {
   const head = (extra = '', picker = false) => `<header class="ph"><div><div class="kicker">Google</div>
       ${picker ? '<div class="ov-title"><h1>站点</h1><span class="ov-sep" aria-hidden="true">/</span><div class="combo ov-link" id="g-acct"></div></div>' : '<h1>站点</h1>'}
       <div class="sub">账号下所有网站的 GA4 访问和 Google 搜索表现</div></div>
-    <span class="sp"></span>${extra}</header>`;
+    <span class="sp"></span>${extra ? `<div class="ph-acts">${extra}</div>` : ''}</header>`;
   shell('sites', `${head()}<div class="stack">${skel(64)}${skel(360)}</div>`);
   const st = await api('/google/status');
   if (token !== routeToken) return;
@@ -4612,6 +4857,7 @@ async function renderNotify(token) {
 
   document.getElementById('page').innerHTML = `${head}
     <div class="stack" id="nf">
+      <div id="nwarn"></div>
       <div id="nstat"></div>
       <section class="card rv">
         <div class="card-h"><h3>推送内容</h3><span class="sub">报告包含访问次数、独立访客、与上一周期对比、热门短链、来源与国家</span></div>
@@ -4631,7 +4877,7 @@ async function renderNotify(token) {
       </section>
       <section class="card rv" id="n-seo" hidden></section>
       <section class="card rv" id="n-use"></section>
-      <div class="sec-row rv"><h2 class="sec-t">推送渠道</h2><span class="hint">参数只需配置一次，之后用开关控制是否推送</span></div>
+      <div class="sec-row rv" id="n-chans"><h2 class="sec-t">推送渠道</h2><span class="hint">参数只需配置一次，之后用开关控制是否推送</span></div>
       <div class="grid2" id="chans"></div>
     </div>`;
   const page = document.getElementById('page');
@@ -4742,6 +4988,12 @@ async function renderNotify(token) {
   const renderStatus = () => {
     renderUse();
     renderSeo();
+    // 没有开启任何渠道时，上面的开关都不会真的发送：在顶部提示
+    const w = document.getElementById('nwarn');
+    w.innerHTML = st.tg.enabled || st.email.enabled ? '' : `<div class="nstat warn">${ic('alert', 15)}<span>还没有开启推送渠道，下面的报告和提醒都不会发送。</span>
+      <span class="sp" style="flex:1"></span><button type="button" class="btn sm" id="n-go">${ic('send', 14)}去配置渠道</button></div>`;
+    const go = document.getElementById('n-go');
+    if (go) go.onclick = () => document.getElementById('n-chans').scrollIntoView({ behavior: 'smooth', block: 'start' });
     document.getElementById('nstat').innerHTML = st.status ? `<div class="nstat ${st.status.ok ? 'ok' : 'bad'}">${ic(st.status.ok ? 'check' : 'alert', 15)}
       上次推送：${fmtTime(st.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报', usage: '用量预警', seo: '每周 SEO 变化' }[st.status.kind] || ''}${st.status.ok ? ' · 发送成功' : ` · 失败：${esc(st.status.error)}`}</div>` : '';
   };
@@ -4872,8 +5124,15 @@ async function renderNotify(token) {
 
 // ---------------------------------------------------------------- router
 let routeToken = 0, lastLinkId = null;
+// 浏览器标签页标题
+const setTitle = (name) => { document.title = name ? `${name} · cligc` : 'cligc 短链'; };
+
 async function route() {
   const token = ++routeToken;
+  const h0 = location.hash || '#/';
+  const gs0 = h0.match(/^#\/site\/([^?]+)/);
+  setTitle(h0.startsWith('#/link/') ? '短链' : gs0 ? decodeURIComponent(gs0[1]) : h0.startsWith('#/notify') ? '统计通知' : h0.startsWith('#/sites') ? '站点'
+    : h0.startsWith('#/settings') ? '设置' : h0.startsWith('#/links') ? '短链' : '概览');
   clearInterval(liveTimer);
   document.querySelectorAll('.pop').forEach((p) => p.remove());
   const h = location.hash || '#/';
@@ -4896,7 +5155,18 @@ async function route() {
     }
     return await renderHome(token);
   } catch (err) {
-    if (err.message !== 'unauthorized') { console.error(err); toast('加载失败：' + err.message, 'bad'); }
+    if (err.message === 'unauthorized') return;
+    // 短链 / 站点不存在（被删除、链接写错）：显示空状态而不是一直停在加载中
+    if (token === routeToken && /not found|不存在/.test(err.message) && /^#\/(link|site)\//.test(location.hash)) {
+      const isLink = location.hash.startsWith('#/link/');
+      const page = document.getElementById('page');
+      if (page) page.innerHTML = `<a class="back" href="${isLink ? '#/links' : '#/sites'}">${ic('back', 14)}${isLink ? '全部短链' : '全部站点'}</a>
+        <section class="card rv"><div class="empty" style="padding:64px 24px;flex-direction:column;gap:6px">${ic('search')}<b>${isLink ? '这个短链不存在' : '这个站点不存在'}</b>
+          <span>可能已被删除，或链接地址有误</span><a class="btn sm" href="${isLink ? '#/links' : '#/sites'}" style="margin-top:8px">返回列表</a></div></section>`;
+      setTitle(isLink ? '短链不存在' : '站点不存在');
+      return;
+    }
+    console.error(err); toast('加载失败：' + err.message, 'bad');
   }
 }
 

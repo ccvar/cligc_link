@@ -180,3 +180,10 @@ CREATE TABLE IF NOT EXISTS site_tags (
   tag   TEXT NOT NULL,
   PRIMARY KEY (host, tag)
 );
+-- 短链分组（标签）
+CREATE TABLE IF NOT EXISTS link_tags (
+  link_id  INTEGER NOT NULL,
+  tag      TEXT NOT NULL,
+  PRIMARY KEY (link_id, tag)
+);
+CREATE INDEX IF NOT EXISTS idx_link_tags_tag ON link_tags(tag);

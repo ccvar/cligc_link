@@ -640,9 +640,10 @@ async function siteSources(env, hosts, days) {
     regs.set(key, hllMerge(regs.get(key) || hllNew(), u.reg));
     siteRegs.set(h, hllMerge(siteRegs.get(h) || hllNew(), u.reg));
   }
-  const res = new Map([...out].map(([k, m]) => [k, [...m.values()].map((e) => ({ ...e, sources: [...e.sources], visitors: regs.has(`${k}|${e.id}`) ? hllCount(regs.get(`${k}|${e.id}`)) : null }))
+  const res = new Map([...out].map(([k, m]) => [k, [...m.values()].map((e) => ({ ...e, sources: [...e.sources], visitors: regs.has(`${k}|${e.id}`) ? Math.min(hllCount(regs.get(`${k}|${e.id}`)), e.human) : null }))
     .filter((e) => e.cur > 0).sort((a, b) => b.human - a.human || b.cur - a.cur)]));
-  res.visitors = new Map([...siteRegs].map(([k, r]) => [k, hllCount(r)]));
+  // 站点访客封顶为站点的真人点击数（估算误差）
+  res.visitors = new Map([...siteRegs].map(([k, r]) => [k, Math.min(hllCount(r), (res.get(k) || []).reduce((a, e) => a + e.human, 0))]));
   return res;
 }
 
