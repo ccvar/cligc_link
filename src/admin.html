@@ -1432,6 +1432,13 @@ button.gtg { cursor: pointer; }
 .chm-l i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .chm-l em { font-style: normal; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chm-l b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+.kd { margin-top: 6px; }
+.kd-c { position: relative; flex: none; width: 52px; height: 52px; }
+.kd-c svg { width: 100%; height: 100%; }
+.kd-c > b { position: absolute; inset: 0; display: grid; place-items: center; grid-auto-flow: column; justify-content: center; align-items: center; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kd-c > b small { font-size: 9.5px; font-weight: 600; color: var(--muted); margin-left: 1px; }
+.kd .chm-l { gap: 2px; }
+.kd .chm-l span { font-size: 11.5px; }
 @media (max-width: 1100px) { .kstrip.gs.has-ch { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .kstrip.gs.has-ch { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 #g-ga .donut-w { gap: 28px; padding: 6px 0 2px; }
@@ -2694,11 +2701,22 @@ const humanPct = (kinds) => {
   const sum = (kinds || []).reduce((a, b) => a + b.n, 0);
   return sum ? Math.round((kindCount(kinds, 'human') / sum) * 100) : '—';
 };
-// 真人占比：经代理的数量跟在百分比后面；下一行只放可疑 / 爬虫，过长时省略
-const kindValue = (kinds) => `<b>${humanPct(kinds)}</b><small>%${proxyCount(kinds) ? `<span class="kc-px" data-tip="真人中经 VPN / 代理访问的次数">经代理 ${num(proxyCount(kinds))}</span>` : ''}</small>`;
-// 提示挂在外层：.kc-k 自身裁剪溢出（用于省略号），挂在它上面会被裁掉
-const kindBar = (kinds) => `<div class="kc-kw" data-tip="真人 ${num(kindCount(kinds, 'human'))}（经代理 ${num(proxyCount(kinds))}）· 可疑 ${num(kindCount(kinds, 'suspect'))} · 爬虫 ${num(kindCount(kinds, 'bot'))}"><div class="kc-k">
-  <span>可疑 ${num(kindCount(kinds, 'suspect'))}</span><span>爬虫 ${num(kindCount(kinds, 'bot'))}</span></div></div>`;
+// 真人占比小环形图：直连的真人 / 经代理的真人 / 可疑 / 爬虫，中间是真人占比
+function kindDonut(kinds) {
+  const sum = (kinds || []).reduce((a, b) => a + b.n, 0);
+  if (!sum) return '<div class="kc-v"><b>—</b></div>';
+  const px = proxyCount(kinds), hu = kindCount(kinds, 'human');
+  const parts = [
+    ['真人', hu - px, 'var(--good)', '直接访问的真人'], ['经代理', px, 'var(--accent)', '真人中经 VPN / 代理访问的'],
+    ['可疑', kindCount(kinds, 'suspect'), 'var(--amber)', '机房 IP、缺少浏览器特征、高频访问等'], ['爬虫', kindCount(kinds, 'bot'), 'var(--faint)', '自报身份的爬虫、链接预览和脚本'],
+  ].filter((x) => x[1] > 0);
+  const r = 22, C = 2 * Math.PI * r;
+  let off = 0;
+  const segs = parts.map(([, n, c]) => { const len = (n / sum) * C; const el = `<circle cx="28" cy="28" r="${r}" stroke="${c}" stroke-dasharray="${Math.max(0, len - (parts.length > 1 ? 1.5 : 0))} ${C}" stroke-dashoffset="${-off}"/>`; off += len; return el; }).join('');
+  return `<div class="chm kd"><div class="kd-c"><svg viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="${r}" stroke="var(--sunken)"/>${segs}</svg>
+      <b data-tipf-always data-tipf="${esc(`真人 ${num(hu)} 次，占 ${pctText(hu / sum)}（含经代理 ${num(px)} 次）`)}">${humanPct(kinds)}<small>%</small></b></div>
+    <div class="chm-l">${parts.map(([l, n, c, tip]) => `<span data-tipf-always data-tipf="${esc(`${tip} · ${num(n)} 次`)}"><i style="background:${c}"></i><em>${l}</em><b>${pctText(n / sum)}</b></span>`).join('')}</div></div>`;
+}
 async function renderHome(token) {
   const now = new Date();
   shell('home', `<header class="ph">
@@ -2761,8 +2779,7 @@ async function renderHome(token) {
       </div>
       <div class="kc">
         <div class="kc-h"><span class="l">真人占比</span></div>
-        <div class="kc-v">${kindValue(d.kinds)}</div>
-        ${kindBar(d.kinds)}
+        ${kindDonut(d.kinds)}
       </div>
       ${d.link ? `<div class="kc">
         <div class="kc-h"><span class="l">最后访问</span><a href="#/link/${d.link.id}" class="kc-a">详情 →</a></div>
@@ -3477,8 +3494,7 @@ async function renderLink(token, id) {
         </div>
         <div class="kc">
           <div class="kc-h"><span class="l">真人占比</span></div>
-          <div class="kc-v">${kindValue(s.kinds)}</div>
-          ${kindBar(s.kinds)}
+          ${kindDonut(s.kinds)}
         </div>
       </section>
 
