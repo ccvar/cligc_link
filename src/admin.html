@@ -84,6 +84,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 @keyframes fade { from { opacity: 0; } }
 @keyframes grow { from { transform: scaleX(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(15,159,90,.45); } 100% { box-shadow: 0 0 0 8px rgba(15,159,90,0); } }
 @keyframes flash { from { background: var(--accent-2); } to { background: transparent; } }
 .rv { animation: rise .6s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 45ms); }
@@ -1036,6 +1037,34 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .bi-u mark.del { background: var(--bad-bg); color: var(--bad); border-radius: 3px; padding: 0 1px; }
 .bi-u mark.add { background: var(--good-bg); color: var(--good); border-radius: 3px; padding: 0 1px; }
 @media (max-width: 640px) { .bulk-stat b { font-size: 17px; } }
+/* 站点（GA4 + GSC） */
+.g-connect .card-b { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 48px 24px; }
+.g-connect h2 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.02em; }
+.g-connect p { margin: 0; max-width: 520px; color: var(--text-2); line-height: 1.8; }
+.g-logo { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--accent-2); color: var(--accent); }
+.g-acct { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); margin-right: 4px; }
+.g-acct svg { color: var(--good); }
+.g-prog { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 10px 14px; border-radius: 10px; background: var(--accent-2); color: var(--accent-ink); font-size: 13px; }
+.g-prog svg { animation: spin 1.2s linear infinite; }
+.g-prog[hidden] { display: none; }
+.gl-wrap { overflow-x: auto; }
+.tbl.gl th.r, .tbl.gt th.r { text-align: right; }
+.tbl.gl td.num, .tbl.gt td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl.gl tbody tr { cursor: pointer; }
+.tbl.gl .gh { font-weight: 600; font-family: var(--mono); font-size: 13px; }
+.tbl.gl .gsp { width: 120px; } .tbl.gl .gsp svg { width: 110px; height: 28px; display: block; color: var(--accent); }
+.gtag { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; margin-right: 5px; border-radius: 4px; font-size: 10.5px; font-weight: 650; vertical-align: 1px; }
+.gtag.ga { color: #e8710a; background: color-mix(in srgb, #e8710a 13%, transparent); }
+.gtag.sc { color: var(--accent-ink); background: var(--accent-2); }
+.gtag.off { color: var(--muted); background: var(--sunken); }
+.gtag.bad { color: var(--bad); background: var(--bad-bg); cursor: default; }
+.gd { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+.gd.up { color: var(--good); } .gd.down { color: var(--bad); }
+.kstrip.gk .kc-h .gd { display: inline; }
+.tbl.gt { table-layout: fixed; }
+.tbl.gt th:first-child { width: 46%; }
+.tbl.gt td { overflow: hidden; }
+.tbl.gt td .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dialog.dup p { margin-bottom: 18px; }
 .dialog.dup .field { margin-bottom: 16px; }
 .dialog.dup .row { margin-top: 22px; }
@@ -1419,6 +1448,7 @@ function shell(active, inner) {
       <nav class="nav">
         <a href="#/" class="${active === 'home' ? 'on' : ''}" data-tip="概览" data-tip-at="right">${ic('home')}<span>概览</span></a>
         <a href="#/links" class="${active === 'links' ? 'on' : ''}" data-tip="短链" data-tip-at="right">${ic('link')}<span>短链</span></a>
+        <a href="#/sites" class="${active === 'sites' ? 'on' : ''}" data-tip="站点" data-tip-at="right">${ic('globe')}<span>站点</span></a>
         <a href="#/notify" class="${active === 'notify' ? 'on' : ''}" data-tip="通知" data-tip-at="right">${ic('bell')}<span>通知</span></a>
       </nav>
       <button class="btn ghost icon acct" id="acct" aria-label="账号菜单" aria-haspopup="menu" aria-expanded="false">${ic('user', 19)}</button>
@@ -3074,6 +3104,241 @@ function openRuleDrawer(link, rule) {
   };
 }
 
+// ---------------------------------------------------------------- 站点（GA4 + Search Console）
+const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions') };
+const pctD = (a, b) => (b ? (a - b) / b : null);
+const gDelta = (a, b, inverse = false) => {
+  const d = pctD(a, b);
+  if (d === null || !isFinite(d)) return '';
+  const up = d >= 0, good = inverse ? !up : up;
+  return `<span class="gd ${Math.abs(d) < 0.005 ? '' : good ? 'up' : 'down'}">${up ? '↑' : '↓'}${Math.abs(d * 100) >= 100 ? Math.round(Math.abs(d * 100)) : Math.abs(d * 100).toFixed(1)}%</span>`;
+};
+const pct1 = (x) => `${(x * 100).toFixed(1)}%`;
+const gRangeBar = () => `<div class="seg" id="g-range">${[[7, '7 天'], [28, '28 天'], [90, '90 天']]
+  .map(([d, l]) => `<button data-d="${d}" class="${d === gState.days ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+function bindGRange(rerender) {
+  const seg = document.getElementById('g-range');
+  if (!seg) return;
+  segThumb(seg);
+  seg.querySelectorAll('button').forEach((b) => (b.onclick = () => { gState.days = Number(b.dataset.d); store.set('g:days', gState.days); rerender(); }));
+}
+
+// 授权回来后的提示
+function googleFlash() {
+  const m = location.hash.match(/[?&]google=([^&]*)/);
+  if (!m) return;
+  const v = decodeURIComponent(m[1]);
+  history.replaceState(null, '', '#/sites');
+  if (v === 'ok') toast('Google 账号已连接，正在同步站点数据'); else toast(v, 'bad');
+}
+
+async function googleSyncAll(btn, onProgress) {
+  const before = Date.now();
+  let first = true, r;
+  if (btn) btn.disabled = true;
+  try {
+    do {
+      r = await api('/google/sync', { method: 'POST', body: { before, discover: first } });
+      first = false;
+      onProgress && onProgress(r);
+    } while (r.left > 0 && r.done > 0);
+  } finally { if (btn) btn.disabled = false; }
+  return r;
+}
+
+async function renderSites(token) {
+  const head = (extra = '') => `<header class="ph"><div><div class="kicker">Google</div><h1>站点</h1><div class="sub">账号下所有网站的 GA4 访问和 Google 搜索表现</div></div>
+    <span class="sp"></span>${extra}</header>`;
+  shell('sites', `${head()}<div class="stack">${skel(64)}${skel(360)}</div>`);
+  const st = await api('/google/status');
+  if (token !== routeToken) return;
+  googleFlash();
+  const page = document.getElementById('page');
+
+  if (!st.configured) {
+    const cmd = 'npx wrangler secret put GOOGLE_CLIENT_SECRET';
+    page.innerHTML = `${head()}<section class="card rv"><div class="card-h"><h3>连接 Google 之前，需要先创建 OAuth 客户端</h3></div><div class="card-b">
+      <ol class="use-steps">
+        <li>打开 <b>Google Cloud 控制台</b>（console.cloud.google.com），新建一个项目。</li>
+        <li>在“API 和服务 → 库”里启用 <b>Google Analytics Admin API</b>、<b>Google Analytics Data API</b>、<b>Google Search Console API</b>。</li>
+        <li>“OAuth 权限请求页面”：用户类型选 <b>外部</b>，填好应用名称和邮箱；然后点 <b>发布应用</b>（否则授权 7 天就会失效）。个人使用无需 Google 审核，授权时点“继续”即可。</li>
+        <li>“凭据 → 创建凭据 → OAuth 客户端 ID”：类型选 <b>Web 应用</b>，已获授权的重定向 URI 填：<div class="use-cmd"><code>${esc(location.origin)}/api/google/callback</code>${copyBtn(`${location.origin}/api/google/callback`, 'btn sm ghost icon')}</div></li>
+        <li>把客户端 ID 填到 wrangler.toml 的 <code>[vars]</code> 里的 <code>GOOGLE_CLIENT_ID</code>，客户端密钥用下面的命令保存，然后重新部署：<div class="use-cmd"><code>${cmd}</code>${copyBtn(cmd, 'btn sm ghost icon')}</div></li>
+      </ol></div></section>`;
+    reveal(page);
+    return;
+  }
+  if (!st.connected) {
+    page.innerHTML = `${head()}<section class="card rv g-connect"><div class="card-b">
+      <div class="g-logo">${ic('globe', 28)}</div>
+      <h2>连接 Google 账号</h2>
+      <p>授权后，账号下所有的 GA4 媒体资源和 Search Console 站点会自动出现在这里，按域名配对。<br>只申请<b>只读</b>权限，不会修改你的任何设置；令牌加密保存在你自己的数据库里，可随时断开。</p>
+      ${st.error ? `<div class="bulk-bad">${ic('info', 15)}${esc(st.error)}</div>` : ''}
+      <button class="btn primary" id="g-connect">${ic('link', 15)}连接 Google 账号</button></div></section>`;
+    reveal(page);
+    document.getElementById('g-connect').onclick = async (e) => {
+      e.currentTarget.disabled = true;
+      try { location.href = (await api('/google/auth')).url; } catch (err) { toast(err.message, 'bad'); e.currentTarget.disabled = false; }
+    };
+    return;
+  }
+
+  const d = await api('/google/sites?days=' + gState.days);
+  if (token !== routeToken) return;
+  const acct = `<div class="g-acct">${ic('check', 13)}<span>${esc(st.email || '已连接')}</span><button type="button" class="hr-more" id="g-off">断开</button></div>`;
+  page.innerHTML = `${head(`${acct}${gRangeBar()}<button class="btn" id="g-sync">${ic('refresh', 15)}立即同步</button>`)}
+    ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}${esc(st.error)}</div>` : ''}
+    ${st.discovered?.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.discovered.errors.map(esc).join('<br>')}</div></div>` : ''}
+    <div class="g-prog" id="g-prog" ${st.pending ? '' : 'hidden'}>${ic('refresh', 14)}<span>正在同步 <b>${st.pending}</b> 个站点的数据…</span></div>
+    <section class="card rv">
+      <div class="lh"><div class="search">${ic('search')}<input class="input" id="g-q" placeholder="搜索域名或 GA4 名称" value="${esc(gState.q)}" aria-label="搜索站点"></div><span class="sp"></span>
+        <div class="seg" id="g-sort">${[['sessions', '按会话'], ['clicks', '按搜索点击'], ['host', '按域名']].map(([k, l]) => `<button data-s="${k}" class="${k === gState.sort ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+      <div id="g-list"></div>
+      <div class="pager"><span>${d.items.length} 个站点 · 统计到 ${d.ranges.to}（截至昨天；Search Console 数据通常延迟 2–3 天）${st.lastSync ? ` · 同步于 ${ago(st.lastSync)}` : ''}</span></div>
+    </section>`;
+  reveal(page);
+  bindGRange(() => renderSites(routeToken));
+  const list = document.getElementById('g-list');
+  const draw = () => {
+    const q = gState.q.toLowerCase();
+    const rows = d.items.filter((x) => !q || x.host.includes(q) || (x.ga4?.name || '').toLowerCase().includes(q));
+    const key = (x) => (gState.sort === 'clicks' ? x.cur.gsc?.clicks ?? -1 : gState.sort === 'host' ? 0 : x.cur.ga?.sessions ?? -1);
+    rows.sort((a, b) => (gState.sort === 'host' ? a.host.localeCompare(b.host) : key(b) - key(a)));
+    list.innerHTML = rows.length ? `<div class="gl-wrap"><table class="tbl gl">
+      <thead><tr><th>站点</th><th class="r">用户</th><th class="r">会话</th><th class="r">关键事件</th><th class="r">搜索点击</th><th class="r">展示</th><th class="r">点击率</th><th class="r">排名</th><th>会话趋势</th></tr></thead>
+      <tbody>${rows.map((x) => {
+        const ga = x.cur.ga, pg = x.prev.ga, sc = x.cur.gsc, ps = x.prev.gsc;
+        return `<tr data-host="${esc(x.host)}" tabindex="0">
+          <td><div class="gh">${esc(x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host)}</div>
+            <div class="sm">${x.ga4 ? `<span class="gtag ga">GA4</span>${esc(x.ga4.name)}` : '<span class="gtag off">无 GA4</span>'}${x.gsc ? '<span class="gtag sc">GSC</span>' : '<span class="gtag off">无 GSC</span>'}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div></td>
+          <td class="num">${x.users != null ? num(x.users) : '—'}${x.prevUsers != null ? gDelta(x.users, x.prevUsers) : ''}</td>
+          <td class="num">${ga ? num(ga.sessions) : '—'}${ga && pg ? gDelta(ga.sessions, pg.sessions) : ''}</td>
+          <td class="num">${ga ? num(ga.keyEvents) : '—'}</td>
+          <td class="num">${sc ? num(sc.clicks) : '—'}${sc && ps ? gDelta(sc.clicks, ps.clicks) : ''}</td>
+          <td class="num">${sc ? num(sc.impressions) : '—'}</td>
+          <td class="num">${sc ? pct1(sc.ctr) : '—'}</td>
+          <td class="num">${sc && sc.impressions ? sc.position.toFixed(1) : '—'}${sc && ps && ps.impressions ? gDelta(sc.position, ps.position, true) : ''}</td>
+          <td class="gsp">${x.spark.length ? kpiSpark(x.spark.map((p) => p.n), 'var(--accent)') : ''}</td></tr>`;
+      }).join('')}</tbody></table></div>`
+      : `<div class="empty" style="padding:48px">${ic('inbox')}${d.items.length ? '没有匹配的站点' : '账号下还没有找到 GA4 媒体资源或 Search Console 站点'}</div>`;
+    list.querySelectorAll('tr[data-host]').forEach((tr) => {
+      const go = () => { location.hash = '#/site/' + encodeURIComponent(tr.dataset.host); };
+      tr.onclick = go; tr.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+    });
+  };
+  draw();
+  const qi = document.getElementById('g-q');
+  let t; qi.oninput = () => { clearTimeout(t); t = setTimeout(() => { gState.q = qi.value.trim(); draw(); }, 150); };
+  const sortSeg = document.getElementById('g-sort');
+  segThumb(sortSeg);
+  sortSeg.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+    gState.sort = b.dataset.s; store.set('g:sort', gState.sort);
+    sortSeg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); segThumb(sortSeg); draw();
+  }));
+  const prog = document.getElementById('g-prog');
+  const sync = async (btn) => {
+    prog.hidden = false;
+    try {
+      await googleSyncAll(btn, (r) => { prog.querySelector('span').innerHTML = r.left ? `正在同步，还剩 <b>${r.left}</b> 个站点…` : '同步完成'; });
+      if (token === routeToken) renderSites(routeToken);
+    } catch (err) { toast(err.message, 'bad'); prog.hidden = true; }
+  };
+  document.getElementById('g-sync').onclick = (e) => sync(e.currentTarget);
+  document.getElementById('g-off').onclick = async () => {
+    const ok = await confirmDialog({ title: '断开 Google 账号？', text: '会撤销授权，并删除已同步的 GA4 / Search Console 数据。之后可以随时重新连接。', ok: '断开', danger: true });
+    if (!ok) return;
+    await api('/google/disconnect', { method: 'POST' });
+    toast('已断开 Google 账号'); renderSites(routeToken);
+  };
+  // 首次连接或有待同步的站点：自动继续同步
+  if (st.pending) sync(null);
+}
+
+async function renderSite(token, host) {
+  shell('sites', `<a class="back" href="#/sites">${ic('back', 14)}全部站点</a><div class="stack">${skel(120)}${skel(320)}</div>`);
+  const d = await api(`/google/site?host=${encodeURIComponent(host)}&days=${gState.days}`);
+  if (token !== routeToken) return;
+  // GA4 汇总优先用现查结果（含区间去重用户数）；现查失败时退回到已同步的每日数据
+  const fromDaily = (x) => (x ? { users: null, newUsers: null, sessions: x.sessions, views: x.views, keyEvents: x.keyEvents, engagement: x.engagement, duration: null } : null);
+  const ga = d.ga?.totals?.cur || fromDaily(d.cur.ga), gp = d.ga?.totals?.prev || fromDaily(d.prev.ga), sc = d.cur.gsc, sp = d.prev.gsc;
+  const kc = (label, v, delta, sub = '') => `<div class="kc"><div class="kc-h"><span class="l">${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b></div>${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
+  const title = host.startsWith('ga4-') ? d.ga4?.name || host : host;
+
+  // 每日序列（缺的日期补 0），上一周期按序号对齐
+  const days = [];
+  for (let t = Date.parse(d.daily[0]?.date || new Date(Date.now() - d.days * 86400000).toISOString().slice(0, 10)); ; t += 86400000) {
+    const k = new Date(t).toISOString().slice(0, 10);
+    if (k > new Date(Date.now() - 86400000).toISOString().slice(0, 10)) break;
+    days.push(k);
+    if (days.length > 400) break;
+  }
+  const map = new Map(d.daily.map((r) => [r.date, r]));
+  const prev = d.prevDaily;
+  const series = days.map((k, i) => {
+    const r = map.get(k) || {}, p = prev[prev.length - days.length + i] || {};
+    const dt = new Date(k + 'T00:00:00');
+    return { k, t: `${dt.getMonth() + 1} 月 ${dt.getDate()} 日 ${WEEK[dt.getDay()]}`, label: `${dt.getMonth() + 1}/${dt.getDate()}`,
+      s: r.sessions || 0, u: r.users || 0, c: r.clicks || 0, i: r.impressions || 0, ps: p.sessions || 0, pc: p.clicks || 0 };
+  });
+
+  const gt = (rows, cols) => rows?.length ? `<table class="tbl gt"><thead><tr>${cols.map((c) => `<th class="${c.r ? 'r' : ''}">${c.h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td class="${c.r ? 'num' : ''}">${c.f(r)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+    : `<div class="empty">${ic('inbox')}该时间段内暂无数据</div>`;
+  const kcell = (k) => `<div class="ell" data-tipf="${esc(k)}">${esc(k || '(未设置)')}</div>`;
+  const scCols = (h) => [{ h, f: (r) => kcell(r.k) }, { h: '点击', r: 1, f: (r) => num(r.clicks) }, { h: '展示', r: 1, f: (r) => num(r.impressions) }, { h: '点击率', r: 1, f: (r) => pct1(r.ctr) }, { h: '排名', r: 1, f: (r) => r.position.toFixed(1) }];
+
+  document.getElementById('page').innerHTML = `
+    <a class="back" href="#/sites">${ic('back', 14)}全部站点</a>
+    <div class="stack">
+      <section class="card hero rv"><div class="info">
+        <div class="ttl"><span class="ttl-t">${esc(d.ga4?.name || '')}</span>${d.realtime != null ? `<span class="live">实时 ${num(d.realtime)} 人在线</span>` : ''}</div>
+        <div class="short">${esc(title)}${host.includes('.') ? `<a class="btn sm ghost icon" href="https://${esc(host)}" target="_blank" rel="noopener" data-tip="打开网站" aria-label="打开网站">${ic('ext', 15)}</a>` : ''}</div>
+        <div class="meta">${d.ga4 ? `GA4：${esc(d.ga4.account)} / ${esc(d.ga4.name)}（${esc(d.ga4.property)}）` : '未关联 GA4'} · ${d.gsc ? `Search Console：${esc(d.gsc)}` : '未关联 Search Console'}${d.syncedAt ? ` · 同步于 ${ago(d.syncedAt)}` : ''}</div>
+      </div><div class="acts">${gRangeBar()}</div></section>
+      ${d.errors?.length || d.error ? `<div class="bulk-bad">${ic('info', 15)}<div>${[d.error, ...(d.errors || [])].filter(Boolean).map(esc).join('<br>')}</div></div>` : ''}
+      <section class="card kstrip gk rv">
+        ${kc('用户', ga?.users != null ? num(ga.users) : '—', ga?.users != null && gp?.users != null ? gDelta(ga.users, gp.users) : '', ga?.newUsers != null ? `新用户 ${num(ga.newUsers)}` : d.ga4 ? '暂时无法读取' : '未关联 GA4')}
+        ${kc('会话', ga ? num(ga.sessions) : '—', ga && gp ? gDelta(ga.sessions, gp.sessions) : '', ga?.duration != null ? `平均时长 ${Math.round(ga.duration)} 秒` : '')}
+        ${kc('浏览量', ga ? num(ga.views) : '—', ga && gp ? gDelta(ga.views, gp.views) : '')}
+        ${kc('关键事件', ga ? num(ga.keyEvents) : '—', ga && gp ? gDelta(ga.keyEvents, gp.keyEvents) : '', ga ? `互动率 ${pct1(ga.engagement)}` : '')}
+        ${kc('搜索点击', sc ? num(sc.clicks) : '—', sc && sp ? gDelta(sc.clicks, sp.clicks) : '', sc ? `展示 ${num(sc.impressions)}` : '未关联 Search Console')}
+        ${kc('点击率 / 排名', sc ? `${pct1(sc.ctr)}<small> · ${sc.impressions ? sc.position.toFixed(1) : '—'}</small>` : '—', sc && sp && sp.impressions ? gDelta(sc.position, sp.position, true) : '', sc ? '排名越小越好' : '')}
+      </section>
+      <div class="grid2">
+        <section class="card rv"><div class="card-h"><h3>访问趋势 · GA4</h3><span class="sp"></span><div class="legend" id="lg-ga"></div></div>
+          <div class="card-b">${d.ga4 ? '<div class="chart sm" id="ch-ga"></div>' : `<div class="empty">${ic('inbox')}未关联 GA4</div>`}</div></section>
+        <section class="card rv"><div class="card-h"><h3>搜索趋势 · Search Console</h3><span class="sp"></span><div class="legend" id="lg-sc"></div></div>
+          <div class="card-b">${d.gsc ? '<div class="chart sm" id="ch-sc"></div>' : `<div class="empty">${ic('inbox')}未关联 Search Console</div>`}</div></section>
+      </div>
+      <div class="grid2">
+        ${d.gsc ? tabCard('g-sc', 'Google 搜索', [
+          { label: '搜索词', html: gt(d.sc?.queries, scCols('搜索词')) },
+          { label: '页面', html: gt(d.sc?.pages?.map((r) => ({ ...r, k: r.k.replace(/^https?:\/\/[^/]+/, '') || '/' })), scCols('页面')) },
+          { label: '国家', html: gt(d.sc?.countries?.map((r) => ({ ...r, k: r.k.toUpperCase() })), scCols('国家')) },
+          { label: '设备', html: gt(d.sc?.devices, scCols('设备')) },
+        ], 'rv') : ''}
+        ${d.ga4 ? tabCard('g-ga', '访问来源 · GA4', [
+          { label: '来源 / 媒介', html: gt(d.ga?.src, [{ h: '来源 / 媒介', f: (r) => kcell(r.k) }, { h: '会话', r: 1, f: (r) => num(r.v[0]) }, { h: '用户', r: 1, f: (r) => num(r.v[1]) }, { h: '关键事件', r: 1, f: (r) => num(r.v[2]) }]) },
+          { label: '页面', html: gt(d.ga?.pages, [{ h: '页面', f: (r) => kcell(r.k) }, { h: '浏览量', r: 1, f: (r) => num(r.v[0]) }, { h: '用户', r: 1, f: (r) => num(r.v[1]) }]) },
+          { label: '国家', html: gt(d.ga?.countries, [{ h: '国家', f: (r) => kcell(r.k) }, { h: '用户', r: 1, f: (r) => num(r.v[0]) }, { h: '会话', r: 1, f: (r) => num(r.v[1]) }]) },
+          { label: '设备', html: gt(d.ga?.devices, [{ h: '设备', f: (r) => kcell(r.k) }, { h: '用户', r: 1, f: (r) => num(r.v[0]) }, { h: '会话', r: 1, f: (r) => num(r.v[1]) }]) },
+        ], 'rv') : ''}
+      </div>
+    </div>`;
+  const page = document.getElementById('page');
+  reveal(page);
+  bindGRange(() => renderSite(routeToken, host));
+  if (d.ga4) mountChart(document.getElementById('ch-ga'), series, [
+    { id: 's', key: 's', label: '会话', color: 'var(--accent)', type: 'area' },
+    { id: 'u', key: 'u', label: '用户（按天）', color: 'var(--violet)', type: 'line' },
+    { id: 'ps', key: 'ps', label: '上一周期会话', type: 'dash' },
+  ], document.getElementById('lg-ga'));
+  if (d.gsc) mountChart(document.getElementById('ch-sc'), series, [
+    { id: 'c', key: 'c', label: '点击', color: 'var(--teal)', type: 'area' },
+    { id: 'pc', key: 'pc', label: '上一周期点击', type: 'dash' },
+  ], document.getElementById('lg-sc'));
+}
+
 // ---------------------------------------------------------------- 设置（修改密码 / 两步验证）
 async function renderSettings(token) {
   const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证和来源追踪</div></div></header>`;
@@ -3528,6 +3793,9 @@ async function route() {
     }
     lastLinkId = null;
     if (h.startsWith('#/notify')) return await renderNotify(token);
+    const gs = h.match(/^#\/site\/([^?]+)/);
+    if (gs) return await renderSite(token, decodeURIComponent(gs[1]));
+    if (h.startsWith('#/sites')) return await renderSites(token);
     if (h.startsWith('#/settings')) return await renderSettings(token);
     if (h.startsWith('#/links')) {
       const openNew = h.includes('?new');

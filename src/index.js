@@ -3,6 +3,7 @@ import HOME_HTML from './home.html';
 import SCHEMA_SQL from '../schema.sql';
 import { renderSVG } from 'uqr';
 import { EmailMessage } from 'cloudflare:email';
+import * as google from './google.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
 const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
@@ -59,6 +60,7 @@ export default {
       await aggregate(env);
       await pruneClicks(env);
       await env.DB.prepare('DELETE FROM login_guard WHERE at < ? AND until < ?').bind(Date.now() - 7 * DAY, Date.now()).run();
+      if (google.googleConfigured(env)) await google.syncBatch(env, await sessionSecret(env), { limit: 10 }).catch((e) => console.error('google sync failed', e));
     })().catch((e) => console.error('aggregate / prune failed', e)));
   },
 };
@@ -427,6 +429,7 @@ async function handleApi(request, env, url) {
   if (mustChange) return json({ error: '请先修改默认密码', mustChange: true }, 403);
   if (path === '/api/overview' && method === 'GET') return overview(env, url);
   if (path === '/api/retention' && method === 'GET') return json(await retentionInfo(env));
+  if (path.startsWith('/api/google/')) return googleApi(request, env, url);
   if (path === '/api/usage' && method === 'GET') return json(await cfUsage(env, url.searchParams.get('force') === '1'));
   if (path === '/api/usage/plan' && method === 'PUT') {
     const body = await request.json().catch(() => ({}));
@@ -1576,6 +1579,43 @@ async function cfUsage(env, force) {
   };
   if (!out.errors.length) await setSetting(env, 'usage_cache', JSON.stringify(out));
   return { ...out, planSetting, plan: planSetting === 'auto' ? detected : planSetting };
+}
+
+// ---------------------------------------------------------------- Google（GA4 + Search Console）
+async function googleApi(request, env, url) {
+  const path = url.pathname, method = request.method;
+  if (!google.googleConfigured(env) && path !== '/api/google/status') return json({ error: '未配置 Google OAuth 客户端' }, 400);
+  const secret = await sessionSecret(env);
+  try {
+    if (path === '/api/google/status') return json(await google.status(env, secret));
+    if (path === '/api/google/auth') return json({ url: await google.authUrl(env, url.origin, secret, hmac) });
+    if (path === '/api/google/callback') {
+      const r = await google.handleCallback(env, url, secret, hmac, safeEqual);
+      if (r.ok) {
+        // 授权完成后立即发现站点并同步第一批
+        await google.discover(env, secret).catch(() => {});
+        await google.syncBatch(env, secret, { limit: 6, cutoff: Date.now() }).catch(() => {});
+      }
+      const q = r.ok ? 'google=ok' : `google=${encodeURIComponent(r.error)}`;
+      return new Response(null, { status: 302, headers: { location: `/admin#/sites?${q}`, 'cache-control': 'no-store' } });
+    }
+    if (path === '/api/google/sync' && method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      if (body.discover) await google.discover(env, secret);
+      const cutoff = Number(body.before) > 0 ? Math.min(Number(body.before), Date.now()) : Date.now() - 6 * 3600000;
+      return json(await google.syncBatch(env, secret, { limit: 12, cutoff }));
+    }
+    if (path === '/api/google/disconnect' && method === 'POST') { await google.disconnect(env, secret); return json({ ok: true }); }
+    const days = [7, 28, 90].includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 28;
+    if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days) });
+    if (path === '/api/google/site') {
+      const d = await google.siteDetail(env, secret, String(url.searchParams.get('host') || ''), days);
+      return d.error ? json(d, 404) : json(d);
+    }
+  } catch (err) {
+    return json({ error: err.message || String(err) }, 500);
+  }
+  return json({ error: 'not found' }, 404);
 }
 
 async function retentionInfo(env) {

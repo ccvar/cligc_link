@@ -102,3 +102,28 @@ CREATE TABLE IF NOT EXISTS login_guard (
   until  INTEGER NOT NULL DEFAULT 0,    -- 锁定到期时间
   at     INTEGER NOT NULL DEFAULT 0     -- 最近一次失败时间
 );
+
+-- Google：GA4 + Search Console（见 src/google.js）
+CREATE TABLE IF NOT EXISTS g_sites (
+  host          TEXT PRIMARY KEY,           -- 主域名（GA4 网站数据流地址或 GSC 资源）
+  ga4_property  TEXT NOT NULL DEFAULT '',   -- GA4 媒体资源 ID
+  ga4_name      TEXT NOT NULL DEFAULT '',
+  ga4_account   TEXT NOT NULL DEFAULT '',
+  gsc_site      TEXT NOT NULL DEFAULT '',   -- GSC 资源，如 sc-domain:example.com
+  users         TEXT NOT NULL DEFAULT '',   -- 区间去重用户数 JSON（7 / 28 / 90 天）
+  synced_at     INTEGER NOT NULL DEFAULT 0,
+  error         TEXT NOT NULL DEFAULT '',
+  updated_at    INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS g_daily (
+  host         TEXT NOT NULL,
+  date         TEXT NOT NULL,
+  users        INTEGER, sessions INTEGER, views INTEGER, key_events REAL, engagement REAL,   -- GA4
+  clicks       INTEGER, impressions INTEGER, ctr REAL, position REAL,                       -- GSC
+  PRIMARY KEY (host, date)
+);
+CREATE TABLE IF NOT EXISTS g_cache (
+  k   TEXT PRIMARY KEY,
+  v   TEXT NOT NULL,
+  at  INTEGER NOT NULL
+);
