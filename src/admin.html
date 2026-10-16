@@ -143,7 +143,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .side .foot .host .out:hover, .side .foot .host .out:focus-visible { color: var(--bad); background: var(--bad-bg); }
 [data-tip] { position: relative; }
 .ftip { position: fixed; z-index: 80; max-width: min(380px, calc(100vw - 16px)); padding: 5px 9px; border-radius: 7px; background: var(--text); color: var(--panel);
-  font: 500 12px/1.5 var(--sans); white-space: normal; overflow-wrap: anywhere; pointer-events: none; box-shadow: var(--shadow-3);
+  font: 500 12px/1.5 var(--sans); white-space: pre-line; overflow-wrap: anywhere; pointer-events: none; box-shadow: var(--shadow-3);
   opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .2s var(--ease-out); }
 .ftip.on { opacity: 1; transform: none; }
 [data-tip]::after { content: attr(data-tip); position: absolute; z-index: 30; left: 50%; bottom: calc(100% + 8px); transform: translate(-50%, 4px); padding: 5px 9px; border-radius: 7px;
@@ -909,6 +909,7 @@ details[open] > summary::before { transform: rotate(90deg); }
 .use-bar { height: 5px; border-radius: 3px; background: var(--sunken); margin-top: 8px; overflow: hidden; }
 .use-bar i { display: block; height: 100%; border-radius: 3px; background: var(--good); }
 .use-bar.warn i { background: var(--amber); } .use-bar.bad i { background: var(--bad); }
+.use-cfgf { margin: 4px 0 16px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
 .use-t { margin-top: 14px; table-layout: fixed; width: 100%; }
 .use-t th:nth-child(1) { width: 13%; } .use-t th:nth-child(2) { width: 15%; } .use-t th:nth-child(3) { width: 28%; }
 .use-t td:first-child { white-space: nowrap; }
@@ -5498,11 +5499,11 @@ const cfForm = (cfg) => `<form class="set-form cfg-f" data-cf-form>
 function bindCfForm(box, u, onState) {
   const done = (d) => { onState(d); renderUsage(box, d, onState); };
   const edit = box.querySelector('[data-cfg-edit]'), view = box.querySelector('[data-cfg-view]'), wrap = box.querySelector('[data-cfg-form]');
-  if (edit) edit.onclick = () => { view.hidden = true; wrap.hidden = false; wrap.querySelector('#cf-acc').focus(); };
+  if (edit) edit.onclick = () => { if (view) view.hidden = true; wrap.hidden = !wrap.hidden; if (!wrap.hidden) wrap.querySelector('#cf-acc').focus(); };
   const f = box.querySelector('[data-cf-form]');
   if (!f) return;
   const cancel = f.querySelector('[data-cfg-cancel]');
-  if (cancel && view) cancel.onclick = () => { view.hidden = false; wrap.hidden = true; };
+  if (cancel) cancel.onclick = () => { if (view) view.hidden = false; wrap.hidden = true; };
   f.onsubmit = async (e) => {
     e.preventDefault();
     const btn = f.querySelector('.primary'), err = f.querySelector('.err');
@@ -5600,7 +5601,11 @@ function renderUsage(box, u, onState) {
       <span class="hint use-why">${u.planSetting === 'auto' || !u.planSetting
         ? (u.detected === 'paid' ? (u.detectedBy === 'usage' ? '自动识别为付费版：用量已超过免费版上限' : '自动识别为付费版') : '无法自动识别（按免费版额度对比），可手动指定')
         : '已手动指定'}${u.subscriptions?.length ? `<span data-tipf-always data-tipf="账户订阅（多为域名套餐，通常不包含 Workers 付费计划）：${esc(u.subscriptions.join('、'))}"> · 订阅 ${u.subscriptions.length} 项</span>` : ''}</span>
-      <span class="sp"></span><button type="button" class="btn sm" id="use-re">${ic('refresh', 14)}刷新</button></div>
+      <span class="sp"></span>
+      <button type="button" class="btn sm icon" data-cfg-edit aria-label="修改凭据" data-tipf-always data-tipf="${esc(['凭据已加密保存在数据库', `账户 ${u.config?.accountId || ''}`, `令牌 ••••${u.config?.tokenTail || ''}`,
+        u.config?.dbId ? `D1 数据库 ${u.config.dbId}` : '', u.config?.worker ? `Worker ${u.config.worker}` : '', '点击修改或删除'].filter(Boolean).join('\n'))}">${ic('key', 14)}</button>
+      <button type="button" class="btn sm" id="use-re">${ic('refresh', 14)}刷新</button></div>
+    <div data-cfg-form class="use-cfgf" hidden>${cfForm(u.config || {})}</div>
     ${u.errors?.length ? `<div class="bulk-bad">${ic('info', 15)}<div>${u.errors.map(esc).join('<br>')}<br>${u.errors.some((e) => /authentication/i.test(e))
       ? '“Authentication error”表示令牌无效：多半是粘贴的不是令牌值（如 Global API Key 或令牌 ID）、令牌已过期或被轮转，或者设置了客户端 IP 筛选。'
       : '请检查 API 令牌是否有“帐户分析（Account Analytics）· 读取”权限。'}</div></div>` : ''}
@@ -5622,10 +5627,6 @@ function renderUsage(box, u, onState) {
         : meter('D1 存储（整个账户）', u.storageBytes, 5e9, u.myStorage, u.myStorage != null, bytes, '包含')}
     </div>
     <div class="hint" style="margin-top:10px">额度按整个 Cloudflare 账户计算，${paid ? '付费版按自然月累计，超出部分按量计费' : '免费版每天 UTC 0 点（北京时间 8 点）重置，超出后当天的请求会失败'}。按 UTC 日期统计${u.updatedAt ? ` · 更新于 ${fmtTime(u.updatedAt)}` : ''}。</div>
-    <div class="cfg-ro use-cfg" data-cfg-view>${ic('key', 14)}<div>凭据已加密保存在数据库
-        <div class="sm mono">账户 ${esc(u.config?.accountId || '')} · 令牌 ••••${esc(u.config?.tokenTail || '')}${u.config?.dbId ? ` · D1 ${esc(u.config.dbId.slice(0, 8))}…` : ''}${u.config?.worker ? ` · Worker ${esc(u.config.worker)}` : ''}</div></div>
-      <span class="sp"></span><button type="button" class="btn sm" data-cfg-edit>修改</button></div>
-    <div data-cfg-form hidden>${cfForm(u.config || {})}</div>
     <table class="tbl use-t"><thead><tr><th>日期（UTC）</th><th style="text-align:right">D1 读取</th><th></th><th style="text-align:right">D1 写入</th><th style="text-align:right">Worker 请求</th></tr></thead>
       <tbody>${(u.days || []).slice().reverse().map((d) => `<tr>
         <td>${d.date.slice(5)}${d.date === u.today ? ' <span class="sm">今天</span>' : ''}</td>
