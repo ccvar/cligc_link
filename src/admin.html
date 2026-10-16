@@ -702,7 +702,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .hc-p { margin-left: 6px; }
 .lrow .c-status { display: flex; flex-wrap: wrap; gap: 4px; }
 .hc-i { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
-#hc-run.busy svg { animation: spin .9s linear infinite; }
+#hc-run.busy svg, #use-re.busy svg { animation: spin .9s linear infinite; }
 .devs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .dv { display: grid; justify-items: start; gap: 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; font: inherit; }
 .dv svg { color: var(--muted); }
@@ -854,6 +854,11 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .ai-st b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-st span { font-size: 12px; color: var(--muted); }
 .ai-st .hr-more { font-size: 12px; }
+.ai-sh { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ai-sh b { flex: 0 1 auto; min-width: 0; }
+.ai-st .ai-hs { display: flex; gap: 4px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+.ai-hs i { font-style: normal; font-size: 11.5px; padding: 1px 6px; border-radius: 5px; background: var(--soft, rgba(127,127,127,.12)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.ai-hs i.more { flex: none; cursor: default; color: var(--text, inherit); }
 .ai-ag { display: inline-flex; gap: 4px; margin-left: 6px; }
 .ai-ag i { font-style: normal; font-size: 11px; padding: 1px 6px; border-radius: 5px; background: color-mix(in srgb, var(--violet) 12%, transparent); color: var(--violet); }
 .dialog.ai-v { width: min(640px, calc(100vw - 32px)); }
@@ -4587,10 +4592,18 @@ function shareDialog(items, pre) {
 }
 
 // 设置 → AI 分析链接：列表、复制、撤销
+// 分析链接包含的站点：最多列 3 个，其余折叠成 +N（鼠标停留看全部）
+function shareHosts(s) {
+  const hs = s.hosts || [];
+  if (!s.label && hs.length === 1) return '';
+  const MAX = 3, shown = hs.slice(0, MAX), rest = hs.length - shown.length;
+  return `<span class="ai-hs">${shown.map((h) => `<i class="mono">${esc(h)}</i>`).join('')}${rest > 0
+    ? `<i class="more" data-tipf-always data-tipf="${esc(`共 ${hs.length} 个站点：\n${hs.join('\n')}`)}">+${rest}</i>` : ''}</span>`;
+}
 function renderShares(box, list, onState) {
   const items = list.items || [];
   box.innerHTML = items.length ? `<div class="ai-sl">${items.map((s) => `<div class="ai-si${s.expired ? ' off' : ''}">
-      <div class="ai-st"><b data-tipf-always data-tipf="${esc(s.hosts.join('、'))}">${esc(shareName(s))}</b>
+      <div class="ai-st"><div class="ai-sh"><b>${esc(s.label || (s.hosts.length === 1 ? s.hosts[0] : `${s.hosts.length} 个站点`))}</b>${shareHosts(s)}</div>
         <span>${SHARE_RANGES.find(([v]) => v === s.days)?.[1] || ''} · 创建于 ${fmtTime(s.createdAt)} · ${shareExpText(s)} ·
           ${s.views ? `<button type="button" class="hr-more" data-views="${esc(s.token)}">打开 ${num(s.views)} 次${s.lastView ? `（最近 ${ago(s.lastView)}）` : ''}</button>` : '还没有被打开'}
           ${s.agents?.length ? `<span class="ai-ag">${s.agents.slice(0, 4).map((a) => `<i>${esc(a.agent)} ${a.n}</i>`).join('')}</span>` : ''}</span></div>
@@ -5604,7 +5617,7 @@ function renderUsage(box, u, onState) {
       <span class="sp"></span>
       <button type="button" class="btn sm icon" data-cfg-edit aria-label="修改凭据" data-tipf-always data-tipf="${esc(['凭据已加密保存在数据库', `账户 ${u.config?.accountId || ''}`, `令牌 ••••${u.config?.tokenTail || ''}`,
         u.config?.dbId ? `D1 数据库 ${u.config.dbId}` : '', u.config?.worker ? `Worker ${u.config.worker}` : '', '点击修改或删除'].filter(Boolean).join('\n'))}">${ic('key', 14)}</button>
-      <button type="button" class="btn sm" id="use-re">${ic('refresh', 14)}刷新</button></div>
+      <button type="button" class="btn sm icon" id="use-re" aria-label="刷新用量" data-tipf-always data-tipf="刷新用量（结果缓存 5 分钟）">${ic('refresh', 14)}</button></div>
     <div data-cfg-form class="use-cfgf" hidden>${cfForm(u.config || {})}</div>
     ${u.errors?.length ? `<div class="bulk-bad">${ic('info', 15)}<div>${u.errors.map(esc).join('<br>')}<br>${u.errors.some((e) => /authentication/i.test(e))
       ? '“Authentication error”表示令牌无效：多半是粘贴的不是令牌值（如 Global API Key 或令牌 ID）、令牌已过期或被轮转，或者设置了客户端 IP 筛选。'
@@ -5641,9 +5654,10 @@ function renderUsage(box, u, onState) {
     catch (err) { toast(err.message, 'bad'); }
   }));
   box.querySelector('#use-re').onclick = async (e) => {
-    e.currentTarget.disabled = true;
-    try { const d = await api('/usage?force=1'); onState(d); renderUsage(box, d, onState); }
-    catch (err) { toast(err.message, 'bad'); e.currentTarget.disabled = false; }
+    const btn = e.currentTarget;
+    btn.disabled = true; btn.classList.add('busy');
+    try { const d = await api('/usage?force=1'); onState(d); renderUsage(box, d, onState); toast('用量已刷新'); }
+    catch (err) { toast(err.message, 'bad'); btn.disabled = false; btn.classList.remove('busy'); }
   };
 }
 
