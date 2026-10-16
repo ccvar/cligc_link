@@ -104,12 +104,23 @@ CREATE TABLE IF NOT EXISTS login_guard (
 );
 
 -- Google：GA4 + Search Console（见 src/google.js）
+CREATE TABLE IF NOT EXISTS g_accounts (
+  id            TEXT PRIMARY KEY,           -- Google 账号 ID（id_token 的 sub）
+  email         TEXT NOT NULL DEFAULT '',
+  auth          TEXT NOT NULL DEFAULT '',   -- 加密的刷新令牌
+  connected_at  INTEGER NOT NULL DEFAULT 0,
+  error         TEXT NOT NULL DEFAULT '',   -- 授权失效等
+  found         TEXT NOT NULL DEFAULT '',   -- 上次发现的 GA4 媒体资源 / GSC 站点 JSON
+  found_at      INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS g_sites (
   host          TEXT PRIMARY KEY,           -- 主域名（GA4 网站数据流地址或 GSC 资源）
   ga4_property  TEXT NOT NULL DEFAULT '',   -- GA4 媒体资源 ID
   ga4_name      TEXT NOT NULL DEFAULT '',
   ga4_account   TEXT NOT NULL DEFAULT '',
   gsc_site      TEXT NOT NULL DEFAULT '',   -- GSC 资源，如 sc-domain:example.com
+  ga4_acct      TEXT NOT NULL DEFAULT '',   -- GA4 数据来自哪个 Google 账号（g_accounts.id）
+  gsc_acct      TEXT NOT NULL DEFAULT '',   -- GSC 数据来自哪个 Google 账号
   users         TEXT NOT NULL DEFAULT '',   -- 区间去重用户数 JSON（7 / 28 / 90 天）
   synced_at     INTEGER NOT NULL DEFAULT 0,
   error         TEXT NOT NULL DEFAULT '',

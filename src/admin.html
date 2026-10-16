@@ -669,11 +669,50 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .chi.pw { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .chi.mfa { background: var(--good-bg); color: var(--good); }
 .chi.trk { background: var(--accent-2); color: var(--accent); }
+.chi-sm { width: 28px; height: 28px; margin-right: 2px; border-radius: 8px; flex: none; }
+.n-use-b { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.n-use-b > label { font-size: 13px; font-weight: 600; }
+.n-use-b .hint a { color: var(--accent); }
+.chi.chi.brand { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }   /* 品牌色标志放在白底上，暗色模式也保持白底 */
+.set-h { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--text); }
 .chi.use { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .use-steps { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 13px; color: var(--text-2); line-height: 1.7; }
 .use-steps code { font-family: var(--mono); font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--sunken); }
 .use-cmd { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 6px 6px 12px; border-radius: 9px; background: var(--sunken); max-width: 420px; }
 .use-cmd code { background: none; padding: 0; flex: 1; }
+/* 用量预测 */
+.use-bar { position: relative; }
+.use-bar s { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--good); opacity: .25; }
+.use-bar.warn s { background: var(--amber); } .use-bar.bad s { background: var(--bad); }
+.use-bar i { position: relative; }
+.use-fc { font-size: 12px; color: var(--text-2); margin-top: 6px; }
+.use-fc b { font-weight: 600; color: var(--text); }
+.use-fc.bad { color: var(--bad); } .use-fc.warn { color: var(--amber); }
+.use-v-b { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 13px; }
+.use-v-b.ok { background: var(--good-bg); color: var(--good); }
+.use-v-b.warn { background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber); }
+.use-v-b.bad { background: var(--bad-bg); color: var(--bad); }
+.use-v-b .hint { margin-left: auto; color: inherit; opacity: .75; }
+/* 凭据配置：只读摘要 / 表单 / 向导 */
+.cfg-ro { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--sunken); font-size: 13px; color: var(--text-2); line-height: 1.6; }
+.cfg-ro > svg { flex: none; color: var(--good); }
+.cfg-ro code { font-family: var(--mono); font-size: 12px; }
+.cfg-ro .sm { margin-top: 2px; word-break: break-all; }
+.cfg-ro[hidden], [data-cfg-form][hidden] { display: none; }
+.use-cfg { margin-top: 16px; }
+.cfg-f { max-width: 460px; }
+.row-l { display: flex; align-items: center; gap: 8px; }
+.btn.danger-t { color: var(--bad); }
+.wz-more { margin-top: 4px; font-size: 13px; color: var(--text-2); }
+/* 折叠标题：去掉浏览器自带的三角，换成 SVG 箭头，展开时旋转 */
+summary { list-style: none; display: flex; align-items: center; gap: 4px; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: ''; flex: none; width: 14px; height: 14px; background: currentColor; transition: transform .2s var(--ease);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; }
+details[open] > summary::before { transform: rotate(90deg); }
+.wz-more summary { cursor: pointer; color: var(--accent); width: max-content; margin-bottom: 8px; }
+.wz-more .field { margin-top: 12px; }
 .use-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .use-h .sp { flex: 1; }
 .use-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -935,7 +974,7 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .pop .opts:focus { outline: none; }
 .pop.plain .opts { padding-top: 4px; max-height: 280px; }
 .pop .oi.act { background: var(--sunken); }
-.pop .oi.sel { color: var(--accent-ink); font-weight: 600; }
+.pop .oi.sel { color: var(--accent-ink); font-weight: 600; min-height: 0; padding: 0 8px; border: 0; flex-wrap: nowrap; gap: 8px; }   /* 覆盖通用的 .sel 样式 */
 .pop .oi > svg { color: var(--accent); }
 .pop .oi mark { background: none; color: var(--accent-ink); font-weight: 650; }
 .sim .res { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
@@ -1041,11 +1080,27 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .g-connect .card-b { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 48px 24px; }
 .g-connect h2 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.02em; }
 .g-connect p { margin: 0; max-width: 520px; color: var(--text-2); line-height: 1.8; }
-.g-logo { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--accent-2); color: var(--accent); }
-.g-acct { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); margin-right: 4px; }
-.g-acct svg { color: var(--good); }
-.g-prog { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 10px 14px; border-radius: 10px; background: var(--accent-2); color: var(--accent-ink); font-size: 13px; }
-.g-prog svg { animation: spin 1.2s linear infinite; }
+.g-logo { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: #fff; box-shadow: inset 0 0 0 1px var(--line), var(--shadow-1, 0 1px 2px rgba(0,0,0,.05)); }
+.g-rng { margin-left: 8px; }
+.g-rng .combo-btn .nm { max-width: none; }
+.g-sync { width: 36px; height: 36px; color: var(--text-2); }
+.g-sync.busy svg { animation: spin .9s linear infinite; }
+.g-op { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); }
+.pop .ot > svg { color: var(--bad); margin-right: 6px; vertical-align: -2px; }
+.pop .ot.g-op > svg { color: inherit; margin-right: 0; }
+.pop .oi:has(.g-sep) { position: relative; margin-top: 9px; }
+.pop .oi:has(.g-sep)::before { content: ''; position: absolute; left: 4px; right: 4px; top: -5px; height: 1px; background: var(--line-2); }
+.g-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bad); flex: none; }
+.g-acc-l { display: grid; gap: 8px; max-width: 640px; }
+.g-acc-r { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 11px; background: var(--sunken); }
+.g-acc-i { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--good-bg); color: var(--good); }
+.g-acc-r.bad .g-acc-i { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.g-acc-t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.g-acc-t b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-acc-t span { font-size: 12px; color: var(--muted); }
+.g-acc-r.bad .g-acc-t span { color: var(--bad); }
+.g-prog { font-size: 12.5px; line-height: 36px; color: var(--muted); white-space: nowrap; margin-right: -18px; animation: fade .2s; }
+.g-prog b { color: var(--accent-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .g-prog[hidden] { display: none; }
 .gl-wrap { overflow-x: auto; }
 .tbl.gl th.r, .tbl.gt th.r { text-align: right; }
@@ -1054,6 +1109,14 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .tbl.gl .gh { font-weight: 600; font-family: var(--mono); font-size: 13px; }
 .tbl.gl .gsp { width: 120px; } .tbl.gl .gsp svg { width: 110px; height: 28px; display: block; color: var(--accent); }
 .gtag { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; margin-right: 5px; border-radius: 4px; font-size: 10.5px; font-weight: 650; vertical-align: 1px; }
+.gm { display: flex; align-items: center; gap: 5px; margin-top: 3px; white-space: nowrap; }
+.gm .gtag { flex: none; }
+.gico { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; cursor: default; }
+.gico:hover { background: var(--sunken); }
+.gico.off { filter: grayscale(1); opacity: .35; }
+.gm .gico + .gico { margin-left: 2px; }
+.gm .gtag { margin-right: 0; vertical-align: 0; }
+.gm .gnm { margin-right: 6px; min-width: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gtag.ga { color: #e8710a; background: color-mix(in srgb, #e8710a 13%, transparent); }
 .gtag.sc { color: var(--accent-ink); background: var(--accent-2); }
 .gtag.off { color: var(--muted); background: var(--sunken); }
@@ -1061,6 +1124,50 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .gd { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
 .gd.up { color: var(--good); } .gd.down { color: var(--bad); }
 .kstrip.gk .kc-h .gd { display: inline; }
+/* 站点列表上方汇总 */
+.kstrip.gs { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 16px; }
+.kstrip.gs .kc-h .gd { display: inline; }
+.kstrip.gs .kc-d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1100px) { .kstrip.gs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .kstrip.gs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.gup { color: var(--good); font-weight: 600; }
+/* 站点卡：访问量占比色条 */
+.gsb { display: flex; gap: 2px; height: 8px; margin: 10px 0 8px; border-radius: 4px; overflow: hidden; }
+.gsb i { min-width: 3px; transition: opacity .15s; }
+.gsb i.o { background: var(--line); }
+.gsb:hover i { opacity: .55; }
+.gsb i:hover { opacity: 1; }
+.gsb-l { display: flex; gap: 4px 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-2); margin-bottom: 4px; max-height: 17px; overflow: hidden; }
+.gsb-l span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.gsb-l i { width: 7px; height: 7px; border-radius: 2px; }
+.gdn { color: var(--bad); font-weight: 600; }
+/* 占比列 */
+.gsh-c { min-width: 96px; white-space: nowrap; }
+.gsh { display: inline-block; vertical-align: middle; width: 54px; height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; margin-right: 8px; }
+.gsh i { display: block; height: 100%; min-width: 2px; border-radius: 3px; background: var(--accent); }
+.gsh-c span { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* 行内的短链标记 */
+.gsl { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 600;
+  color: var(--accent-ink); background: var(--accent-2); font-variant-numeric: tabular-nums; cursor: default; }
+.gsl-t tbody tr { cursor: pointer; }
+/* 详情页：数据来源 */
+.g-src { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
+.g-si { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.g-si .sm { margin-left: 2px; }
+.g-si > svg { color: var(--muted); }
+.g-si.off { color: var(--muted); }
+.g-si.off .gico { filter: grayscale(1); opacity: .4; }
+/* 空状态：图标 + 说明 + 按钮横排 */
+.g-empty { display: flex; align-items: center; gap: 14px; padding: 18px 20px 20px; }
+.g-empty-i { flex: none; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--sunken); color: var(--muted); }
+.g-empty > div { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.g-empty b { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.g-empty div span { font-size: 12.5px; color: var(--muted); }
+@media (max-width: 640px) { .g-empty { flex-wrap: wrap; } .g-empty .btn { margin-left: 52px; } }
+.gsl-t tbody tr:hover { background: var(--panel-2); }
+.gsl-t .mono { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+.gsl-t th { white-space: nowrap; }
+.gsl-t .ell { min-width: 110px; max-width: 260px; }
 .tbl.gt { table-layout: fixed; }
 .tbl.gt th:first-child { width: 46%; }
 .tbl.gt td { overflow: hidden; }
@@ -1165,6 +1272,7 @@ const I = {
   send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
   mail: '<rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m22 7-10 6L2 7"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>',
@@ -1645,15 +1753,19 @@ function mountChart(el, data, series, legendEl) {
 }
 
 // KPI 卡片底部的小面积图
-function kpiSpark(values, color) {
+// prev：可选的上一周期数据，画成浅色虚线（与本期同一纵轴）
+function kpiSpark(values, color, prev) {
   const W = 300, H = 44, n = values.length;
   if (n < 2) return '';
-  const max = Math.max(1, ...values);
-  const line = smooth(values.map((v, i) => [(i / (n - 1)) * W, H - 4 - (v / max) * (H - 10)]));
+  const max = Math.max(1, ...values, ...(prev || []));
+  const pt = (v, i, len) => [(i / (len - 1)) * W, H - 4 - (v / max) * (H - 10)];
+  const line = smooth(values.map((v, i) => pt(v, i, n)));
+  const pl = prev?.length > 1 && prev.some(Boolean) ? smooth(prev.map((v, i) => pt(v, i, prev.length))) : '';
   const id = 'k' + Math.random().toString(36).slice(2, 8);
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".18"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
     <path d="${line}L${W},${H}L0,${H}Z" fill="url(#${id})" style="animation:fade 1s var(--ease) both .3s"/>
+    ${pl ? `<path d="${pl}" fill="none" stroke="var(--faint)" stroke-width="1.3" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ''}
     <path d="${line}" fill="none" stroke="${color}" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>`;
 }
 
@@ -2590,6 +2702,32 @@ function openDrawer(link, onDone) {
 }
 
 // ---------------------------------------------------------------- link detail
+// 短链详情：跳转去向对应的站点（GA4 / Search Console），最近 28 天；没连接 Google 或没匹配到站点时不显示
+async function linkSitesCard(token, id) {
+  const box = document.getElementById('lk-gs');
+  if (!box) return;
+  const d = await api(`/google/link?id=${id}&days=28`).catch(() => null);
+  if (token !== routeToken || !d?.items?.length) return;
+  box.innerHTML = `<section class="card rv in"><div class="card-h"><h3>目标站点</h3><span class="sp"></span><span class="sub">Google 数据 · 最近 28 天，截至 ${d.ranges.to}</span></div>
+    <div class="scroll"><table class="tbl gt gsl-t">
+      <thead><tr><th>站点</th><th>跳转去向</th><th class="r"><span data-tipf-always data-tipf="这个短链跳转到该站点的真人访问次数">短链点击</span></th><th class="r">用户</th><th class="r">会话</th><th class="r">关键事件</th><th class="r">搜索点击</th></tr></thead>
+      <tbody>${d.items.map((x) => {
+        const l = x.links[0], ga = x.cur.ga, sc = x.cur.gsc;
+        return `<tr data-href="#/site/${encodeURIComponent(x.host)}" tabindex="0">
+          <td><div class="gh mono">${esc(x.host)}</div><div class="sm gm">${x.ga4 ? `<span class="gico">${BRAND.ga(13)}</span>` : ''}${x.gsc ? `<span class="gico">${BRAND.gsc(13)}</span>` : ''}</div></td>
+          <td><div class="ell">${esc((l?.routes || []).map(routeLabel).join(' · ') || '—')}</div></td>
+          <td class="num"${l && ga?.sessions ? ` data-tipf-always data-tipf="${esc(`粗略对比：本短链真人点击约为站点会话的 ${pctText(l.human / ga.sessions)}`)}"` : ''}>${l ? num(l.human) : '—'}${l ? gDelta(l.human, l.prevHuman) : ''}</td>
+          <td class="num">${x.users != null ? num(x.users) : '—'}${x.prevUsers != null ? gDelta(x.users, x.prevUsers) : ''}</td>
+          <td class="num">${ga ? num(ga.sessions) : '—'}${ga && x.prev.ga ? gDelta(ga.sessions, x.prev.ga.sessions) : ''}</td>
+          <td class="num">${ga ? num(ga.keyEvents) : '—'}</td>
+          <td class="num">${sc ? num(sc.clicks) : '—'}${sc && x.prev.gsc ? gDelta(sc.clicks, x.prev.gsc.clicks) : ''}</td></tr>`;
+      }).join('')}</tbody></table></div></section>`;
+  box.querySelectorAll('tr[data-href]').forEach((tr) => {
+    const go = () => { location.hash = tr.dataset.href; };
+    tr.onclick = go; tr.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  });
+}
+
 async function renderLink(token, id) {
   shell('links', `<a class="back" href="#/links">${ic('back', 14)}全部短链</a><div class="stack">${skel(150)}<div class="kpis">${skel(150, 4)}</div>${skel(360)}</div>`);
   const [link, s, c] = await Promise.all([
@@ -2704,6 +2842,7 @@ async function renderLink(token, id) {
       </div>
 
 
+      <div id="lk-gs"></div>
       <section class="card rv">
         <div class="card-h"><h3>访问明细</h3><span class="sp"></span><span class="sub">共 ${num(c.total)} 条</span></div>
         ${c.items.length ? `<div class="scroll tbl-wrap"><table class="tbl vt">
@@ -2728,6 +2867,7 @@ async function renderLink(token, id) {
   reveal(page);
   countUp(page);
   bindRange(route);
+  linkSitesCard(token, id);
   mountChart(document.getElementById('ch-link'), series, [
     { id: 'n', key: 'n', label: '访问次数', color: 'var(--accent)', type: 'area' },
     { id: 'u', key: 'u', label: '独立访客', color: 'var(--violet)', type: 'line' },
@@ -3105,7 +3245,7 @@ function openRuleDrawer(link, rule) {
 }
 
 // ---------------------------------------------------------------- 站点（GA4 + Search Console）
-const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions') };
+const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), acct: '' };
 const pctD = (a, b) => (b ? (a - b) / b : null);
 const gDelta = (a, b, inverse = false) => {
   const d = pctD(a, b);
@@ -3114,14 +3254,29 @@ const gDelta = (a, b, inverse = false) => {
   return `<span class="gd ${Math.abs(d) < 0.005 ? '' : good ? 'up' : 'down'}">${up ? '↑' : '↓'}${Math.abs(d * 100) >= 100 ? Math.round(Math.abs(d * 100)) : Math.abs(d * 100).toFixed(1)}%</span>`;
 };
 const pct1 = (x) => `${(x * 100).toFixed(1)}%`;
-const gRangeBar = () => `<div class="seg" id="g-range">${[[7, '7 天'], [28, '28 天'], [90, '90 天']]
-  .map(([d, l]) => `<button data-d="${d}" class="${d === gState.days ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+const gKc = (label, v, delta, sub = '', tip = '', extra = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b>${extra.startsWith('<svg') ? `<span class="kc-sp">${extra}</span>` : ''}</div>${extra && !extra.startsWith('<svg') ? extra : ''}${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
+// 跳转去向的文字：默认地址 / 地区规则的国家
+const routeLabel = (r) => (r.rule ? (r.countries || '').split(',').filter(Boolean).map((c) => country(c)).join('、') || '地区规则' : '默认地址');
+// 时间范围：截至昨天；365 天的上一周期超出回填范围，不做环比
+const G_LABEL = () => (G_RANGES.find(([d]) => d === gState.days)?.[1] || '') ;
+const G_RANGES = [[7, '最近 7 天'], [14, '最近 14 天'], [28, '最近 28 天'], [90, '最近 3 个月'], [180, '最近 6 个月'], [365, '最近 12 个月']];
+if (!G_RANGES.some(([d]) => d === gState.days)) gState.days = 28;
+const gRangeBar = () => '<div class="combo g-rng" id="g-range"></div>';
 function bindGRange(rerender) {
-  const seg = document.getElementById('g-range');
-  if (!seg) return;
-  segThumb(seg);
-  seg.querySelectorAll('button').forEach((b) => (b.onclick = () => { gState.days = Number(b.dataset.d); store.set('g:days', gState.days); rerender(); }));
+  const root = document.getElementById('g-range');
+  if (!root) return;
+  const label = new Map(G_RANGES);
+  dropdown(root, {
+    value: String(gState.days), aria: '时间范围', minWidth: 160,
+    groups: () => [['', G_RANGES.map(([d]) => String(d))]],
+    button: (v) => `${ic('chart', 14)}<span class="nm">${label.get(Number(v))}</span>`,
+    option: (v) => `<span class="ot">${label.get(Number(v))}${v === '365' ? '<small>不含环比</small>' : ''}</span>`,
+    onChange: (v) => { gState.days = Number(v); store.set('g:days', gState.days); rerender(); },
+  });
 }
+// 邮箱脱敏：gr•••@gmail.com，鼠标悬停显示完整邮箱
+const maskEmail = (e) => String(e || '').replace(/^(.{1,2})[^@]*(@.*)$/, '$1•••$2');
+const mailTip = (e) => `<span data-tipf-always data-tipf="${esc(e)}">${esc(maskEmail(e))}</span>`;
 
 // 授权回来后的提示
 function googleFlash() {
@@ -3135,19 +3290,170 @@ function googleFlash() {
 async function googleSyncAll(btn, onProgress) {
   const before = Date.now();
   let first = true, r;
-  if (btn) btn.disabled = true;
+  if (btn) { btn.disabled = true; btn.classList.add('busy'); }
   try {
     do {
       r = await api('/google/sync', { method: 'POST', body: { before, discover: first } });
       first = false;
       onProgress && onProgress(r);
     } while (r.left > 0 && r.done > 0);
-  } finally { if (btn) btn.disabled = false; }
+  } finally { if (btn) { btn.disabled = false; btn.classList.remove('busy'); } }
   return r;
 }
 
+// 第 1 步：在 Google Cloud 控制台里要做的事
+const googleSteps = () => `<ol class="use-steps">
+  <li>打开 <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener"><b>Google Cloud 控制台</b></a>，新建一个项目。</li>
+  <li>在“API 和服务 → 库”里启用 <b>Google Analytics Admin API</b>、<b>Google Analytics Data API</b>、<b>Google Search Console API</b>。</li>
+  <li>“OAuth 权限请求页面”：用户类型选 <b>外部</b>，填好应用名称和邮箱；然后点 <b>发布应用</b>（否则授权 7 天就会失效）。个人使用无需 Google 审核，授权时点“继续”即可。</li>
+  <li>“凭据 → 创建凭据 → OAuth 客户端 ID”：类型选 <b>Web 应用</b>，已获授权的重定向 URI 填：<div class="use-cmd"><code>${esc(location.origin)}/api/google/callback</code>${copyBtn(`${location.origin}/api/google/callback`, 'btn sm ghost icon')}</div></li>
+  <li>创建后会显示 <b>客户端 ID</b> 和 <b>客户端密钥</b>，填到下一步。</li></ol>`;
+
+// 第 2 步：客户端 ID / 密钥。环境变量配置的只读显示；后台填写的加密保存，密钥只显示末 4 位
+function googleConfigBox(st) {
+  const cfg = st.config || {};
+  if (cfg.source === 'env') return `<div class="cfg-ro">${ic('lock', 14)}<div>已通过环境变量配置（<code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>），如需修改请改 wrangler.toml 和 secret 后重新部署。
+    <div class="sm mono">${esc(cfg.clientId)} · 密钥 ••••${esc(cfg.secretTail)}</div></div></div>`;
+  if (st.configured) return `<div class="cfg-ro" data-cfg-view>${ic('check', 14)}<div>已保存（加密存储在数据库）
+      <div class="sm mono">${esc(cfg.clientId)} · 密钥 ••••${esc(cfg.secretTail)}</div></div>
+      <span class="sp"></span><button type="button" class="btn sm" data-cfg-edit>修改</button></div>
+    <div data-cfg-form hidden>${googleForm(cfg)}</div>`;
+  return googleForm(cfg);
+}
+const googleForm = (cfg) => `<form class="set-form cfg-f" data-g-form>
+  <div class="field"><label for="g-cid">客户端 ID</label><input class="input mono" id="g-cid" required autocomplete="off" spellcheck="false"
+    placeholder="xxxxxxxx.apps.googleusercontent.com" value="${esc(cfg.clientId || '')}"></div>
+  <div class="field"><label for="g-sec">客户端密钥</label><input class="input mono" id="g-sec" type="password" autocomplete="off" spellcheck="false"
+    ${cfg.clientId ? `placeholder="已保存 ••••${esc(cfg.secretTail)}，留空则不修改"` : 'required placeholder="GOCSPX-…"'}></div>
+  <div class="err" style="margin:4px 0 12px" role="alert"></div>
+  <div class="row-l"><button class="btn primary">保存</button>${cfg.clientId ? '<button type="button" class="btn ghost" data-cfg-cancel>取消</button><span class="sp"></span><button type="button" class="btn ghost danger-t" data-cfg-del>删除配置</button>' : ''}</div>
+</form>`;
+function bindGoogleConfig(root, st, onSaved) {
+  const edit = root.querySelector('[data-cfg-edit]'), view = root.querySelector('[data-cfg-view]'), wrap = root.querySelector('[data-cfg-form]');
+  if (edit) edit.onclick = () => { view.hidden = true; wrap.hidden = false; wrap.querySelector('#g-cid').focus(); };
+  const f = root.querySelector('[data-g-form]');
+  if (!f) return;
+  const cancel = f.querySelector('[data-cfg-cancel]');
+  if (cancel && view) cancel.onclick = () => { view.hidden = false; wrap.hidden = true; };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = f.querySelector('.primary'), err = f.querySelector('.err');
+    const clientId = f.querySelector('#g-cid').value.trim(), clientSecret = f.querySelector('#g-sec').value.trim();
+    if (st.connected && st.config?.clientId && clientId !== st.config.clientId) {
+      const ok = await confirmDialog({ title: '更换 OAuth 客户端？', text: '换了客户端之后，现在的 Google 授权会失效，需要重新连接。已同步的数据会删除。', ok: '更换' });
+      if (!ok) return;
+    }
+    btn.disabled = true; err.textContent = '';
+    try { await api('/google/config', { method: 'PUT', body: { clientId, clientSecret } }); toast('客户端信息已保存'); onSaved(); }
+    catch (ex) { err.textContent = ex.message; btn.disabled = false; }
+  };
+  const del = f.querySelector('[data-cfg-del]');
+  if (del) del.onclick = async () => {
+    const ok = await confirmDialog({ title: '删除 OAuth 客户端配置？', text: '会断开 Google 账号，并删除已同步的 GA4 / Search Console 数据。', ok: '删除', danger: true });
+    if (!ok) return;
+    try { await api('/google/config', { method: 'DELETE' }); toast('已删除客户端配置'); onSaved(); } catch (ex) { toast(ex.message, 'bad'); }
+  };
+}
+// 去 Google 授权（添加账号 / 重新连接都走这里，Google 会让用户选择账号）
+async function googleConnect(btn) {
+  if (btn) btn.disabled = true;
+  try { location.href = (await api('/google/auth')).url; } catch (err) { toast(err.message, 'bad'); if (btn) btn.disabled = false; }
+}
+
+// 标题后面的账号下拉：按账号筛选站点；底部是添加账号、管理账号
+function googleAcctPicker(root, accts, items, onFilter) {
+  const by = new Map(accts.map((a) => [a.id, a]));
+  const count = (id) => items.filter((x) => x.ga4?.acct === id || x.gscAcct === id).length;
+  const ADD = '+add', MANAGE = '+manage';
+  const init = () => dropdown(root, {
+    value: gState.acct, aria: '选择 Google 账号', minWidth: 260, maxWidth: 320,
+    groups: () => [['', ['']], ['Google 账号', accts.map((a) => a.id)], ['', [ADD, MANAGE]]],
+    button: (v) => `<span class="nm">${v ? mailTip(by.get(v)?.email || '') : '全部'}</span>${accts.some((a) => a.error) ? `<i class="g-dot" data-tip="有账号需要重新连接"></i>` : ''}`,
+    option: (v) => v === ADD ? `<span class="ot g-op g-sep">${ic('plus', 14)}添加账号</span>`
+      : v === MANAGE ? `<span class="ot g-op">${ic('gear', 14)}管理账号</span>`
+      : !v ? `<span class="ot">全部账号<small>${items.length} 个站点</small></span>`
+      : `<span class="ot">${by.get(v).error ? ic('alert', 13) : ''}${mailTip(by.get(v).email)}<small>${by.get(v).error ? '需要重新连接' : `${count(v)} 个站点`}</small></span>`,
+    onChange: (v) => {
+      if (v === ADD || v === MANAGE) { init(); return v === ADD ? googleConnect(null) : goSettings('goo'); }
+      gState.acct = v; onFilter();
+    },
+  });
+  init();
+}
+
+// 品牌标志（用于标识集成的服务，保留原色）
+const BRAND = {
+  // Google Analytics：三根圆角柱
+  ga: (n) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="16" y="1.5" width="6" height="21" rx="3" fill="#F9AB00"/><rect x="9" y="9" width="6" height="13.5" rx="3" fill="#E37400"/><circle cx="5" cy="19.5" r="3" fill="#E37400"/></svg>`,
+  // Search Console（取自官方标志）
+  gsc: (n) => `<svg width="${n}" height="${n}" viewBox="4 4 32 32" aria-hidden="true">
+    <path d="M11.081 30.527l-4.72 4.721a.933.933 0 0 1-1.317 0l-.292-.292a.933.933 0 0 1 0-1.316l4.72-4.721a.933.933 0 0 1 1.318 0l.291.291a.93.93 0 0 1 0 1.317z" fill="#FBBC04"/>
+    <path d="M23.75 32.5h6.042a6.04 6.04 0 0 0 6.041-6.042v-16.25a6.04 6.04 0 0 0-6.041-6.041 6.04 6.04 0 0 0-6.042 6.041V32.5z" fill="#4285F4"/>
+    <path d="M13.75 32.5a6.04 6.04 0 0 0 6.042-6.042 6.04 6.04 0 0 0-6.042-6.041 6.04 6.04 0 0 0-6.042 6.041A6.04 6.04 0 0 0 13.75 32.5z" fill="#FBBC04"/>
+    <path d="M27.97 32.5h-5.887a6.04 6.04 0 0 1-6.041-6.042v-7.916a6.04 6.04 0 0 1 6.041-6.042 6.04 6.04 0 0 1 6.042 6.042v13.804a.154.154 0 0 1-.154.154z" fill="#34A853"/>
+    <path d="M28.125 32.346V18.542a6.042 6.042 0 0 0-4.375-5.807V32.5h4.22a.154.154 0 0 0 .155-.154z" fill="#1967D2"/>
+    <path d="M19.792 26.575a6.04 6.04 0 0 0-3.75-5.59v5.59c0 1.72.72 3.273 1.875 4.373a6.024 6.024 0 0 0 1.875-4.373z" fill="#EA4335"/></svg>`,
+  google: (n) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`,
+  cloudflare: (n) => `<svg width="${n + 4}" height="${n + 4}" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#F38020" d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268z"/>
+    <path fill="#FBAD41" d="M19.2656 11.2813c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"/></svg>`,
+};
+
+// 打开设置页并展开某一项
+function goSettings(id) { store.set('set:open', id); location.hash = '#/settings'; }
+
+// 设置 → Google 集成：OAuth 客户端 + 已连接的账号（添加账号在“站点”页）
+function googleSummary(st) {
+  if (!st.configured) return '未配置，用于“站点”页的 GA4 / Search Console 数据';
+  const n = (st.accounts || []).length;
+  return `客户端 ${esc(st.config.clientId.split('-')[0])}… · ${n ? `已连接 ${n} 个账号` : '还没有连接账号'}${st.error ? ' · 有账号需要重新连接' : ''}`;
+}
+const googlePill = (st) => !st.configured ? '<span class="pill off">未配置</span>'
+  : st.error ? '<span class="pill off">需重新连接</span>' : '<span class="pill on">已配置</span>';
+
+function renderGoogleSettings(box, st, onState) {
+  const reload = async () => {
+    try { const d = await api('/google/status'); onState(d); renderGoogleSettings(box, d, onState); } catch (err) { toast(err.message, 'bad'); }
+  };
+  const accts = st.accounts || [];
+  const n = (v, l) => (v == null ? '' : `${l} ${v} 个`);
+  box.innerHTML = `
+    <h4 class="set-h">OAuth 客户端</h4>
+    ${st.configured
+      ? `${googleConfigBox(st)}
+        <details class="wz-more" style="margin-top:12px"><summary>创建步骤和重定向 URI</summary>${googleSteps()}</details>`
+      : `<p class="set-p">连接 Google 账号之前，需要先在 Google Cloud 创建一个 OAuth 客户端：</p>${googleSteps()}<div style="margin-top:18px">${googleConfigBox(st)}</div>`}
+    ${st.configured ? `<h4 class="set-h" style="margin-top:26px">已连接的账号</h4>
+      ${accts.length ? `<div class="g-acc-l">${accts.map((a) => `<div class="g-acc-r${a.error ? ' bad' : ''}">
+        <span class="g-acc-i">${ic(a.error ? 'alert' : 'check', 14)}</span>
+        <div class="g-acc-t"><b>${a.email ? mailTip(a.email) : esc(a.id)}</b>
+          <span>${a.error ? esc(a.error) : [n(a.ga4, 'GA4'), n(a.gsc, 'GSC'), `连接于 ${fmtTime(a.connectedAt)}`].filter(Boolean).join(' · ')}</span></div>
+        ${a.error ? '<button type="button" class="btn sm" data-re>重新连接</button>' : ''}
+        <button type="button" class="btn sm ghost danger-t" data-off="${esc(a.id)}" data-mail="${esc(a.email)}">断开</button></div>`).join('')}</div>
+        <p class="hint" style="margin-top:10px">所有账号的站点按域名合并显示；多个账号都能看到同一个站点时，用最早连接的账号的数据。添加账号请到 <a href="#/sites">站点</a> 页。</p>`
+      : `<p class="set-p">还没有连接账号，到 <a href="#/sites">站点</a> 页连接 Google 账号。</p>`}` : ''}`;
+  bindGoogleConfig(box, st, reload);
+  box.querySelectorAll('[data-re]').forEach((b) => (b.onclick = () => googleConnect(b)));
+  box.querySelectorAll('[data-off]').forEach((b) => (b.onclick = async () => {
+    const last = accts.length === 1;
+    const ok = await confirmDialog({ title: `断开 ${maskEmail(b.dataset.mail)}？`,
+      text: last ? '会撤销授权，并删除已同步的 GA4 / Search Console 数据。之后可以随时重新连接。'
+        : '会撤销这个账号的授权；只来自这个账号的站点和数据会删除，其他账号的站点不受影响。', ok: '断开', danger: true });
+    if (!ok) return;
+    try { const d = await api('/google/disconnect', { method: 'POST', body: { id: b.dataset.off } }); toast(`已断开 ${maskEmail(b.dataset.mail)}`); onState(d); renderGoogleSettings(box, d, onState); }
+    catch (err) { toast(err.message, 'bad'); }
+  }));
+}
+
 async function renderSites(token) {
-  const head = (extra = '') => `<header class="ph"><div><div class="kicker">Google</div><h1>站点</h1><div class="sub">账号下所有网站的 GA4 访问和 Google 搜索表现</div></div>
+  const head = (extra = '', picker = false) => `<header class="ph"><div><div class="kicker">Google</div>
+      ${picker ? '<div class="ov-title"><h1>站点</h1><span class="ov-sep" aria-hidden="true">/</span><div class="combo ov-link" id="g-acct"></div></div>' : '<h1>站点</h1>'}
+      <div class="sub">账号下所有网站的 GA4 访问和 Google 搜索表现</div></div>
     <span class="sp"></span>${extra}</header>`;
   shell('sites', `${head()}<div class="stack">${skel(64)}${skel(360)}</div>`);
   const st = await api('/google/status');
@@ -3155,64 +3461,120 @@ async function renderSites(token) {
   googleFlash();
   const page = document.getElementById('page');
 
+  // 还没配置 OAuth 客户端：去设置
   if (!st.configured) {
-    const cmd = 'npx wrangler secret put GOOGLE_CLIENT_SECRET';
-    page.innerHTML = `${head()}<section class="card rv"><div class="card-h"><h3>连接 Google 之前，需要先创建 OAuth 客户端</h3></div><div class="card-b">
-      <ol class="use-steps">
-        <li>打开 <b>Google Cloud 控制台</b>（console.cloud.google.com），新建一个项目。</li>
-        <li>在“API 和服务 → 库”里启用 <b>Google Analytics Admin API</b>、<b>Google Analytics Data API</b>、<b>Google Search Console API</b>。</li>
-        <li>“OAuth 权限请求页面”：用户类型选 <b>外部</b>，填好应用名称和邮箱；然后点 <b>发布应用</b>（否则授权 7 天就会失效）。个人使用无需 Google 审核，授权时点“继续”即可。</li>
-        <li>“凭据 → 创建凭据 → OAuth 客户端 ID”：类型选 <b>Web 应用</b>，已获授权的重定向 URI 填：<div class="use-cmd"><code>${esc(location.origin)}/api/google/callback</code>${copyBtn(`${location.origin}/api/google/callback`, 'btn sm ghost icon')}</div></li>
-        <li>把客户端 ID 填到 wrangler.toml 的 <code>[vars]</code> 里的 <code>GOOGLE_CLIENT_ID</code>，客户端密钥用下面的命令保存，然后重新部署：<div class="use-cmd"><code>${cmd}</code>${copyBtn(cmd, 'btn sm ghost icon')}</div></li>
-      </ol></div></section>`;
+    page.innerHTML = `${head()}<section class="card rv g-connect"><div class="card-b">
+      <div class="g-logo">${BRAND.google(30)}</div>
+      <h2>先配置 Google OAuth 客户端</h2>
+      <p>连接 Google 账号之前，需要先在 Google Cloud 创建一个 OAuth 客户端，并把客户端 ID 和密钥填到 <b>设置 → Google 集成</b>。</p>
+      <button class="btn primary" id="g-set">${ic('gear', 15)}去设置</button></div></section>`;
     reveal(page);
+    document.getElementById('g-set').onclick = () => goSettings('goo');
     return;
   }
+  // 已配置、还没有账号：连接第一个账号
   if (!st.connected) {
     page.innerHTML = `${head()}<section class="card rv g-connect"><div class="card-b">
-      <div class="g-logo">${ic('globe', 28)}</div>
+      <div class="g-logo">${BRAND.google(30)}</div>
       <h2>连接 Google 账号</h2>
-      <p>授权后，账号下所有的 GA4 媒体资源和 Search Console 站点会自动出现在这里，按域名配对。<br>只申请<b>只读</b>权限，不会修改你的任何设置；令牌加密保存在你自己的数据库里，可随时断开。</p>
-      ${st.error ? `<div class="bulk-bad">${ic('info', 15)}${esc(st.error)}</div>` : ''}
+      <p>授权后，账号下所有的 GA4 媒体资源和 Search Console 站点会自动出现在这里，按域名配对。可以连接多个账号。<br>只申请<b>只读</b>权限，不会修改你的任何设置；令牌加密保存在你自己的数据库里，可在设置里随时断开。</p>
       <button class="btn primary" id="g-connect">${ic('link', 15)}连接 Google 账号</button></div></section>`;
     reveal(page);
-    document.getElementById('g-connect').onclick = async (e) => {
-      e.currentTarget.disabled = true;
-      try { location.href = (await api('/google/auth')).url; } catch (err) { toast(err.message, 'bad'); e.currentTarget.disabled = false; }
-    };
+    document.getElementById('g-connect').onclick = (e) => googleConnect(e.currentTarget);
     return;
   }
 
   const d = await api('/google/sites?days=' + gState.days);
   if (token !== routeToken) return;
-  const acct = `<div class="g-acct">${ic('check', 13)}<span>${esc(st.email || '已连接')}</span><button type="button" class="hr-more" id="g-off">断开</button></div>`;
-  page.innerHTML = `${head(`${acct}${gRangeBar()}<button class="btn" id="g-sync">${ic('refresh', 15)}立即同步</button>`)}
-    ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}${esc(st.error)}</div>` : ''}
-    ${st.discovered?.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.discovered.errors.map(esc).join('<br>')}</div></div>` : ''}
-    <div class="g-prog" id="g-prog" ${st.pending ? '' : 'hidden'}>${ic('refresh', 14)}<span>正在同步 <b>${st.pending}</b> 个站点的数据…</span></div>
+  const accts = st.accounts || [], many = accts.length > 1, bad = accts.some((a) => a.error);
+  if (gState.acct && !accts.some((a) => a.id === gState.acct)) gState.acct = '';
+  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden><span></span></span><button class="btn ghost icon g-sync" id="g-sync" data-tip="立即同步" aria-label="立即同步">${ic('refresh', 17)}</button>`, true)}
+    ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<span>${esc(st.error)}</span><span class="sp"></span><button type="button" class="btn sm" id="g-re">重新连接</button></div>` : ''}
+    ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
+    <section class="card kstrip gs rv" id="g-sum"></section>
     <section class="card rv">
-      <div class="lh"><div class="search">${ic('search')}<input class="input" id="g-q" placeholder="搜索域名或 GA4 名称" value="${esc(gState.q)}" aria-label="搜索站点"></div><span class="sp"></span>
+      <div class="lh"><div class="search">${ic('search')}<input class="input" id="g-q" placeholder="搜索域名或 GA4 名称" value="${esc(gState.q)}" aria-label="搜索站点"></div>${gRangeBar()}<span class="sp"></span>
         <div class="seg" id="g-sort">${[['sessions', '按会话'], ['clicks', '按搜索点击'], ['host', '按域名']].map(([k, l]) => `<button data-s="${k}" class="${k === gState.sort ? 'on' : ''}">${l}</button>`).join('')}</div></div>
       <div id="g-list"></div>
-      <div class="pager"><span>${d.items.length} 个站点 · 统计到 ${d.ranges.to}（截至昨天；Search Console 数据通常延迟 2–3 天）${st.lastSync ? ` · 同步于 ${ago(st.lastSync)}` : ''}</span></div>
+      <div class="pager"><span><span id="g-cnt">${d.items.length} 个站点</span> · 统计到 ${d.ranges.to}（截至昨天；Search Console 数据通常延迟 2–3 天）${st.lastSync ? ` · 同步于 ${ago(st.lastSync)}` : ''}</span></div>
     </section>`;
   reveal(page);
   bindGRange(() => renderSites(routeToken));
   const list = document.getElementById('g-list');
+  // 表格上方的汇总：跟随账号筛选和搜索
+  const sumStrip = (rows) => {
+    const S = (f) => rows.reduce((a, x) => a + (f(x) || 0), 0);
+    const hasP = gState.days !== 365;
+    const ses = S((x) => x.cur.ga?.sessions), pses = S((x) => x.prev.ga?.sessions);
+    const usr = S((x) => x.users), pusr = S((x) => x.prevUsers);
+    const kev = S((x) => x.cur.ga?.keyEvents);
+    const clk = S((x) => x.cur.gsc?.clicks), pclk = S((x) => x.prev.gsc?.clicks), imp = S((x) => x.cur.gsc?.impressions);
+    const posw = S((x) => (x.cur.gsc ? x.cur.gsc.position * x.cur.gsc.impressions : 0));
+    const lnk = rows.flatMap((x) => x.links);
+    const lh = lnk.reduce((a, l) => a + l.human, 0), lph = lnk.reduce((a, l) => a + l.prevHuman, 0);
+    const lids = new Set(lnk.map((l) => l.id)).size;
+    // 涨跌：有会话看会话，没有 GA4 看搜索点击
+    let up = 0, down = 0;
+    if (hasP) for (const x of rows) {
+      const [a, b] = x.cur.ga && x.prev.ga ? [x.cur.ga.sessions, x.prev.ga.sessions] : x.cur.gsc && x.prev.gsc ? [x.cur.gsc.clicks, x.prev.gsc.clicks] : [0, 0];
+      if (a > b * 1.05 && a - b >= 3) up++; else if (a < b * 0.95 && b - a >= 3) down++;
+    }
+    const active = rows.filter((x) => (x.cur.ga?.sessions || 0) + (x.cur.gsc?.clicks || 0) > 0).length;
+    // 每日序列：区间内每天相加；上一周期按“第几天”对齐
+    const days = [];
+    for (let t = Date.parse(d.ranges.from); ; t += 86400000) { const k = new Date(t).toISOString().slice(0, 10); if (k > d.ranges.to) break; days.push(k); }
+    const series = (pick) => {
+      const m = new Map();
+      for (const x of rows) for (const p of pick(x)) m.set(p[0], (m.get(p[0]) || 0) + p[1]);
+      return days.map((k) => m.get(k) || 0);
+    };
+    const sSes = series((x) => x.spark.map((p) => [p.k, p.n])), sUsr = series((x) => x.spark.map((p) => [p.k, p.u || 0]));
+    const sClk = series((x) => x.spark.map((p) => [p.k, p.c])), sLnk = series((x) => x.links.flatMap((l) => Object.entries(l.daily || {})));
+    const pm = new Map();
+    for (const x of rows) for (const p of x.prevSpark || []) pm.set(p.k, (pm.get(p.k) || 0) + p.n);
+    const shift = (k, n) => new Date(Date.parse(k) - n * 86400000).toISOString().slice(0, 10);
+    const sPrev = hasP && pm.size ? days.map((k) => pm.get(shift(k, gState.days)) || 0) : null;
+    // 访问量占比：会话最多的 5 个站点各一段，其余合并；没有 GA4 数据时按搜索点击
+    const byS = ses > 0, val = (x) => (byS ? x.cur.ga?.sessions : x.cur.gsc?.clicks) || 0, tot = byS ? ses : clk;
+    const top = rows.filter((x) => val(x) > 0).sort((a, b) => val(b) - val(a)).slice(0, 5);
+    const rest = tot - top.reduce((a, x) => a + val(x), 0);
+    const COL = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', '#e26d9c'];
+    const nm = (x) => (x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host);
+    const bar = tot ? `<div class="gsb">${top.map((x, i) => `<i style="flex:${val(x)};background:${COL[i]}" data-tipf-always data-tipf="${esc(`${nm(x)} · ${pctText(val(x) / tot)}`)}"></i>`).join('')}${rest > 0 ? `<i style="flex:${rest}" class="o" data-tipf-always data-tipf="其余 ${rows.length - top.length} 个站点 · ${pctText(rest / tot)}"></i>` : ''}</div>
+      <div class="gsb-l">${top.slice(0, 3).map((x, i) => `<span><i style="background:${COL[i]}"></i>${esc(nm(x))} ${pctText(val(x) / tot)}</span>`).join('')}</div>` : '';
+    document.getElementById('g-sum').innerHTML = [
+      gKc('站点', num(rows.length), '', hasP ? `<span class="gup">↑ ${up}</span> 增长 · <span class="gdn">↓ ${down}</span> 下降 · ${active} 个有访问` : `${active} 个有访问`,
+        `GA4 ${rows.filter((x) => x.ga4).length} 个 · Search Console ${rows.filter((x) => x.gsc).length} 个；色条为${byS ? '会话' : '搜索点击'}占比`, bar),
+      gKc('用户', num(usr), hasP ? gDelta(usr, pusr) : '', '各站点相加', '各站点的用户数直接相加，同一个人访问多个站点会重复计算；趋势为每天的用户数', kpiSpark(sUsr, 'var(--violet)')),
+      gKc('会话', num(ses), hasP ? gDelta(ses, pses) : '', `关键事件 ${num(kev)}`, sPrev ? '虚线为上一周期' : '', kpiSpark(sSes, 'var(--accent)', sPrev)),
+      gKc('搜索点击', num(clk), hasP ? gDelta(clk, pclk) : '', imp ? `展示 ${num(imp)} · 点击率 ${pct1(clk / imp)} · 排名 ${(posw / imp).toFixed(1)}` : '暂无搜索数据', '', kpiSpark(sClk, 'var(--teal)')),
+      gKc('短链点击', num(lh), hasP ? gDelta(lh, lph) : '', lids ? `${lids} 个短链跳转到这些站点` : '还没有短链跳转到这些站点', '按短链的默认地址和地区规则的域名匹配站点；只计真人访问', sLnk.some(Boolean) ? kpiSpark(sLnk, 'var(--amber)') : ''),
+    ].join('');
+  };
   const draw = () => {
     const q = gState.q.toLowerCase();
-    const rows = d.items.filter((x) => !q || x.host.includes(q) || (x.ga4?.name || '').toLowerCase().includes(q));
+    const rows = d.items.filter((x) => (!q || x.host.includes(q) || (x.ga4?.name || '').toLowerCase().includes(q))
+      && (!gState.acct || x.ga4?.acct === gState.acct || x.gscAcct === gState.acct));
     const key = (x) => (gState.sort === 'clicks' ? x.cur.gsc?.clicks ?? -1 : gState.sort === 'host' ? 0 : x.cur.ga?.sessions ?? -1);
     rows.sort((a, b) => (gState.sort === 'host' ? a.host.localeCompare(b.host) : key(b) - key(a)));
+    // 占比：按搜索点击排序时看点击占比，否则看会话占比
+    const byClicks = gState.sort === 'clicks';
+    const shareOf = (x) => (byClicks ? x.cur.gsc?.clicks : x.cur.ga?.sessions) || 0;
+    const shareSum = rows.reduce((a, x) => a + shareOf(x), 0);
     list.innerHTML = rows.length ? `<div class="gl-wrap"><table class="tbl gl">
-      <thead><tr><th>站点</th><th class="r">用户</th><th class="r">会话</th><th class="r">关键事件</th><th class="r">搜索点击</th><th class="r">展示</th><th class="r">点击率</th><th class="r">排名</th><th>会话趋势</th></tr></thead>
+      <thead><tr><th>站点</th><th class="r">用户</th><th class="r">会话</th><th>${byClicks ? '点击占比' : '会话占比'}</th><th class="r">关键事件</th><th class="r">搜索点击</th><th class="r">展示</th><th class="r">点击率</th><th class="r">排名</th><th>会话趋势</th></tr></thead>
       <tbody>${rows.map((x) => {
         const ga = x.cur.ga, pg = x.prev.ga, sc = x.cur.gsc, ps = x.prev.gsc;
         return `<tr data-host="${esc(x.host)}" tabindex="0">
           <td><div class="gh">${esc(x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host)}</div>
-            <div class="sm">${x.ga4 ? `<span class="gtag ga">GA4</span>${esc(x.ga4.name)}` : '<span class="gtag off">无 GA4</span>'}${x.gsc ? '<span class="gtag sc">GSC</span>' : '<span class="gtag off">无 GSC</span>'}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div></td>
+            <div class="sm gm">${x.ga4
+              ? `<span class="gico" data-tipf-always data-tipf="${esc(`Google Analytics 4：${x.ga4.account} / ${x.ga4.name}（${x.ga4.property}）${many ? ` · 来自 ${x.ga4.email}` : ''}`)}">${BRAND.ga(14)}</span><span class="gnm">${esc(x.ga4.name)}</span>`
+              : `<span class="gico off" data-tipf-always data-tipf="未关联 Google Analytics 4">${BRAND.ga(14)}</span>`}${x.gsc
+              ? `<span class="gico" data-tipf-always data-tipf="${esc(`Search Console：${x.gsc}${many ? ` · 来自 ${x.gscEmail}` : ''}`)}">${BRAND.gsc(14)}</span>`
+              : `<span class="gico off" data-tipf-always data-tipf="未关联 Search Console">${BRAND.gsc(14)}</span>`}${x.links.length ? `<span class="gsl" data-tipf-always data-tipf="${esc(`${x.links.length} 个短链跳转到这里 · ${G_LABEL()}真人点击 ${num(x.links.reduce((a, l) => a + l.human, 0))}（含机器 ${num(x.links.reduce((a, l) => a + l.cur, 0))}）`)}">${ic('link', 12)}${num(x.links.reduce((a, l) => a + l.human, 0))}</span>` : ''}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div></td>
           <td class="num">${x.users != null ? num(x.users) : '—'}${x.prevUsers != null ? gDelta(x.users, x.prevUsers) : ''}</td>
           <td class="num">${ga ? num(ga.sessions) : '—'}${ga && pg ? gDelta(ga.sessions, pg.sessions) : ''}</td>
+          <td class="gsh-c">${shareSum && shareOf(x) ? `<div class="gsh"><i style="width:${(shareOf(x) / shareSum) * 100}%"></i></div><span>${pctText(shareOf(x) / shareSum)}</span>` : '<span class="sm">—</span>'}</td>
           <td class="num">${ga ? num(ga.keyEvents) : '—'}</td>
           <td class="num">${sc ? num(sc.clicks) : '—'}${sc && ps ? gDelta(sc.clicks, ps.clicks) : ''}</td>
           <td class="num">${sc ? num(sc.impressions) : '—'}</td>
@@ -3221,6 +3583,9 @@ async function renderSites(token) {
           <td class="gsp">${x.spark.length ? kpiSpark(x.spark.map((p) => p.n), 'var(--accent)') : ''}</td></tr>`;
       }).join('')}</tbody></table></div>`
       : `<div class="empty" style="padding:48px">${ic('inbox')}${d.items.length ? '没有匹配的站点' : '账号下还没有找到 GA4 媒体资源或 Search Console 站点'}</div>`;
+    sumStrip(rows);
+    const cnt = document.getElementById('g-cnt');
+    if (cnt) cnt.textContent = rows.length === d.items.length ? `${d.items.length} 个站点` : `${rows.length} / ${d.items.length} 个站点`;
     list.querySelectorAll('tr[data-host]').forEach((tr) => {
       const go = () => { location.hash = '#/site/' + encodeURIComponent(tr.dataset.host); };
       tr.onclick = go; tr.onkeydown = (e) => { if (e.key === 'Enter') go(); };
@@ -3236,22 +3601,44 @@ async function renderSites(token) {
     sortSeg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); segThumb(sortSeg); draw();
   }));
   const prog = document.getElementById('g-prog');
-  const sync = async (btn) => {
+  const syncBtn = document.getElementById('g-sync');
+  const sync = async () => {
+    if (syncBtn.disabled) return;
+    prog.querySelector('span').innerHTML = st.pending ? `同步中 · 还剩 <b>${st.pending}</b> 个站点` : '同步中…';
     prog.hidden = false;
     try {
-      await googleSyncAll(btn, (r) => { prog.querySelector('span').innerHTML = r.left ? `正在同步，还剩 <b>${r.left}</b> 个站点…` : '同步完成'; });
+      await googleSyncAll(syncBtn, (r) => { prog.querySelector('span').innerHTML = r.left ? `同步中 · 还剩 <b>${r.left}</b> 个站点` : '同步完成'; });
       if (token === routeToken) renderSites(routeToken);
     } catch (err) { toast(err.message, 'bad'); prog.hidden = true; }
   };
-  document.getElementById('g-sync').onclick = (e) => sync(e.currentTarget);
-  document.getElementById('g-off').onclick = async () => {
-    const ok = await confirmDialog({ title: '断开 Google 账号？', text: '会撤销授权，并删除已同步的 GA4 / Search Console 数据。之后可以随时重新连接。', ok: '断开', danger: true });
-    if (!ok) return;
-    await api('/google/disconnect', { method: 'POST' });
-    toast('已断开 Google 账号'); renderSites(routeToken);
-  };
+  syncBtn.onclick = () => sync();
+  googleAcctPicker(document.getElementById('g-acct'), accts, d.items, draw);
+  const re = document.getElementById('g-re');
+  if (re) re.onclick = () => googleConnect(re);
+
   // 首次连接或有待同步的站点：自动继续同步
-  if (st.pending) sync(null);
+  if (st.pending) sync();
+}
+
+// 站点详情：跳转到这个站点的短链
+function siteLinksCard(d) {
+  const ls = d.links || [];
+  const hasP = d.days !== 365;
+  const total = ls.reduce((a, l) => a + l.human, 0);
+  return `<section class="card rv">
+    <div class="card-h"><h3>跳转到这个站点的短链</h3><span class="sp"></span><span class="sub">${ls.length ? `${ls.length} 个短链 · ${G_LABEL()}真人点击 ${num(total)}` : '按短链跳转地址的域名匹配'}</span></div>
+    ${ls.length ? `<div class="scroll"><table class="tbl gt gsl-t">
+      <thead><tr><th>短链</th><th>跳转去向</th><th class="r">真人点击</th><th class="r">含机器</th><th class="r">占比</th></tr></thead>
+      <tbody>${ls.map((l) => `<tr data-href="#/link/${l.id}" tabindex="0">
+        <td><div class="mono">/${esc(l.slug)}</div>${l.title ? `<div class="sm ell" data-tipf="${esc(l.title)}">${esc(l.title)}</div>` : ''}</td>
+        <td><div class="ell" data-tipf-always data-tipf="${esc(l.routes.map((r) => `${routeLabel(r)}：${r.url}`).join('\n'))}">${esc(l.routes.map(routeLabel).join(' · '))}</div></td>
+        <td class="num">${num(l.human)}${hasP ? gDelta(l.human, l.prevHuman) : ''}</td>
+        <td class="num">${num(l.cur)}</td>
+        <td class="num">${total ? pctText(l.human / total) : '—'}</td></tr>`).join('')}</tbody></table></div>`
+      : `<div class="g-empty"><span class="g-empty-i">${ic('link', 18)}</span>
+          <div><b>还没有短链跳转到这个站点</b><span>创建短链时，把默认地址或地区规则设为 ${esc(d.host)} 下的页面，就会出现在这里</span></div>
+          <a class="btn sm" href="#/links">${ic('plus', 14)}创建短链</a></div>`}
+  </section>`;
 }
 
 async function renderSite(token, host) {
@@ -3293,7 +3680,10 @@ async function renderSite(token, host) {
       <section class="card hero rv"><div class="info">
         <div class="ttl"><span class="ttl-t">${esc(d.ga4?.name || '')}</span>${d.realtime != null ? `<span class="live">实时 ${num(d.realtime)} 人在线</span>` : ''}</div>
         <div class="short">${esc(title)}${host.includes('.') ? `<a class="btn sm ghost icon" href="https://${esc(host)}" target="_blank" rel="noopener" data-tip="打开网站" aria-label="打开网站">${ic('ext', 15)}</a>` : ''}</div>
-        <div class="meta">${d.ga4 ? `GA4：${esc(d.ga4.account)} / ${esc(d.ga4.name)}（${esc(d.ga4.property)}）` : '未关联 GA4'} · ${d.gsc ? `Search Console：${esc(d.gsc)}` : '未关联 Search Console'}${d.syncedAt ? ` · 同步于 ${ago(d.syncedAt)}` : ''}</div>
+        <div class="meta g-src">
+          <span class="g-si${d.ga4 ? '' : ' off'}"><span class="gico" data-tipf-always data-tipf="Google Analytics 4">${BRAND.ga(14)}</span>${d.ga4 ? `${esc(d.ga4.account)} / ${esc(d.ga4.name)}<span class="sm">（${esc(d.ga4.property)}）</span>${d.ga4.email ? `<span class="sm">· ${mailTip(d.ga4.email)}</span>` : ''}` : '未关联 GA4'}</span>
+          <span class="g-si${d.gsc ? '' : ' off'}"><span class="gico" data-tipf-always data-tipf="Search Console">${BRAND.gsc(14)}</span>${d.gsc ? `${esc(d.gsc)}${d.gscEmail && d.gscEmail !== d.ga4?.email ? `<span class="sm">· ${mailTip(d.gscEmail)}</span>` : ''}` : '未关联 Search Console'}</span>
+          ${d.syncedAt ? `<span class="g-si">${ic('refresh', 13)}同步于 ${ago(d.syncedAt)}</span>` : ''}</div>
       </div><div class="acts">${gRangeBar()}</div></section>
       ${d.errors?.length || d.error ? `<div class="bulk-bad">${ic('info', 15)}<div>${[d.error, ...(d.errors || [])].filter(Boolean).map(esc).join('<br>')}</div></div>` : ''}
       <section class="card kstrip gk rv">
@@ -3304,6 +3694,7 @@ async function renderSite(token, host) {
         ${kc('搜索点击', sc ? num(sc.clicks) : '—', sc && sp ? gDelta(sc.clicks, sp.clicks) : '', sc ? `展示 ${num(sc.impressions)}` : '未关联 Search Console')}
         ${kc('点击率 / 排名', sc ? `${pct1(sc.ctr)}<small> · ${sc.impressions ? sc.position.toFixed(1) : '—'}</small>` : '—', sc && sp && sp.impressions ? gDelta(sc.position, sp.position, true) : '', sc ? '排名越小越好' : '')}
       </section>
+      ${siteLinksCard(d)}
       <div class="grid2">
         <section class="card rv"><div class="card-h"><h3>访问趋势 · GA4</h3><span class="sp"></span><div class="legend" id="lg-ga"></div></div>
           <div class="card-b">${d.ga4 ? '<div class="chart sm" id="ch-ga"></div>' : `<div class="empty">${ic('inbox')}未关联 GA4</div>`}</div></section>
@@ -3328,27 +3719,32 @@ async function renderSite(token, host) {
   const page = document.getElementById('page');
   reveal(page);
   bindGRange(() => renderSite(routeToken, host));
+  page.querySelectorAll('.gsl-t tr[data-href]').forEach((tr) => {
+    const go = () => { location.hash = tr.dataset.href; };
+    tr.onclick = go; tr.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  });
   if (d.ga4) mountChart(document.getElementById('ch-ga'), series, [
     { id: 's', key: 's', label: '会话', color: 'var(--accent)', type: 'area' },
     { id: 'u', key: 'u', label: '用户（按天）', color: 'var(--violet)', type: 'line' },
-    { id: 'ps', key: 'ps', label: '上一周期会话', type: 'dash' },
+    ...(d.prevDaily.length ? [{ id: 'ps', key: 'ps', label: '上一周期会话', type: 'dash' }] : []),
   ], document.getElementById('lg-ga'));
   if (d.gsc) mountChart(document.getElementById('ch-sc'), series, [
     { id: 'c', key: 'c', label: '点击', color: 'var(--teal)', type: 'area' },
-    { id: 'pc', key: 'pc', label: '上一周期点击', type: 'dash' },
+    ...(d.prevDaily.length ? [{ id: 'pc', key: 'pc', label: '上一周期点击', type: 'dash' }] : []),
   ], document.getElementById('lg-sc'));
 }
 
 // ---------------------------------------------------------------- 设置（修改密码 / 两步验证）
 async function renderSettings(token) {
-  const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证和来源追踪</div></div></header>`;
+  const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证、来源追踪和第三方集成</div></div></header>`;
   shell('settings', `${head}<div class="acc">${skel(76, 3)}</div>`);
-  const [mfa, trk, ret, use] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'), api('/usage').catch((e) => ({ configured: true, errors: [e.message], days: [] }))]);
+  const [mfa, trk, ret, use, goo] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'),
+    api('/usage').catch((e) => ({ configured: true, errors: [e.message], days: [] })), api('/google/status').catch(() => ({ configured: false }))]);
   if (token !== routeToken) return;
   const item = (id, icon, cls, title, sub, status, body) => `
     <section class="card rv fold acc-i" data-acc="${id}">
       <button type="button" class="card-h fold-h" aria-expanded="false">
-        <span class="chi ${cls}">${ic(icon, 17)}</span>
+        <span class="chi ${cls}">${BRAND[icon] ? BRAND[icon](18) : ic(icon, 17)}</span>
         <div class="acc-t"><h3>${title}</h3><span class="sub" data-sub="${id}">${sub}</span></div>
         <span class="sp"></span><span class="acc-s" data-st="${id}">${status}</span>${ic('chev', 16)}</button>
       <div class="fold-b"><div class="card-b" id="acc-${id}">${body}</div></div>
@@ -3373,7 +3769,8 @@ async function renderSettings(token) {
         </ul>
         <button class="btn ${mfa.enabled ? 'danger' : 'primary'}" id="mfa-btn">${ic('shield', 15)}${mfa.enabled ? '关闭两步验证' : '开启两步验证'}</button>`)}
       ${item('trk', 'search', 'trk', '来源追踪', '识别访客从哪个搜索引擎进入推广页', pill(trk.enabled), '')}
-      ${item('use', 'pulse', 'use', 'Cloudflare 用量', usageSummary(use), usagePill(use), '')}
+      ${item('goo', 'google', 'goo brand', 'Google 集成', googleSummary(goo), googlePill(goo), '')}
+      ${item('use', 'cloudflare', 'use brand', 'Cloudflare 用量', usageSummary(use), usagePill(use), '')}
       ${item('ret', 'inbox', 'ret', '数据保留', '访问明细保存多久；统计数据长期保留', `<span class="pill on">${ret.days ? ret.days + ' 天' : '永久'}</span>`, '')}
     </div>`;
   const page = document.getElementById('page');
@@ -3397,6 +3794,10 @@ async function renderSettings(token) {
   bindPasswordForm(pwf, '', () => { pwf.reset(); pwf.querySelector('.pwm').dataset.n = ''; pwf.querySelector('#p-tip').textContent = '至少 8 位，建议混合字母、数字和符号'; pwf.querySelector('button.primary').disabled = false; });
   document.getElementById('mfa-btn').onclick = () => openMfaDialog(() => route());
   renderTracking(document.getElementById('acc-trk'), trk, (on) => { page.querySelector('[data-st="trk"]').innerHTML = pill(on); });
+  renderGoogleSettings(document.getElementById('acc-goo'), goo, (g) => {
+    page.querySelector('[data-st="goo"]').innerHTML = googlePill(g);
+    page.querySelector('[data-sub="goo"]').innerHTML = googleSummary(g);
+  });
   renderUsage(document.getElementById('acc-use'), use, (u) => {
     page.querySelector('[data-st="use"]').innerHTML = usagePill(u);
     page.querySelector('[data-sub="use"]').innerHTML = usageSummary(u);
@@ -3414,6 +3815,12 @@ const usagePill = (u) => !u.configured ? '<span class="pill off">未配置</span
 // 用量是否足够：按目前速度推算到月底（付费版）或今天结束（免费版），取最紧的一项
 function usageHealth(u) {
   if (!u.configured || !(u.days || []).length) return null;
+  if (u.forecast) {
+    const NAME = { rowsRead: '读取', rowsWritten: '写入', requests: '请求' };
+    const items = u.forecast.items.map((x) => ({ k: x.k, name: NAME[x.k], used: x.ratio, proj: x.projRatio, runOut: x.runOut }));
+    const worst = items.reduce((a, b) => (b.proj > a.proj ? b : a));
+    return { paid: u.forecast.paid, items, worst, level: worst.proj >= 1 ? 'bad' : worst.proj >= 0.8 ? 'warn' : 'ok' };
+  }
   const paid = u.plan === 'paid';
   const cur = paid ? u.month : (u.days || []).find((d) => d.date === u.today);
   if (!cur) return null;
@@ -3437,7 +3844,7 @@ const pctText = (x) => (x > 0 && x < 0.01 ? '<1%' : `${Math.round(x * 100)}%`);
 
 // 收起时标题下的一句话摘要
 function usageSummary(u) {
-  if (!u.configured) return '未配置 API 令牌，展开查看配置方法';
+  if (!u.configured) return '未配置，展开填写账户 ID 和 API 令牌';
   if (u.errors?.length && !(u.days || []).some((d) => d.rowsRead)) return '读取用量失败，展开查看原因';
   const h = usageHealth(u);
   if (!h) return '暂无数据';
@@ -3453,17 +3860,57 @@ function usageSummary(u) {
   return `<span class="use-sum" data-tipf-always data-tipf="${esc(sentence)}"><b class="use-lv ${h.level}">${label}</b>${h.items.map(bar).join('')}</span>`;
 }
 
+// 账户 ID / API 令牌表单：保存前服务器会先请求一次 Cloudflare 验证
+const cfForm = (cfg) => `<form class="set-form cfg-f" data-cf-form>
+  <div class="field"><label for="cf-acc">账户 ID</label><input class="input mono" id="cf-acc" required autocomplete="off" spellcheck="false" maxlength="32"
+    placeholder="32 位字符" value="${esc(cfg.accountId || '')}"></div>
+  <div class="field"><label for="cf-tok">API 令牌</label><input class="input mono" id="cf-tok" type="password" autocomplete="off" spellcheck="false"
+    ${cfg.accountId ? `placeholder="已保存 ••••${esc(cfg.tokenTail)}，留空则不修改"` : 'required placeholder="粘贴令牌的值"'}></div>
+  <details class="wz-more"${cfg.dbId || cfg.worker ? ' open' : ''}><summary>单独显示本项目的用量（可选）</summary>
+    <div class="field"><label for="cf-db">D1 数据库 ID</label><input class="input mono" id="cf-db" autocomplete="off" spellcheck="false" placeholder="wrangler.toml 里的 database_id" value="${esc(cfg.dbId || '')}"></div>
+    <div class="field"><label for="cf-wk">Worker 名称</label><input class="input mono" id="cf-wk" autocomplete="off" spellcheck="false" placeholder="wrangler.toml 里的 name" value="${esc(cfg.worker || '')}"></div>
+  </details>
+  <div class="err" style="margin:4px 0 12px" role="alert"></div>
+  <div class="row-l"><button class="btn primary">验证并保存</button>${cfg.accountId ? '<button type="button" class="btn ghost" data-cfg-cancel>取消</button><span class="sp"></span><button type="button" class="btn ghost danger-t" data-cfg-del>删除凭据</button>' : ''}</div>
+</form>`;
+function bindCfForm(box, u, onState) {
+  const done = (d) => { onState(d); renderUsage(box, d, onState); };
+  const edit = box.querySelector('[data-cfg-edit]'), view = box.querySelector('[data-cfg-view]'), wrap = box.querySelector('[data-cfg-form]');
+  if (edit) edit.onclick = () => { view.hidden = true; wrap.hidden = false; wrap.querySelector('#cf-acc').focus(); };
+  const f = box.querySelector('[data-cf-form]');
+  if (!f) return;
+  const cancel = f.querySelector('[data-cfg-cancel]');
+  if (cancel && view) cancel.onclick = () => { view.hidden = false; wrap.hidden = true; };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = f.querySelector('.primary'), err = f.querySelector('.err');
+    btn.disabled = true; err.textContent = ''; btn.textContent = '正在验证…';
+    try {
+      const d = await api('/usage/config', { method: 'PUT', body: {
+        accountId: f.querySelector('#cf-acc').value.trim(), token: f.querySelector('#cf-tok').value.trim(),
+        dbId: f.querySelector('#cf-db').value.trim(), worker: f.querySelector('#cf-wk').value.trim() } });
+      toast('Cloudflare 凭据已保存'); done(d);
+    } catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = '验证并保存'; }
+  };
+  const del = f.querySelector('[data-cfg-del]');
+  if (del) del.onclick = async () => {
+    const ok = await confirmDialog({ title: '删除 Cloudflare 凭据？', text: '删除后不再显示用量，可以随时重新填写。', ok: '删除', danger: true });
+    if (!ok) return;
+    try { done(await api('/usage/config', { method: 'DELETE' })); toast('已删除凭据'); } catch (ex) { toast(ex.message, 'bad'); }
+  };
+}
+
 function renderUsage(box, u, onState) {
   if (!u.configured) {
-    const cmd = 'npx wrangler secret put CF_API_TOKEN';
     box.innerHTML = `
-      <p class="set-p">在后台查看 Cloudflare 账号的用量，需要一个只读的 API 令牌：</p>
-      <ol class="use-steps">
+      <p class="set-p">在后台查看 Cloudflare 账号的用量，需要账户 ID 和一个只读的 API 令牌：</p>
+      <ol class="use-steps" style="margin-bottom:18px">
         <li>打开 Cloudflare 控制台 → 右上角头像 → <b>我的个人资料 → API 令牌 → 创建令牌 → 创建自定义令牌</b>。</li>
-        <li>权限添加 <b>账户 · Account Analytics · 读取</b>；想显示套餐的话再加 <b>账户 · 账单 · 读取</b>。账户资源选你的账户。</li>
-        <li>在项目目录执行下面的命令，粘贴生成的令牌：<div class="use-cmd"><code>${cmd}</code>${copyBtn(cmd, 'btn sm ghost icon')}</div></li>
-        <li>${u.accountId ? `账号 ID 已配置（<code>${esc(u.accountId)}</code>）` : '在 wrangler.toml 的 <code>[vars]</code> 里填写 <code>CF_ACCOUNT_ID</code>（控制台首页右侧可以找到账户 ID）'}，然后重新部署。</li>
-      </ol>`;
+        <li>权限添加 <b>帐户 · 帐户分析 · 读取</b>（英文界面是 Account Analytics · Read）；想显示套餐的话再加 <b>帐户 · 计费 · 读取</b>。帐户资源选你的账户。</li>
+        <li>账户 ID 在控制台首页（Workers 和 Pages 概览）右侧可以找到，是一串 32 位字符。</li>
+      </ol>
+      ${cfForm(u.config || {})}`;
+    bindCfForm(box, u, onState);
     return;
   }
   const zero = { rowsRead: 0, rowsWritten: 0, requests: 0, mine: { rowsRead: 0, rowsWritten: 0, requests: 0 } };
@@ -3473,12 +3920,18 @@ function renderUsage(box, u, onState) {
   const L = paid ? { rowsRead: 25e9, rowsWritten: 5e7, requests: 1e7 } : { rowsRead: 5e6, rowsWritten: 1e5, requests: 1e5 };
   const cur = paid ? (u.month || zero) : t;
   const when = paid ? '本月' : '今天';
-  const meter = (label, v, limit, mine, has, fmt = wan, unit = paid ? '每月包含' : '每天') => {
+  const fc = new Map((u.forecast?.items || []).map((x) => [x.k, x]));
+  const endName = paid ? '月底' : '今天结束时';
+  const md = (ms) => { const d = new Date(ms); return paid ? `${d.getMonth() + 1} 月 ${d.getDate()} 日` : `${pad(d.getHours())}:00`; };
+  const meter = (label, v, limit, mine, has, fmt = wan, unit = paid ? '每月包含' : '每天', key = '') => {
     const pct = limit ? Math.min(100, (v / limit) * 100) : 0;
-    const lv = pct >= 85 ? 'bad' : pct >= 60 ? 'warn' : 'ok';
+    const f = fc.get(key);
+    const pp = f ? Math.min(100, f.projRatio * 100) : 0;
+    const lv = (f ? f.projRatio * 100 : pct) >= 100 ? 'bad' : (f ? f.projRatio * 100 : pct) >= 80 ? 'warn' : 'ok';
     return `<div class="use-m"><div class="use-l">${label}</div><div class="use-v">${fmt(v)}</div>
       <div class="use-s">${paid ? '付费版' : '免费版'}${unit} ${fmt(limit)} · 已用 ${pct < 1 && v ? '<1' : Math.round(pct)}%</div>
-      <div class="use-bar ${lv}"><i style="width:${Math.max(pct, v ? 1 : 0)}%"></i></div>
+      <div class="use-bar ${lv}">${f ? `<s style="width:${Math.max(pp, pct)}%"></s>` : ''}<i style="width:${Math.max(pct, v ? 1 : 0)}%"></i></div>
+      ${f ? `<div class="use-fc ${lv}">${endName}预计 <b>${fmt(f.proj)}</b>（${pctText(f.projRatio)}）· ${f.ratio >= 1 ? '已超出' : f.runOut ? `约 ${md(f.runOut)} 用完` : '够用'}</div>` : ''}
       ${has ? `<div class="use-mine">其中本项目 <b>${fmt(mine || 0)}</b></div>` : ''}</div>`;
   };
   const mine = cur.mine || zero.mine;
@@ -3493,14 +3946,28 @@ function renderUsage(box, u, onState) {
     ${u.errors?.length ? `<div class="bulk-bad">${ic('info', 15)}<div>${u.errors.map(esc).join('<br>')}<br>${u.errors.some((e) => /authentication/i.test(e))
       ? '“Authentication error”表示令牌无效：多半是粘贴的不是令牌值（如 Global API Key 或令牌 ID）、令牌已过期或被轮转，或者设置了客户端 IP 筛选。'
       : '请检查 API 令牌是否有“帐户分析（Account Analytics）· 读取”权限。'}</div></div>` : ''}
+    ${(() => {
+      const h = usageHealth(u);
+      if (!h) return '';
+      const over = h.items.filter((x) => x.proj >= 1);
+      const msg = over.length
+        ? `按目前速度，${over.map((x) => `${x.name}${x.used >= 1 ? '已超出' : x.runOut ? `约 ${md(x.runOut)} 用完` : `${endName}约 ${pctText(x.proj)}`}`).join('、')}${paid ? '，超出部分按量计费' : '，超出后当天请求会失败'}`
+        : `按目前速度，${paid ? '本月' : '今天'}的包含额度够用：${endName}最多用到 ${pctText(h.worst.proj)}（${h.worst.name}）`;
+      return `<div class="use-v-b ${h.level}">${ic(h.level === 'ok' ? 'check' : 'alert', 15)}<span>${msg}</span>
+        <span class="hint">${paid ? '按最近 7 天的日均用量推算' : '按今天已过时间推算'}</span></div>`;
+    })()}
     <div class="use-g">
-      ${meter(`D1 读取行数（${when}·整个账户）`, cur.rowsRead, L.rowsRead, mine.rowsRead, u.hasMine?.d1)}
-      ${meter(`D1 写入行数（${when}·整个账户）`, cur.rowsWritten, L.rowsWritten, mine.rowsWritten, u.hasMine?.d1)}
-      ${meter(`Worker 请求（${when}·整个账户）`, cur.requests, L.requests, mine.requests, u.hasMine?.worker)}
+      ${meter(`D1 读取行数（${when}·整个账户）`, cur.rowsRead, L.rowsRead, mine.rowsRead, u.hasMine?.d1, wan, undefined, 'rowsRead')}
+      ${meter(`D1 写入行数（${when}·整个账户）`, cur.rowsWritten, L.rowsWritten, mine.rowsWritten, u.hasMine?.d1, wan, undefined, 'rowsWritten')}
+      ${meter(`Worker 请求（${when}·整个账户）`, cur.requests, L.requests, mine.requests, u.hasMine?.worker, wan, undefined, 'requests')}
       ${u.storageBytes == null ? `<div class="use-m"><div class="use-l">D1 存储（整个账户）</div><div class="use-v">—</div><div class="use-s">暂无数据</div></div>`
         : meter('D1 存储（整个账户）', u.storageBytes, 5e9, u.myStorage, u.myStorage != null, bytes, '包含')}
     </div>
     <div class="hint" style="margin-top:10px">额度按整个 Cloudflare 账户计算，${paid ? '付费版按自然月累计，超出部分按量计费' : '免费版每天 UTC 0 点（北京时间 8 点）重置，超出后当天的请求会失败'}。按 UTC 日期统计${u.updatedAt ? ` · 更新于 ${fmtTime(u.updatedAt)}` : ''}。</div>
+    <div class="cfg-ro use-cfg" data-cfg-view>${ic(u.config?.source === 'env' ? 'lock' : 'key', 14)}<div>${u.config?.source === 'env' ? '凭据来自环境变量（CF_ACCOUNT_ID / CF_API_TOKEN）' : '凭据已加密保存在数据库'}
+        <div class="sm mono">账户 ${esc(u.config?.accountId || '')} · 令牌 ••••${esc(u.config?.tokenTail || '')}${u.config?.dbId ? ` · D1 ${esc(u.config.dbId.slice(0, 8))}…` : ''}${u.config?.worker ? ` · Worker ${esc(u.config.worker)}` : ''}</div></div>
+      <span class="sp"></span>${u.config?.source === 'env' ? '' : '<button type="button" class="btn sm" data-cfg-edit>修改</button>'}</div>
+    <div data-cfg-form hidden>${u.config?.source === 'env' ? '' : cfForm(u.config || {})}</div>
     <table class="tbl use-t"><thead><tr><th>日期（UTC）</th><th style="text-align:right">D1 读取</th><th></th><th style="text-align:right">D1 写入</th><th style="text-align:right">Worker 请求</th></tr></thead>
       <tbody>${(u.days || []).slice().reverse().map((d) => `<tr>
         <td>${d.date.slice(5)}${d.date === u.today ? ' <span class="sm">今天</span>' : ''}</td>
@@ -3508,6 +3975,7 @@ function renderUsage(box, u, onState) {
         <td style="width:34%"><div class="use-mini"><i style="width:${(d.rowsRead / maxDay) * 100}%"></i><b style="width:${(((d.mine?.rowsRead) || 0) / maxDay) * 100}%"></b></div></td>
         <td class="num">${wan(d.rowsWritten)}${u.hasMine?.d1 ? `<div class="sm">本项目 ${wan(d.mine?.rowsWritten || 0)}</div>` : ''}</td>
         <td class="num">${wan(d.requests)}${u.hasMine?.worker ? `<div class="sm">本项目 ${wan(d.mine?.requests || 0)}</div>` : ''}</td></tr>`).join('')}</tbody></table>`;
+  bindCfForm(box, u, onState);
   segThumb(box.querySelector('#use-plan'));
   box.querySelectorAll('#use-plan button').forEach((b) => (b.onclick = async () => {
     try { const d = await api('/usage/plan', { method: 'PUT', body: { plan: b.dataset.p } }); onState(d); renderUsage(box, d, onState); }
@@ -3610,6 +4078,7 @@ async function renderNotify(token) {
           </div>
         </div>
       </section>
+      <section class="card rv" id="n-use"></section>
       <div class="sec-row rv"><h2 class="sec-t">推送渠道</h2><span class="hint">参数只需配置一次，之后用开关控制是否推送</span></div>
       <div class="grid2" id="chans"></div>
     </div>`;
@@ -3636,6 +4105,7 @@ async function renderNotify(token) {
   const persist = async (patch = {}) => {
     const body = {
       reports: Object.fromEntries(['daily', 'weekly', 'monthly'].map((k) => [k, page.querySelector(`[name=r-${k}]`).checked])),
+      usage: { ...st.usage, ...(patch.usage || {}) },
       hour: hourBox.value, tz: TZ,
       tg: { ...st.tg, ...(patch.tg || {}) },
       email: { ...st.email, ...(patch.email || {}) },
@@ -3649,9 +4119,43 @@ async function renderNotify(token) {
     : !!(st.email.from && st.email.to && (st.email.provider === 'cloudflare' ? st.cloudflareEmail : st.email.key));
   const maskMail = (v) => v.split(/[\s,，;；]+/).filter(Boolean).map((a) => a.replace(/^(.{3}).*(@.*)$/, '$1***$2')).join('、');
 
+  // Cloudflare 用量预警
+  const renderUse = () => {
+    const box = document.getElementById('n-use'), u = st.usage;
+    const anyCh = st.tg.enabled || st.email.enabled;
+    box.innerHTML = `<div class="card-h"><span class="chi brand chi-sm">${BRAND.cloudflare(16)}</span><h3>Cloudflare 用量预警</h3>
+        <span class="sub">已用达到阈值，或按目前速度到期末会超出包含额度时推送；同一周期每种情况只提醒一次</span><span class="sp"></span>
+        <label class="switch"><input type="checkbox" id="u-on" ${u.enabled ? 'checked' : ''} ${st.cfConfigured ? '' : 'disabled'} aria-label="开启用量预警"><span class="t"></span></label></div>
+      <div class="card-b n-use-b">${!st.cfConfigured
+        ? `<div class="hint">${ic('info', 14)} 需要先在 <a href="#/settings" data-goto-use>设置 → Cloudflare 用量</a> 填写账户 ID 和 API 令牌。</div>`
+        : `<label>提醒阈值</label><div class="seg" id="u-th">${[70, 80, 90].map((t) => `<button type="button" data-t="${t}" class="${t === u.threshold ? 'on' : ''}">已用 ${t}%</button>`).join('')}</div>
+          <span class="hint">每小时检查一次，推送到下方已开启的渠道${anyCh ? '' : '（目前没有开启的渠道）'}</span><span class="sp" style="flex:1"></span>
+          <button type="button" class="btn sm ghost" id="u-test" ${anyCh ? '' : 'disabled'}>${ic('send', 14)}发送测试预警</button>`}</div>`;
+    const go = box.querySelector('[data-goto-use]');
+    if (go) go.onclick = (e) => { e.preventDefault(); goSettings('use'); };
+    if (!st.cfConfigured) return;
+    box.querySelector('#u-on').onchange = async (e) => {
+      try { await persist({ usage: { enabled: e.target.checked } }); toast(e.target.checked ? '用量预警已开启' : '用量预警已关闭'); }
+      catch (ex) { e.target.checked = !e.target.checked; toast(ex.message, 'bad'); }
+    };
+    const seg = box.querySelector('#u-th');
+    segThumb(seg);
+    seg.querySelectorAll('button').forEach((b) => (b.onclick = async () => {
+      try { await persist({ usage: { threshold: Number(b.dataset.t) } }); toast('已保存'); } catch (ex) { toast(ex.message, 'bad'); }
+    }));
+    box.querySelector('#u-test').onclick = async (e) => {
+      const btn = e.currentTarget; btn.disabled = true;
+      try {
+        for (const ch of ['tg', 'email']) if (st[ch].enabled) await api('/notify/test', { method: 'POST', body: { channel: ch, kind: 'usage' } });
+        toast('测试预警已发送');
+      } catch (ex) { toast(ex.message, 'bad'); } finally { btn.disabled = false; }
+    };
+  };
+
   const renderStatus = () => {
+    renderUse();
     document.getElementById('nstat').innerHTML = st.status ? `<div class="nstat ${st.status.ok ? 'ok' : 'bad'}">${ic(st.status.ok ? 'check' : 'alert', 15)}
-      上次推送：${fmtTime(st.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报' }[st.status.kind] || ''}${st.status.ok ? ' · 发送成功' : ` · 失败：${esc(st.status.error)}`}</div>` : '';
+      上次推送：${fmtTime(st.status.at)} · ${{ daily: '日报', weekly: '周报', monthly: '月报', usage: '用量预警' }[st.status.kind] || ''}${st.status.ok ? ' · 发送成功' : ` · 失败：${esc(st.status.error)}`}</div>` : '';
   };
 
   function renderChannels() {

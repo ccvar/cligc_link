@@ -82,16 +82,18 @@ routes = [
 | `HOME_URL` | 访问根路径 `/` 时跳转到的地址；留空则显示内置的产品首页 |
 | `ADMIN_HOST` | 后台只允许通过这个域名访问；留空则任意域名的 `/admin` 都可访问 |
 | `TURNSTILE_SITEKEY` | Cloudflare Turnstile 站点密钥；留空则登录不做人机验证 |
-| `CF_ACCOUNT_ID` | Cloudflare 账号 ID，用于后台“Cloudflare 用量”；需配合 `CF_API_TOKEN` |
+| `CF_ACCOUNT_ID` | Cloudflare 账号 ID，用于后台“Cloudflare 用量”；需配合 `CF_API_TOKEN`。也可以不设置，直接在后台填写 |
+| `GOOGLE_CLIENT_ID` | Google OAuth 客户端 ID，用于“站点”；需配合 `GOOGLE_CLIENT_SECRET`。也可以不设置，直接在后台填写 |
 
 **密钥**（用 `npx wrangler secret put <名称>` 设置）：
 
 | 名称 | 必填 | 说明 |
 | --- | --- | --- |
 | `ADMIN_PASSWORD` | 否 | 初始后台密码。不设置时默认为 `admin`，首次登录强制修改 |
-| `SESSION_SECRET` | 否 | 会话签名密钥。不设置时首次运行自动生成并保存在数据库中 |
+| `SESSION_SECRET` | 建议 | 会话签名密钥，也用于加密保存在数据库里的令牌和客户端密钥。不设置时首次运行自动生成并保存在数据库中（这时数据库被导出或泄露，加密的内容也能被解开）；更换后需要在后台重新填写客户端信息、重新连接 Google |
 | `TURNSTILE_SECRET` | 否 | Turnstile 服务端密钥，与 `TURNSTILE_SITEKEY` 配套 |
-| `CF_API_TOKEN` | 否 | 只读 API 令牌（Account Analytics: Read），用于后台“Cloudflare 用量” |
+| `CF_API_TOKEN` | 否 | 只读 API 令牌（Account Analytics: Read），用于后台“Cloudflare 用量”；也可以在后台填写 |
+| `GOOGLE_CLIENT_SECRET` | 否 | Google OAuth 客户端密钥；也可以在后台填写 |
 
 ### 管理员密码
 
@@ -263,17 +265,31 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 1. 在 [Google Cloud 控制台](https://console.cloud.google.com/) 新建项目，启用 **Google Analytics Admin API**、**Google Analytics Data API**、**Google Search Console API**。
 2. “OAuth 权限请求页面”：用户类型选“外部”，填写应用名称和邮箱，然后点 **发布应用**。未发布（测试状态）的应用授权 7 天后失效；个人使用无需 Google 审核，授权时出现“此应用未经验证”点“继续”即可。
 3. “凭据 → 创建凭据 → OAuth 客户端 ID”，类型选 **Web 应用**，已获授权的重定向 URI 填 `https://<你的域名>/api/google/callback`。
-4. 把客户端 ID 填到 `wrangler.toml` 的 `GOOGLE_CLIENT_ID`，执行 `npx wrangler secret put GOOGLE_CLIENT_SECRET` 保存客户端密钥，重新部署。
-5. 打开后台“站点”，点“连接 Google 账号”。
+4. 打开后台“设置 → Google 集成”，填写客户端 ID 和客户端密钥并保存（密钥加密保存在 D1，之后只显示末 4 位）。
+5. 到“站点”页点“连接 Google 账号”完成授权。
 
-刷新令牌用会话密钥加密后保存在 D1。每日数据由定时任务每小时分批同步（每个站点最多 6 小时同步一次，首次回填 120 天）；详情页的排行和实时在线人数打开时现查，缓存 1 小时。统计区间截至昨天，Search Console 数据通常延迟 2–3 天。
+也可以用环境变量配置：在 `wrangler.toml` 填写 `GOOGLE_CLIENT_ID`，执行 `npx wrangler secret put GOOGLE_CLIENT_SECRET`，重新部署。环境变量优先，此时后台只读显示。客户端可以在“设置 → Google 集成”里修改或删除；更换客户端 ID 会断开所有已连接的账号。
+
+列表上方汇总当前筛选的站点数（及增长 / 下降的站点数）、用户、会话、关键事件、搜索点击和短链点击，表格里有每个站点的会话（或搜索点击）占比。
+
+**与短链打通**：按短链的跳转地址（默认地址和每条地区规则）的域名匹配站点，域名相同或是站点的子域名都算。站点列表里显示有多少短链跳转到该站点及其真人点击数，站点详情页列出这些短链；短链详情页的“目标站点”显示跳转去向对应站点的 GA4 / Search Console 数据（最近 28 天）。一条短链的不同去向按各自的点击数分别计入对应站点。
+
+可以连接多个 Google 账号：在“站点”页右上角点“添加账号”，授权时选择另一个账号即可；已连接的账号在“设置 → Google 集成”里查看、断开或重新连接。所有账号的站点按域名合并显示（同一个域名可以 GA4 来自一个账号、Search Console 来自另一个账号；多个账号都能看到同一个站点时用最早连接的账号），列表可以按账号筛选。每个账号可以单独断开，只来自这个账号的站点和数据会删除；某个账号授权失效时只影响它自己，点“重新连接”即可。
+
+刷新令牌用会话密钥加密后保存在 D1。每日数据由定时任务每小时分批同步（每个站点最多 6 小时同步一次，首次回填 16 个月，即 Search Console 保留数据的上限）；详情页的排行和实时在线人数打开时现查，缓存 1 小时。时间范围可选最近 7 / 14 / 28 天、3 / 6 / 12 个月，截至昨天，和上一周期对比（12 个月不做对比）；Search Console 数据通常延迟 2–3 天。
 
 ### Cloudflare 用量
 
 后台“设置 → Cloudflare 用量”显示整个账户的 D1 读写行数、Worker 请求数和 D1 存储，并单独列出本项目的用量（`D1_DATABASE_ID`、`WORKER_NAME`）。免费版对比每天的额度（UTC 0 点重置），付费版对比本月累计与每月包含额度；套餐可自动识别，也可在面板里手动指定。需要：
 
 1. 在 Cloudflare 控制台创建自定义 API 令牌，权限 **账户 · Account Analytics · 读取**（可选 **账户 · 账单 · 读取**，用于显示是否为付费版）。
-2. `npx wrangler secret put CF_API_TOKEN` 填入令牌；在 `wrangler.toml` 的 `[vars]` 里填写 `CF_ACCOUNT_ID`，重新部署。
+2. 在面板里填写账户 ID 和令牌（可选填 D1 数据库 ID、Worker 名称，用于单独显示本项目用量），点“验证并保存”。保存前会先请求一次 Cloudflare 接口确认令牌有效；令牌加密保存在 D1，之后只显示末 4 位。
+
+也可以用环境变量：`npx wrangler secret put CF_API_TOKEN`，并在 `wrangler.toml` 的 `[vars]` 里填写 `CF_ACCOUNT_ID`（以及 `D1_DATABASE_ID`、`WORKER_NAME`），重新部署。环境变量优先，此时面板只读显示。
+
+面板会按目前速度推算到期末的用量（付费版按最近 7 天日均推算到月底，免费版推算到今天结束），显示是否够用、预计哪天用完包含额度。
+
+**用量预警**：在“通知”页开启“Cloudflare 用量预警”，选择阈值（已用 70% / 80% / 90%）。定时任务每小时检查一次，已用达到阈值、已超出包含额度，或按目前速度到期末会超出时，推送到已开启的 Telegram / 邮件渠道；同一计费周期里每项指标的每种情况只提醒一次。
 
 结果缓存 5 分钟，可手动刷新。
 
