@@ -1311,7 +1311,7 @@ const I = {
   home: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   dup: '<rect x="8" y="8" width="14" height="14" rx="2.5"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/><path d="M15 12v6M12 15h6"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
-  ext: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  ext: '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>',   // 在新窗口打开：只有右上箭头，不带方框
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   chart: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -1579,19 +1579,52 @@ function reveal(root = document) {
   root.querySelectorAll('.rv').forEach((el, i) => el.style.setProperty('--i', i));
 }
 // 数字从 0 滚动到目标值
+// data-fmt="wan"：大数字用“万 / 亿”显示
+const fmtCount = (el, v) => (el.dataset.fmt === 'wan' && v >= 1e5 ? wan(v) : num(v));
 function countUp(root = document) {
+  fitNums(root);
   root.querySelectorAll('[data-count]').forEach((el) => {
     const to = Number(el.dataset.count) || 0;
-    if (REDUCED || to < 10) { el.textContent = num(to); return; }
+    if (REDUCED || to < 10) { el.textContent = fmtCount(el, to); return; }
     const t0 = performance.now(), dur = 900;
     const step = (t) => {
       const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 4);
-      el.textContent = num(to * e);
+      el.textContent = fmtCount(el, to * e);
       if (p < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
   });
 }
+// 数字太长放不下时逐步缩小字号（最小 13px）。按最终显示的文字测量（临时换上最终文字量一下再换回），数字滚动动画不会让字号跳动。
+// 适用于：环形图中间的总数、指标卡片的数值
+function fitNums(root = document) {
+  root.querySelectorAll('.donut .ctr b, .kc-v > b').forEach((el) => {
+    if (!el.isConnected || !el.offsetParent) return;
+    let avail;
+    if (el.closest('.donut')) avail = el.closest('.donut').clientWidth * 0.6;   // 圆环内径
+    else {
+      const box = el.parentElement, gap = parseFloat(getComputedStyle(box).columnGap) || 0;
+      let others = 0;
+      for (const sib of box.children) {
+        if (sib === el) continue;
+        // 迷你趋势图可以压缩到最小宽度，其他元素按实际宽度
+        others += (sib.classList.contains('kc-sp') ? 44 : sib.offsetWidth) + gap;
+      }
+      avail = box.clientWidth - others;
+    }
+    // 有滚动动画的先换上最终文字再量；其他的（可能带 <small> 等标记）直接量
+    const anim = el.dataset.count != null, cur = anim ? el.textContent : null;
+    el.style.fontSize = '';
+    if (anim) el.textContent = fmtCount(el, Number(el.dataset.count) || 0);
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    const base = size;
+    while (size > 13 && el.getBoundingClientRect().width > avail) { size -= 1; el.style.fontSize = size + 'px'; }
+    if (size === base) el.style.fontSize = '';
+    if (anim) el.textContent = cur;
+  });
+}
+{ let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => fitNums(), 150); }); }
+
 // 分段控件：滑块跟随选中项
 function segThumb(seg) {
   if (!seg) return;
@@ -1892,7 +1925,7 @@ function donut(items) {
   }).join('');
   setTimeout(() => document.querySelectorAll('.donut circle[data-len]').forEach((c) => c.setAttribute('stroke-dasharray', `${c.dataset.len} ${C}`)), 80);
   return `<div class="donut-w"><div class="donut"><svg viewBox="0 0 136 136" aria-hidden="true"><circle cx="68" cy="68" r="${r}" stroke="var(--sunken)"/>${segs}</svg>
-      <div class="ctr"><b data-count="${sum}">0</b><span>次访问</span></div></div>
+      <div class="ctr" data-tipf-always data-tipf="${num(sum)} 次访问"><b data-count="${sum}" data-fmt="wan">0</b><span>次访问</span></div></div>
     <div class="dlg">${items.slice(0, 5).map((it, i) => `<div class="x"><i style="background:${COLORS[i]}"></i><span>${esc(devName(it.k))}</span><b>${num(it.n)}</b><em>${Math.round((it.n / sum) * 100)}%</em></div>`).join('')}</div></div>`;
 }
 
@@ -3799,6 +3832,7 @@ async function renderSites(token) {
       gKc('短链点击', num(lh), hasP ? gDelta(lh, lph) : '', lids ? `${lv ? `${num(lv)} 位访客 · ` : ''}${lids} 个短链${ses ? ` · 点出率 ${pct1(lh / ses)}` : ''}` : '这些站点还没有点出的短链',
         '从这些站点点出去的短链真人点击：按短链访问的来源（src 参数或 Referer 域名）匹配站点。访客按 IP 去重（估算，误差约 4%），多个站点的访客直接相加。点出率 = 短链点击 ÷ 会话', sLnk.some(Boolean) ? kpiSpark(sLnk, 'var(--amber)') : ''),
     ].join('');
+    fitNums(document.getElementById('g-sum'));
   };
   const draw = () => {
     const q = gState.q.toLowerCase();
