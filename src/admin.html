@@ -1422,6 +1422,14 @@ button.gtg { cursor: pointer; }
 .tbl.gt.qt.q3 th:last-child { width: 30%; }
 .qt td.num { white-space: nowrap; }
 .ch-h { margin-top: 12px; font-size: 12px; }
+/* 站点详情的排行表：最多显示约 10 行，其余在卡片内滚动，表头固定 */
+.g-scr { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; margin: 0 calc(var(--cp) * -1); padding: 0 var(--cp); }
+/* 并排的两张排行卡片：内容区一样高，表格填满筛选按钮下面剩下的空间，两边底部对齐 */
+#g-sc, #g-ga { display: flex; flex-direction: column; }
+#g-sc > .card-b, #g-ga > .card-b { flex: none; height: 420px; display: flex; flex-direction: column; min-height: 0; }
+#g-sc .g-scr, #g-ga .g-scr { flex: 1 1 auto; min-height: 0; max-height: none; }
+@media (max-width: 960px) { #g-sc > .card-b, #g-ga > .card-b { height: auto; } #g-sc .g-scr, #g-ga .g-scr { max-height: 360px; } }
+.g-scr thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line-2); }
 /* 站点列表汇总：流量渠道小环形图 */
 .kstrip.gs.has-ch { grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.6fr) minmax(0, 1fr); }
 .chm { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
@@ -4192,6 +4200,9 @@ const pct1 = (x) => `${(x * 100).toFixed(1)}%`;
 const G_CTR = [0, 0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018];
 const gExpCtr = (pos) => (pos < 1 ? 0.28 : pos <= 10 ? G_CTR[Math.round(pos)] : pos <= 20 ? 0.01 : 0.003);
 
+// GA4 媒体资源名和域名一样（忽略大小写、协议、www. 和结尾的 /）时不重复显示
+const sameName = (name, host) => { const n = (v) => String(v || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, ''); return n(name) === n(host); };
+
 // GA4 默认渠道分组的中文名（英文界面用 GA4 原名）
 const GA_CH = { 'AI Assistant': 'AI 助手', 'Organic Search': '自然搜索', Direct: '直接访问', Referral: '引荐', 'Organic Social': '社交媒体', 'Paid Search': '付费搜索', Email: '邮件',
   Unassigned: '未归类', 'Organic Video': '视频', Display: '展示广告', 'Paid Social': '付费社交', Affiliates: '联盟推广', 'Cross-network': '跨网络广告',
@@ -4272,8 +4283,8 @@ function queryView(sc, f) {
     head = ['搜索词', '点击', '展示', '点击率', '排名'];
     row = (x) => [kc(x.k), num(x.clicks), num(x.impressions), pct1(x.ctr), `${x.position.toFixed(1)}${rankChange(x, hp)}`];
   }
-  return `${chips}<table class="tbl gt qt${head.length === 3 ? ' q3' : ''}"><thead><tr>${head.map((h, i) => `<th class="${i ? 'r' : ''}">${h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map((x) => `<tr>${row(x).map((c, i) => `<td class="${i ? 'num' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  return `${chips}<div class="g-scr"><table class="tbl gt qt${head.length === 3 ? ' q3' : ''}"><thead><tr>${head.map((h, i) => `<th class="${i ? 'r' : ''}">${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((x) => `<tr>${row(x).map((c, i) => `<td class="${i ? 'num' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 const tzLabelOf = (m) => `UTC${m >= 0 ? '+' : '−'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + String(Math.abs(m) % 60).padStart(2, '0') : ''}`;
 const gKc = (label, v, delta, sub = '', tip = '', extra = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b>${extra.startsWith('<svg') ? `<span class="kc-sp">${extra}</span>` : ''}</div>${extra && !extra.startsWith('<svg') ? extra : ''}${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
@@ -5016,7 +5027,7 @@ async function renderSites(token) {
         return `<tr data-host="${esc(x.host)}" tabindex="0">
           <td><div class="gh">${esc(x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host)}</div>
             <div class="sm gm">${x.tags.length ? `${x.tags.slice(0, 2).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}${x.tags.length > 2 ? `<span class="gtg sm-t" data-tipf-always data-tipf="${esc(x.tags.join('、'))}">+${x.tags.length - 2}</span>` : ''}` : ''}${x.ga4
-              ? `<span class="gico" data-tipf-always data-tipf="${esc(`Google Analytics 4：${x.ga4.account} / ${x.ga4.name}（${x.ga4.property}）${many ? ` · 来自 ${x.ga4.email}` : ''}`)}">${BRAND.ga(14)}</span><span class="gnm">${esc(x.ga4.name)}</span>`
+              ? `<span class="gico" data-tipf-always data-tipf="${esc(`Google Analytics 4：${x.ga4.account} / ${x.ga4.name}（${x.ga4.property}）${many ? ` · 来自 ${x.ga4.email}` : ''}`)}">${BRAND.ga(14)}</span>${sameName(x.ga4.name, x.host) ? '' : `<span class="gnm">${esc(x.ga4.name)}</span>`}`
               : `<span class="gico off" data-tipf-always data-tipf="未关联 Google Analytics 4">${BRAND.ga(14)}</span>`}${x.gsc
               ? `<span class="gico" data-tipf-always data-tipf="${esc(`Search Console：${x.gsc}${many ? ` · 来自 ${x.gscEmail}` : ''}`)}">${BRAND.gsc(14)}</span>`
               : `<span class="gico off" data-tipf-always data-tipf="未关联 Search Console">${BRAND.gsc(14)}</span>`}${x.linksFrom.length ? (() => {
@@ -5172,8 +5183,8 @@ async function renderSite(token, host) {
   const rankScale = () => (sc?.impressions ? `<div class="kc-rank"><div class="kr-t">${sp?.impressions ? `<i class="p" style="left:${rankX(sp.position)}%" data-tipf-always data-tipf="${esc(`上一周期 ${sp.position.toFixed(1)}`)}"></i>` : ''}<i style="left:${rankX(sc.position)}%"></i></div>
     <div class="kr-l"><span>1</span><span style="left:${rankX(10)}%">10</span><span style="left:${rankX(20)}%">20</span><span class="e">50+</span></div></div>` : '');
 
-  const gt = (rows, cols) => rows?.length ? `<table class="tbl gt"><thead><tr>${cols.map((c) => `<th class="${c.r ? 'r' : ''}">${c.h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td class="${c.r ? 'num' : ''}">${c.f(r)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+  const gt = (rows, cols) => rows?.length ? `<div class="g-scr"><table class="tbl gt"><thead><tr>${cols.map((c) => `<th class="${c.r ? 'r' : ''}">${c.h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td class="${c.r ? 'num' : ''}">${c.f(r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
     : `<div class="empty">${ic('inbox')}该时间段内暂无数据</div>`;
   const kcell = (k) => `<div class="ell" data-tipf="${esc(k)}">${esc(k || '(未设置)')}</div>`;
   const scCols = (h) => [{ h, f: (r) => kcell(r.k) }, { h: '点击', r: 1, f: (r) => num(r.clicks) }, { h: '展示', r: 1, f: (r) => num(r.impressions) }, { h: '点击率', r: 1, f: (r) => pct1(r.ctr) }, { h: '排名', r: 1, f: (r) => r.position.toFixed(1) }];
@@ -5182,7 +5193,7 @@ async function renderSite(token, host) {
     <a class="back" href="#/sites">${ic('back', 14)}全部站点</a>
     <div class="stack">
       <section class="card hero rv"><div class="info">
-        <div class="ttl"><span class="ttl-t">${esc(d.ga4?.name || '')}</span>${d.realtime != null ? `<span class="live">实时 ${num(d.realtime)} 人在线</span>` : ''}</div>
+        <div class="ttl"><span class="ttl-t">${esc(d.ga4?.name && !sameName(d.ga4.name, title) ? d.ga4.name : '')}</span>${d.realtime != null ? `<span class="live">实时 ${num(d.realtime)} 人在线</span>` : ''}</div>
         <div class="short">${esc(title)}${host.includes('.') ? `<a class="btn sm ghost icon" href="https://${esc(host)}" target="_blank" rel="noopener" data-tip="打开网站" aria-label="打开网站">${ic('ext', 15)}</a>` : ''}</div>
         <div class="meta g-src">
           <span class="gico${d.ga4 ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.ga4 ? `Google Analytics 4：${d.ga4.account} / ${d.ga4.name}（${d.ga4.property}）${d.ga4.email ? ` · ${d.ga4.email}` : ''}` : '未关联 Google Analytics 4')}">${BRAND.ga(15)}</span>
