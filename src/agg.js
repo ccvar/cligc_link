@@ -3,6 +3,7 @@
 //   agg_h  每小时 · 每个短链 · 真人 / 机器 的访问次数（趋势、今日、活跃时段）
 //   agg_d  每天 · 每个短链 · 真人 / 机器 · 维度值 的访问次数（来源、国家、设备……）
 //   agg_uv 每天 · 每个短链（0 = 全部短链）· 真人 / 机器 的独立访客（HyperLogLog 估算，误差约 4%）
+//   agg_suv 每天 · 每个短链 · 每个来源 的真人独立访客（同样是 HyperLogLog；访客少时用稀疏格式省空间），用于“从站点点出的短链”去重
 // 汇总进度记在 settings.agg_mark（整点毫秒），之后的访问直接读原始明细，统计始终实时。
 // “天”按 settings.agg_tz（分钟偏移）划分，取自首次统计请求的浏览器时区。
 
@@ -42,6 +43,19 @@ export function hllCount(reg) {
 }
 const hllDecode = (s) => (s ? Uint8Array.from(atob(s), (c) => c.charCodeAt(0)) : hllNew());
 const hllEncode = (r) => btoa(String.fromCharCode(...r));
+// 稀疏格式：只记非零寄存器“序号.值”，以 s 开头；非零的多了就用完整格式
+export function hllParse(s) {
+  if (!s) return hllNew();
+  if (s[0] !== 's') return hllDecode(s);
+  const reg = hllNew();
+  for (const p of s.slice(1).split(',')) { if (!p) continue; const [i, v] = p.split('.'); reg[Number(i)] = Number(v); }
+  return reg;
+}
+function hllPack(reg) {
+  const nz = [];
+  for (let i = 0; i < M; i++) if (reg[i]) nz.push(`${i}.${reg[i]}`);
+  return nz.length <= 60 ? 's' + nz.join(',') : hllEncode(reg);
+}
 
 // ---------------------------------------------------------------- 写入汇总
 
@@ -104,7 +118,7 @@ async function aggregateRange(env, from, to, tz) {
   ).bind(from, to).all()).results;
   if (!rows.length) return 0;
 
-  const h = new Map(), d = new Map(), uv = new Map();
+  const h = new Map(), d = new Map(), uv = new Map(), suv = new Map();
   const inc = (m, key, n = 1) => m.set(key, (m.get(key) || 0) + n);
   for (const r of rows) {
     const mc = r.is_bot ? 1 : 0, day = dayKey(r.ts, tz);
@@ -122,6 +136,7 @@ async function aggregateRange(env, from, to, tz) {
       if (!uv.has(key)) uv.set(key, new Set());
       uv.get(key).add(r.ip || '');
     }
+    addSource(suv, r, day);
   }
 
   const stmts = [];
@@ -155,8 +170,70 @@ async function aggregateRange(env, from, to, tz) {
       'INSERT INTO agg_uv (day, link_id, machine, hll) VALUES (?, ?, ?, ?) ON CONFLICT DO UPDATE SET hll = excluded.hll'
     ).bind(day, Number(lid), Number(mc), hllEncode(reg)));
   }
+  stmts.push(...(await suvStatements(env, suv)));
   for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
   return rows.length;
+}
+
+// 按来源的独立访客：只统计真人访问、有来源的
+function addSource(suv, r, day) {
+  if (r.is_bot || !r.source || r.source === '(direct)') return;
+  const key = `${day}\u0001${r.link_id}\u0001${r.source}`;
+  if (!suv.has(key)) suv.set(key, new Set());
+  suv.get(key).add(r.ip || '');
+}
+// 读出已有的估算，合并新 IP 后写回（同一个 IP 重复加入不影响结果，所以重复处理也不会多算）
+async function suvStatements(env, suv) {
+  const keys = [...suv.keys()].map((k) => k.split('\u0001'));
+  const old = new Map();
+  for (let i = 0; i < keys.length; i += 30) {
+    const part = keys.slice(i, i + 30);
+    const res = await env.DB.prepare(
+      `SELECT day, link_id, k, hll FROM agg_suv WHERE ${part.map(() => '(day = ? AND link_id = ? AND k = ?)').join(' OR ')}`
+    ).bind(...part.flatMap(([day, lid, k]) => [day, Number(lid), k])).all();
+    for (const r of res.results) old.set(`${r.day}\u0001${r.link_id}\u0001${r.k}`, r.hll);
+  }
+  const stmts = [];
+  for (const [key, ips] of suv) {
+    const reg = hllParse(old.get(key));
+    for (const ip of ips) hllAdd(reg, ip);
+    const [day, lid, k] = key.split('\u0001');
+    stmts.push(env.DB.prepare('INSERT INTO agg_suv (day, link_id, k, hll) VALUES (?, ?, ?, ?) ON CONFLICT DO UPDATE SET hll = excluded.hll')
+      .bind(day, Number(lid), k, hllPack(reg)));
+  }
+  return stmts;
+}
+
+// 一次性回填：按来源的独立访客是后加的，已汇总过的旧明细从头补一遍（每次最多 2 万条，进度记在 settings.suv_mark）
+export async function backfillSourceUv(env) {
+  const st = await aggState(env);
+  if (st.tz === null || !st.mark) return { done: true };
+  const done = await getSetting(env, 'suv_mark');
+  if (done === 'done') return { done: true };
+  let from = Number(done) || 0;
+  if (!from) from = (await env.DB.prepare('SELECT MIN(ts) AS t FROM clicks').first('t')) || st.mark;
+  if (from >= st.mark) { await setSetting(env, 'suv_mark', 'done'); return { done: true }; }
+  const rows = (await env.DB.prepare(
+    "SELECT link_id, ts, is_bot, ip, source FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0 AND source != '' AND source != '(direct)' ORDER BY ts LIMIT 20000"
+  ).bind(from, st.mark).all()).results;
+  const suv = new Map();
+  for (const r of rows) addSource(suv, r, dayKey(r.ts, st.tz));
+  const stmts = await suvStatements(env, suv);
+  for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
+  const next = rows.length < 20000 ? st.mark : rows[rows.length - 1].ts + 1;
+  await setSetting(env, 'suv_mark', next >= st.mark ? 'done' : next);
+  return { done: next >= st.mark, rows: rows.length };
+}
+
+// 读取：区间内每个（短链, 来源）的独立访客寄存器（按天合并好）
+export async function sourceUv(env, fromDay, toDay) {
+  const rows = (await env.DB.prepare('SELECT link_id, k, hll FROM agg_suv WHERE day >= ? AND day <= ?').bind(fromDay, toDay).all()).results;
+  const m = new Map();
+  for (const r of rows) {
+    const key = `${r.link_id}\u0001${r.k}`;
+    m.set(key, m.has(key) ? hllMerge(m.get(key), hllParse(r.hll)) : hllParse(r.hll));
+  }
+  return [...m].map(([key, reg]) => { const [lid, k] = key.split('\u0001'); return { link_id: Number(lid), k, reg }; });
 }
 
 // 访客类型重新判定后，汇总里的真人 / 机器划分已过期：从仍保留明细的第二天起重建
@@ -172,6 +249,7 @@ export async function rebuildAgg(env) {
     env.DB.prepare('DELETE FROM agg_h WHERE hour >= ?').bind(Math.floor(fromTs / HOUR)),
     env.DB.prepare('DELETE FROM agg_d WHERE day >= ?').bind(fromDay),
     env.DB.prepare('DELETE FROM agg_uv WHERE day >= ?').bind(fromDay),
+    env.DB.prepare('DELETE FROM agg_suv WHERE day >= ?').bind(fromDay),
   ]);
   await setSetting(env, 'agg_mark', fromTs);
 }
@@ -181,6 +259,7 @@ export async function dropLinkAgg(env, id) {
     env.DB.prepare('DELETE FROM agg_h WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM agg_d WHERE link_id = ?').bind(id),
     env.DB.prepare('DELETE FROM agg_uv WHERE link_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM agg_suv WHERE link_id = ?').bind(id),
   ]);
 }
 

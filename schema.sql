@@ -86,6 +86,13 @@ CREATE TABLE IF NOT EXISTS agg_d (
   n        INTEGER NOT NULL,
   PRIMARY KEY (dim, day, link_id, machine, k)
 );
+CREATE TABLE IF NOT EXISTS agg_suv (
+  day      TEXT NOT NULL,
+  link_id  INTEGER NOT NULL,
+  k        TEXT NOT NULL,               -- 访问来源（与 agg_d 的 source 维度相同）
+  hll      TEXT NOT NULL,               -- 真人独立访客 HyperLogLog（s 开头为稀疏格式）
+  PRIMARY KEY (day, link_id, k)
+);
 CREATE TABLE IF NOT EXISTS agg_uv (
   day      TEXT NOT NULL,
   link_id  INTEGER NOT NULL,            -- 0 = 全部短链

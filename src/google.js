@@ -6,6 +6,8 @@
 // 所有账号的 GA4 媒体资源和 GSC 站点按域名合并到 g_sites，并记下各自来自哪个账号（ga4_acct / gsc_acct）。
 // 每日数据存在 g_daily，由定时任务和“立即同步”分批更新；详情页的排行、实时数据现查并缓存一小时。
 
+import { sourceUv, hllNew, hllMerge, hllCount } from './agg.js';
+
 const SCOPES = [
   'openid', 'email',
   'https://www.googleapis.com/auth/analytics.readonly',
@@ -505,6 +507,7 @@ export async function sitesList(env, days) {
       users: users[days] ?? null, prevUsers: hasPrev(days) ? users[`p${days}`] ?? null : null,
       links: sl.get(s.host) || [],          // 跳转到这个站点的短链
       linksFrom: sf.get(s.host) || [],      // 从这个站点点出的短链
+      linksFromVisitors: sf.visitors?.get(s.host) ?? null,   // 这些点击来自多少位访客（去重）
       cur: sumRange(rs, from, to), prev: hasPrev(days) ? sumRange(rs, pfrom, pto) : { ga: null, gsc: null },
       // 每日：n 会话、c 搜索点击、u 用户（按天）、i 搜索展示；prevSpark 是上一周期每天的会话
       spark: rs.filter((r) => r.date >= from).sort((a, b) => (a.date < b.date ? -1 : 1))
@@ -540,7 +543,7 @@ async function siteSources(env, hosts, days) {
   const { from, to, pfrom } = ranges(days);
   const labels = new Map();
   for (const h of hosts) { const l = h.split('.')[0]; if (!labels.has(l)) labels.set(l, []); labels.get(l).push(h); }
-  const [links, counts, daily] = await Promise.all([
+  const [links, counts, daily, uvs] = await Promise.all([
     env.DB.prepare('SELECT id, slug, title FROM links').all().then((r) => r.results),
     env.DB.prepare(
       `SELECT link_id, k, machine, SUM(CASE WHEN day >= ? THEN n ELSE 0 END) AS cur, SUM(CASE WHEN day < ? THEN n ELSE 0 END) AS prev
@@ -549,6 +552,7 @@ async function siteSources(env, hosts, days) {
     env.DB.prepare(
       `SELECT link_id, k, day, SUM(n) AS n FROM agg_d WHERE dim = 'source' AND machine = 0 AND day >= ? AND day <= ? AND k != '(direct)' GROUP BY link_id, k, day`
     ).bind(from, to).all().then((r) => r.results),
+    sourceUv(env, from, to).catch(() => []),
   ]);
   const byId = new Map(links.map((l) => [l.id, l]));
   const out = new Map();
@@ -573,8 +577,19 @@ async function siteSources(env, hosts, days) {
     const e = entry(h, d.link_id);
     e.daily[d.day] = (e.daily[d.day] || 0) + d.n;
   }
-  return new Map([...out].map(([k, m]) => [k, [...m.values()].map((e) => ({ ...e, sources: [...e.sources] }))
+  // 独立访客：同一个短链在这个站点的所有来源标识合并去重（HyperLogLog 估算）；站点合计跨短链再合并一次
+  const regs = new Map(), siteRegs = new Map();
+  for (const u of uvs) {
+    const h = site(u.k);
+    if (!h || !byId.has(u.link_id)) continue;
+    const key = `${h}|${u.link_id}`;
+    regs.set(key, hllMerge(regs.get(key) || hllNew(), u.reg));
+    siteRegs.set(h, hllMerge(siteRegs.get(h) || hllNew(), u.reg));
+  }
+  const res = new Map([...out].map(([k, m]) => [k, [...m.values()].map((e) => ({ ...e, sources: [...e.sources], visitors: regs.has(`${k}|${e.id}`) ? hllCount(regs.get(`${k}|${e.id}`)) : null }))
     .filter((e) => e.cur > 0).sort((a, b) => b.human - a.human || b.cur - a.cur)]));
+  res.visitors = new Map([...siteRegs].map(([k, r]) => [k, hllCount(r)]));
+  return res;
 }
 
 // 返回 Map：站点 → [{ id, slug, title, routes: [{ rule, url, countries }], cur, human, prev }]
@@ -667,7 +682,9 @@ export async function siteDetail(env, secret, host, days) {
   };
   // 来源匹配要用全部站点（不带点的 src 名称需要确认只对应一个站点）
   const all = new Set((await env.DB.prepare('SELECT host FROM g_sites').all()).results.map((r) => r.host));
-  out.linksFrom = (await siteSources(env, all, days).catch(() => new Map())).get(host) || [];
+  const sf = await siteSources(env, all, days).catch(() => new Map());
+  out.linksFrom = sf.get(host) || [];
+  out.linksFromVisitors = sf.visitors?.get(host) ?? null;
   const tasks = [];
   if (s.ga4_property) {
     const prop = s.ga4_property;
@@ -760,7 +777,8 @@ export async function aiReport(env, secret, hosts, days, sections, hide) {
       try { site.traffic = await trafficSection(env, secret, s, days, from, to, pfrom, pto, lim); } catch (e) { site.errors.push(`GA4：${e.message}`); }
     }
     if (want('links')) {
-      site.linksFrom = (fromLinks.get(host) || []).map((l) => ({ slug: l.slug, title: l.title, humanClicks: l.human, allClicks: l.cur, prevHumanClicks: l.prevHuman, sources: l.sources }));
+      site.linksFrom = (fromLinks.get(host) || []).map((l) => ({ slug: l.slug, title: l.title, humanClicks: l.human, visitors: l.visitors, allClicks: l.cur, prevHumanClicks: l.prevHuman, sources: l.sources }));
+      site.linksFromVisitors = fromLinks.visitors?.get(host) ?? null;
       site.links = (links.get(host) || []).map((l) => ({ slug: l.slug, title: l.title, humanClicks: l.human, allClicks: l.cur, prevHumanClicks: l.prevHuman,
         routes: l.routes.map((r) => ({ to: r.url, when: r.rule ? `访客来自 ${r.countries}` : '默认' })) }));
     }
@@ -985,9 +1003,9 @@ export function reportMarkdown(r) {
     if (has('links') && (!r.compact || s.linksFrom?.length)) {
       const out = (s.linksFrom || []).reduce((a, l) => a + l.humanClicks, 0), ses = s.cur.ga?.sessions;
       L.push(`### 站点上的推广短链（从这个站点点出去的短链）`, '');
-      if (s.linksFrom?.length) L.push(`共 ${n(out)} 次真人点击${ses ? `，约为站点会话的 ${pc(out / ses)}（点出率）` : ''}。按短链访问的来源（src 参数或 Referer）匹配。`, '');
+      if (s.linksFrom?.length) L.push(`共 ${n(out)} 次真人点击${s.linksFromVisitors != null ? `，来自约 ${n(s.linksFromVisitors)} 位访客（按 IP 去重，估算）` : ''}${ses ? `，约为站点会话的 ${pc(out / ses)}（点出率）` : ''}。按短链访问的来源（src 参数或 Referer）匹配。`, '');
       L.push(s.linksFrom?.length
-        ? table(['短链', '标题', '真人点击', '上期真人点击', '含机器访问', '来源标识'], s.linksFrom.map((l) => [`/${l.slug}`, l.title || '—', n(l.humanClicks), r.prevRange ? n(l.prevHumanClicks) : '—', n(l.allClicks), l.sources.join('、')]))
+        ? table(['短链', '标题', '真人点击', '访客（去重）', '上期真人点击', '含机器访问', '来源标识'], s.linksFrom.map((l) => [`/${l.slug}`, l.title || '—', n(l.humanClicks), n(l.visitors), r.prevRange ? n(l.prevHumanClicks) : '—', n(l.allClicks), l.sources.join('、')]))
         : '_没有从这个站点点出的短链_\n');
     }
     if (has('links') && s.links?.length) {

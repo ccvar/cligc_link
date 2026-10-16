@@ -4,7 +4,7 @@ import SCHEMA_SQL from '../schema.sql';
 import { renderSVG } from 'uqr';
 import { EmailMessage } from 'cloudflare:email';
 import * as google from './google.js';
-import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
+import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, backfillSourceUv, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
 const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
 // 回退检测：访客浏览器内探测地区地址的超时时间
@@ -64,6 +64,8 @@ export default {
     ctx.waitUntil((async () => {
       await ensureSchema(env);
       await aggregate(env);
+      // 按来源的独立访客：一次性回填旧数据（先于清理明细，每次最多 5 批）
+      for (let i = 0; i < 5; i++) if ((await backfillSourceUv(env).catch((e) => { console.error('suv backfill failed', e); return { done: true }; })).done) break;
       await pruneClicks(env);
       await env.DB.prepare('DELETE FROM login_guard WHERE at < ? AND until < ?').bind(Date.now() - 7 * DAY, Date.now()).run();
       // Google 接口缓存和 AI 报告缓存：只用 1 小时，两天前的清掉
