@@ -29,6 +29,9 @@ export default {
       if (path !== '/' && path !== '' && path !== '/robots.txt') await ensureSchema(env);
       if (path === '/admin' || path === '/admin/' || path.startsWith('/api/')) {
         if (env.ADMIN_HOST && url.hostname !== env.ADMIN_HOST) return notFound();
+        // Google 授权回调：会话 Cookie 是 SameSite=Strict，从 Google 跳回时浏览器不会带上，
+        // 所以不走登录校验，改由签名的 state（只有已登录的后台才能生成，10 分钟有效）保护
+        if (path === '/api/google/callback') return await googleCallback(env, url);
         if (path.startsWith('/api/')) return await handleApi(request, env, url);
         return new Response(ADMIN_HTML.replace('__TURNSTILE_SITEKEY__', env.TURNSTILE_SITEKEY || ''), {
           headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
@@ -1589,16 +1592,6 @@ async function googleApi(request, env, url) {
   try {
     if (path === '/api/google/status') return json(await google.status(env, secret));
     if (path === '/api/google/auth') return json({ url: await google.authUrl(env, url.origin, secret, hmac) });
-    if (path === '/api/google/callback') {
-      const r = await google.handleCallback(env, url, secret, hmac, safeEqual);
-      if (r.ok) {
-        // 授权完成后立即发现站点并同步第一批
-        await google.discover(env, secret).catch(() => {});
-        await google.syncBatch(env, secret, { limit: 6, cutoff: Date.now() }).catch(() => {});
-      }
-      const q = r.ok ? 'google=ok' : `google=${encodeURIComponent(r.error)}`;
-      return new Response(null, { status: 302, headers: { location: `/admin#/sites?${q}`, 'cache-control': 'no-store' } });
-    }
     if (path === '/api/google/sync' && method === 'POST') {
       const body = await request.json().catch(() => ({}));
       if (body.discover) await google.discover(env, secret);
@@ -1616,6 +1609,25 @@ async function googleApi(request, env, url) {
     return json({ error: err.message || String(err) }, 500);
   }
   return json({ error: 'not found' }, 404);
+}
+
+async function googleCallback(env, url) {
+  let r;
+  if (!google.googleConfigured(env)) r = { error: '未配置 Google OAuth 客户端' };
+  else {
+    const secret = await sessionSecret(env);
+    r = await google.handleCallback(env, url, secret, hmac, safeEqual).catch((e) => ({ error: e.message }));
+    if (r.ok) {
+      // 授权完成后立即发现站点并同步第一批
+      await google.discover(env, secret).catch(() => {});
+      await google.syncBatch(env, secret, { limit: 6, cutoff: Date.now() }).catch(() => {});
+    }
+  }
+  // 用页面内跳转回后台（同站跳转会带上 Strict Cookie；服务端 302 仍算从 Google 发起，不会带）
+  const to = `/admin#/sites?google=${r.ok ? 'ok' : encodeURIComponent(r.error)}`;
+  return new Response(`<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>正在返回后台…</title>
+<body style="font:14px -apple-system,sans-serif;color:#888;display:grid;place-items:center;min-height:90vh">正在返回后台…
+<script>location.replace(${JSON.stringify(to)})</script></body>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
 
 async function retentionInfo(env) {
