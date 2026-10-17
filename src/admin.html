@@ -1408,7 +1408,10 @@ button.gtg { cursor: pointer; }
 .g-acc-r.bad .g-acc-t span { color: var(--bad); }
 .g-acc-r.warn .g-acc-i { background: var(--warn-bg); color: var(--warn); }
 .g-acc-r.warn .g-acc-t span { color: var(--warn); }
-.g-prog { font-size: 12.5px; line-height: 36px; color: var(--muted); white-space: nowrap; animation: fade .2s; }
+.g-prog { position: relative; font-size: 12.5px; line-height: 36px; color: var(--muted); white-space: nowrap; animation: fade .2s; }
+/* 同步进度条：贴在文字下方 */
+.g-prog::after { content: ''; position: absolute; left: 0; right: 0; bottom: 4px; height: 3px; border-radius: 2px; background: var(--sunken); }
+.g-prog i { position: absolute; left: 0; bottom: 4px; height: 3px; border-radius: 2px; background: var(--accent); z-index: 1; width: 0; transition: width .6s var(--ease); }
 .g-prog b { color: var(--accent-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .g-prog[hidden] { display: none; }
 .gl-wrap { overflow-x: auto; }
@@ -1641,6 +1644,13 @@ button.gtg { cursor: pointer; }
 .key-ro { display: flex; align-items: center; gap: 10px; height: 38px; }
 .key-ro code { font-family: var(--mono); font-size: 13px; }
 .key-ro .btn { margin-left: -4px; }
+.key-ro > * { margin: 0; }
+.key-ro code { display: inline-flex; align-items: center; height: 26px; padding: 0 8px; border-radius: 6px; background: var(--sunken); line-height: 1; }
+.field .key-ro .hint, .key-ro .hint { margin: 0; line-height: 26px; }
+/* “Bing 请求经代理发出”：图标和文字同一水平线 */
+.b-proxy { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; }
+.b-proxy svg { flex: none; }
+.b-proxy code { line-height: 1.6; }
 /* 推荐的代理地址：域名可以直接改 + 复制 */
 .bp-head { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; font-size: 13px; }
 .bp-url { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
@@ -5166,7 +5176,7 @@ async function renderSites(token) {
   store.set('g:bing', hasBing);
   const accts = st.accounts || [], many = accts.length > 1, bad = accts.some((a) => a.error);
   if (gState.acct && !accts.some((a) => a.id === gState.acct)) gState.acct = '';
-  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden><span></span></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="立即同步" aria-label="立即同步">${ic('refresh', 17)}</button>`, true)}
+  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步 Google 和 Bing' : '立即同步'}" aria-label="立即同步">${ic('refresh', 17)}</button>`, true)}
     ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<span>${esc(st.error)}</span><span class="sp"></span><button type="button" class="btn sm" id="g-re">重新连接</button></div>` : ''}
     ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
     <section class="card kstrip gs rv" id="g-sum"></section>
@@ -5322,12 +5332,32 @@ async function renderSites(token) {
   const syncBtn = document.getElementById('g-sync');
   const sync = async () => {
     if (syncBtn.disabled) return;
-    prog.querySelector('span').innerHTML = st.pending ? `同步中 · 还剩 <b>${st.pending}</b> 个站点` : '同步中…';
+    // 进度：已完成 / 总数 + 细进度条；列表在全部同步完后才刷新一次
+    const say = (name, done, total, msg) => {
+      prog.querySelector('span').innerHTML = msg || `${name} 同步中 <b>${num(done)}</b> / ${num(total)}`;
+      prog.querySelector('i').style.width = `${total ? Math.min(100, (done / total) * 100) : 0}%`;
+    };
+    // Google 同步会把列表里所有站点（包括只在 Bing 的）都过一遍
+    const gTotal = d.items.length, bTotal = d.items.filter((x) => x.bing).length;
+    say('Google', 0, gTotal);
     prog.hidden = false;
     try {
-      await googleSyncAll(syncBtn, (r) => { prog.querySelector('span').innerHTML = r.left ? `同步中 · 还剩 <b>${r.left}</b> 个站点` : '同步完成'; });
+      await googleSyncAll(syncBtn, (r) => say('Google', Math.max(0, gTotal - r.left), gTotal));
+      // 接了 Bing 的，接着同步 Bing（每次 20 个站点，直到同步完；被限流时停下，交给定时任务）
+      if (hasBing) {
+        say('Bing', 0, bTotal);
+        syncBtn.disabled = true; syncBtn.classList.add('busy');
+        for (let i = 0; i < 10; i++) {
+          const r = await api('/bing/sync', { method: 'POST', body: {} });
+          if (r.error) { toast(`Bing：${r.error}`, 'bad'); break; }
+          say('Bing', Math.max(0, bTotal - r.left), bTotal);
+          if (!r.left || !r.done) break;
+        }
+        syncBtn.disabled = false; syncBtn.classList.remove('busy');
+      }
+      toast('同步完成，列表已更新');
       if (token === routeToken) renderSites(routeToken);
-    } catch (err) { toast(err.message, 'bad'); prog.hidden = true; }
+    } catch (err) { toast(err.message, 'bad'); prog.hidden = true; syncBtn.disabled = false; syncBtn.classList.remove('busy'); }
   };
   syncBtn.onclick = () => sync();
   document.getElementById('g-csv').onclick = () => exportSitesCsv(lastRows, d);
@@ -6346,7 +6376,7 @@ function renderBingSettings(box, b, onState) {
         <button type="button" class="btn sm icon" id="bing-sync" aria-label="立即同步" data-tipf-always data-tipf="立即同步：重新列出站点，并同步一批站点的数据">${ic('refresh', 14)}</button>
         <button type="button" class="btn sm" id="bing-edit">${bingThrottled(b) && !b.proxy ? '设置代理' : '修改'}</button>
         <button type="button" class="btn sm ghost danger-t" id="bing-del">删除</button></div></div>
-      ${b.proxy ? `<p class="hint" style="margin-top:8px">${ic('globe', 13)} Bing 请求经代理发出：<code>${esc(new URL(b.proxy).host)}</code></p>` : ''}
+      ${b.proxy ? `<p class="hint b-proxy">${ic('globe', 13)}<span>Bing 请求经代理发出：</span><code>${esc(new URL(b.proxy).host)}</code></p>` : ''}
       ${b.siteErrors ? `<p class="hint" style="margin-top:8px">${ic('alert', 13)} ${b.siteErrors} 个站点同步出错，到站点详情页查看原因</p>` : ''}
       <label class="opt trk-sw" style="margin-top:16px"><div class="tx"><b>自动提交未收录的网址</b>
         <span class="hint">每天刷新站点地图后，把 Bing 还没收录、30 天内没提交过的网址提交给 Bing，不超过 Bing 给每个站点的每日配额。</span></div>
