@@ -1641,6 +1641,9 @@ button.gtg { cursor: pointer; }
 .key-ro { display: flex; align-items: center; gap: 10px; height: 38px; }
 .key-ro code { font-family: var(--mono); font-size: 13px; }
 .key-ro .btn { margin-left: -4px; }
+/* 代理地址示例：地址 + 复制 + 填入 */
+.bp-url { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.bp-url code { font-family: var(--mono); font-size: 12.5px; padding: 5px 9px; border-radius: 7px; background: var(--sunken); word-break: break-all; }
 /* Bing 设置卡片的错误原因 */
 .b-warn { color: var(--warn); } .b-bad { color: var(--bad); }
 /* 系统状态：立即运行一次 */
@@ -6265,7 +6268,9 @@ const bingProxyHelp = (b) => {
   ${bingCode('caddy', 'Caddy（推荐，自动申请证书）', BING_CADDY(host, path))}
   ${bingCode('nginx', 'nginx', BING_NGINX(host, path))}
   ${bingCode('test', '自测', BING_TEST(host, path))}
-  <p class="hint" style="margin-top:8px">路径里的随机字符已经生成好了，别人猜不到，不会被借用。已有站点的话，也可以只把中间转发那段放进现有站点里。配好后代理地址填 <code data-bp="url">https://${esc(host)}${esc(path)}</code>。</p>
+  <p class="hint" style="margin-top:8px">路径里的随机字符已经生成好了，别人猜不到，不会被借用。已有站点的话，也可以只把中间转发那段放进现有站点里。配好后代理地址填：</p>
+  <div class="bp-url"><code data-bp="url">https://${esc(host)}${esc(path)}</code>${copyBtn(`https://${host}${path}`, 'btn sm', '复制').replace('<button ', '<button data-bp-copy ')}
+    <button type="button" class="btn sm" id="bing-fill" data-tipf-always data-tipf="填进上面的代理地址，并选中域名部分，直接输入你的域名即可">${ic('edit', 14)}填入</button></div>
 </details>`;
 };
 // 输入代理地址时，示例配置里的域名跟着变
@@ -6284,8 +6289,18 @@ function bindBingProxyHelp(form, b) {
       const btn = el.previousElementSibling?.querySelector('[data-copy]');
       if (btn) btn.dataset.copy = texts[el.dataset.bp];
     });
+    const cp = form.querySelector('[data-bp-copy]');
+    if (cp) cp.dataset.copy = texts.url;
   };
   input.addEventListener('input', upd);
+  // 填入：把完整地址填进输入框，选中域名部分，直接输入就能替换
+  const fill = form.querySelector('#bing-fill');
+  if (fill) fill.onclick = () => {
+    const url = form.querySelector('[data-bp="url"]').textContent, host = new URL(url).hostname;
+    input.value = url; upd();
+    input.focus(); input.setSelectionRange(8, 8 + host.length);
+    input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
 }
 const bingForm = (b) => `<form class="set-form cfg-f" id="bing-f">
   <div class="field"><label for="bing-key">API Key</label>
