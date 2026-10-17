@@ -119,9 +119,9 @@ export async function discover(env, secret) {
   if (!c) return;
   try { await saveFound(env, (await bget(c.key, 'GetUserSites')) || []); }
   catch (e) {
-    // 出错时保留上次的站点，只记下错误
+    // 出错时保留上次的站点和读取时间，只记下错误（定时任务每小时会再试）
     const old = await bingFound(env);
-    await setSetting(env, 'bing_found', JSON.stringify({ ...(old || { sites: [] }), at: Date.now(), error: e.message }));
+    await setSetting(env, 'bing_found', JSON.stringify({ sites: old?.sites || [], at: old?.at || 0, error: e.message, errorAt: Date.now() }));
     return;
   }
   await rebuildSites(env);
@@ -183,7 +183,7 @@ export async function syncBatch(env, secret, { limit = 25, cutoff = Date.now() -
   const c = await bingCreds(env, secret);
   if (!c) return { skipped: true };
   const f = await bingFound(env);
-  if (!f || f.at < Date.now() - DAY) await discover(env, secret);
+  if (!f || f.error || f.at < Date.now() - DAY) await discover(env, secret);
   const due = (await env.DB.prepare("SELECT host, bing_site, b_error, b_in_index FROM g_sites WHERE bing_site != '' AND b_synced_at < ? ORDER BY b_synced_at LIMIT ?")
     .bind(cutoff, limit).all()).results;
   let done = 0;
