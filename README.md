@@ -86,6 +86,24 @@ routes = [
 
 重新执行 `npx wrangler deploy` 即可。
 
+## 升级
+
+每个版本都会打 `vX.Y.Z` 标签、在 [Releases](https://github.com/ccvar/cligc_link/releases) 里写明更新内容（也见 [CHANGELOG.md](CHANGELOG.md)）。后台“设置 → 系统状态”显示当前版本；定时任务每天到 GitHub 查一次最新版本（只读取版本号，不上报任何数据），有新版本时在系统状态里提示，并推送一次到已开启的 Telegram / 邮箱。
+
+数据库不需要手动迁移：新版本第一次运行时会自动补表、补列，数据不会丢失。升级后出问题，可以用 `npx wrangler rollback` 回到上一次部署的代码。
+
+**命令行部署的**：在项目目录执行
+
+```bash
+npm run upgrade
+```
+
+它会拉取最新发布的版本、保留你在 `wrangler.toml` 里的 Worker 名称、域名、D1 数据库和 `[vars]`、安装依赖，确认后部署。只想先更新代码、检查后再部署：`npm run upgrade -- --no-deploy`；升级到指定版本：`npm run upgrade -- --to v1.2.0`。
+
+**用“Deploy to Cloudflare”按钮部署的**：按钮会在你的 GitHub 下生成一个仓库，并让 Cloudflare 在仓库有新提交时自动部署。打开这个仓库的 **Actions → 同步上游新版本 → Run workflow**，它会把最新版本合并进你的仓库（同样保留 `wrangler.toml` 里的配置），Cloudflare 随后自动重新部署。这个任务每周一也会自动检查一次，不想自动升级就删掉 `.github/workflows/sync-upstream.yml` 里 `schedule` 那两行。
+
+> 在 v1.1.0 之前部署的，仓库里还没有升级脚本：命令行部署的先 `git pull` 一次（`wrangler.toml` 有冲突时保留自己的数据库 ID 和域名），之后就可以用 `npm run upgrade`；一键部署的把本仓库的 `scripts/` 和 `.github/workflows/sync-upstream.yml` 复制到自己的仓库，再运行上面的 Action。
+
 ## 配置
 
 **变量**（写在 `wrangler.toml` 的 `[vars]` 中）：
@@ -444,6 +462,8 @@ src/index.js      Worker：跳转、访问记录、后台 API、定时任务、�
 src/lib.js        不依赖 Workers 环境的纯逻辑：访客识别、跳转规则与 A/B 分流、24 小时统计工具、用量预测
 src/agg.js        访问汇总（按小时 / 按天）、独立访客 HyperLogLog
 src/google.js     Google 集成：OAuth、GA4 / Search Console 同步、站点与短链匹配、AI 报告、每周 SEO 变化
+src/bing.js       Bing Webmaster：API Key / 代理、每日数据同步、搜索词与抓取统计、收录检查与提交
+src/gindex.js     网页索引：站点地图、Google 网址检查、Bing 收录检查与自动提交
 src/admin.html    管理后台（单文件，无构建步骤）
 src/home.html     根路径产品首页
 src/i18n/         英文界面：翻译脚本（client.js）和后台 / 首页的词典
@@ -451,6 +471,9 @@ test/             node --test 测试
 schema.sql        数据库表结构（首次请求时自动执行）
 migrations/       旧版本数据库的升级脚本
 wrangler.toml     Cloudflare 配置模板
+scripts/          升级脚本（npm run upgrade）：拉取新版本并保留 wrangler.toml 里的个人配置
+.github/workflows/ 一键部署仓库用的“同步上游新版本”任务
+CHANGELOG.md      更新日志
 ```
 
 ## 免费额度

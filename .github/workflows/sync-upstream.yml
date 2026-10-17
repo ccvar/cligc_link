@@ -1,0 +1,31 @@
+# 同步上游新版本：把 ccvar/cligc_link 最新发布的版本合并进你自己的仓库，Cloudflare 会自动重新部署。
+# 适用于用“Deploy to Cloudflare”按钮部署的仓库（或自己 fork 的仓库）。
+# 在仓库的 Actions 页面选“同步上游新版本”→ Run workflow 手动运行；也会每周一自动检查一次（不想自动升级就删掉 schedule 那两行）。
+# 你在 wrangler.toml 里的 Worker 名称、域名、D1 数据库、[vars] 会保留。
+name: 同步上游新版本
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    # 上游仓库自己不运行
+    if: github.repository != 'ccvar/cligc_link'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 升级到最新版本
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          node scripts/upgrade.mjs --ci

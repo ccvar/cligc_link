@@ -1,4 +1,5 @@
 import ADMIN_HTML from './admin.html';
+import PKG from '../package.json';
 import HOME_HTML from './home.html';
 import SCHEMA_SQL from '../schema.sql';
 import ADMIN_EN from './i18n/admin.en.json';
@@ -9,7 +10,7 @@ import { EmailMessage } from 'cloudflare:email';
 import * as google from './google.js';
 import * as gindex from './gindex.js';
 import * as bing from './bing.js';
-import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast } from './lib.js';
+import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, backfillSourceUv, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
 // 后台页面的 ETag（按内容算 FNV-1a 哈希，同一个实例里只算一次）
@@ -71,7 +72,7 @@ export default {
         if (path === '/api/google/callback') return await googleCallback(env, url);
         if (path.startsWith('/api/')) return await handleApi(request, env, url);
         // 后台页面按内容生成 ETag：浏览器每次都来确认，没变就返回 304，不用重新下载整个页面
-        const html = ADMIN_HTML.replace('__TURNSTILE_SITEKEY__', env.TURNSTILE_SITEKEY || '');
+        const html = ADMIN_HTML.replace('__TURNSTILE_SITEKEY__', env.TURNSTILE_SITEKEY || '').replace('__VERSION__', VERSION);
         const etag = adminEtag(html);
         if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { etag, 'cache-control': 'no-cache' } });
         return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', etag } });
@@ -103,14 +104,80 @@ export default {
 };
 
 // ---------------------------------------------------------------- 系统状态（后台“设置 → 系统状态”）
+// ---------------------------------------------------------------- 版本与更新检查
+// 版本号取自 package.json（发布时打 vX.Y.Z 标签、发 GitHub Release）。
+// 定时任务每天查一次上游仓库的最新 Release（只读取版本号和更新说明，不上报任何数据），有新版本时在“系统状态”里提示，并推送一次
+const VERSION = PKG.version;
+const UPSTREAM = 'ccvar/cligc_link';
+async function checkUpdate(env, force = false) {
+  const parse = (v) => { try { return v ? JSON.parse(v) : null; } catch { return null; } };
+  const old = parse((await getSetting(env, 'update_check'))?.value);
+  if (!force && old?.at > Date.now() - 20 * 3600000 && old.current === VERSION) return { skipped: true };
+  const repo = env.UPDATE_REPO || UPSTREAM;
+  let latest = '', url = '', notes = '', published = 0, error = '';
+  try {
+    const r = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+      headers: { 'user-agent': 'cligc-link', accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      latest = d.tag_name || ''; url = d.html_url || ''; notes = String(d.body || '').slice(0, 4000); published = Date.parse(d.published_at) || 0;
+    } else if (r.status !== 404) throw new Error(`GitHub 返回 HTTP ${r.status}`);
+  } catch (e) {
+    // GitHub 接口按 IP 限流时，退回到网页的跳转地址（/releases/latest → /releases/tag/vX.Y.Z）
+    try {
+      const r2 = await fetch(`https://github.com/${repo}/releases/latest`, { redirect: 'manual', signal: AbortSignal.timeout(10000) });
+      const loc = r2.headers.get('location') || '', m = /\/tag\/([^/?#]+)$/.exec(loc);
+      if (m) { latest = decodeURIComponent(m[1]); url = loc; } else error = e.message;
+    } catch { error = e.message; }
+  }
+  const v = latest.replace(/^v/, '');
+  const out = { at: Date.now(), current: VERSION, latest: v, url, notes, published, error, newer: !!v && semverGt(v, VERSION) };
+  await setSetting(env, 'update_check', JSON.stringify(out));
+  // 每个新版本只推送一次
+  if (out.newer && (await getSetting(env, 'notify_update'))?.value !== v) {
+    const cfg = await getNotify(env);
+    if (cfg.tg.enabled || cfg.email.enabled) {
+      const report = buildUpdateNotice(cfg, out);
+      const errors = [];
+      if (cfg.tg.enabled) await sendTelegram(cfg.tg, report.tg).catch((e) => errors.push(e.message));
+      if (cfg.email.enabled) await sendEmail(env, cfg.email, report).catch((e) => errors.push(e.message));
+      await setSetting(env, 'notify_status', JSON.stringify({ at: Date.now(), kind: 'update', ok: !errors.length, error: errors.join('；') }));
+    }
+    await setSetting(env, 'notify_update', v);
+  }
+  return { current: VERSION, latest: v, newer: out.newer, ...(error ? { error } : {}) };
+}
+function buildUpdateNotice(cfg, u) {
+  const h = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const title = `cligc link 有新版本 v${u.latest}`;
+  // 更新说明只取前几行要点
+  const lines = u.notes.split('\n').map((l) => l.trim()).filter((l) => /^[-*]\s/.test(l)).slice(0, 8).map((l) => l.replace(/^[-*]\s+/, '').replace(/\*\*/g, ''));
+  const how = '升级方法：命令行部署的执行 npm run upgrade；一键部署的在 GitHub 仓库的 Actions 里运行“同步上游新版本”。';
+  const admin = cfg.base ? `${cfg.base}/admin#/settings` : '';
+  const tg = [`🆕 <b>${h(title)}</b>`, `当前 v${h(u.current)}`, '', ...lines.map((l) => `• ${h(l)}`), lines.length ? '' : '',
+    h(how), u.url ? `<a href="${h(u.url)}">查看更新说明 →</a>` : ''].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n').trim();
+  const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #e3e6ec;border-radius:16px"><tr><td style="padding:28px">
+<div style="font-size:13px;color:#868e9e">cligc link · 版本更新</div>
+<h1 style="margin:6px 0 10px;font-size:20px;color:#0b1020">${h(title)}</h1>
+<p style="margin:0 0 12px;font-size:13px;color:#454d5e">当前运行的是 v${h(u.current)}。</p>
+${lines.map((l) => `<div style="font-size:13px;color:#454d5e;padding:4px 0;border-bottom:1px solid #f0f1f4">${h(l)}</div>`).join('')}
+<p style="margin:16px 0 0;font-size:13px;color:#454d5e">${h(how)}</p>
+${u.url ? `<p style="margin:20px 0 0"><a href="${h(u.url)}" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#0b1020;color:#fff;text-decoration:none;font-size:14px">查看更新说明</a></p>` : ''}
+${admin ? `<p style="margin:12px 0 0;font-size:12px"><a href="${h(admin)}" style="color:#868e9e">打开后台</a></p>` : ''}
+</td></tr></table></body></html>`;
+  return { title, tg, html, text: tg.replace(/<[^>]+>/g, '') };
+}
+
 async function systemStatus(env) {
   const get = async (k) => (await getSetting(env, k))?.value ?? null;
   const parse = (v) => { try { return v ? JSON.parse(v) : null; } catch { return null; } };
-  const [cron, mark, suv, nstat, n, accts, sites, cf, cronManual] = await Promise.all([
+  const [cron, mark, suv, nstat, n, accts, sites, cf, cronManual, update] = await Promise.all([
     get('cron_status').then(parse), get('agg_mark'), get('suv_mark'), get('notify_status').then(parse), getNotify(env),
     env.DB.prepare('SELECT email, error, found_at FROM g_accounts').all().then((r) => r.results).catch(() => []),
     env.DB.prepare('SELECT COUNT(*) AS n, MAX(synced_at) AS last, SUM(synced_at = 0) AS pending, SUM(error != \'\') AS errors FROM g_sites').first().catch(() => null),
-    cfCreds(env), get('cron_manual').then(parse),
+    cfCreds(env), get('cron_manual').then(parse), get('update_check').then(parse),
   ]);
   const health = await env.DB.prepare(
     `SELECT COUNT(*) AS n, SUM(state = 'down') AS down, MAX(checked_at) AS last FROM url_health WHERE url IN (
@@ -118,7 +185,8 @@ async function systemStatus(env) {
        UNION SELECT t.url FROM link_targets t JOIN links l ON l.id = t.link_id WHERE l.enabled = 1)`
   ).first().catch(() => null);
   return {
-    now: Date.now(), cron, cronManual, aggMark: Number(mark) || null, backfillDone: suv === 'done',
+    now: Date.now(), version: VERSION, update: update?.current === VERSION ? update : update ? { ...update, newer: !!update.latest && semverGt(update.latest, VERSION) } : null,
+    cron, cronManual, aggMark: Number(mark) || null, backfillDone: suv === 'done',
     google: { accounts: accts.length, accountErrors: accts.filter((a) => a.error).map((a) => ({ email: a.email, error: a.error })), sites: sites?.n || 0, lastSync: sites?.last || null, pending: sites?.pending || 0, siteErrors: sites?.errors || 0 },
     notify: { channels: [n.tg.enabled && 'Telegram', n.email.enabled && '邮件'].filter(Boolean), last: nstat },
     usage: { configured: !!cf, alert: !!n.usage.enabled },
@@ -164,6 +232,7 @@ async function runCron(env, at = Date.now(), { manual = false } = {}) {
     return await gindex.cronBatch(env, gsec, manual ? { budgetMs: 40000, bingBudget: 20000, autoSubmit: false } : {});
   });
   await step('health', () => runHealthChecks(env));
+  await step('update', () => checkUpdate(env));
   if (!manual) {
     await step('notify', () => runNotifications(env, at));
     await step('usage', () => runUsageAlert(env));
@@ -492,6 +561,8 @@ async function authedApi(request, env, url, cred) {
     return json({ ok: true });
   }
   if (path === '/api/status' && method === 'GET') return json(await systemStatus(env));
+  // 立即检查更新
+  if (path === '/api/update/check' && method === 'POST') { await checkUpdate(env, true); return json(await systemStatus(env)); }
   // 立即运行一次定时任务（同一时间只跑一个；正在跑的超过 15 分钟视为已中断）
   if (path === '/api/cron/run' && method === 'POST') {
     const running = Number((await getSetting(env, 'cron_running'))?.value) || 0;

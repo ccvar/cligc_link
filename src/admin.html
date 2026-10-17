@@ -138,6 +138,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .side .foot .btn.on svg.i { color: var(--accent); }
 .side .foot .host { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; padding: 6px 2px 0 12px; border-top: 1px solid var(--line); margin-top: 4px; font-family: var(--mono); white-space: nowrap; }
 .side .foot .host .hn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.side .foot .host .ver { flex: none; font-size: 11px; color: var(--faint); }
 .side .foot .host .out { position: relative; flex: none; width: 28px; height: 28px; border: 0; border-radius: 7px; background: none; color: var(--muted); cursor: pointer; display: grid; place-items: center;
   transition: color .15s, background .15s; }
 .side .foot .host .out:hover, .side .foot .host .out:focus-visible { color: var(--bad); background: var(--bad-bg); }
@@ -166,7 +167,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .shell.mini .wrap { max-width: calc(var(--app-max) - 72px); }
 .shell.mini .wordmark, .shell.mini .product, .shell.mini .nav span, .shell.mini .foot .btn span, .shell.mini .nav-label { display: none; }
 .shell.mini .side .foot .host { justify-content: center; padding: 6px 0 0; }
-.shell.mini .side .foot .host i, .shell.mini .side .foot .host .hn { display: none; }
+.shell.mini .side .foot .host i, .shell.mini .side .foot .host .hn, .shell.mini .side .foot .host .ver { display: none; }
 .shell.mini .side-head { flex-direction: column; gap: 14px; padding: 0; }
 .shell.mini .collapse { margin: 0; }
 .shell.mini .collapse svg { transform: rotate(180deg); }
@@ -706,7 +707,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .hc-p { margin-left: 6px; }
 .lrow .c-status { display: flex; flex-wrap: wrap; gap: 4px; }
 .hc-i { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
-#hc-run.busy svg, #sys-run.busy svg, #use-re.busy svg, #ix-chk.busy svg, [data-ixi].busy svg, #bing-sync.busy svg, [data-ixb].busy svg { animation: spin .9s linear infinite; }
+#hc-run.busy svg, #sys-run.busy svg, #sys-upd.busy svg, #use-re.busy svg, #ix-chk.busy svg, [data-ixi].busy svg, #bing-sync.busy svg, [data-ixb].busy svg { animation: spin .9s linear infinite; }
 .devs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .dv { display: grid; justify-items: start; gap: 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; font: inherit; }
 .dv svg { color: var(--muted); }
@@ -1749,6 +1750,8 @@ const $app = document.getElementById('app');
 const TZ = -new Date().getTimezoneOffset();
 const ORIGIN = location.origin;
 const HOST = location.host;
+// 当前版本（服务端渲染时替换）
+const APP_VERSION = '__VERSION__';
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const store = {
@@ -2249,7 +2252,7 @@ function shell(active, inner) {
       <button class="btn ghost icon acct" id="acct" aria-label="账号菜单" aria-haspopup="menu" aria-expanded="false">${ic('user', 19)}</button>
       <div class="foot">
         <a class="btn ghost ${active === 'settings' ? 'on' : ''}" href="#/settings" data-tip="设置" data-tip-at="right">${ic('gear', 18)}<span>设置</span></a>
-        <div class="host"><i title="服务运行中"></i><span class="hn">${esc(HOST)}</span>
+        <div class="host"><i title="服务运行中"></i><span class="hn" data-tip="${esc(`${HOST} · v${APP_VERSION}`)}" data-tip-at="right">${esc(HOST)}</span><span class="ver">v${esc(APP_VERSION)}</span>
           <button class="out" id="logout" data-tip="退出登录" aria-label="退出登录">${ic('out', 15)}</button></div>
       </div>
     </aside>
@@ -5072,18 +5075,26 @@ function sysChecks(st) {
   out.push(st.usage.configured ? { lv: 'ok', t: 'Cloudflare 用量', d: st.usage.alert ? '已配置，用量预警已开启' : '已配置（用量预警未开启，可以在“通知”页开启）' }
     : { lv: 'warn', t: 'Cloudflare 用量', d: '没有填写凭据，看不到账户用量' });
   if (!st.backfillDone && st.aggMark) out.push({ lv: 'warn', t: '访客回填', d: '按来源的独立访客正在回填旧数据，几个小时内完成' });
+  // 版本：每天查一次上游的最新 Release
+  const u = st.update, v = st.version || APP_VERSION;
+  out.push(!u ? { lv: 'ok', t: '版本', d: `v${v}（还没检查过更新，定时任务每天检查一次）` }
+    : u.newer ? { lv: 'warn', t: '版本', d: `当前 v${v}，有新版本 v${u.latest}`, links: [[u.url, '查看更新说明'], [UPGRADE_DOC, '怎么升级']] }
+    : u.error ? { lv: 'ok', t: '版本', d: `v${v} · 检查更新失败：${u.error}` }
+    : { lv: 'ok', t: '版本', d: `v${v} · 已是最新${u.latest ? '' : '（上游还没有发布版本）'}，${ago(u.at)}检查` });
   return out;
 }
+// 升级说明（README 里的“升级”一节）
+const UPGRADE_DOC = 'https://github.com/ccvar/cligc_link#升级';
 const sysLevel = (st) => { const c = sysChecks(st); return c.some((x) => x.lv === 'bad') ? 'bad' : c.some((x) => x.lv === 'warn') ? 'warn' : 'ok'; };
 const sysPill = (st) => ({ ok: '<span class="pill on">正常</span>', warn: '<span class="pill exp">注意</span>', bad: '<span class="pill bad-p">异常</span>' }[sysLevel(st)]);
 const sysSummary = (st) => {
   const c = sysChecks(st), bad = c.filter((x) => x.lv === 'bad'), warn = c.filter((x) => x.lv === 'warn');
   return bad.length ? `${bad.map((x) => x.t).join('、')}异常` : warn.length ? `${warn.length} 项需要注意：${warn.map((x) => x.t).join('、')}` : `定时任务、汇总${st.google.accounts ? '、Google 同步' : ''}都正常`;
 };
-const sysBody = (st) => `<div class="sys-l">${sysChecks(st).map((x) => `<div class="sys-r ${x.lv}"><span class="sys-i">${ic(x.lv === 'ok' ? 'check' : 'alert', 13)}</span><b>${x.t}</b><span>${esc(x.d)}</span></div>`).join('')}</div>
+const sysBody = (st) => `<div class="sys-l">${sysChecks(st).map((x) => `<div class="sys-r ${x.lv}"><span class="sys-i">${ic(x.lv === 'ok' ? 'check' : 'alert', 13)}</span><b>${x.t}</b><span>${esc(x.d)}${(x.links || []).filter(([h]) => h).map(([h, l]) => ` · <a href="${esc(h)}" target="_blank" rel="noopener">${l}</a>`).join('')}</span></div>`).join('')}</div>
   ${st.cron ? `<details class="wz-more" style="margin-top:12px"><summary>上次定时任务的各个步骤</summary>${cronSteps(st.cron)}</details>` : ''}
   ${st.cronManual ? `<details class="wz-more" style="margin-top:8px"><summary>最近一次手动运行（${ago(st.cronManual.at)}，耗时 ${(st.cronManual.ms / 1000).toFixed(1)} 秒）</summary>${cronSteps(st.cronManual)}</details>` : ''}
-  <div class="sys-run"><button type="button" class="btn sm" id="sys-run" data-tipf-always data-tipf="按定时任务的步骤立即跑一遍：访问汇总、Google / Bing 同步、网页索引检查、目标页检查。不发推送通知、不自动提交网址给 Bing，每步比整点那次少做一些。请求从你当前访问的 Cloudflare 节点发出">${ic('refresh', 14)}立即运行一次</button></div>`;
+  <div class="sys-run"><button type="button" class="btn sm" id="sys-upd" data-tipf-always data-tipf="立即到 GitHub 查一次最新版本（只读取版本号，不上报任何数据）">${ic('refresh', 14)}检查更新</button> <button type="button" class="btn sm" id="sys-run" data-tipf-always data-tipf="按定时任务的步骤立即跑一遍：访问汇总、Google / Bing 同步、网页索引检查、目标页检查。不发推送通知、不自动提交网址给 Bing，每步比整点那次少做一些。请求从你当前访问的 Cloudflare 节点发出">${ic('refresh', 14)}立即运行一次</button></div>`;
 // 定时任务各步骤的耗时 / 错误
 const cronSteps = (c) => `<div class="sys-steps">${Object.entries(c.steps).map(([k, v]) => `<span class="${v.ok ? '' : 'bad'}">${esc(k)} · ${v.ok ? `${v.ms} ms` : esc(v.error)}</span>`).join('')}</div>`;
 
@@ -5912,6 +5923,18 @@ async function renderSettings(token) {
   renderTracking(document.getElementById('acc-trk'), trk, (on) => { page.querySelector('[data-st="trk"]').innerHTML = pill(on); });
   const sysBox = document.getElementById('acc-sys');
   if (sysBox) sysBox.addEventListener('click', async (e) => {
+    const ub = e.target.closest('#sys-upd');
+    if (ub && !ub.disabled) {
+      ub.disabled = true; ub.classList.add('busy');
+      try {
+        const d = await api('/update/check', { method: 'POST', body: {} });
+        sysBox.innerHTML = sysBody(d);
+        page.querySelector('[data-st="sys"]').innerHTML = sysPill(d);
+        page.querySelector('[data-sub="sys"]').innerHTML = sysSummary(d);
+        toast(d.update?.newer ? `有新版本 v${d.update.latest}` : d.update?.error ? `检查更新失败：${d.update.error}` : '已是最新版本', d.update?.error ? 'bad' : 'ok');
+      } catch (err) { toast(err.message, 'bad'); ub.disabled = false; ub.classList.remove('busy'); }
+      return;
+    }
     const btn = e.target.closest('#sys-run');
     if (!btn || btn.disabled) return;
     btn.disabled = true; btn.classList.add('busy');

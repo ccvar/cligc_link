@@ -86,6 +86,24 @@ routes = [
 
 Then run `npx wrangler deploy` again.
 
+## Upgrading
+
+Every release is tagged `vX.Y.Z` with notes in [Releases](https://github.com/ccvar/cligc_link/releases) (see also [CHANGELOG.en.md](CHANGELOG.en.md)). "Settings → System status" shows the running version; the scheduled job checks GitHub for the latest release once a day (it only reads the version number and reports nothing), shows a notice there when a newer one is out, and pushes it once to your enabled Telegram / email.
+
+No manual database migration is needed: a new version adds tables and columns on its first run without losing data. If something goes wrong after an upgrade, `npx wrangler rollback` returns to the previously deployed code.
+
+**If you deployed from the command line**, run this in the project folder:
+
+```bash
+npm run upgrade
+```
+
+It fetches the latest release, keeps your Worker name, routes, D1 database and `[vars]` from `wrangler.toml`, installs dependencies, and deploys after you confirm. To update the code and deploy later: `npm run upgrade -- --no-deploy`; to go to a specific version: `npm run upgrade -- --to v1.2.0`.
+
+**If you used the "Deploy to Cloudflare" button**: the button creates a repository in your GitHub account and has Cloudflare deploy every new commit. In that repository, open **Actions → 同步上游新版本 (sync upstream) → Run workflow**; it merges the latest release into your repository (keeping your `wrangler.toml` settings) and Cloudflare redeploys automatically. The workflow also checks every Monday; delete the two `schedule` lines in `.github/workflows/sync-upstream.yml` if you don't want automatic upgrades.
+
+> Deployed before v1.1.0? Your copy doesn't have the upgrade tooling yet. From the command line, `git pull` once (on a `wrangler.toml` conflict, keep your own database ID and routes) and use `npm run upgrade` from then on. With the button, copy `scripts/` and `.github/workflows/sync-upstream.yml` from this repository into yours, then run the workflow above.
+
 ## Configuration
 
 **Variables** (in `[vars]` of `wrangler.toml`):
@@ -446,6 +464,8 @@ src/index.js      Worker: redirects, visit logging, admin API, scheduled jobs, a
 src/lib.js        Runtime-independent logic: visitor classification, redirect rules and A/B split, 24-hour stats helpers, usage forecasts
 src/agg.js        Visit aggregation (hourly / daily), HyperLogLog unique visitors
 src/google.js     Google integration: OAuth, GA4 / Search Console sync, site–link matching, AI reports, weekly SEO changes
+src/bing.js       Bing Webmaster: API key / proxy, daily data sync, queries and crawl stats, index checks and submission
+src/gindex.js     Page indexing: sitemaps, Google URL inspection, Bing index checks and auto-submission
 src/admin.html    Admin (single file, no build step)
 src/home.html     Home page served at /
 src/i18n/         English UI: the translation script (client.js) and dictionaries for the admin / home page
@@ -453,6 +473,9 @@ test/             node --test tests
 schema.sql        Database schema (applied automatically on the first request)
 migrations/       Upgrade scripts for older databases
 wrangler.toml     Cloudflare configuration template
+scripts/          Upgrade script (npm run upgrade): fetches a new release and keeps your wrangler.toml settings
+.github/workflows/ "Sync upstream" workflow for repositories created by the deploy button
+CHANGELOG.md      Changelog
 ```
 
 ## Free tier

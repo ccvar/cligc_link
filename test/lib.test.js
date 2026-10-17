@@ -104,3 +104,12 @@ test('A/B 分流：同一访客总是同一个地址，整体接近设定比例'
   assert.equal(pickArm([0, 0], 'x'), 0);
   assert.equal(pickArm([0, 10], 'x'), 1);
 });
+
+test('semverGt 比较版本号', async () => {
+  const { semverGt } = await import('../src/lib.js');
+  assert.equal(semverGt('1.1.0', '1.0.9'), true);
+  assert.equal(semverGt('v1.10.0', '1.9.0'), true);
+  assert.equal(semverGt('1.0.0', '1.0.0'), false);
+  assert.equal(semverGt('1.0.0', '1.0.1'), false);
+  assert.equal(semverGt('2.0.0-beta', '1.9.9'), true);
+});

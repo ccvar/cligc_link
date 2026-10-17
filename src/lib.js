@@ -196,3 +196,11 @@ export function usageForecast(u, now = Date.now()) {
   return { paid, period: paid ? u.today.slice(0, 7) : u.today, end, elapsed, items };
 }
 
+
+// 版本号比较：a 是否比 b 新（只比较主.次.修订，忽略 v 前缀和预发布后缀）
+export function semverGt(a, b) {
+  const p = (v) => String(v).replace(/^v/, '').split(/[.-]/).slice(0, 3).map((x) => Number(x) || 0);
+  const [x, y] = [p(a), p(b)];
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
+  return false;
+}
