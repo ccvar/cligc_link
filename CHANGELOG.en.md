@@ -2,6 +2,27 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.3.0 · 2026-10-17
+
+Anti-abuse: hammering a short link no longer floods the database, and hammering the home page no longer uses Workers requests. Short-link counts now show human visits.
+
+### New
+
+- **Short-link anti-abuse**: after more than 10 visits per minute from one IP to one link, visits still redirect but are only counted, not logged in detail, so database writes can't be flooded
+- **Static home page**: the home page, robots.txt and the home translation script are built into static files (`public/`) on deploy and served directly by Cloudflare — no Worker, no Workers requests; hammering the home page no longer affects short links
+
+### Improved
+
+- The link list shows human visits (excluding crawlers and suspicious visits) and "Most visited" sorts by them; hover to see the total including machine traffic and rapid repeats that weren't logged
+- Link details show total / daily human visits, with the total including machine traffic below
+- The language switch at the top right of the home page is now a dropdown
+
+### Upgrade notes
+
+- If you set `HOME_URL` (redirecting the home page elsewhere), enable `run_worker_first = ["/"]` under `[assets]` in `wrangler.toml`. Upgrades via `npm run upgrade` or "sync upstream" do this automatically
+- `index`, `index.html` and `i18n` are now reserved and can't be used as short-link slugs
+- Human visit counts for existing links are backfilled from existing visit records on the first run after upgrading
+
 ## v1.2.0 · 2026-10-17
 
 Faster page indexing with numbers closer to Search Console, and a stoppable, selectable site sync.
