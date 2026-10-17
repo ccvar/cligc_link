@@ -12,7 +12,7 @@ import { spend } from './budget.js';
 
 const DAY = 86400000, HOUR = 3600000;
 // 定时任务每次：刷新 SITEMAP_PER_RUN 个站点的站点地图（约 100 秒），再用 G_BUDGET 检查最多 RUN_LIMIT 个 Google 网址（两者各算各的时间）
-const MAX_URLS = 500, QUOTA = 1800, RUN_LIMIT = 400, SITEMAP_PER_RUN = 8, CONCURRENCY = 8, G_BUDGET = 120000;
+const MAX_URLS = 500, QUOTA = 1800, RUN_LIMIT = 400, SITEMAP_PER_RUN = 8, CONCURRENCY = 8, G_BUDGET = 240000;
 // Bing 的 GetUrlInfo 限流很严（实测约每分钟 10 次），只能逐个、间隔 B_GAP 查；定时任务每次给它 B_BUDGET
 const B_RUN_LIMIT = 40, B_GAP = 6500, B_BUDGET = 240000, B_AUTO_MAX = 100, NEVER = 9e15;
 const ymd = (t) => new Date(t).toISOString().slice(0, 10);
@@ -362,6 +362,12 @@ const idxSites = async (env, host) => new Map((await env.DB.prepare(
 // Bing 的凭据 { key, proxy }；没配置时为 null
 const bingKey = async (env, secret) => (await bing.bingCreds(env, secret)) || null;
 
+// 到期网址按站点轮流排队：rn = 在本站点里的到期顺序，先按 rn 再按到期时间
+const rrSql = (col, linked) => `SELECT ${ROW_COLS} FROM (
+    SELECT ${ROW_COLS}, u.${col} AS due, ROW_NUMBER() OVER (PARTITION BY u.host ORDER BY u.${col}) AS rn
+    FROM g_urls u JOIN g_sites s ON s.host = u.host WHERE u.${col} <= ? AND ${linked}) u
+  ORDER BY rn, due LIMIT ?`;
+
 // 刷新几个站点的站点地图，再检查一批到期的网址（Google 和 Bing 各一批）
 export async function cronBatch(env, secret, { budgetMs = 100000, inspectBudget = G_BUDGET, bingBudget = B_BUDGET, autoSubmit = true } = {}) {
   const deadline = Date.now() + budgetMs, margin = Math.min(40000, budgetMs / 2);
@@ -377,15 +383,14 @@ export async function cronBatch(env, secret, { budgetMs = 100000, inspectBudget 
     if (Date.now() > deadline - margin) break;
     try { await refreshSite(env, secret, sites.get(host), bkey, { auto: autoSubmit }); refreshed++; } catch (e) { if (e.budget) break; console.error('sitemap refresh', host, e); }
   }
-  // 只取还关联着 GSC / Bing 的站点的网址（解除关联的不占队列）
-  const due = (await env.DB.prepare(`SELECT ${ROW_COLS} FROM g_urls u JOIN g_sites s ON s.host = u.host
-    WHERE u.due_at <= ? AND s.gsc_site != '' AND s.gsc_acct != '' ORDER BY u.due_at LIMIT ?`).bind(Date.now(), RUN_LIMIT).all()).results;
+  // 只取还关联着 GSC / Bing 的站点的网址（解除关联的不占队列）。
+  // 按站点轮流取：每个站点先各取最早到期的一个，再各取第二个……这样每个站点每小时都能查到一些，不会一个站点查完才轮到下一个
+  const due = (await env.DB.prepare(rrSql('due_at', "s.gsc_site != '' AND s.gsc_acct != ''")).bind(Date.now(), RUN_LIMIT).all()).results;
   // 网址检查有自己的时间预算，不被前面刷新站点地图用掉（之前共用时每小时只查得到几十个）
   const g = due.length ? await inspectRows(env, secret, sites, due, Date.now() + inspectBudget) : { done: 0, failed: 0 };
   let b = { done: 0, failed: 0 };
   if (bkey) {
-    const bdue = (await env.DB.prepare(`SELECT ${ROW_COLS} FROM g_urls u JOIN g_sites s ON s.host = u.host
-      WHERE u.b_due_at <= ? AND s.bing_site != '' ORDER BY u.b_due_at LIMIT ?`).bind(Date.now(), B_RUN_LIMIT).all()).results;
+    const bdue = (await env.DB.prepare(rrSql('b_due_at', "s.bing_site != ''")).bind(Date.now(), B_RUN_LIMIT).all()).results;
     if (bdue.length) b = await bingRows(env, bkey, sites, bdue, Date.now() + bingBudget);
   }
   return { refreshed, inspected: g.done, failed: g.failed, bing: b.done, bingFailed: b.failed };
