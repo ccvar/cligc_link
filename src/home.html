@@ -666,8 +666,22 @@ footer a:hover { color: var(--text); }
 .kbi.on svg { color: var(--accent-ink); }
 .kbl { display: flex; gap: 6px; padding: 10px 16px; border-top: 1px solid var(--line-2); background: var(--bg); }
 .kbl span.on { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); background: var(--accent-2); }
-.nav .lang { gap: 6px; padding: 0 11px; }
-.nav .lang svg { width: 15px; height: 15px; }
+.lng { position: relative; }
+.lng-b { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: none; color: var(--text-2);
+  font: inherit; font-size: 14.5px; cursor: pointer; transition: color .2s, background .2s; }
+.lng-b:hover, .lng-b[aria-expanded="true"] { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.lng-b svg { width: 16px; height: 16px; flex: none; }
+.lng-b .chev { width: 13px; height: 13px; color: var(--muted); transition: transform .2s var(--ease); }
+.lng-b[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.lng-m { position: absolute; top: calc(100% + 8px); right: 0; min-width: 156px; padding: 6px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel);
+  box-shadow: var(--shadow-3); opacity: 0; transform: translateY(-4px) scale(.98); transform-origin: top right; pointer-events: none; transition: opacity .16s, transform .2s var(--ease); }
+.lng-m.open { opacity: 1; transform: none; pointer-events: auto; }
+.lng-m button { display: flex; align-items: center; gap: 10px; width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 9px; background: none;
+  color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.lng-m button:hover, .lng-m button:focus-visible { background: var(--sunken); outline: none; }
+.lng-m button small { color: var(--muted); font-size: 12px; }
+.lng-m button svg { width: 15px; height: 15px; margin-left: auto; color: var(--accent); visibility: hidden; }
+.lng-m button[aria-checked="true"] svg { visibility: visible; }
 
 /* ==================================================================== 响应式 */
 @media (max-width: 1080px) {
@@ -723,7 +737,7 @@ footer a:hover { color: var(--text); }
   .bento { grid-template-columns: 1fr; }
   .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt, .t-trk, .t-bot, .t-st, .t-out, .t-ai2, .t-idx, .t-seo, .t-cv, .t-uf, .t-ab, .t-hc, .t-log, .t-dv, .t-sys, .t-kb { grid-column: auto; }
   .lgc { white-space: normal; }
-  .nav .lang span { display: none; }
+  .lng-b .lng-t { display: none; }
   .sth, .str { grid-template-columns: minmax(0, 1.6fr) 1fr 70px; }
   .sth span:nth-child(3), .sth span:nth-child(4), .str > span:nth-child(3), .str > span:nth-child(4) { display: none; }
   .ufr { grid-template-columns: 76px minmax(0, 1fr); }
@@ -767,7 +781,13 @@ footer a:hover { color: var(--text); }
       <a href="#product">产品</a><a href="#features">功能</a><a href="#sites">站点与 SEO</a><a href="#ops">运维与安全</a><a href="#deploy">部署</a><a href="#faq">常见问题</a>
     </nav>
     <span class="sp"></span>
-    <button type="button" class="btn sm lang notranslate" id="lang" aria-label="Switch language / 切换语言"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span id="lang-t">EN</span></button>
+    <div class="lng notranslate">
+      <button type="button" class="lng-b" id="lang" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-m" aria-label="Language / 语言"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span class="lng-t" id="lang-t">中文</span><svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="lng-m" id="lang-m" role="menu" aria-label="Language / 语言">
+        <button type="button" role="menuitemradio" data-l="zh" tabindex="-1">简体中文<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7.5"/></svg></button>
+        <button type="button" role="menuitemradio" data-l="en" tabindex="-1">English<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7.5"/></svg></button>
+      </div>
+    </div>
     <a class="btn sm gh" href="https://github.com/ccvar/cligc_link" target="_blank" rel="noopener">
       <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       <span class="gh-t">Star on GitHub</span>
@@ -1474,9 +1494,29 @@ footer a:hover { color: var(--text); }
   });
 
   /* ---------------------------------------------------------------- 语言切换 */
-  $('#lang-t').textContent = window.LANG === 'en' ? '中文' : 'EN';
-  $('#lang').addEventListener('click', () => {
-    try { localStorage.setItem('sl:lang', JSON.stringify(window.LANG === 'en' ? 'zh' : 'en')); } catch {}
+  // 下拉选择：按钮显示当前语言，菜单里勾选当前项；方向键移动、Esc 关闭
+  const langB = $('#lang'), langM = $('#lang-m'), langItems = [...langM.querySelectorAll('button')];
+  $('#lang-t').textContent = window.LANG === 'en' ? 'English' : '中文';
+  langItems.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.l === window.LANG)));
+  const langOpen = (on, focus) => {
+    langM.classList.toggle('open', on);
+    langB.setAttribute('aria-expanded', String(on));
+    if (on && focus) (langItems.find((b) => b.dataset.l === window.LANG) || langItems[0]).focus();
+  };
+  langB.addEventListener('click', (e) => { e.stopPropagation(); langOpen(!langM.classList.contains('open'), e.detail === 0); });
+  langB.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') { e.preventDefault(); langOpen(true, true); } });
+  langM.addEventListener('keydown', (e) => {
+    const i = langItems.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); langItems[(i + (e.key === 'ArrowDown' ? 1 : langItems.length - 1)) % langItems.length].focus(); }
+    else if (e.key === 'Escape' || e.key === 'Tab') { langOpen(false); if (e.key === 'Escape') langB.focus(); }
+  });
+  document.addEventListener('click', (e) => { if (!langM.contains(e.target)) langOpen(false); });
+  langM.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    langOpen(false);
+    if (b.dataset.l === window.LANG) return;
+    try { localStorage.setItem('sl:lang', JSON.stringify(b.dataset.l)); } catch {}
     history.replaceState(null, '', location.pathname + location.hash);
     location.reload();
   });
