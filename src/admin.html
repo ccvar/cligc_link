@@ -1641,10 +1641,13 @@ button.gtg { cursor: pointer; }
 .key-ro { display: flex; align-items: center; gap: 10px; height: 38px; }
 .key-ro code { font-family: var(--mono); font-size: 13px; }
 .key-ro .btn { margin-left: -4px; }
-/* 代理地址示例：地址 + 复制 + 填入 */
+/* 推荐的代理地址：域名可以直接改 + 复制 */
 .bp-head { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; font-size: 13px; }
 .bp-url { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
-.bp-url code { font-family: var(--mono); font-size: 12.5px; padding: 5px 9px; border-radius: 7px; background: var(--sunken); word-break: break-all; }
+.bp-addr { display: inline-flex; align-items: center; flex-wrap: wrap; font-family: var(--mono); font-size: 12.5px; padding: 3px 9px; border-radius: 7px; background: var(--sunken); cursor: text; max-width: 100%; }
+.bp-host { font: inherit; color: var(--text); background: var(--panel); border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 5px; padding: 2px 5px; margin: 0 1px; min-width: 0; max-width: 100%; }
+.bp-host:focus { outline: none; border-style: solid; border-color: var(--accent); }
+.bp-host::placeholder { color: var(--muted); }
 /* Bing 设置卡片的错误原因 */
 .b-warn { color: var(--warn); } .b-bad { color: var(--bad); }
 /* 系统状态：立即运行一次 */
@@ -6260,9 +6263,9 @@ const bingProxyHelp = (b) => {
   const path = bingProxyPath(b), host = bingProxyHost(b.proxy) || BING_HOST0;
   return `<details class="wz-more"><summary>怎么搭代理</summary>
   <p class="set-p" style="margin-top:8px">Bing 会按来源 IP 限流，Cloudflare 的出口 IP 是很多网站共用的，常被拦下（提示“按 IP 限流”）。在你自己的服务器上加一条转发，让 Bing 请求从那台机器发出。</p>
-  <div class="bp-head"><b>推荐的代理地址</b><span class="hint">点“填入”后输入你的域名，下面的配置会实时跟着变；路径里的随机字符已经生成好了，别人猜不到</span></div>
-  <div class="bp-url"><code data-bp="url">https://${esc(host)}${esc(path)}</code>${copyBtn(`https://${host}${path}`, 'btn sm', '复制').replace('<button ', '<button data-bp-copy ')}
-    <button type="button" class="btn sm" id="bing-fill" data-tipf-always data-tipf="填进上面的代理地址输入框，并选中域名部分，直接输入你的域名即可">${ic('edit', 14)}填入</button></div>
+  <div class="bp-head"><b>推荐的代理地址</b><span class="hint">直接把域名改成你的，上面的代理地址和下面的配置会同步更新；路径里的随机字符已经生成好了，别人猜不到</span></div>
+  <div class="bp-url"><label class="bp-addr notranslate"><span>https://</span><input class="bp-host" id="bing-host" value="${host === BING_HOST0 ? '' : esc(host)}" placeholder="${BING_HOST0}" spellcheck="false" autocomplete="off" aria-label="代理域名"><span data-bp="path">${esc(path)}</span></label>
+    ${copyBtn(`https://${host}${path}`, 'btn sm', '复制').replace('<button ', '<button data-bp-copy ')}</div>
   <ol class="use-steps" style="margin-top:14px">
     <li>准备一个域名（例如 <code>${esc(BING_HOST0)}</code>），加一条 A 记录指向服务器 IP；托管在 Cloudflare 的话先设成<b>仅 DNS</b>（灰色云朵）。</li>
     <li>服务器防火墙放开 80 和 443 端口（申请 https 证书要用）。</li>
@@ -6277,32 +6280,43 @@ const bingProxyHelp = (b) => {
 };
 // 输入代理地址时，示例配置里的域名跟着变
 function bindBingProxyHelp(form, b) {
-  const input = form.querySelector('#bing-proxy');
-  if (!input) return;
+  const input = form.querySelector('#bing-proxy'), hostIn = form.querySelector('#bing-host');
+  if (!input || !hostIn) return;
   const path0 = bingProxyPath(b);
-  const upd = () => {
-    const v = input.value.trim(), host = bingProxyHost(v) || BING_HOST0;
-    // 代理地址里自己写了路径的，示例用它；否则用生成的随机路径
+  // 当前的域名和路径：以上面的代理地址为准；它没填或格式不对时用下面的域名框
+  const cur = () => {
+    const v = input.value.trim(), host = bingProxyHost(v);
     let path = path0;
-    try { const p = new URL(v).pathname; if (host !== BING_HOST0 && p.length > 1) path = p.endsWith('/') ? p : `${p}/`; } catch {}
-    const texts = { caddy: BING_CADDY(host, path), nginx: BING_NGINX(host, path), test: BING_TEST(host, path), url: `https://${host}${path}` };
+    try { const p = new URL(v).pathname; if (host && p.length > 1) path = p.endsWith('/') ? p : `${p}/`; } catch {}
+    return { host: host || hostIn.value.trim() || BING_HOST0, path };
+  };
+  const fit = () => { hostIn.style.width = `${Math.max(hostIn.value.length, BING_HOST0.length) + 1}ch`; };
+  const render = (h0) => {
+    const c = cur(), host = h0 || c.host, path = c.path;
+    const texts = { caddy: BING_CADDY(host, path), nginx: BING_NGINX(host, path), test: BING_TEST(host, path), path };
     form.querySelectorAll('[data-bp]').forEach((el) => {
       el.textContent = texts[el.dataset.bp];
       const btn = el.previousElementSibling?.querySelector('[data-copy]');
       if (btn) btn.dataset.copy = texts[el.dataset.bp];
     });
     const cp = form.querySelector('[data-bp-copy]');
-    if (cp) cp.dataset.copy = texts.url;
+    if (cp) cp.dataset.copy = `https://${host}${path}`;
   };
-  input.addEventListener('input', upd);
-  // 填入：把完整地址填进输入框，选中域名部分，直接输入就能替换
-  const fill = form.querySelector('#bing-fill');
-  if (fill) fill.onclick = () => {
-    const url = form.querySelector('[data-bp="url"]').textContent, host = new URL(url).hostname;
-    input.value = url; upd();
-    input.focus(); input.setSelectionRange(8, 8 + host.length);
-    input.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  };
+  // 上面的代理地址改了：域名框跟着变
+  input.addEventListener('input', () => {
+    const h = bingProxyHost(input.value.trim());
+    if (h && document.activeElement !== hostIn) { hostIn.value = h; fit(); }
+    render();
+  });
+  // 域名框改了：上面的代理地址跟着变（域名里要有点才写回去，免得输入到一半把代理地址清掉）
+  hostIn.addEventListener('input', () => {
+    hostIn.value = hostIn.value.replace(/^https?:\/\//i, '').replace(/[/\s].*$/, '');
+    fit();
+    const h = hostIn.value.trim();
+    if (h.includes('.')) input.value = `https://${h}${cur().path}`;
+    render(h || BING_HOST0);
+  });
+  fit();
 }
 const bingForm = (b) => `<form class="set-form cfg-f" id="bing-f">
   <div class="field"><label for="bing-key">API Key</label>
