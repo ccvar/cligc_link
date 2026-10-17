@@ -317,6 +317,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .kc-v small { font-size: 12.5px; color: var(--muted); font-weight: 500; white-space: nowrap; padding-bottom: 3px; }
 .kc-sp { flex: 1; min-width: 36px; height: 30px; margin-left: 8px; }
 .kc-sp svg { display: block; width: 100%; height: 100%; }
+/* 趋势图在下面的卡片：竖向排列，趋势图贴底，同一排卡片的趋势图对齐 */
+.kc:has(> .kc-sb) { display: flex; flex-direction: column; }
+.kc-sb { margin-top: auto; padding-top: 10px; height: 40px; flex: none; }
+.kc-sb svg { display: block; width: 100%; height: 100%; }
 .kc-d { margin-top: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kc-a { font-size: 12px; color: var(--accent-ink); font-weight: 550; white-space: nowrap; }
 .kc-m { height: 4px; border-radius: 2px; background: var(--sunken); margin-top: 12px; overflow: hidden; }
@@ -4476,7 +4480,8 @@ function queryView(sc, f) {
     <tbody>${rows.map((x) => `<tr>${row(x).map((c, i) => `<td class="${i ? 'num' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 const tzLabelOf = (m) => `UTC${m >= 0 ? '+' : '−'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + String(Math.abs(m) % 60).padStart(2, '0') : ''}`;
-const gKc = (label, v, delta, sub = '', tip = '', extra = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b>${extra.startsWith('<svg') ? `<span class="kc-sp">${extra}</span>` : ''}</div>${extra && !extra.startsWith('<svg') ? extra : ''}${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
+// 迷你趋势图放在说明文字下面，铺满卡片宽度、底部对齐；其他附加内容（如占比色条）放在数字下面
+const gKc = (label, v, delta, sub = '', tip = '', extra = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b></div>${extra && !extra.startsWith('<svg') ? extra : ''}${sub ? `<div class="kc-d">${sub}</div>` : ''}${extra.startsWith('<svg') ? `<div class="kc-sb">${extra}</div>` : ''}</div>`;
 // 跳转去向的文字：默认地址 / 地区规则的国家
 const routeLabel = (r) => {
   if (!r.rule) return '默认地址';
