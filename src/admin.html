@@ -1637,6 +1637,10 @@ button.gtg { cursor: pointer; }
 .kc-h .l .kl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .kc-h > :not(.l) { flex: none; }
 .seg button:focus:not(:focus-visible) { outline: none; }
+/* 已保存的 Key：只读一行 + 铅笔 */
+.key-ro { display: flex; align-items: center; gap: 10px; height: 38px; }
+.key-ro code { font-family: var(--mono); font-size: 13px; }
+.key-ro .btn { margin-left: -4px; }
 /* Bing 设置卡片的错误原因 */
 .b-warn { color: var(--warn); } .b-bad { color: var(--bad); }
 /* 系统状态：立即运行一次 */
@@ -6284,8 +6288,11 @@ function bindBingProxyHelp(form, b) {
   input.addEventListener('input', upd);
 }
 const bingForm = (b) => `<form class="set-form cfg-f" id="bing-f">
-  <div class="field"><label for="bing-key">API Key</label><input class="input mono" id="bing-key" type="password" autocomplete="off" spellcheck="false" maxlength="64"
-    ${b.configured ? `placeholder="已保存 ••••${esc(b.keyTail)}，粘贴新的 Key 替换"` : 'required placeholder="32 位字符"'}></div>
+  <div class="field"><label for="bing-key">API Key</label>
+    ${b.configured ? `<div class="key-ro" id="bing-key-ro"><code>••••${esc(b.keyTail)}</code><span class="hint">已保存</span>
+      <button type="button" class="btn sm ghost icon" id="bing-key-edit" aria-label="更换 API Key" data-tipf-always data-tipf="更换 API Key">${ic('edit', 14)}</button></div>` : ''}
+    <input class="input mono" id="bing-key" type="password" autocomplete="off" spellcheck="false" maxlength="64"
+    ${b.configured ? 'hidden placeholder="粘贴新的 Key"' : 'required placeholder="32 位字符"'}></div>
   <div class="field"><label for="bing-proxy">代理地址 <span class="hint">可选</span></label><input class="input mono" id="bing-proxy" autocomplete="off" spellcheck="false"
     placeholder="https://你的域名${esc(bingProxyPath(b))}" value="${esc(b.proxy || '')}"></div>
   ${bingProxyHelp(b)}
@@ -6316,6 +6323,9 @@ function renderBingSettings(box, b, onState) {
       <div id="bing-fw" hidden style="margin-top:16px">${bingForm(b)}</div></div>`;
   const f = box.querySelector('#bing-f');
   bindBingProxyHelp(f, b);
+  // 已保存的 Key 只显示后四位，点铅笔才出现输入框
+  const keyEdit = f.querySelector('#bing-key-edit');
+  if (keyEdit) keyEdit.onclick = () => { f.querySelector('#bing-key-ro').hidden = true; const k = f.querySelector('#bing-key'); k.hidden = false; k.focus(); };
   f.onsubmit = async (e) => {
     e.preventDefault();
     const btn = f.querySelector('.primary'), err = f.querySelector('.err');
@@ -6328,7 +6338,7 @@ function renderBingSettings(box, b, onState) {
   };
   if (!b.configured) return;
   const fw = box.querySelector('#bing-fw');
-  box.querySelector('#bing-edit').onclick = () => { fw.hidden = !fw.hidden; if (!fw.hidden) fw.querySelector('#bing-key').focus(); };
+  box.querySelector('#bing-edit').onclick = () => { fw.hidden = !fw.hidden; if (!fw.hidden) fw.querySelector('#bing-proxy').focus(); };
   box.querySelector('#bing-cancel').onclick = () => { fw.hidden = true; };
   box.querySelector('#bing-del').onclick = async () => {
     const ok = await confirmDialog({ title: '删除 Bing API Key？', text: '会删除已同步的 Bing 点击 / 展示数据，站点页不再显示 Bing。之后可以随时重新填写。', ok: '删除', danger: true });
