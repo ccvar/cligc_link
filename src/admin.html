@@ -1373,6 +1373,7 @@ button.gtg { cursor: pointer; }
 .ph-acts { display: flex; align-items: center; gap: 4px; }
 .ph-acts .g-prog { margin-right: 6px; }
 .g-sync.busy svg { animation: spin .9s linear infinite; }
+.g-sync.stopping { opacity: .5; pointer-events: none; }
 .g-op { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); }
 .pop .ot > svg { color: var(--bad); margin-right: 6px; vertical-align: -2px; }
 .pop .ot.g-op > svg { color: inherit; margin-right: 0; }
@@ -1704,6 +1705,8 @@ html.masked input:focus { filter: none; }
 .ix-t.nog th:nth-child(2) { width: 34%; } .ix-t.nog th:last-child { width: 72px; }
 .ix-box { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
 .ix-bh { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ix-sub { font-size: 11px; white-space: nowrap; }
+.ix-done { display: flex; align-items: center; gap: 4px; margin-top: -4px; cursor: help; }
 .ix-bh .ix-q { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ix-box .ix-k b { font-size: 18px; }
 .ix-bing #ix-bsub { justify-self: start; }
@@ -1810,7 +1813,9 @@ const I = {
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   back: '<path d="m15 18-6-6 6-6"/>',
   code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+  stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2.5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.3M12 17h.01"/>',
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
   out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
   dl: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
@@ -4519,17 +4524,15 @@ function googleFlash() {
   if (v === 'ok') toast('Google 账号已连接，正在同步站点数据'); else toast(v, 'bad');
 }
 
-async function googleSyncAll(btn, onProgress) {
+// 一批一批同步，直到同步完；stopped() 返回 true 时在当前这批完成后停下
+async function googleSyncAll(onProgress, stopped) {
   const before = Date.now();
   let first = true, r;
-  if (btn) { btn.disabled = true; btn.classList.add('busy'); }
-  try {
-    do {
-      r = await api('/google/sync', { method: 'POST', body: { before, discover: first } });
-      first = false;
-      onProgress && onProgress(r);
-    } while (r.left > 0 && r.done > 0);
-  } finally { if (btn) { btn.disabled = false; btn.classList.remove('busy'); } }
+  do {
+    r = await api('/google/sync', { method: 'POST', body: { before, discover: first } });
+    first = false;
+    onProgress && onProgress(r);
+  } while (r.left > 0 && r.done > 0 && !(stopped && stopped()));
   return r;
 }
 
@@ -5160,7 +5163,7 @@ async function renderSites(token) {
   store.set('g:bing', hasBing);
   const accts = st.accounts || [], many = accts.length > 1, bad = accts.some((a) => a.error);
   if (gState.acct && !accts.some((a) => a.id === gState.acct)) gState.acct = '';
-  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步 Google 和 Bing' : '立即同步'}" aria-label="立即同步">${ic('refresh', 17)}</button>`, true)}
+  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步（可以选 Google / Bing）' : '立即同步'}" aria-label="立即同步"${hasBing ? ' aria-haspopup="menu" aria-expanded="false"' : ''}>${ic('refresh', 17)}</button>`, true)}
     ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<span>${esc(st.error)}</span><span class="sp"></span><button type="button" class="btn sm" id="g-re">重新连接</button></div>` : ''}
     ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
     <section class="card kstrip gs rv" id="g-sum"></section>
@@ -5314,36 +5317,89 @@ async function renderSites(token) {
   }));
   const prog = document.getElementById('g-prog');
   const syncBtn = document.getElementById('g-sync');
-  const sync = async () => {
-    if (syncBtn.disabled) return;
+  const idleTip = syncBtn.dataset.tip;
+  // 同步中：按钮变成“停止”，点了以后等当前这批（十几个站点）完成再停
+  let running = false, stop = false;
+  const setRunning = (on) => {
+    running = on; stop = false;
+    syncBtn.innerHTML = ic(on ? 'stop' : 'refresh', 17);
+    syncBtn.dataset.tip = on ? '停止同步' : idleTip;
+    syncBtn.setAttribute('aria-label', on ? '停止同步' : '立即同步');
+    syncBtn.classList.toggle('stopping', false);
+  };
+  // what：all = Google 和 Bing，google / bing = 只同步一个
+  const sync = async (what = 'all') => {
+    if (running) return;
     // 进度：已完成 / 总数 + 细进度条；列表在全部同步完后才刷新一次
     const say = (name, done, total, msg) => {
-      prog.querySelector('span').innerHTML = msg || `${name} 同步中 <b>${num(done)}</b> / ${num(total)}`;
+      if (!stop) prog.querySelector('span').innerHTML = msg || `${name} 同步中 <b>${num(done)}</b> / ${num(total)}`;
       prog.querySelector('i').style.width = `${total ? Math.min(100, (done / total) * 100) : 0}%`;
     };
     // Google 同步会把列表里所有站点（包括只在 Bing 的）都过一遍
     const gTotal = d.items.length, bTotal = d.items.filter((x) => x.bing).length;
-    say('Google', 0, gTotal);
+    const doG = what !== 'bing', doB = hasBing && what !== 'google';
+    const stopped = () => stop || token !== routeToken;
+    setRunning(true);
     prog.hidden = false;
     try {
-      await googleSyncAll(syncBtn, (r) => say('Google', Math.max(0, gTotal - r.left), gTotal));
+      if (doG) {
+        say('Google', 0, gTotal);
+        await googleSyncAll((r) => say('Google', Math.max(0, gTotal - r.left), gTotal), stopped);
+      }
       // 接了 Bing 的，接着同步 Bing（每次 20 个站点，直到同步完；被限流时停下，交给定时任务）
-      if (hasBing) {
+      if (doB && !stopped()) {
         say('Bing', 0, bTotal);
-        syncBtn.disabled = true; syncBtn.classList.add('busy');
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 10 && !stopped(); i++) {
           const r = await api('/bing/sync', { method: 'POST', body: {} });
           if (r.error) { toast(`Bing：${r.error}`, 'bad'); break; }
           say('Bing', Math.max(0, bTotal - r.left), bTotal);
           if (!r.left || !r.done) break;
         }
-        syncBtn.disabled = false; syncBtn.classList.remove('busy');
       }
-      toast('同步完成，列表已更新');
-      if (token === routeToken) renderSites(routeToken);
-    } catch (err) { toast(err.message, 'bad'); prog.hidden = true; syncBtn.disabled = false; syncBtn.classList.remove('busy'); }
+      const wasStopped = stop;
+      setRunning(false);
+      if (token !== routeToken) return;
+      toast(wasStopped ? '已停止同步。已同步的站点会保留，剩下的由定时任务每小时继续' : '同步完成，列表已更新', wasStopped ? 'warn' : 'ok');
+      renderSites(routeToken);
+    } catch (err) { toast(err.message, 'bad'); prog.hidden = true; setRunning(false); }
   };
-  syncBtn.onclick = () => sync();
+  // 点按钮：同步中 → 停止；接了 Bing → 先选同步哪个；否则直接同步
+  syncBtn.onclick = (e) => {
+    e.stopPropagation();
+    if (running) {
+      if (stop) return;
+      stop = true;
+      syncBtn.classList.add('stopping');
+      syncBtn.dataset.tip = '正在停止…';
+      prog.querySelector('span').innerHTML = '正在停止，等这一批同步完…';
+      return;
+    }
+    if (!hasBing) return sync('google');
+    if (document.querySelector('.menu')) return document.querySelector('.menu').remove();
+    const m = document.createElement('div');
+    m.className = 'menu'; m.setAttribute('role', 'menu');
+    m.innerHTML = `<div class="menu-h">立即同步</div>
+      <button role="menuitem" data-w="all">${ic('refresh', 16)}Google 和 Bing</button>
+      <button role="menuitem" data-w="google">${BRAND.google(16)}只同步 Google</button>
+      <button role="menuitem" data-w="bing">${BRAND.bing(16)}只同步 Bing</button>`;
+    const r = syncBtn.getBoundingClientRect();
+    m.style.top = r.bottom + 8 + 'px'; m.style.right = Math.max(8, innerWidth - r.right) + 'px';
+    document.body.appendChild(m);
+    syncBtn.setAttribute('aria-expanded', 'true');
+    m.querySelector('button').focus();
+    const close = () => { m.remove(); syncBtn.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', close); document.removeEventListener('keydown', onKey); };
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') { close(); syncBtn.focus(); }
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        const bs = [...m.querySelectorAll('button')], i = bs.indexOf(document.activeElement);
+        bs[(i + (ev.key === 'ArrowDown' ? 1 : -1) + bs.length) % bs.length].focus();
+      }
+    };
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+    m.onclick = (ev) => { const b = ev.target.closest('button'); if (b) { close(); sync(b.dataset.w); } };
+  };
   document.getElementById('g-csv').onclick = () => exportSitesCsv(lastRows, d);
   googleAcctPicker(document.getElementById('g-acct'), accts, d.items, draw);
   googleLinkFilter(document.getElementById('g-lf'), d.items, draw);
@@ -5458,6 +5514,11 @@ function idxFilter(d, f, reason) {
   const rows = (reason ? by.no.filter((r) => idxState(r) === reason) : by[f] || u).slice().sort((a, b) => rank(a) - rank(b) || a.url.localeCompare(b.url));
   return { by, rows };
 }
+// 已检查的进度和收录比例：这里只检查收集到的网址（每个站点最多几百个），和后台全站的数字口径不同，用比例对照
+function ixDone(yes, no, total, max, se, report) {
+  const done = yes + no;
+  return `<div class="hint ix-done" data-tipf-always data-tipf="${esc(`这里逐个检查从站点地图和搜索结果里收集到的网址（每个站点最多 ${num(max)} 个），已检查 ${num(done)} 个，其余的每小时陆续检查。\n${report}统计的是 ${se} 知道的全部网页，所以数量会和这里不同，可以用收录比例对照。`)}">已检查 ${num(done)} / ${num(total)}${done ? ` · 收录率 ${Math.round((yes / done) * 100)}%` : ''}${ic('help', 12)}</div>`;
+}
 function idxUrlsView(d, f, reason) {
   const g = d.google, bg = d.bing;
   if (!g && ['yes', 'no', 'bad', 'err'].includes(f)) f = 'all';
@@ -5478,6 +5539,7 @@ function idxUrlsView(d, f, reason) {
       <div class="ix-n"><div class="ix-k yes"><span>${ic('check', 13)}已收录</span><b>${num(bYes)}</b></div>
         <div class="ix-k no"><span>${ic('info', 13)}未收录</span><b>${num(bNo)}</b></div>
         ${bWait ? `<div class="ix-k wait"><span>${ic('history', 13)}待检查</span><b>${num(bWait)}</b></div>` : ''}</div>
+      ${ixDone(bYes, bNo, d.urls.length, d.maxUrls, 'Bing', 'Bing Webmaster 后台')}
       <button type="button" class="btn sm" id="ix-bsub" ${bCand && bg.quota !== 0 ? '' : 'disabled'} data-tipf-always data-tipf="${esc(bg.quota === 0 ? '今天的 Bing 提交配额已用完' : `提交 ${bCand} 个网址给 Bing（未收录或未检查，且 30 天内没提交过）${bg.quota != null ? `\n今天剩余配额 ${bg.quota}` : ''}`)}">${ic('send', 13)}提交到 Bing${bCand ? `<small>${num(bg.quota != null ? Math.min(bCand, bg.quota) : bCand)}</small>` : ''}</button>
       ${bg.issues ? `<div class="hint ix-err" data-tipf-always data-tipf="${esc(bg.issues)}">${ic('alert', 13)}<span class="ell">${esc(bg.issues)}</span></div>` : ''}
     </div>` : '';
@@ -5488,10 +5550,11 @@ function idxUrlsView(d, f, reason) {
       <div class="ix-k no"><span>${ic('info', 13)}未编入</span><b>${num(no)}</b>${reasons.length ? `<small>${reasons.length} 个原因</small>` : ''}</div>
       ${wait ? `<div class="ix-k wait"><span>${ic('history', 13)}待检查</span><b>${num(wait)}</b>${by.err.length ? `<small class="bad">${by.err.length} 个检查失败</small>` : ''}</div>` : ''}</div>
     <div class="ix-bar"><i class="yes" style="width:${(yes / tot) * 100}%"></i><i class="no" style="width:${(no / tot) * 100}%"></i></div>
+    ${ixDone(yes, no, d.urls.length, d.maxUrls, 'Google', 'Search Console 的“网页索引”报告')}
     ${d.issues ? `<div class="hint ix-err" data-tipf-always data-tipf="${esc(d.issues)}">${ic('alert', 13)}<span class="ell">${esc(d.issues)}</span></div>` : ''}
     </div>` : ''}
     ${bingBox}
-    <div class="hint">共 ${num(d.urls.length)} 个网址${d.urls.length >= d.maxUrls ? `（最多检查 ${num(d.maxUrls)} 个）` : ''}${last ? ` · 最近检查 ${ago(last)}` : ''}</div>
+    <div class="hint">共 ${num(d.urls.length)} 个网址<small class="ix-sub">${d.urls.length >= d.maxUrls ? `（最多检查 ${num(d.maxUrls)} 个）` : ''}${last ? ` · 最近检查 ${ago(last)}` : ''}</small></div>
     ${reasons.length ? `<div class="ix-rs"><div class="ix-rh"><span>未编入的原因</span><span>网页</span></div>${reasons.map(([k, c]) => `<button type="button" class="ix-r${reason === k ? ' on' : ''}${bad.has(k) ? ' bad' : ''}" data-ixr="${esc(k)}"><span class="ell">${esc(k)}</span><b>${num(c)}</b></button>`).join('')}</div>` : ''}
   </div>`;
   const shown = IDX_F.filter(([k]) => (k !== 'err' || by.err.length || f === 'err') && (g || !['yes', 'no', 'bad', 'err'].includes(k)) && (bg || k !== 'bno'));
