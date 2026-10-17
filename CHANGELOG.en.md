@@ -2,6 +2,23 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.2.0 · 2026-10-17
+
+Faster page indexing with numbers closer to Search Console, and a stoppable, selectable site sync.
+
+### New
+
+- **Page indexing: URLs with search impressions count as indexed**: URLs that appeared in Google search results in the last 28 days are no longer inspected one by one — only the rest are, so the first pass is much faster and saves quota
+- **Page indexing: site-wide numbers**: the Google card shows how many pages had search impressions in the last 3 months (a lower bound for "indexed"); the Bing card shows Bing's site-wide "in index" count, matching Bing Webmaster
+- **Page indexing: progress and indexed rate**: Google and Bing each show "x / 500 checked · indexed rate", with a note on how it differs from the site-wide numbers
+- **Site sync can be stopped**: while syncing, the refresh button becomes a stop button that stops after the current batch; with Bing connected you can sync Google and Bing, Google only or Bing only
+
+### Improved
+
+- Page indexing: due URLs are checked taking turns across sites, so every site gets some checks each hour; Google checks have their own, doubled time budget (about 200 per hour)
+- Page indexing: Google stats sit in a card with its logo and the quota next to the title; the sitemaps view gets a Google heading; the URL-count note uses smaller text
+- Site page: the Google search / GA4 cards no longer have a fixed height; the left card matches the right one
+
 ## v1.1.1 · 2026-10-17
 
 A batch of reliability, performance and UI fixes. Upgrading is recommended.
