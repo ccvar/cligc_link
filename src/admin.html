@@ -1156,6 +1156,10 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .hs-ks { display: flex; gap: 10px 32px; flex-wrap: wrap; }
 .hs-k { display: grid; gap: 1px; }
 .hs-k span { font-size: 12px; color: var(--muted); }
+.hs-l { display: inline-flex; align-items: center; gap: 4px; }
+.hs-l svg { flex: none; }
+.hs-h { display: grid; grid-template-columns: minmax(0, 1fr) 64px 52px 54px; gap: 10px; padding: 0 8px 3px; font-size: 11.5px; color: var(--muted); }
+.hs-h .hs-l { justify-content: flex-end; }
 .hs-k div { display: flex; align-items: baseline; gap: 6px; }
 .hs-k b { font-size: 18px; font-weight: 680; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .hs-k .gd { font-size: 11.5px; }
@@ -1502,6 +1506,8 @@ button.gtg { cursor: pointer; }
 }
 .gtag { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; margin-right: 5px; border-radius: 4px; font-size: 10.5px; font-weight: 650; vertical-align: 1px; }
 .gm { display: flex; align-items: center; gap: 5px; margin-top: 3px; white-space: nowrap; }
+/* 站点名下面那排图标 / 分组 / 状态放不下时换行，不把整张表撑出横向滚动 */
+.tbl.gl .gm { flex-wrap: wrap; row-gap: 2px; }
 .gm .gtag { flex: none; }
 .gico { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; cursor: default; }
 .gico:hover { background: var(--sunken); }
@@ -1714,6 +1720,22 @@ button.gtg { cursor: pointer; }
 .g-se .thumb { top: 2px; bottom: 2px; }
 @media (max-width: 600px) { .ov-title .g-se { margin-left: 0; } }
 .se-ic { display: inline-flex; flex: none; gap: 1px; margin-right: 5px; vertical-align: -2px; }
+.kc-src { display: inline-flex; align-items: center; gap: 5px; }
+.kc-src svg { flex: none; }
+.se-th { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; }
+.se-i { display: inline-flex; gap: 2px; font-style: normal; }
+/* 可以点着排序的表头 */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; transition: color .15s; }
+th.sortable:hover, th.sortable[aria-sort] { color: var(--text); }
+th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+.sl { display: inline-flex; align-items: center; }
+.sk { width: 10px; height: 10px; margin-left: 3px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .15s, transform .2s var(--ease-out); vertical-align: -1px; }
+th.sortable:hover .sk { opacity: .45; }
+th.sortable[aria-sort] .sk { opacity: 1; color: var(--accent); }
+th.sortable[aria-sort="ascending"] .sk { transform: rotate(180deg); }
+.se-i svg { flex: none; display: block; }
+/* 屏幕不够宽时，来源图标放到表头文字上面，不占列宽（站点表格列很多） */
+@media (max-width: 1440px) { .se-th { flex-direction: column; align-items: flex-end; gap: 2px; } }
 /* 标签放不下时省略，涨跌幅始终完整显示 */
 .kc-h .l { min-width: 0; }
 .kc-h .l .kl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -3481,19 +3503,23 @@ async function homeSitesCard(root, token, dataP) {
   const days = homeSitesDays();
   const S = (f) => d.items.reduce((a, x) => a + (f(x) || 0), 0);
   const ses = S((x) => x.cur.ga?.sessions), pses = S((x) => x.prev.ga?.sessions);
-  const clk = S((x) => x.cur.gsc?.clicks), pclk = S((x) => x.prev.gsc?.clicks);
-  const imp = S((x) => x.cur.gsc?.impressions), pimp = S((x) => x.prev.gsc?.impressions);
+  // 搜索点击 / 展示跟着“站点”页的 Google / Bing / 合计 选择（SE），和那边的数字一致
+  const clk = S((x) => SE(x)?.clicks), pclk = S((x) => SE(x, 'prev')?.clicks);
+  const imp = S((x) => SE(x)?.impressions), pimp = S((x) => SE(x, 'prev')?.impressions);
   const lk = S((x) => x.linksFrom.reduce((a, l) => a + l.human, 0)), plk = S((x) => x.linksFrom.reduce((a, l) => a + l.prevHuman, 0));
   const hasP = days !== 365;
   const top = d.items.filter((x) => x.cur.ga?.sessions).sort((a, b) => b.cur.ga.sessions - a.cur.ga.sessions).slice(0, 3);
   const label = G_RANGES.find(([v]) => v === days)?.[1] || '';
-  const kc = (l, v, dl) => `<div class="hs-k"><span>${l}</span><div><b>${num(v)}</b>${hasP ? dl : ''}</div></div>`;
+  // 每个指标前面带上数据来源的图标，鼠标移上去说明
+  const kc = (l, v, dl, icons, tip) => `<div class="hs-k"><span class="hs-l" data-tipf-always data-tipf="${esc(tip)}">${icons}${l}</span><div><b>${num(v)}</b>${hasP ? dl : ''}</div></div>`;
+  const seIc = gState.se === 'bing' ? BRAND.bing(12) : gState.se === 'all' ? BRAND.gsc(12) + BRAND.bing(12) : BRAND.gsc(12);
+  const seTip = `${gState.se === 'bing' ? '来自 Bing Webmaster' : gState.se === 'all' ? 'Google Search Console 和 Bing Webmaster 相加' : '来自 Google Search Console'}（跟着“站点”页的 Google / Bing / 合计 选择）`;
   const el = document.createElement('section');
   el.className = 'card rv home-sites';
   el.innerHTML = `<div class="card-h"><h3>站点</h3><span class="sub">${d.items.length} 个站点 · ${label}（截至 ${d.ranges.to}）</span><span class="sp"></span><a class="kc-a" href="#/sites">查看全部站点 →</a></div>
     <div class="hs-b">
-      <div class="hs-ks">${kc('会话', ses, gDelta(ses, pses))}${kc('搜索点击', clk, gDelta(clk, pclk))}${kc('搜索展示', imp, gDelta(imp, pimp))}${kc('短链点击', lk, gDelta(lk, plk))}</div>
-      <div class="hs-top">${top.map((x) => `<a class="hs-r" href="#/site/${encodeURIComponent(x.host)}"><span class="mono">${esc(x.host)}</span>
+      <div class="hs-ks">${kc('会话', ses, gDelta(ses, pses), BRAND.ga(12), '来自 Google Analytics 4，各站点相加')}${kc('搜索点击', clk, gDelta(clk, pclk), seIc, seTip)}${kc('搜索展示', imp, gDelta(imp, pimp), seIc, seTip)}${kc('短链点击', lk, gDelta(lk, plk), ic('link', 12), '从这些站点点出短链的真人点击（本系统记录）')}</div>
+      <div class="hs-top"><div class="hs-h"><span>会话最多的站点</span><span></span><span class="hs-l" data-tipf-always data-tipf="来自 Google Analytics 4">${BRAND.ga(11)}会话</span><span></span></div>${top.map((x) => `<a class="hs-r" href="#/site/${encodeURIComponent(x.host)}"><span class="mono">${esc(x.host)}</span>
         <span class="hs-sp">${kpiSpark(downsample(x.spark.map((p) => p.n)), 'var(--accent)')}</span><b>${num(x.cur.ga.sessions)}</b>${x.prev.ga ? gDelta(x.cur.ga.sessions, x.prev.ga.sessions) : '<span></span>'}</a>`).join('')}</div>
     </div>`;
   // 放在指标卡片下面（有占位就替换占位）
@@ -4925,7 +4951,9 @@ function openSplitDrawer(link, parent) {
 }
 
 // ---------------------------------------------------------------- 站点（GA4 + Search Console）
-const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), acct: '', link: '', tag: '', se: store.get('g:se', 'google') };
+const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), dir: store.get('g:dir', ''), acct: '', link: '', tag: '', se: store.get('g:se', 'google') };
+// 站点表格默认从小到大排的列（域名按字母、排名越小越好），其余默认从大到小
+const SORT_ASC = new Set(['host', 'pos']);
 // 站点列表搜索列的数据来源：google / bing / all（合计）；Bing 没有按天的平均排名，合计时排名只看 Google
 const SE_NAME = { google: 'Google', bing: 'Bing', all: '合计' };
 function SE(x, k = 'cur') {
@@ -4940,9 +4968,75 @@ function SE(x, k = 'cur') {
 }
 // 搜索数据来源切换：放在标题“站点 / 账号”后面
 const seSeg = () => `<div class="seg g-se" id="g-se" data-tipf-always data-tipf="搜索点击、展示、点击率、排名和收录几列的数据来源">${Object.entries(SE_NAME).map(([k, l]) => `<button data-e="${k}" class="${k === gState.se ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-// 汇总卡片标签前的来源图标：只有 Google 时不显示
-const seIcons = () => (gState.se === 'bing' ? `<span class="se-ic" data-tipf-always data-tipf="Bing">${BRAND.bing(12)}</span>`
-  : gState.se === 'all' ? `<span class="se-ic" data-tipf-always data-tipf="Google + Bing">${BRAND.gsc(12)}${BRAND.bing(12)}</span>` : '');
+// 站点表格搜索几列的表头：前面带上数据来源的图标（跟着顶部 Google / Bing / 合计切换），鼠标移上去说明
+// 排名：Bing 没有整站的平均排名，合计时只看 Google，Bing 时显示“—”
+function seTh(label, rank = false) {
+  const g = BRAND.gsc(12), b = BRAND.bing(12), se = gState.se;
+  const [icons, tip] = rank
+    ? (se === 'bing' ? [b, 'Bing 没有整站的平均排名'] : [g, se === 'all' ? '只看 Google：Bing 没有整站的平均排名' : '来自 Google Search Console（按展示加权的平均排名）'])
+    : (se === 'bing' ? [b, '来自 Bing Webmaster'] : se === 'all' ? [g + b, 'Google Search Console 和 Bing Webmaster 相加'] : [g, '来自 Google Search Console']);
+  return `<span class="se-th" data-tipf-always data-tipf="${esc(tip)}"><i class="se-i">${icons}</i><span class="sl">${label}${SORT_IC}</span></span>`;
+}
+// 表头的排序箭头：平时隐藏，鼠标移上去淡淡显示，当前排序列用主题色（倒序朝下、正序朝上）
+const SORT_IC = '<svg class="sk" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1.5v7M2.2 5.8 5 8.6l2.8-2.8"/></svg>';
+// 其他数据表（搜索词、页面、GA4 各标签、短链列表等）：点表头就在页面上按这一列排序，再点反过来。
+// 只给第一列（名称）和右对齐的数字列加；数字取单元格的 data-v，没有就取第一行文字里的数；“—”等没数的永远排最后
+{
+  const NUM = (td) => {
+    if (td.dataset.v !== undefined) return td.dataset.v === '' ? null : Number(td.dataset.v);
+    const m = /-?\d[\d,]*(\.\d+)?/.exec((td.innerText || td.textContent || '').split('\n')[0]);
+    return m ? Number(m[0].replace(/,/g, '')) : null;
+  };
+  const enhance = (t) => {
+    if (t._sortable || t.matches('.gl, .vt, .ix-t, .ix-sm, .nosort') || !t.tHead || !t.tBodies[0] || t.tBodies[0].rows.length < 2) return;
+    t._sortable = true;
+    [...t.tHead.rows[0].cells].forEach((th, i) => {
+      if (i && !th.classList.contains('r')) return;
+      th.classList.add('sortable'); th.tabIndex = 0; th.dataset.col = i;
+      if (!th.querySelector('.sk')) th.insertAdjacentHTML('beforeend', SORT_IC);
+    });
+  };
+  const sortBy = (th) => {
+    const t = th.closest('table'), i = Number(th.dataset.col), body = t.tBodies[0];
+    const asc = th.getAttribute('aria-sort') === 'descending' || (!th.hasAttribute('aria-sort') && i === 0);
+    t.tHead.querySelectorAll('th[aria-sort]').forEach((x) => x.removeAttribute('aria-sort'));
+    th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+    // 只排普通数据行（合计行、展开行等带 data-fixed 的不动）
+    const rows = [...body.rows].filter((r) => !r.hasAttribute('data-fixed') && r.cells.length > i);
+    const val = (r) => (i === 0 ? (r.cells[0].innerText || '').trim() : NUM(r.cells[i]));
+    rows.sort((a, b) => {
+      const va = val(a), vb = val(b);
+      if (va == null || va === '' || vb == null || vb === '') return (va == null || va === '') ? ((vb == null || vb === '') ? 0 : 1) : -1;
+      return (asc ? 1 : -1) * (i === 0 ? String(va).localeCompare(String(vb), 'zh-Hans-CN', { numeric: true }) : va - vb);
+    });
+    body.append(...rows);
+  };
+  document.addEventListener('click', (e) => { const th = e.target.closest('table.tbl th.sortable[data-col]'); if (th && !e.target.closest('a, button')) sortBy(th); });
+  document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('table.tbl th.sortable[data-col]')) { e.preventDefault(); sortBy(e.target); } });
+  new MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) {
+      if (n.nodeType !== 1) continue;
+      if (n.matches('table.tbl.gt')) enhance(n); else n.querySelectorAll?.('table.tbl.gt').forEach(enhance);
+    }
+  }).observe(document.getElementById('app'), { childList: true, subtree: true });
+}
+// “合计”时，鼠标移到搜索几列的数字上，分别显示 Google 和 Bing 的数（其他模式不加提示）
+function seSplit(x, metric) {
+  if (gState.se !== 'all') return '';
+  const g = x.cur?.gsc, b = x.cur?.bing;
+  const val = (d, isBing) => {
+    if (!d) return '没有关联';
+    if (metric === 'clicks') return num(d.clicks || 0);
+    if (metric === 'impressions') return num(d.impressions || 0);
+    if (metric === 'ctr') return d.impressions ? pct1((d.clicks || 0) / d.impressions) : '—';
+    return isBing ? '没有整站的平均排名' : d.position != null && d.impressions ? d.position.toFixed(1) : '—';
+  };
+  return ` data-tipf-always data-tipf="${esc(`Google ${val(g, false)}\nBing ${val(b, true)}`)}"`;
+}
+// 汇总卡片下面一行前的来源图标（Google 时也显示，和用户、会话卡片的 GA4 图标一致）
+const seIcons = () => (gState.se === 'bing' ? `<span class="se-ic" data-tipf-always data-tipf="来自 Bing Webmaster">${BRAND.bing(12)}</span>`
+  : gState.se === 'all' ? `<span class="se-ic" data-tipf-always data-tipf="Google Search Console 和 Bing Webmaster 相加">${BRAND.gsc(12)}${BRAND.bing(12)}</span>`
+  : `<span class="se-ic" data-tipf-always data-tipf="来自 Google Search Console">${BRAND.gsc(12)}</span>`);
 const seDay = (p) => (gState.se === 'bing' ? [p.bc || 0, p.bi || 0] : gState.se === 'all' ? [(p.c || 0) + (p.bc || 0), (p.i || 0) + (p.bi || 0)] : [p.c || 0, p.i || 0]);
 const pctD = (a, b) => (b ? (a - b) / b : null);
 const gDelta = (a, b, inverse = false) => {
@@ -5742,7 +5836,7 @@ async function renderSites(token) {
     <section class="card kstrip gs rv" id="g-sum"></section>
     <section class="card rv">
       <div class="lh"><div class="search">${ic('search')}<input class="input" id="g-q" placeholder="搜索域名或 GA4 名称" value="${esc(gState.q)}" aria-label="搜索站点"><button type="button" class="s-clear" id="g-qx" aria-label="清除搜索" ${gState.q ? '' : 'hidden'}>${ic('x', 14)}</button></div>${gRangeBar()}<div class="combo g-lf" id="g-lf"></div><div class="combo g-lf" id="g-tf"></div><span class="sp"></span>
-        <div class="seg" id="g-sort">${[['sessions', '按会话'], ['clicks', '按搜索点击'], ['growth', '按增长', '按用户比上一周期增加的人数排序'], ['host', '按域名']].map(([k, l, tip]) => `<button data-s="${k}" class="${k === gState.sort ? 'on' : ''}"${tip ? ` data-tip="${tip}"` : ''}>${l}</button>`).join('')}</div></div>
+        </div>
       <div id="g-list"></div>
       <div class="pager"><span><span id="g-cnt">${d.items.length} 个站点</span> · 统计到 ${d.ranges.to}（截至昨天；Search Console 数据通常延迟 2–3 天<span data-tipf-always data-tipf="Google 数据按 UTC 自然日统计，短链点击按后台时区（${tzLabelOf(TZ)}）的自然日统计，日期边界可能相差几个小时">；短链按本地日期</span>）${st.lastSync ? ` · 同步于 ${ago(st.lastSync)}` : ''}</span></div>
     </section>`;
@@ -5808,8 +5902,8 @@ async function renderSites(token) {
     document.getElementById('g-sum').innerHTML = [
       gKc('站点', num(rows.length), '', hasP ? `<span class="gup">↑ ${up}</span> 增长 · <span class="gdn">↓ ${down}</span> 下降 · ${active} 个有访问` : `${active} 个有访问`,
         `GA4 ${rows.filter((x) => x.ga4).length} 个 · Search Console ${rows.filter((x) => x.gsc).length} 个${hasBing ? ` · Bing ${rows.filter((x) => x.bing).length} 个` : ''}；色条为${byS ? '会话' : '搜索点击'}占比`, bar),
-      gKc('用户', num(usr), hasP ? gDelta(usr, pusr) : '', '各站点相加', '各站点的用户数直接相加，同一个人访问多个站点会重复计算；趋势为每天的用户数', kpiSpark(sUsr, 'var(--violet)')),
-      gKc('会话', num(ses), hasP ? gDelta(ses, pses) : '', `关键事件 ${num(kev)}`, sPrev ? '虚线为上一周期' : '', kpiSpark(sSes, 'var(--accent)', sPrev)),
+      gKc('用户', num(usr), hasP ? gDelta(usr, pusr) : '', `<span class="kc-src" data-tipf-always data-tipf="来自 Google Analytics 4：各站点的用户数直接相加，同一个人访问多个站点会重复计算；趋势为每天的用户数">${BRAND.ga(12)}${hasP ? `上一周期 ${num(pusr)}` : '各站点相加'}</span>`, '', kpiSpark(sUsr, 'var(--violet)')),
+      gKc('会话', num(ses), hasP ? gDelta(ses, pses) : '', `<span class="kc-src" data-tipf-always data-tipf="来自 Google Analytics 4，各站点相加；关键事件是在 GA4 里标记为转化的事件${sPrev ? '；趋势图的虚线为上一周期' : ''}">${BRAND.ga(12)}关键事件 ${num(kev)}</span>`, '', kpiSpark(sSes, 'var(--accent)', sPrev)),
       gKc('搜索点击', num(clk), hasP ? gDelta(clk, pclk) : '', `${seIcons()}${imp ? `点击率 ${pct1(clk / imp)}` : '暂无搜索数据'}`, '', kpiSpark(sClk, 'var(--teal)')),
       gKc('搜索展示', num(imp), hasP ? gDelta(imp, pimp) : '', `${seIcons()}${pos != null ? `${gState.se === 'all' ? 'Google ' : ''}平均排名 ${pos.toFixed(1)}${hasP && ppos != null ? ` ${gDelta(pos, ppos, true)}` : ''}` : imp ? '' : '暂无搜索数据'}`,
         gState.se === 'bing' ? 'Bing 的展示次数（Bing 没有按天的平均排名）' : gState.se === 'all' ? 'Google 和 Bing 的展示次数相加；平均排名只算 Google' : 'Search Console 的展示次数；平均排名按展示加权，数字越小越靠前', kpiSpark(sImp, 'var(--sky)')),
@@ -5827,17 +5921,33 @@ async function renderSites(token) {
       && (!gState.tag || (gState.tag === '+none' ? !x.tags.length : x.tags.includes(gState.tag)))
       && (!gState.link || (gState.link === 'any' ? x.linksFrom.length + x.links.length > 0
         : x.linksFrom.some((l) => String(l.id) === gState.link) || x.links.some((l) => String(l.id) === gState.link))));
-    // 按增长：用户比上一周期增加的人数（绝对值，避免小站点百分比虚高）；没有上一周期时按用户数
-    const growth = (x) => (x.users == null ? -Infinity : x.prevUsers == null ? x.users : x.users - x.prevUsers);
-    const key = (x) => (gState.sort === 'clicks' ? SE(x)?.clicks ?? -1 : gState.sort === 'host' ? 0 : gState.sort === 'growth' ? growth(x) : x.cur.ga?.sessions ?? -1);
-    rows.sort((a, b) => (gState.sort === 'host' ? a.host.localeCompare(b.host) : key(b) - key(a)));
-    // 占比：按搜索点击排序时看点击占比，否则看会话占比
-    const byClicks = gState.sort === 'clicks';
+    // 增长（“会话趋势”列）：用户比上一周期增加的人数（绝对值，避免小站点百分比虚高）；没有上一周期时按用户数
+    const growth = (x) => (x.users == null ? null : x.prevUsers == null ? x.users : x.users - x.prevUsers);
+    // 已编入 / 已收录：和表格里显示的数一致
+    const idxVal = (x) => (gState.se === 'bing' ? (!x.bing ? null : x.index?.bdone ? x.index.byes : x.bingInIndex || null) : !x.gsc || !x.index?.done ? null : x.index.yes);
+    // 占比：按搜索几列排序时看点击占比，否则看会话占比
+    const byClicks = ['clicks', 'impr', 'ctr', 'pos'].includes(gState.sort);
     const shareOf = (x) => (byClicks ? SE(x)?.clicks : x.cur.ga?.sessions) || 0;
+    const VAL = {
+      users: (x) => x.users, sessions: (x) => x.cur.ga?.sessions, share: shareOf, events: (x) => x.cur.ga?.keyEvents,
+      clicks: (x) => SE(x)?.clicks, impr: (x) => SE(x)?.impressions, ctr: (x) => (SE(x)?.impressions ? SE(x).ctr : null), pos: (x) => SE(x)?.position, idx: idxVal, growth,
+    };
+    const sk = VAL[gState.sort] || gState.sort === 'host' ? gState.sort : 'sessions';
+    const asc = (gState.dir || (SORT_ASC.has(sk) ? 'asc' : 'desc')) === 'asc';
+    // 没有数据的行（未关联、还没同步）不管正序倒序都排在最后
+    rows.sort((a, b) => {
+      if (sk === 'host') return (asc ? 1 : -1) * a.host.localeCompare(b.host);
+      const va = VAL[sk](a), vb = VAL[sk](b);
+      if (va == null || vb == null) return va == null ? (vb == null ? 0 : 1) : -1;
+      return asc ? va - vb : vb - va;
+    });
     const shareSum = rows.reduce((a, x) => a + shareOf(x), 0);
+    // 表头：可以点着排序，当前排序列带箭头
+    const sth = (k, inner, cls = 'r') => `<th class="${cls} sortable" data-sk="${k}" tabindex="0"${sk === k ? ` aria-sort="${asc ? 'ascending' : 'descending'}"` : ''}>${inner}</th>`;
+    const lab = (t) => `<span class="sl">${t}${SORT_IC}</span>`;
     list.innerHTML = rows.length ? `<div class="gl-wrap"><table class="tbl gl">
-      <thead><tr><th>站点</th><th class="r">用户</th><th class="r">会话</th><th>${byClicks ? '点击占比' : '会话占比'}</th><th class="r">关键事件</th><th class="r">搜索点击</th><th class="r">展示</th><th class="r">点击率</th><th class="r">排名</th>${gState.se === 'bing' ? '<th class="r" data-tipf-always data-tipf="站点地图和搜索结果里的网址中，已被 Bing 收录的数量；还没逐个检查时显示 Bing 抓取统计里的索引网页数">已收录</th>'
-        : `<th class="r" data-tipf-always data-tipf="${gState.se === 'all' ? '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量；下面一行是 Bing 已收录的数量' : '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量'}">已编入</th>`}<th>会话趋势</th></tr></thead>
+      <thead><tr>${sth('host', lab('站点'), '')}${sth('users', lab('用户'))}${sth('sessions', lab('会话'))}${sth('share', lab(byClicks ? '点击占比' : '会话占比'), '')}${sth('events', lab('关键事件'))}${sth('clicks', seTh('搜索点击'))}${sth('impr', seTh('展示'))}${sth('ctr', seTh('点击率'))}${sth('pos', seTh('排名', true))}${gState.se === 'bing' ? sth('idx', `<span class="se-th" data-tipf-always data-tipf="站点地图和搜索结果里的网址中，已被 Bing 收录的数量；还没逐个检查时显示 Bing 抓取统计里的索引网页数"><i class="se-i">${BRAND.bing(12)}</i>${lab('已收录')}</span>`)
+        : sth('idx', `<span class="se-th" data-tipf-always data-tipf="${gState.se === 'all' ? '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量；下面一行是 Bing 已收录的数量' : '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量'}"><i class="se-i">${BRAND.gsc(12)}${gState.se === 'all' ? BRAND.bing(12) : ''}</i>${lab('已编入')}</span>`)}${sth('growth', `<span class="sl" data-tipf-always data-tipf="按用户比上一周期增加的人数排序">会话趋势${SORT_IC}</span>`, '')}</tr></thead>
       <tbody>${rows.map((x) => {
         const ga = x.cur.ga, pg = x.prev.ga, sc = SE(x), ps = SE(x, 'prev');
         return `<tr data-host="${esc(x.host)}" tabindex="0">
@@ -5857,10 +5967,10 @@ async function renderSites(token) {
           <td class="num">${ga ? num(ga.sessions) : '—'}${ga && pg ? gDelta(ga.sessions, pg.sessions) : ''}</td>
           <td class="gsh-c">${shareSum && shareOf(x) ? `<div class="gsh"><i style="width:${(shareOf(x) / shareSum) * 100}%"></i></div><span>${pctText(shareOf(x) / shareSum)}</span>` : '<span class="sm">—</span>'}</td>
           <td class="num">${ga ? num(ga.keyEvents) : '—'}</td>
-          <td class="num">${sc ? num(sc.clicks) : '—'}${sc && ps ? gDelta(sc.clicks, ps.clicks) : ''}</td>
-          <td class="num">${sc ? num(sc.impressions) : '—'}</td>
-          <td class="num">${sc ? pct1(sc.ctr) : '—'}</td>
-          <td class="num">${sc?.position != null ? sc.position.toFixed(1) : '—'}${sc?.position != null && ps?.position != null ? gDelta(sc.position, ps.position, true) : ''}</td>
+          <td class="num"${seSplit(x, 'clicks')}>${sc ? num(sc.clicks) : '—'}${sc && ps ? gDelta(sc.clicks, ps.clicks) : ''}</td>
+          <td class="num"${seSplit(x, 'impressions')}>${sc ? num(sc.impressions) : '—'}</td>
+          <td class="num"${seSplit(x, 'ctr')}>${sc ? pct1(sc.ctr) : '—'}</td>
+          <td class="num"${seSplit(x, 'position')}>${sc?.position != null ? sc.position.toFixed(1) : '—'}${sc?.position != null && ps?.position != null ? gDelta(sc.position, ps.position, true) : ''}</td>
           <td class="num">${idxCell(x)}</td>
           <td class="gsp">${x.spark.length ? sparkOf(x) : ''}</td></tr>`;
       }).join('')}</tbody></table></div>`
@@ -5890,12 +6000,17 @@ async function renderSites(token) {
     }));
     setTimeout(() => segThumb(seEl), 0);
   }
-  const sortSeg = document.getElementById('g-sort');
-  segThumb(sortSeg);
-  sortSeg.querySelectorAll('button').forEach((b) => (b.onclick = () => {
-    gState.sort = b.dataset.s; store.set('g:sort', gState.sort);
-    sortSeg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); segThumb(sortSeg); draw();
-  }));
+  // 点表头排序：再点同一列反过来；记住上次的排序
+  list.addEventListener('click', (e) => {
+    const th = e.target.closest('th[data-sk]');
+    if (!th || e.target.closest('a, button')) return;
+    const k = th.dataset.sk;
+    gState.dir = gState.sort === k ? (gState.dir === 'asc' ? 'desc' : 'asc') : SORT_ASC.has(k) ? 'asc' : 'desc';
+    gState.sort = k; store.set('g:sort', k); store.set('g:dir', gState.dir);
+    draw();
+    list.querySelector(`th[data-sk="${k}"]`)?.focus({ preventScroll: true });
+  });
+  list.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('th[data-sk]')) { e.preventDefault(); e.target.click(); } });
   const prog = document.getElementById('g-prog');
   const syncBtn = document.getElementById('g-sync');
   const idleTip = syncBtn.dataset.tip;
