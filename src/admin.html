@@ -121,7 +121,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .nav a:hover svg.i { transform: translateX(1px); }
 .nav a.on { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(13,19,33,.06), 0 6px 16px -8px rgba(13,19,33,.12); }
 .nav a.on svg.i { color: var(--accent); }
-.nav a.on::after { content: ''; position: absolute; right: 14px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.nav a.on::before { content: ''; position: absolute; right: 14px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .side .foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
 .side .acct { display: none; }
 .menu { position: fixed; z-index: 60; min-width: 188px; padding: 6px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-3);
@@ -173,7 +173,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .shell.mini .collapse svg { transform: rotate(180deg); }
 .shell.mini .nav { margin-top: 28px; }
 .shell.mini .nav a, .shell.mini .foot .btn { width: 42px; padding: 0; justify-content: center; }
-.shell.mini .nav a.on::after { right: 5px; top: 7px; }
+.shell.mini .nav a.on::before { right: 5px; top: 7px; }
 
 @media (max-width: 900px) {
   .shell, .shell.mini { grid-template-columns: 1fr; }
@@ -189,7 +189,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
   .nav span { display: none !important; }
   .nav a, .shell.mini .nav a { width: 42px; padding: 0; justify-content: center; }
   .nav a.on, .shell.mini .nav a.on { background: none; box-shadow: none; color: var(--accent-ink); }
-  .nav a.on::after { display: block; top: auto; bottom: 2px; right: auto; left: 50%; width: 16px; height: 2.5px; border-radius: 2px; transform: translateX(-50%); }
+  .nav a.on::before { display: block; top: auto; bottom: 2px; right: auto; left: 50%; width: 16px; height: 2.5px; border-radius: 2px; transform: translateX(-50%); }
   .side, .shell.mini .side { transition: transform .35s var(--ease-out), box-shadow .3s; will-change: transform; }
   .side.hide { transform: translateY(-100%); }
   .side.stuck { box-shadow: 0 6px 20px -12px rgba(13,19,33,.18); }
@@ -542,6 +542,11 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .lck input { margin: 0; cursor: pointer; }
 .lrow.sel-r { background: var(--accent-2); }
 .lrow .su .gtg { margin-left: 2px; }
+/* 列表里名称后面的“新窗口打开”：平时浅色，悬停变成主题色 */
+.row-ext { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 4px; border-radius: 6px; color: color-mix(in srgb, var(--faint) 55%, transparent); flex: none; transition: color .15s, background .15s; }
+.row-ext:hover, .row-ext:focus-visible { color: var(--accent); background: var(--accent-2); outline: none; }
+tr:hover .row-ext, .lrow:hover .row-ext { color: var(--faint); }
+tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .lbulk { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 12px 12px; padding: 10px 14px;
   border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-3); font-size: 13px; animation: rise .2s var(--ease-out); }
 .lbulk[hidden] { display: none; }
@@ -1408,7 +1413,7 @@ button.gtg { cursor: pointer; }
 .tbl.gl th.r, .tbl.gt th.r { text-align: right; }
 .tbl.gl td.num, .tbl.gt td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tbl.gl tbody tr { cursor: pointer; }
-.tbl.gl .gh { font-weight: 600; font-family: var(--mono); font-size: 13px; }
+.tbl.gl .gh { display: flex; align-items: center; font-weight: 600; font-family: var(--mono); font-size: 13px; }
 .tbl.gl .gsp { width: 120px; } .tbl.gl .gsp svg { width: 110px; height: 28px; display: block; color: var(--accent); }
 .gtag { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; margin-right: 5px; border-radius: 4px; font-size: 10.5px; font-weight: 650; vertical-align: 1px; }
 .gm { display: flex; align-items: center; gap: 5px; margin-top: 3px; white-space: nowrap; }
@@ -3172,7 +3177,7 @@ async function renderLinks(token, opts = {}) {
     ${d.items.map((l) => `
     <div class="lrow ${listState.flash === l.id ? 'flash' : ''}${listState.sel.has(l.id) ? ' sel-r' : ''}" data-go="${l.id}" tabindex="0">
       <div class="c-main"><label class="lck" aria-label="选择 ${esc(l.slug)}"><input type="checkbox" data-sel="${l.id}" ${listState.sel.has(l.id) ? 'checked' : ''}></label><div style="min-width:0">
-        <div class="su">${esc(shortDisp(l.slug))}${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}${(l.tags || []).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}</div>
+        <div class="su">${esc(shortDisp(l.slug))}${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}<a class="row-ext" href="${esc(shortUrl(l.slug))}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 13)}</a>${(l.tags || []).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}</div>
         <div class="tg">${l.rules ? `<span class="rb has-pop" tabindex="0">${ic('route')}${l.rules} 条跳转规则${rulePop(l)}</span>` : ''}${l.arms ? `<span class="rb ab-rb" data-tipf-always data-tipf="${esc(`按比例分到 ${l.arms} 个额外版本（A/B 测试）`)}">${ic('split')}A/B</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
       </div></div>
       <div class="c-spark">${sparkline(l.spark)}</div>
@@ -5267,7 +5272,7 @@ async function renderSites(token) {
       <tbody>${rows.map((x) => {
         const ga = x.cur.ga, pg = x.prev.ga, sc = SE(x), ps = SE(x, 'prev');
         return `<tr data-host="${esc(x.host)}" tabindex="0">
-          <td><div class="gh">${esc(x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host)}</div>
+          <td><div class="gh">${esc(x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host)}${x.host.includes('.') ? `<a class="row-ext" href="https://${esc(x.host)}" target="_blank" rel="noopener" data-tip="打开网站" aria-label="打开网站">${ic('ext', 13)}</a>` : ''}</div>
             <div class="sm gm">${x.tags.length ? `${x.tags.slice(0, 2).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}${x.tags.length > 2 ? `<span class="gtg sm-t" data-tipf-always data-tipf="${esc(x.tags.join('、'))}">+${x.tags.length - 2}</span>` : ''}` : ''}${x.ga4
               ? `<span class="gico" data-tipf-always data-tipf="${esc(`Google Analytics 4：${x.ga4.account} / ${x.ga4.name}（${x.ga4.property}）${many ? ` · 来自 ${x.ga4.email}` : ''}`)}">${BRAND.ga(14)}</span>${sameName(x.ga4.name, x.host) ? '' : `<span class="gnm">${esc(x.ga4.name)}</span>`}`
               : `<span class="gico off" data-tipf-always data-tipf="未关联 Google Analytics 4">${BRAND.ga(14)}</span>`}${x.gsc
@@ -5297,7 +5302,8 @@ async function renderSites(token) {
     if (cnt) cnt.textContent = rows.length === d.items.length ? `${d.items.length} 个站点` : `${rows.length} / ${d.items.length} 个站点`;
     list.querySelectorAll('tr[data-host]').forEach((tr) => {
       const go = () => { location.hash = '#/site/' + encodeURIComponent(tr.dataset.host); };
-      tr.onclick = go; tr.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+      tr.onclick = (e) => { if (!e.target.closest('a')) go(); };
+      tr.onkeydown = (e) => { if (e.key === 'Enter' && e.target === tr) go(); };
     });
   };
   draw();
