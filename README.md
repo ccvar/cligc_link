@@ -379,18 +379,20 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 - 网页索引卡片用 `GetUrlInfo` 检查每个网址是否在 Bing 索引里（Bing 限流较严，每小时约检查 36 个，已收录的 30 天复查一次、未收录的 7 天），可以逐个或批量提交；“自动提交”默认开启，每天把未收录、30 天内没提交过的网址按配额提交。
 - AI 分析报告和每周 SEO 变化里也会带上 Bing 的数据。
 
-**Bing 提示“按 IP 限流”怎么办**：Bing 会按来源 IP 限流，Cloudflare Workers 的出口 IP 是很多网站共用的，常被拦下。在自己的服务器上加一条转发，然后在“设置 → Bing Webmaster”里填上代理地址（`https://你的域名/bing-随机字符/`），Bing 请求就会从那台机器发出。nginx 示例（Caddy 的写法在后台的“怎么搭代理”里）：
+**Bing 提示“按 IP 限流”怎么办**：Bing 会按来源 IP 限流，Cloudflare Workers 的出口 IP 是很多网站共用的，常被拦下。在自己的服务器上加一条转发，然后在“设置 → Bing Webmaster”里填上代理地址（`https://你的域名/bing-随机字符/`），Bing 请求就会从那台机器发出。准备一个域名指向这台服务器（托管在 Cloudflare 的话设成“仅 DNS”），放开 80 / 443 端口。Caddy 示例（会自动申请 https 证书；nginx 的写法和自测命令在后台的“怎么搭代理”里，路径里的随机字符也会自动生成）：
 
-```nginx
-location /bing-换成一串随机字符/ {
-    proxy_pass https://ssl.bing.com/webmaster/api.svc/json/;
-    proxy_set_header Host ssl.bing.com;
-    proxy_ssl_server_name on;
-    proxy_ssl_name ssl.bing.com;
+```caddy
+bing.example.com {
+    handle_path /bing-换成一串随机字符/* {
+        rewrite * /webmaster/api.svc/json{uri}
+        reverse_proxy https://ssl.bing.com {
+            header_up Host ssl.bing.com
+        }
+    }
 }
 ```
 
-代理地址必须是 https（API Key 在请求参数里），路径里放一串别人猜不到的随机字符。
+然后代理地址填 `https://bing.example.com/bing-那串字符/`。代理地址必须是 https（API Key 在请求参数里），路径里放一串别人猜不到的随机字符。
 
 ### AI 分析链接
 
