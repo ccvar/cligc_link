@@ -1,5 +1,6 @@
 // 升级时保留用户自己的 wrangler.toml 配置：从旧文件里取出 Worker 名称、域名、D1 数据库、[vars] 和邮件绑定，
 // 再填进新版本的 wrangler.toml 模板里（模板里的注释和新增的配置都保留）。
+// 另外保留 [assets] 的 run_worker_first（设置了 HOME_URL 时首页要先交给 Worker）。
 // 只认这几项；其他手改的内容不会保留，升级脚本会提示。
 
 const unq = (v) => v.replace(/^"|"$/g, '');
@@ -30,6 +31,8 @@ export function extractConfig(text) {
   for (const m of section(text, 'vars').matchAll(/^([A-Z0-9_]+)\s*=\s*(.+?)\s*$/gm)) out.vars[m[1]] = m[2];
   const se = /^\[\[send_email\]\]\s*\n\s*name\s*=\s*("[^"]*")/m.exec(text);
   if (se) out.sendEmail = unq(se[1]);
+  const rwf = /^run_worker_first\s*=.*$/m.exec(section(text, 'assets'));
+  if (rwf) out.runWorkerFirst = rwf[0].trim();
   return out;
 }
 
@@ -56,6 +59,11 @@ export function applyConfig(template, c) {
     } else if (/^\[vars\]\s*$/m.test(t)) {
       t = t.replace(/^\[vars\]\s*$/m, () => `[vars]\n${k} = ${v}`);
     }
+  }
+  // 首页跳转（HOME_URL）要由 Worker 处理：保留原来的 run_worker_first；旧版本没有 [assets] 时，填了 HOME_URL 就自动打开
+  const rwf = c.runWorkerFirst || (c.vars?.HOME_URL && c.vars.HOME_URL !== '""' ? 'run_worker_first = ["/"]' : '');
+  if (rwf && /^\[assets\]\s*$/m.test(t) && !/^run_worker_first\s*=/m.test(section(t, 'assets'))) {
+    t = /^# run_worker_first\s*=.*$/m.test(t) ? t.replace(/^# run_worker_first\s*=.*$/m, () => rwf) : t.replace(/^\[assets\]\s*$/m, (m0) => `${m0}\n${rwf}`);
   }
   if (c.databaseName) t = t.replace(/^database_name\s*=\s*"[^"]*"/m, () => `database_name = "${c.databaseName}"`);
   if (c.databaseId) t = t.replace(/^database_id\s*=\s*"[^"]*"/m, () => `database_id = "${c.databaseId}"`);

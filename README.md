@@ -110,7 +110,7 @@ npm run upgrade
 
 | 名称 | 说明 |
 | --- | --- |
-| `HOME_URL` | 访问根路径 `/` 时跳转到的地址；留空则显示内置的产品首页 |
+| `HOME_URL` | 访问根路径 `/` 时跳转到的地址；留空则显示内置的产品首页。填了的话还要去掉 `[assets]` 里 `run_worker_first` 前面的 `#`（首页平时是静态文件，不经过 Worker） |
 | `ADMIN_HOST` | 后台只允许通过这个域名访问；留空则任意域名的 `/admin` 都可访问 |
 | `TURNSTILE_SITEKEY` | Cloudflare Turnstile 站点密钥；留空则登录不做人机验证 |
 
@@ -465,13 +465,13 @@ src/google.js     Google 集成：OAuth、GA4 / Search Console 同步、站点�
 src/bing.js       Bing Webmaster：API Key / 代理、每日数据同步、搜索词与抓取统计、收录检查与提交
 src/gindex.js     网页索引：站点地图、Google 网址检查、Bing 收录检查与自动提交
 src/admin.html    管理后台（单文件，无构建步骤）
-src/home.html     根路径产品首页
+src/home.html     根路径产品首页（部署时生成静态文件到 public/，Cloudflare 直接返回，不占 Workers 请求额度）
 src/i18n/         英文界面：翻译脚本（client.js）和后台 / 首页的词典
 test/             node --test 测试
 schema.sql        数据库表结构（首次请求时自动执行）
 migrations/       旧版本数据库的升级脚本
 wrangler.toml     Cloudflare 配置模板
-scripts/          升级脚本（npm run upgrade）：拉取新版本并保留 wrangler.toml 里的个人配置
+scripts/          升级脚本（npm run upgrade）：拉取新版本并保留 wrangler.toml 里的个人配置；build-assets.mjs 生成静态首页
 .github/workflows/ 一键部署仓库用的“同步上游新版本”任务
 CHANGELOG.md      更新日志
 ```

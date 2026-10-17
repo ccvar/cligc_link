@@ -11,7 +11,7 @@ import * as google from './google.js';
 import * as gindex from './gindex.js';
 import * as bing from './bing.js';
 import { subreq } from './budget.js';
-import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt } from './lib.js';
+import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, backfillSourceUv, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
 // 后台页面的 ETag（按内容算 FNV-1a 哈希，同一个实例里只算一次）
@@ -43,7 +43,8 @@ function adminEtag(html) {
   return adminTag.v;
 }
 
-const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb']);
+// index、i18n 会和静态首页的文件路径冲突
+const RESERVED = new Set(['admin', 'api', 'favicon.ico', 'robots.txt', '_fb', 'index', 'index.html', 'i18n']);
 // 回退检测：访客浏览器内探测地区地址的超时时间
 const PROBE_TIMEOUT = 2500;
 const SLUG_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -83,10 +84,9 @@ export default {
       if (path === '/_fb' && request.method === 'POST') return await recordFallback(request, env);
       if (path === '/t.js') return await trackerScript(env, url);
       if (path.startsWith('/r/')) return await shareView(request, env, ctx, url);
-      if (path === '/robots.txt') {
-        // 短链不需要被收录；/r/ 是给 AI 读的分析报告，要允许 AI 工具抓取（报告本身带 noindex，不会被搜索引擎收录）
-        return new Response('User-agent: *\nAllow: /r/\nDisallow: /\n', { headers: { 'content-type': 'text/plain' } });
-      }
+      // 首页、robots.txt、首页翻译脚本平时由静态文件直接返回（public/，不经过 Worker）；
+      // 下面是没配置 [assets] 的旧 wrangler.toml，或设置了 HOME_URL、让 Worker 先处理首页时才会走到
+      if (path === '/robots.txt') return new Response(ROBOTS_TXT, { headers: { 'content-type': 'text/plain' } });
       if (path === '/' || path === '') {
         if (env.HOME_URL) return Response.redirect(env.HOME_URL, 302);
         return new Response(HOME_HTML.replaceAll('__YEAR__', String(new Date().getUTCFullYear())), {

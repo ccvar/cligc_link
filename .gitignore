@@ -4,3 +4,4 @@ node_modules
 .DS_Store
 # 个人线上配置（含域名、数据库 ID 等）
 wrangler.prod.toml
+public

@@ -47,3 +47,21 @@ test('单行 routes', () => {
   const c = extractConfig(tpl.replace('compatibility_date = "2026-07-01"', 'compatibility_date = "2026-07-01"\nroutes = [{ pattern = "a.com", custom_domain = true }]'));
   assert.equal(c.routes, 'routes = [{ pattern = "a.com", custom_domain = true }]');
 });
+
+test('首页跳转：填了 HOME_URL 的旧配置升级后自动让 Worker 先处理首页', () => {
+  // 旧版本的 wrangler.toml 没有 [assets]
+  const old = tpl.replace(/\n# 首页、robots\.txt[\s\S]*?# run_worker_first = \["\/"\]\n/, '\n').replace('HOME_URL = ""', 'HOME_URL = "https://mine.com"');
+  assert.doesNotMatch(old, /^\[assets\]/m);
+  const out = applyConfig(tpl, extractConfig(old));
+  assert.match(out, /^run_worker_first = \["\/"\]$/m);
+  assert.doesNotMatch(out, /^# run_worker_first/m);
+  // 没填 HOME_URL 的不打开
+  assert.doesNotMatch(applyConfig(tpl, extractConfig(tpl)), /^run_worker_first/m);
+});
+
+test('首页跳转：自己打开的 run_worker_first 升级后保留', () => {
+  const mine = tpl.replace('# run_worker_first = ["/"]', 'run_worker_first = ["/", "/about"]');
+  const c = extractConfig(mine);
+  assert.equal(c.runWorkerFirst, 'run_worker_first = ["/", "/about"]');
+  assert.match(applyConfig(tpl, c), /^run_worker_first = \["\/", "\/about"\]$/m);
+});

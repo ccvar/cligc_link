@@ -110,7 +110,7 @@ It fetches the latest release, keeps your Worker name, routes, D1 database and `
 
 | Name | Description |
 | --- | --- |
-| `HOME_URL` | Where `/` redirects to; leave empty to show the built-in home page |
+| `HOME_URL` | Where `/` redirects to; leave empty to show the built-in home page. If you set it, also uncomment `run_worker_first` under `[assets]` (the home page is normally a static file that skips the Worker) |
 | `ADMIN_HOST` | Only allow the admin on this hostname; leave empty to allow `/admin` on any hostname |
 | `TURNSTILE_SITEKEY` | Cloudflare Turnstile site key; leave empty to skip the bot check at sign-in |
 
@@ -467,13 +467,13 @@ src/google.js     Google integration: OAuth, GA4 / Search Console sync, site–l
 src/bing.js       Bing Webmaster: API key / proxy, daily data sync, queries and crawl stats, index checks and submission
 src/gindex.js     Page indexing: sitemaps, Google URL inspection, Bing index checks and auto-submission
 src/admin.html    Admin (single file, no build step)
-src/home.html     Home page served at /
+src/home.html     Home page served at / (built into public/ as a static file on deploy; Cloudflare serves it directly, without using Workers requests)
 src/i18n/         English UI: the translation script (client.js) and dictionaries for the admin / home page
 test/             node --test tests
 schema.sql        Database schema (applied automatically on the first request)
 migrations/       Upgrade scripts for older databases
 wrangler.toml     Cloudflare configuration template
-scripts/          Upgrade script (npm run upgrade): fetches a new release and keeps your wrangler.toml settings
+scripts/          Upgrade script (npm run upgrade): fetches a new release and keeps your wrangler.toml settings; build-assets.mjs builds the static home page
 .github/workflows/ "Sync upstream" workflow for repositories created by the deploy button
 CHANGELOG.md      Changelog
 ```

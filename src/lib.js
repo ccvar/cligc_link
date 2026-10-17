@@ -1,6 +1,10 @@
 // 不依赖 Workers 运行环境的纯逻辑：访客识别、24 小时统计的计数工具、Cloudflare 用量预测。
 // 单独放一个文件，方便 node --test 直接测试（见 test/）。
 
+// robots.txt：短链不需要被收录；/r/ 是给 AI 读的分析报告，要允许 AI 工具抓取（报告本身带 noindex，不会被搜索引擎收录）
+// 静态首页（scripts/build-assets.mjs）和 Worker 都用这一份
+export const ROBOTS_TXT = 'User-agent: *\nAllow: /r/\nDisallow: /\n';
+
 // ---------------------------------------------------------------- 访客类型：真人 / 爬虫 / 可疑
 
 // 云服务商 / 机房的运营商名称。Cloudflare、Akamai 不算：iCloud 私密中继、WARP 的真人用户也走它们

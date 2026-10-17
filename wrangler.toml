@@ -7,6 +7,16 @@ compatibility_date = "2026-07-01"
 #   { pattern = "go.example.com", custom_domain = true },
 # ]
 
+# 首页、robots.txt 等静态文件：部署时由 scripts/build-assets.mjs 生成到 public/，Cloudflare 直接返回，
+# 不经过 Worker、不占 Workers 请求额度（首页被恶意刷也不影响短链）
+[build]
+command = "node scripts/build-assets.mjs"
+
+[assets]
+directory = "public"
+# 设置了下面的 HOME_URL（首页跳转到别的网址）时，去掉下一行的 #，让首页先交给 Worker 处理
+# run_worker_first = ["/"]
+
 # 定时任务：每小时整点检查一次，到了后台“通知”里设定的时间就发送统计报告
 [triggers]
 crons = ["0 * * * *"]
@@ -16,7 +26,7 @@ crons = ["0 * * * *"]
 # name = "EMAIL"
 
 [vars]
-# 访问根路径 / 时跳转到的地址；留空则显示内置的产品首页
+# 访问根路径 / 时跳转到的地址；留空则显示内置的产品首页（填了的话还要打开上面 [assets] 里的 run_worker_first）
 HOME_URL = ""
 # 后台只允许通过这个域名访问；留空则任何域名的 /admin 都可访问
 ADMIN_HOST = ""
