@@ -2,6 +2,51 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.4.0 · 2026-10-17
+
+Short-link QR codes, opening apps, and a large batch of fixes from a full review. **Fixes fresh deployments since v1.1.1 failing to create tables, which made the admin and every link return errors** — please upgrade if you deployed with the button or the CLI.
+
+### New
+
+- **QR codes**: the link page shows the QR code at the top right, and each row in the link list has a QR button; download it as SVG (vector, for print) or a 1024 px PNG
+- **Open apps**: destinations can be app links (`tg://`, `weixin://`, `snssdk1128://`…) and Android `intent://`. Visits try to open the app first and fall back to a website (the link's "Website if the app can't open", or the default destination); inside WeChat, QQ, Weibo, Douyin and similar apps visitors are asked to open the link in a browser; iOS visitors are told to tap "Open"; crawlers and link previews go straight to the website
+- **Destination type**: the default destination and redirect rules have a "Website / App" switch; App mode adds "Pick a common app" with brand icons and search (Chinese or English names), templates for major Chinese and international apps and app stores, and a custom scheme option for anything not listed
+
+### Fixed
+
+- Fresh deployments ran the schema in the wrong order, rolled back the whole batch and returned 500 everywhere (since v1.1.1); a new test runs the whole schema on an empty database
+- The deploy button prefilled local development example secrets (admin password `change-me` and always-passing Turnstile test keys) as production secrets; deployments still using `change-me` are asked to change it after signing in
+- Configuring only the Turnstile server secret locked you out of the admin
+- Backfilling human visits on upgrade, deleting links and bulk deletes read rows in proportion to the number of links, which could use up a day's read quota at once
+- The overview failed to load once you had 100 links (over D1's 100 parameters per statement); bulk actions on many links likewise
+- Single-link stats and visit lists read data for the whole site, so reads grew with total traffic
+- A wrong two-step code bounced you back to the password step; failed copies still said "Copied"; drawers and dialogs stayed on screen after navigating or when the session expired
+- Login brute-force protection counted full IPs, so IPv6 attackers could rotate addresses (IPv6 now counts per /64)
+- Malformed percent-encoding in a short-link path returns 404 instead of "temporarily unavailable"
+
+### Improved
+
+- **Usage**: retention cleanup runs in batches (up to 500 per hour on the free plan, more on paid) and the admin estimates how long it will take; daily / weekly / monthly reports scan visits two fewer times; rate-limited AI analysis links no longer write on every request; `/favicon.ico` skips the database; visit counts over 10,000 show as "10,000+"; source tracking recommends the full code, which uses no Workers requests
+- **Security**: anti-framing, `nosniff` and related headers on the admin and API; write endpoints only accept same-origin JSON requests; app links reject `javascript:`, Windows / Office system schemes and misspelled `http`
+- **Getting started**:
+  - Opening the admin on `*.workers.dev` warns that it's usually blocked in mainland China, and the README explains adding a custom domain in the dashboard
+  - New "Locked out of the admin" section (forgotten password, lockout, lost phone)
+  - Bilingual pages for expired / missing links and errors, including when the D1 quota resets
+  - Changing a slug asks for confirmation; "Copy short link" is now "Duplicate"
+  - Corrected `wrangler.toml` comments, the Google authorization note and the README's free-tier section
+- **UI**:
+  - Help text contrast is now at least 4.5:1; dark-mode hovers and overlays are visible
+  - Squeezed, clipped or horizontally scrolling layouts at medium and phone widths are fixed (link list, site table, query tables, page indexing…); lists gained an "open in new tab" icon
+  - Clicking outside the link editor no longer discards unsaved changes; Tab stays inside dialogs and focus returns to the button that opened them
+  - Paging through visits no longer redraws the whole page; overview cards load together instead of pushing content down
+  - The home page demos pause when scrolled away, two misalignments are fixed, and the language switch is a dropdown
+
+### Upgrade notes
+
+- New columns, tables and indexes are added automatically on the first request after upgrading
+- Write endpoints now require `content-type: application/json` and a same-origin request; add the header if you call the admin API from your own scripts
+- Button deployments whose admin password is still `change-me` are asked to change it after signing in
+
 ## v1.3.1 · 2026-10-17
 
 More anti-abuse and usage savings, plus a few UI details.
