@@ -1,6 +1,8 @@
 // ---------------------------------------------------------------- 站点地图 + 网页索引（Google Search Console + Bing Webmaster）
 // Google 没有开放“网页索引”报告的接口，这里用 URL Inspection API 逐个检查网址，自己汇总出已编入 / 未编入和原因。
 // 网址来源：站点地图里的网址（会读取站点地图文件，支持索引文件和 .gz），加上最近 28 天在搜索结果里出现过的页面。
+// 最近 28 天在搜索结果里有展示的网址一定已编入：直接记为已编入、不逐个检查（省配额），只查剩下的；
+// 另外记下近 3 个月有展示的网页数，作为站点级“至少已编入”的数字（Google 没有开放“网页索引”报告的总数）。
 // 每个站点最多检查 MAX_URLS 个网址；已编入的 7 天复查一次，其余 3 天一次。
 // 配额：每个资源每天 2000 次、每分钟 600 次，这里每天最多用 QUOTA 次；定时任务每次最多查 RUN_LIMIT 个。
 // Bing：同一份网址清单用 GetUrlInfo 检查是否收录（逐个查，每小时约 36 个；已收录的 30 天复查，未收录的 7 天），没收录的按每天的提交配额自动提交（可在设置里关掉）。
@@ -14,6 +16,8 @@ const DAY = 86400000, HOUR = 3600000;
 // 定时任务每次：刷新 SITEMAP_PER_RUN 个站点的站点地图（约 100 秒），再用 G_BUDGET 检查最多 RUN_LIMIT 个 Google 网址（两者各算各的时间）
 const MAX_URLS = 500, QUOTA = 1800, RUN_LIMIT = 400, SITEMAP_PER_RUN = 8, CONCURRENCY = 8, G_BUDGET = 240000;
 // Bing 的 GetUrlInfo 限流很严（实测约每分钟 10 次），只能逐个、间隔 B_GAP 查；定时任务每次给它 B_BUDGET
+// 搜索数据每次最多取 SC_ROWS 行（接口上限）；有展示的网址记成这个状态（以 Indexed 开头，算已编入）
+const SC_ROWS = 25000, SEEN_STATE = 'Indexed, seen in search results';
 const B_RUN_LIMIT = 40, B_GAP = 6500, B_BUDGET = 240000, B_AUTO_MAX = 100, NEVER = 9e15;
 const ymd = (t) => new Date(t).toISOString().slice(0, 10);
 const API = 'https://www.googleapis.com/webmasters/v3/sites/';
@@ -163,15 +167,15 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
   }
   const sm = paths.length ? await sitemapUrls(paths, prop(s)) : { urls: [], errors: [] };
   if (sm.errors.length) errs.push(`读取站点地图失败：${sm.errors.slice(0, 2).join('；')}`);
-  // 最近 28 天在 Google 搜索结果里出现过的页面
-  let pages = [];
+  // 在 Google 搜索结果里有展示的页面：近 28 天的补进网址清单（按点击排前 MAX_URLS 个），并直接记为已编入；
+  // 近 3 个月的网页数存起来，作为站点级“至少已编入”的数字
+  let pages = [], seen = new Set(), scPages = null;
   if (hasG(s)) {
-    try {
-      const d = await gfetch(env, secret, s.gsc_acct, `${API}${encodeURIComponent(s.gsc_site)}/searchAnalytics/query`, {
-        startDate: ymd(now - 29 * DAY), endDate: ymd(now - DAY), dimensions: ['page'], rowLimit: MAX_URLS, dataState: 'all',
-      });
-      pages = (d.rows || []).map((r) => r.keys[0]).filter((u) => inProperty(u, s.gsc_site));
-    } catch (e) { if (e.budget) throw e; errs.push(`搜索页面：${e.message}`); }
+    const q = async (days) => (await gfetch(env, secret, s.gsc_acct, `${API}${encodeURIComponent(s.gsc_site)}/searchAnalytics/query`, {
+      startDate: ymd(now - (days + 1) * DAY), endDate: ymd(now - DAY), dimensions: ['page'], rowLimit: SC_ROWS, dataState: 'all',
+    })).rows?.map((r) => r.keys[0]).filter((u) => inProperty(u, s.gsc_site)) || [];
+    try { const p = await q(28); seen = new Set(p); pages = p.slice(0, MAX_URLS); } catch (e) { if (e.budget) throw e; errs.push(`搜索页面：${e.message}`); }
+    try { scPages = (await q(90)).length; } catch (e) { if (e.budget) throw e; }
   }
 
   // 合并：站点地图优先，总数不超过 MAX_URLS
@@ -181,7 +185,7 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
     if (want.size >= MAX_URLS) break;
     if (!want.has(u)) want.set(u, (inSm.has(u) ? 1 : 0) | (inSc.has(u) ? 2 : 0));
   }
-  const have = new Map((await env.DB.prepare('SELECT url, src FROM g_urls WHERE host = ?').bind(s.host).all()).results.map((r) => [r.url, r.src]));
+  const have = new Map((await env.DB.prepare('SELECT url, src, state, verdict, due_at FROM g_urls WHERE host = ?').bind(s.host).all()).results.map((r) => [r.url, r]));
   const stmts = [];
   // 拿不到网址、又有出错或说不准的时候不删旧数据（免得一次接口抖动就丢掉收录状态和提交记录）
   const reliable = want.size > 0 || (!errs.length && !unsure);
@@ -189,9 +193,26 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
   const gOn = hasG(s) ? 1 : 0, bOn = s.bing_site ? 1 : 0;
   const gDue = gOn ? 0 : NEVER, bDue = bOn ? 0 : NEVER;
   let changed = 0;
+  // 有搜索展示的网址：7 天后（加点随机）再看；每天刷新时还在展示就继续往后推，一直不用逐个检查
+  const later = () => now + 7 * DAY + Math.floor(Math.random() * 12 * HOUR);
   for (const [u, src] of want) {
-    if (!have.has(u)) { stmts.push(env.DB.prepare('INSERT INTO g_urls (host, url, src, due_at, b_due_at) VALUES (?, ?, ?, ?, ?)').bind(s.host, u, src, gDue, bDue)); changed++; }
-    else if (have.get(u) !== src) stmts.push(env.DB.prepare('UPDATE g_urls SET src = ? WHERE host = ? AND url = ?').bind(src, s.host, u));
+    const r = have.get(u), hit = gOn && seen.has(u);
+    if (!r) {
+      stmts.push(hit
+        ? env.DB.prepare("INSERT INTO g_urls (host, url, src, state, verdict, checked_at, due_at, b_due_at) VALUES (?, ?, ?, ?, 'PASS', ?, ?, ?)").bind(s.host, u, src, SEEN_STATE, now, later(), bDue)
+        : env.DB.prepare('INSERT INTO g_urls (host, url, src, due_at, b_due_at) VALUES (?, ?, ?, ?, ?)').bind(s.host, u, src, gDue, bDue));
+      changed++;
+      continue;
+    }
+    if (r.src !== src) stmts.push(env.DB.prepare('UPDATE g_urls SET src = ? WHERE host = ? AND url = ?').bind(src, s.host, u));
+    if (!hit) continue;
+    // 还没有结果（没查过或查失败）：直接记为已编入；已经查出已编入、快到复查时间的：往后推。查出未编入的不动，以检查结果为准
+    if (!r.state) {
+      stmts.push(env.DB.prepare("UPDATE g_urls SET state = ?, verdict = 'PASS', error = '', checked_at = ?, due_at = ? WHERE host = ? AND url = ?").bind(SEEN_STATE, now, later(), s.host, u));
+      changed++;
+    } else if (isIndexed(r) && r.due_at < now + DAY) {
+      stmts.push(env.DB.prepare('UPDATE g_urls SET due_at = ? WHERE host = ? AND url = ?').bind(later(), s.host, u));
+    }
   }
   if (reliable) for (const u of have.keys()) if (!want.has(u)) { stmts.push(env.DB.prepare('DELETE FROM g_urls WHERE host = ? AND url = ?').bind(s.host, u)); changed++; }
   // 关联状态变了才调整已有网址的排期（平时不用整站扫一遍）
@@ -206,6 +227,8 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
   stmts.push(env.DB.prepare(
     `UPDATE g_sitemaps SET list = ?, urls = ?, error = ?, at = ?, b_feeds = ?, b_error = ?, g_on = ?, b_on = ? WHERE host = ?`
   ).bind(JSON.stringify(list), sm.urls.length, errs.join('；'), now, JSON.stringify(bf), berr, gOn, bOn, s.host));
+  // 取失败时保留上次的数字；sc_at 总是更新，免得每次定时任务都来重试
+  if (gOn) stmts.push(env.DB.prepare('UPDATE g_sitemaps SET sc_pages = COALESCE(?, sc_pages), sc_at = ? WHERE host = ?').bind(scPages, now, s.host));
   // 网址有增删时才整站重新计数；平时检查结果用增量更新
   if (changed || !old) stmts.push(recountStmt(env, s.host));
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
@@ -376,7 +399,9 @@ export async function cronBatch(env, secret, { budgetMs = 100000, inspectBudget 
   const bkey = await bingKey(env, secret);
   const stale = (await env.DB.prepare(
     `SELECT s.host FROM g_sites s LEFT JOIN g_sitemaps m ON m.host = s.host
-     WHERE ((s.gsc_site != '' AND s.gsc_acct != '') OR s.bing_site != '') AND COALESCE(m.at, 0) < ? ORDER BY COALESCE(m.at, 0) LIMIT ?`
+     WHERE ((s.gsc_site != '' AND s.gsc_acct != '') OR s.bing_site != '')
+       AND (COALESCE(m.at, 0) < ? OR (s.gsc_site != '' AND s.gsc_acct != '' AND COALESCE(m.sc_at, 0) = 0))
+     ORDER BY COALESCE(m.at, 0) LIMIT ?`
   ).bind(Date.now() - DAY, SITEMAP_PER_RUN).all()).results;
   let refreshed = 0;
   for (const { host } of stale) {
@@ -411,6 +436,7 @@ export async function siteIndex(env, secret, host) {
     host, google: hasG(s), site: s.gsc_site || '', email: email || '', canSubmit: hasG(s) ? await canSubmit(env, secret, s.gsc_acct) : false,
     sitemaps: m ? JSON.parse(m.list || '[]') : [], sitemapUrls: m?.urls || 0, refreshedAt: m?.at || 0, issues: m?.error || '',
     quota: m?.q_day === today() ? m.q_n : 0, quotaMax: QUOTA, maxUrls: MAX_URLS,
+    scPages: hasG(s) && m?.sc_pages >= 0 ? m.sc_pages : null, scRows: SC_ROWS,
     bing: s.bing_site ? {
       site: s.bing_site, feeds: JSON.parse(m?.b_feeds || '[]'), issues: m?.b_error || '', auto: await bing.bingAuto(env),
       quota: m && m.b_quota >= 0 && ymd(m.b_quota_at) === today() ? m.b_quota : null,

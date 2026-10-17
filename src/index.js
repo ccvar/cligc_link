@@ -272,7 +272,7 @@ async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}
 // 每个 Worker 实例只执行一次；表已存在时 CREATE ... IF NOT EXISTS 不会有影响
 // 数据库版本：表结构（schema.sql 的内容）或下面 migrate() 里的补列有变化时才真正执行，平时每个实例只读一行设置。
 // 改了 migrate() 里的补列逻辑时把 MIGRATE_REV 加一
-const MIGRATE_REV = 2;
+const MIGRATE_REV = 3;
 const hashStr = (t) => { let h = 2166136261; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619); return (h >>> 0).toString(36); };
 const SCHEMA_VER = `${hashStr(SCHEMA_SQL)}-${MIGRATE_REV}`;
 let schemaReady = null;
@@ -327,7 +327,8 @@ async function migrate(env) {
   if (!dcols.includes('channels')) await env.DB.prepare('ALTER TABLE g_daily ADD COLUMN channels TEXT').run();
   for (const c of ['b_clicks', 'b_impressions']) if (!dcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_daily ADD COLUMN ${c} INTEGER`).run();
   const scols = (await env.DB.prepare('PRAGMA table_info(g_sitemaps)').all()).results.map((c) => c.name);
-  for (const c of ['g_on', 'b_on']) if (!scols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sitemaps ADD COLUMN ${c} INTEGER NOT NULL DEFAULT -1`).run();
+  for (const c of ['g_on', 'b_on', 'sc_pages']) if (!scols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sitemaps ADD COLUMN ${c} INTEGER NOT NULL DEFAULT -1`).run();
+  if (!scols.includes('sc_at')) await env.DB.prepare('ALTER TABLE g_sitemaps ADD COLUMN sc_at INTEGER NOT NULL DEFAULT 0').run();
   for (const [c, def] of [['kind', "TEXT NOT NULL DEFAULT ''"], ['reason', "TEXT NOT NULL DEFAULT ''"],
     ['asn', 'INTEGER NOT NULL DEFAULT 0'], ['tls', "TEXT NOT NULL DEFAULT ''"], ['http', "TEXT NOT NULL DEFAULT ''"],
     ['proxy', 'INTEGER NOT NULL DEFAULT 0']]) {

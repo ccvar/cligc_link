@@ -199,7 +199,9 @@ CREATE TABLE IF NOT EXISTS g_sitemaps (
   b_quota  INTEGER NOT NULL DEFAULT -1,     -- Bing 今天剩余的提交配额（-1 = 未知）
   b_quota_at INTEGER NOT NULL DEFAULT 0,
   g_on     INTEGER NOT NULL DEFAULT -1,     -- 上次刷新时是否关联了 GSC / Bing（变了才调整网址的检查排期）
-  b_on     INTEGER NOT NULL DEFAULT -1
+  b_on     INTEGER NOT NULL DEFAULT -1,
+  sc_pages INTEGER NOT NULL DEFAULT -1,     -- 近 3 个月在 Google 搜索结果里有展示的网页数（-1 = 还没取到）
+  sc_at    INTEGER NOT NULL DEFAULT 0       -- 上次取这个数的时间
 );
 CREATE TABLE IF NOT EXISTS g_cache (
   k   TEXT PRIMARY KEY,

@@ -5484,6 +5484,7 @@ const IDX_STATE = {
   'blocked due to other 4xx issue': '由于出现其他 4xx 问题而被屏蔽',
   'blocked by page removal tool': '被网页移除工具屏蔽',
   'url is unknown to google': 'Google 尚未发现此网址',
+  'indexed, seen in search results': '已编入索引（有搜索展示）',
 };
 const idxState = (r) => {
   if (!r.checkedAt) return '待检查';
@@ -5553,6 +5554,7 @@ function idxUrlsView(d, f, reason) {
       ${wait ? `<div class="ix-k wait"><span>${ic('history', 13)}待检查</span><b>${num(wait)}</b>${by.err.length ? `<small class="bad">${by.err.length} 个检查失败</small>` : ''}</div>` : ''}</div>
     <div class="ix-bar"><i class="yes" style="width:${(yes / tot) * 100}%"></i><i class="no" style="width:${(no / tot) * 100}%"></i></div>
     ${ixDone(yes, no, d.urls.length, d.maxUrls, 'Google', 'Search Console 的“网页索引”报告')}
+    ${d.scPages != null ? `<div class="hint ix-done" data-tipf-always data-tipf="最近 3 个月在 Google 搜索结果里出现过的网页数（每天更新，有 2～3 天延迟）。出现过就一定被编入过，所以已编入的至少有这么多；编入了但从没出现在搜索结果里的不算在内，所以会比 Search Console 的“已编入”少一些。\n近 28 天有展示的网址直接记为已编入，不再逐个检查">近 3 个月有搜索展示 <b class="ix-all">${num(d.scPages)}${d.scPages >= d.scRows ? '+' : ''}</b> 个网页${ic('help', 12)}</div>` : ''}
     ${d.issues ? `<div class="hint ix-err" data-tipf-always data-tipf="${esc(d.issues)}">${ic('alert', 13)}<span class="ell">${esc(d.issues)}</span></div>` : ''}
     </div>` : ''}
     ${bingBox}
