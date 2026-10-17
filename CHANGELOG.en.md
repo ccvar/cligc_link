@@ -2,6 +2,21 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.3.1 · 2026-10-17
+
+More anti-abuse and usage savings, plus a few UI details.
+
+### Improved
+
+- Hammering a short link from many IPs no longer amplifies database reads: a "link + IP + time" index was added, and once one IP hits the limit it's stopped in Worker memory without touching the database, with rapid-repeat counts written in batches
+- The tracking script (`/t.js`) no longer queries the database on every load; the on/off setting is cached for a minute
+- An "open in new tab" icon after the domain in the site list and after the title in the link list
+
+### Fixed
+
+- A fallback report (`/_fb`) signature could be resubmitted repeatedly to inflate the fallback count
+- With the sidebar collapsed, hovering the current menu item merged the tooltip and the selection dot into a blue blob
+
 ## v1.3.0 · 2026-10-17
 
 Anti-abuse: hammering a short link no longer floods the database, and hammering the home page no longer uses Workers requests. Short-link counts now show human visits.
