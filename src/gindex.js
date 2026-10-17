@@ -11,7 +11,8 @@ import * as bing from './bing.js';
 import { spend } from './budget.js';
 
 const DAY = 86400000, HOUR = 3600000;
-const MAX_URLS = 500, QUOTA = 1800, RUN_LIMIT = 200, SITEMAP_PER_RUN = 8, CONCURRENCY = 8;
+// 定时任务每次：刷新 SITEMAP_PER_RUN 个站点的站点地图（约 100 秒），再用 G_BUDGET 检查最多 RUN_LIMIT 个 Google 网址（两者各算各的时间）
+const MAX_URLS = 500, QUOTA = 1800, RUN_LIMIT = 400, SITEMAP_PER_RUN = 8, CONCURRENCY = 8, G_BUDGET = 120000;
 // Bing 的 GetUrlInfo 限流很严（实测约每分钟 10 次），只能逐个、间隔 B_GAP 查；定时任务每次给它 B_BUDGET
 const B_RUN_LIMIT = 40, B_GAP = 6500, B_BUDGET = 240000, B_AUTO_MAX = 100, NEVER = 9e15;
 const ymd = (t) => new Date(t).toISOString().slice(0, 10);
@@ -362,7 +363,7 @@ const idxSites = async (env, host) => new Map((await env.DB.prepare(
 const bingKey = async (env, secret) => (await bing.bingCreds(env, secret)) || null;
 
 // 刷新几个站点的站点地图，再检查一批到期的网址（Google 和 Bing 各一批）
-export async function cronBatch(env, secret, { budgetMs = 100000, bingBudget = B_BUDGET, autoSubmit = true } = {}) {
+export async function cronBatch(env, secret, { budgetMs = 100000, inspectBudget = G_BUDGET, bingBudget = B_BUDGET, autoSubmit = true } = {}) {
   const deadline = Date.now() + budgetMs, margin = Math.min(40000, budgetMs / 2);
   const sites = await idxSites(env);
   if (!sites.size) return { skipped: true };
@@ -379,7 +380,8 @@ export async function cronBatch(env, secret, { budgetMs = 100000, bingBudget = B
   // 只取还关联着 GSC / Bing 的站点的网址（解除关联的不占队列）
   const due = (await env.DB.prepare(`SELECT ${ROW_COLS} FROM g_urls u JOIN g_sites s ON s.host = u.host
     WHERE u.due_at <= ? AND s.gsc_site != '' AND s.gsc_acct != '' ORDER BY u.due_at LIMIT ?`).bind(Date.now(), RUN_LIMIT).all()).results;
-  const g = due.length ? await inspectRows(env, secret, sites, due, deadline) : { done: 0, failed: 0 };
+  // 网址检查有自己的时间预算，不被前面刷新站点地图用掉（之前共用时每小时只查得到几十个）
+  const g = due.length ? await inspectRows(env, secret, sites, due, Date.now() + inspectBudget) : { done: 0, failed: 0 };
   let b = { done: 0, failed: 0 };
   if (bkey) {
     const bdue = (await env.DB.prepare(`SELECT ${ROW_COLS} FROM g_urls u JOIN g_sites s ON s.host = u.host

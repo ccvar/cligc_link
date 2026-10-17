@@ -279,6 +279,13 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .g3 { display: grid; gap: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 1180px) { .g-main { grid-template-columns: 1fr; } .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g3 > :last-child { grid-column: 1 / -1; } }
 @media (max-width: 960px) { .grid2, .g3 { grid-template-columns: 1fr; } .g3 > :last-child { grid-column: auto; } }
+/* .grid2.fit：左边卡片的高度跟着右边——左边不参与撑高这一排（height: 0），再拉伸到整排的高度；内容多时在卡片里滚动。
+   只在两列并排时生效（单列时各自按内容高度） */
+@media (min-width: 961px) {
+  .grid2.fit > .card:first-child { height: 0; min-height: 100%; display: flex; flex-direction: column; }
+  .grid2.fit > .card:first-child > .card-b { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .grid2.fit > .card:first-child > .card-b > .g-scr { flex: 1; min-height: 120px; max-height: none; }
+}
 
 /* KPI */
 .kpis { display: grid; gap: 20px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -5665,7 +5672,7 @@ function bingCardsHtml(d) {
     ${issues.length ? `<h4 class="bk-h">抓取问题 <small>${issues.length}</small></h4><div class="g-scr bk-iss"><table class="tbl gt"><thead><tr><th>网址</th><th>问题</th><th class="r">HTTP</th></tr></thead>
       <tbody>${issues.map((x) => `<tr><td><div class="ell" data-tipf="${esc(x.url)}">${esc(pg(x.url))}</div></td><td><div class="ell">${esc(bits(x.issues))}</div></td><td class="num">${x.code || '—'}</td></tr>`).join('')}</tbody></table></div>` : ''}`
     : `<div class="empty">${ic('inbox')}${b ? '该时间段内暂无抓取数据' : '暂时无法读取 Bing 数据'}</div>`;
-  return `<div class="grid2">
+  return `<div class="grid2 fit">
     ${tabCard('b-sc', `${BRAND.bing(15)}Bing 搜索`, [
       { label: '搜索词', get html() { return bingQueryView(b, store.get('b:qf', 'all')); } },
       { label: '页面', html: pages },
@@ -5774,7 +5781,7 @@ async function renderSite(token, host) {
         <section class="card rv"><div class="card-h"><h3>${d.bingSite ? '搜索趋势' : '搜索趋势 · Search Console'}</h3><span class="sp"></span><div class="legend" id="lg-sc"></div></div>
           <div class="card-b">${d.gsc || d.bingSite ? '<div class="chart sm" id="ch-sc"></div>' : `<div class="empty">${ic('inbox')}未关联 Search Console</div>`}</div></section>
       </div>
-      <div class="grid2">
+      <div class="grid2${d.gsc && d.ga4 ? ' fit' : ''}">
         ${d.gsc ? tabCard('g-sc', 'Google 搜索', [
           { label: '搜索词', get html() { return queryView(d.sc, store.get('g:qf', 'all')); } },
           { label: '页面', html: gt(d.sc?.pages?.map((r) => ({ ...r, k: r.k.replace(/^https?:\/\/[^/]+/, '') || '/' })), scCols('页面')) },

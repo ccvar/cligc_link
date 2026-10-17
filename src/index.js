@@ -252,7 +252,7 @@ async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}
   await step('gindex', async () => {
     const gsec = await sessionSecret(env);
     if (!(await google.googleConfigured(env, gsec)) && !(await bing.bingCreds(env, gsec))) return { skipped: true };
-    return await gindex.cronBatch(env, gsec, manual ? { budgetMs: 25000, bingBudget: 10000, autoSubmit: false } : {});
+    return await gindex.cronBatch(env, gsec, manual ? { budgetMs: 15000, inspectBudget: 15000, bingBudget: 10000, autoSubmit: false } : {});
   });
   await step('health', () => runHealthChecks(env));
   await step('update', () => checkUpdate(env, false, { notify: !manual }));
