@@ -51,6 +51,8 @@
 
 Click **Deploy to Cloudflare** above and follow the prompts; the Worker and D1 database are created for you. Then open `https://<your worker>/admin`, sign in with the default password **`admin`**, and set a new password when asked.
 
+> The default address is `*.workers.dev`, which is **usually blocked in mainland China**. If your visitors are there, [use your own domain](#use-your-own-domain) first; copied short links and QR codes then use it.
+
 ### Option 2: command line
 
 You need Node.js 18+ and a Cloudflare account.
@@ -85,6 +87,8 @@ routes = [
 ```
 
 Then run `npx wrangler deploy` again.
+
+Deployed with the button? In the Cloudflare dashboard open **Workers & Pages → your Worker → Settings → Domains & Routes → Add → Custom domain** and enter the domain (it must also be on Cloudflare). Then open the admin on the new domain so copied short links and QR codes use it.
 
 ## Upgrading
 
@@ -126,16 +130,20 @@ It fetches the latest release, keeps your Worker name, routes, D1 database and `
 
 Without `SESSION_SECRET`, the session secret is generated and stored in the database. It also encrypts the Google tokens, client secret and Cloudflare token in the database, so a database leak would expose them. Store **the same value** as a Wrangler Secret — sign-ins and connected Google accounts keep working:
 
+Run these in the project directory (`<database name>` is `database_name` in `wrangler.toml`, `cligc-link` by default):
+
 ```bash
 # 1. Read the secret from the database and pipe it straight into a Secret (never shown on screen)
-npx wrangler d1 execute <database name> -c wrangler.prod.toml --remote --json \
+npx wrangler d1 execute <database name> --remote --json \
   --command "SELECT value FROM settings WHERE key = 'session_secret'" \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['results'][0]['value'], end='')" \
-  | npx wrangler secret put SESSION_SECRET -c wrangler.prod.toml
+  | node -e "let s='';process.stdin.on('data',(d)=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s)[0].results[0].value))" \
+  | npx wrangler secret put SESSION_SECRET
 
 # 2. After confirming the admin still works, delete the copy in the database
-npx wrangler d1 execute <database name> -c wrangler.prod.toml --remote --command "DELETE FROM settings WHERE key = 'session_secret'"
+npx wrangler d1 execute <database name> --remote --command "DELETE FROM settings WHERE key = 'session_secret'"
 ```
+
+Deployed with the one-click button and have no local project? In the Cloudflare dashboard open **Storage & Databases → D1 → your database → Console**, run `SELECT value FROM settings WHERE key = 'session_secret'` and copy the result; then open **Workers & Pages → your Worker → Settings → Variables and Secrets → Add**, choose type "Secret", name it `SESSION_SECRET`, paste the value and deploy. Once the admin still works, go back to the D1 console and run `DELETE FROM settings WHERE key = 'session_secret'`.
 
 Note: if you switch to a **new** secret instead, every device is signed out, and you need to re-enter the Google client / Cloudflare token and reconnect Google accounts.
 
@@ -143,19 +151,15 @@ Note: if you switch to a **new** secret instead, every device is signed out, and
 
 - Priority: password changed in the admin > `ADMIN_PASSWORD` > default password `admin`.
 - Change it anytime under "Settings → Change password"; the new password is stored in D1 as a salted PBKDF2 hash, and other devices are signed out.
-- If you forget it, delete the stored password to fall back to `ADMIN_PASSWORD` (or the default `admin` if unset, which must then be changed after signing in):
-
-  ```bash
-  npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key = 'admin_password'"
-  ```
+- If you forget it, delete the stored password to fall back to `ADMIN_PASSWORD` (or the default `admin` if unset, which must then be changed after signing in) — see [Locked out of the admin](#locked-out-of-the-admin).
 
 ### Brute-force protection
 
-- 5 wrong passwords in a row from the same IP locks it out, starting at 15 minutes and doubling each time up to 24 hours; a successful sign-in resets it.
+- 5 wrong passwords in a row from the same IP locks it out, starting at 15 minutes and doubling each time up to 24 hours; a successful sign-in resets it. IPv6 addresses are counted per /64 (a single server usually has a whole /64, so switching addresses doesn't reset the count).
 - Passwords are stored as salted PBKDF2 hashes (100,000 iterations), and each wrong attempt is delayed by 0.8 s.
 - With Turnstile set up, the bot check runs before the password is checked, so scripts can't try passwords in bulk.
 - With two-step verification on, a leaked password isn't enough to sign in; 5 wrong codes in a row locks for 15 minutes.
-- If you lock yourself out, wait, or run `npx wrangler d1 execute cligc-link --remote --command "DELETE FROM login_guard"` to unlock right away.
+- If you lock yourself out, wait, or unlock right away as described in [Locked out of the admin](#locked-out-of-the-admin).
 
 ### Signed-in devices
 
@@ -175,11 +179,27 @@ Turn it on under "Settings → Two-step verification": enter your current passwo
 
 - 5 wrong codes in a row locks for 15 minutes; each code can only be used once.
 - Turning two-step verification on or off signs out other devices.
-- If you lose your phone, run this in your Cloudflare account to turn it off, then sign in with the password and set it up again:
+- If you lose your phone, turn it off as described in [Locked out of the admin](#locked-out-of-the-admin), then sign in with the password and set it up again.
 
-  ```bash
-  npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key IN ('totp', 'mfa_fail')"
-  ```
+### Locked out of the admin
+
+Forgot the password, got locked out, or lost your phone? Run one SQL statement against the database, either way:
+
+- **Cloudflare dashboard** (no command line needed, works for one-click deploys too): open **Storage & Databases → D1 → your database → Console** and run the SQL from the table below.
+- **Command line** (in the project directory): `npx wrangler d1 execute <database name> --remote --command "<SQL>"`. `<database name>` is `database_name` in `wrangler.toml` (`cligc-link` by default; if you renamed it on the one-click deploy page, use your name).
+
+| Situation | SQL | Then |
+| --- | --- | --- |
+| Forgot the password | `DELETE FROM settings WHERE key = 'admin_password'` | Sign in with `ADMIN_PASSWORD` (or `admin` if unset) and set a new password |
+| Locked out after too many wrong passwords | `DELETE FROM login_guard` | You can sign in again right away |
+| Locked out after too many wrong codes | `DELETE FROM settings WHERE key = 'mfa_fail'` | You can enter a code again right away (it also unlocks by itself after 15 minutes) |
+| Lost your phone, no codes | `DELETE FROM settings WHERE key IN ('totp', 'mfa_fail')` | Two-step verification is off; sign in with the password and set it up again |
+
+For example, a forgotten password from the command line:
+
+```bash
+npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key = 'admin_password'"
+```
 
 ### Notifications (daily / weekly / monthly / weekly SEO changes / usage alerts / target alerts)
 
@@ -296,7 +316,9 @@ Also, for privacy, browsers only send the referring site's domain (e.g. `www.zhi
 
 ### Search source tracking (optional)
 
-When visitors reach your landing page from a search engine and then click a short link on it, the link only sees "from the landing page". Turn it on under "Settings → Source tracking" and put the snippet on the landing page; it detects which search engine (Google, Bing, Baidu, Sogou, 360, Shenma…) or ad click (`gclid` / `msclkid`) the visitor came from and adds `utm_source` to links pointing to your short link domain:
+When visitors reach your landing page from a search engine and then click a short link on it, the link only sees "from the landing page". Turn it on under "Settings → Source tracking" and paste the **full code** from the admin into the landing page (recommended: it runs in the visitor's browser and uses no Workers requests); it detects which search engine (Google, Bing, Baidu, Sogou, 360, Shenma…) or ad click (`gclid` / `msclkid`) the visitor came from and adds `utm_source` to links pointing to your short link domain:
+
+You can instead add a one-line script tag, which picks up rule changes without re-pasting, but every new visitor loading it uses one Workers request (shared with short-link redirects in the free plan's 100k/day), so prefer the full code on busy pages:
 
 ```html
 <script src="https://go.example.com/t.js" async></script>
@@ -305,7 +327,7 @@ When visitors reach your landing page from a search engine and then click a shor
 - Only links to the short link domain are touched; existing `src` and `utm_source` are left alone.
 - The visitor's first source is remembered (sessionStorage), so it's kept even after browsing a few pages.
 - See it under "Sources · utm_source" on the link page; for links without `src`, `utm_source` also counts directly as the "source".
-- You can also copy the full code from the admin and paste it into the page. Turning the switch off disables `/t.js`; full code already pasted into pages is unaffected.
+- Turning the switch off disables `/t.js` (copies already cached in visitors' browsers last until the cache expires); full code already pasted into pages is unaffected.
 - Search engines no longer pass search keywords, so you'll know which engine, but not the query.
 
 ### Human / bot detection
@@ -351,7 +373,7 @@ Every visit records a row. Stats pages (ranges of 7 days or more) read hourly / 
 
 - Aggregate tables: `agg_h` (visits per hour), `agg_d` (visits per day by dimension: source, country, city, device, browser, OS, rule hits, visitor type…), `agg_uv` (unique visitors per day, estimated with HyperLogLog, ~5% error).
 - Aggregation runs incrementally on stats requests and in the hourly job, with nothing to do by hand; when visitor-type rules change, aggregates are rebuilt from the retained visits.
-- Under "Settings → Data retention", keep visits for 60 / 90 / 180 / 365 days or forever (the default). Expired visits are cleaned up hourly; trends, sources, regions and other stats read aggregates and are unaffected. The visit list, CSV export and reports only include retained visits.
+- Under "Settings → Data retention", keep visits for 60 / 90 / 180 / 365 days or forever (the default). Expired visits are cleaned up hourly in batches: at most 500 per run on the free plan (about 12,000 a day), or up to 20,000 per run when "Cloudflare usage" is set to (or detects) the paid plan. Each deleted visit takes about 4 row writes (the table plus 3 indexes), so while clearing a backlog the free plan uses up to about 48,000 row writes a day — roughly half the free quota; how many days a backlog takes depends on its size and your daily traffic, and the admin shows an estimate. On a free plan with several thousand visits a day or more, check the write headroom under "Settings → Cloudflare usage" before turning it on; trends, sources, regions and other stats read aggregates and are unaffected. The visit list, CSV export and reports only include retained visits.
 
 ### Sites: GA4 and Search Console
 
@@ -362,7 +384,7 @@ The "Page indexing" card on a site page lists sitemaps (status, errors, last rea
 Setup (each deployment needs its own OAuth client):
 
 1. In the [Google Cloud console](https://console.cloud.google.com/), create a project and enable the **Google Analytics Admin API**, **Google Analytics Data API** and **Google Search Console API**.
-2. "OAuth consent screen": user type "External", fill in the app name and email, then click **Publish app**. Unpublished (testing) apps lose authorization after 7 days; personal use doesn't need Google review — when you see "This app isn't verified", click "Continue".
+2. "OAuth consent screen": user type "External", fill in the app name and email, then click **Publish app**. Unpublished (testing) apps lose authorization after 7 days; personal use doesn't need Google review — when you see "Google hasn't verified this app", click "Continue"; if there's no "Continue" button, click "Advanced", then the "Go to … (unsafe)" link below it — it's your own app, so it's safe to continue.
 3. "Credentials → Create credentials → OAuth client ID", type **Web application**, authorized redirect URI `https://<your domain>/api/google/callback`.
 4. In the admin, open "Settings → Google integration", enter the client ID and secret and save (the secret is stored encrypted in D1 and only the last 4 characters are shown afterwards).
 5. On the "Sites" page, click "Connect a Google account" to authorize.
@@ -451,11 +473,11 @@ Uses Node's built-in test runner (no extra dependencies), covering visitor class
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars   # change the local password if you like
+cp .dev.vars.example .dev.vars   # remove the leading # on the lines you need
 npm run dev                      # http://localhost:8787/admin
 ```
 
-Local development uses Cloudflare's Turnstile test keys, which always pass.
+Locally, Turnstile is off and the password is `admin` by default. To try Turnstile locally, uncomment both `TURNSTILE_SITEKEY` and `TURNSTILE_SECRET` in `.dev.vars` (Cloudflare's test keys, which always pass).
 
 ## Project structure
 
@@ -480,7 +502,11 @@ CHANGELOG.md      Changelog
 
 ## Free tier
 
-Only Workers and D1 are used. Cloudflare's free plan includes 100,000 Worker requests a day, 5 million D1 rows read / 100,000 rows written a day and 5 GB of storage — usually more than enough for individuals and small teams. Each redirect writes one visit record.
+Only Workers and D1 are used. Cloudflare's free plan includes 100,000 Worker requests a day, 5 million D1 rows read / 100,000 rows written a day and 5 GB of storage — usually more than enough for individuals and small teams.
+
+What usually runs out first is **D1 writes**: each visit writes one visit record, and D1 also counts a row for each of its 3 indexes and the autoincrement counter; together with the link's visit counter and the hourly aggregates, **a visit takes about 10 rows written on average** (more with many links and scattered traffic). So the free plan records roughly several thousand to 10,000 visits a day in full. **Past the day's read or write quota, D1 rejects every query for the rest of the day: links show a "temporarily unavailable" page and the admin can't load** until the quota resets at 00:00 UTC. "Settings → Cloudflare usage" shows usage; turn on usage alerts on the "Notifications" page to be warned before it runs out. For more traffic, the Workers Paid plan ($5/month, 50 million rows written a month included) is recommended.
+
+Also note that deleting a link deletes all its visit records too, about 4 row writes each: deleting tens of thousands of visit records at once can use up the day's write quota and stop every link for the rest of the day. To just stop it redirecting, disable it instead.
 
 ## License
 

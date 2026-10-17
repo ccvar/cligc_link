@@ -1,6 +1,7 @@
-# 本地开发用的变量，复制为 .dev.vars 后使用（.dev.vars 不会提交到仓库）
-# 不设置 ADMIN_PASSWORD 时默认密码为 admin，首次登录需修改
-ADMIN_PASSWORD=change-me
-# Cloudflare 官方提供的 Turnstile 测试密钥，验证总会通过
-TURNSTILE_SITEKEY=1x00000000000000000000AA
-TURNSTILE_SECRET=1x0000000000000000000000000000000AA
+# 本地开发用：复制为 .dev.vars，再按需去掉行首的 #（.dev.vars 不会提交到仓库）
+# 注意：Deploy to Cloudflare 按钮会把这个文件里没注释的条目当成线上密钥预填，所以这里全部保持注释
+# 不设置 ADMIN_PASSWORD 时默认密码为 admin，首次登录会要求修改
+# ADMIN_PASSWORD=change-me
+# Cloudflare 官方提供的 Turnstile 测试密钥（验证总会通过，只能在本地用）
+# TURNSTILE_SITEKEY=1x00000000000000000000AA
+# TURNSTILE_SECRET=1x0000000000000000000000000000000AA

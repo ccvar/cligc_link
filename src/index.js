@@ -11,8 +11,8 @@ import * as google from './google.js';
 import * as gindex from './gindex.js';
 import * as bing from './bing.js';
 import { subreq } from './budget.js';
-import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT } from './lib.js';
-import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, backfillSourceUv, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
+import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT, normalizeTarget, isAppUrl, isWebUrl, inAppBrowser, intentWithFallback, guardKey, isDbError } from './lib.js';
+import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAggStmts, pruneClicks, backfillSourceUv, prunePerRun, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
 // 后台页面的 ETag（按内容算 FNV-1a 哈希，同一个实例里只算一次）
 // 英文界面：词典 + 翻译脚本，按需加载（中文界面不下载）
@@ -28,9 +28,14 @@ function i18nScript(name) {
   }
   return I18N_JS[name];
 }
+// 翻译脚本的版本号（内容哈希）：后台页面引用时带上 ?v=版本号
+const i18nVer = (name) => i18nScript(name).etag.replace(/\W/g, '');
 function i18nResponse(request, name) {
   const { body, etag } = i18nScript(name);
-  const headers = { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache', etag };
+  // 带着和当前内容一致的 ?v= 来请求的，内容不会再变（换了内容版本号也跟着变），让浏览器长期缓存，
+  // 打开英文后台时不用每次先回源确认一遍才能继续解析页面；不带或版本号对不上的（旧页面），照旧每次确认
+  const immutable = new URL(request.url).searchParams.get('v') === i18nVer(name);
+  const headers = { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache', etag };
   if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers });
   return new Response(body, { headers });
 }
@@ -51,6 +56,7 @@ const SLUG_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const SESSION_TTL = 7 * 24 * 3600 * 1000;
 // 未设置任何密码时使用的默认密码；用它登录后必须先修改密码才能使用后台
 const DEFAULT_PASSWORD = 'admin';
+const WEAK_PASSWORDS = new Set([DEFAULT_PASSWORD, 'change-me']);
 const MIN_PASSWORD_LENGTH = 8;
 // 两步验证：连续输错 MFA_MAX_FAILS 次后锁定 MFA_LOCK_MS
 const MFA_MAX_FAILS = 5;
@@ -61,26 +67,16 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
+    const adminPath = path === '/admin' || path === '/admin/' || path.startsWith('/api/');
 
     try {
       // 首页和 robots.txt 不需要数据库，其余请求先确保表已创建
       if (path === '/i18n/home.en.js') return i18nResponse(request, 'home');
       if (path === '/admin/i18n.en.js') return i18nResponse(request, 'admin');
+      // 没有 /favicon.ico 这个文件：直接回 404 并让浏览器缓存一天，不查数据库，也不用每个页面都多跑一次 Worker
+      if (path === '/favicon.ico') return new Response(null, { status: 404, headers: { 'cache-control': 'public, max-age=86400' } });
       if (path !== '/' && path !== '' && path !== '/robots.txt') await ensureSchema(env);
-      if (path === '/admin' || path === '/admin/' || path.startsWith('/api/')) {
-        if (env.ADMIN_HOST && url.hostname !== env.ADMIN_HOST) return notFound();
-        // Google 授权回调：会话 Cookie 是 SameSite=Strict，从 Google 跳回时浏览器不会带上，
-        // 所以不走登录校验，改由签名的 state（只有已登录的后台才能生成，10 分钟有效）保护
-        if (path === '/api/google/callback') return await googleCallback(env, url);
-        if (path.startsWith('/api/')) return await handleApi(request, env, url);
-        // 后台页面按内容生成 ETag：浏览器每次都来确认，没变就返回 304，不用重新下载整个页面
-        // 替换后的页面和 ETag 只算一次（页面有 500 多 KB，每次请求都替换很浪费）
-        const sk = env.TURNSTILE_SITEKEY || '';
-        if (adminPage?.sk !== sk) { const html = ADMIN_HTML.replace('__TURNSTILE_SITEKEY__', sk).replace('__VERSION__', VERSION); adminPage = { sk, html, etag: adminEtag(html) }; }
-        const { html, etag } = adminPage;
-        if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { etag, 'cache-control': 'no-cache' } });
-        return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', etag } });
-      }
+      if (adminPath) return withAdminHeaders(await adminRequest(request, env, url));
       if (path === '/_fb' && request.method === 'POST') return await recordFallback(request, env);
       if (path === '/t.js') return await trackerScript(env, url);
       if (path.startsWith('/r/')) return await shareView(request, env, ctx, url);
@@ -96,7 +92,12 @@ export default {
       return await handleRedirect(request, env, ctx, url);
     } catch (err) {
       console.error(err);
-      return json({ error: 'internal error' }, 500);
+      // 数据库出错（比如 D1 免费版当天的读写额度用完）：后台接口给出能看懂的中文说明和 503；
+      // 访客点短链、打开后台页面时显示提示页（按浏览器语言显示中文或英文），不再是一段 JSON 原文
+      const db = isDbError(err);
+      if (path.startsWith('/api/')) return withAdminHeaders(json({ error: db ? DB_DOWN : 'internal error', ...(db ? { db: true } : {}) }, db ? 503 : 500));
+      const page = infoPage(adminPath && db ? 'dbAdmin' : 'error', db ? 503 : 500, request);
+      return adminPath ? withAdminHeaders(page) : page;
     }
   },
 
@@ -317,6 +318,7 @@ async function migrate(env) {
   if (!lcols.includes('utm')) await env.DB.prepare('ALTER TABLE links ADD COLUMN utm INTEGER NOT NULL DEFAULT 0').run();
   if (!lcols.includes('ab_weight')) await env.DB.prepare('ALTER TABLE links ADD COLUMN ab_weight INTEGER NOT NULL DEFAULT 0').run();
   for (const c of ['human', 'flood']) if (!lcols.includes(c)) await env.DB.prepare(`ALTER TABLE links ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`).run();
+  if (!lcols.includes('app_web')) await env.DB.prepare("ALTER TABLE links ADD COLUMN app_web TEXT NOT NULL DEFAULT ''").run();
   const gcols = (await env.DB.prepare('PRAGMA table_info(g_sites)').all()).results.map((c) => c.name);
   for (const c of ['ga4_acct', 'gsc_acct']) {
     if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`).run();
@@ -344,8 +346,9 @@ async function migrate(env) {
 // 按汇总表 + 汇总之后的明细重算每个短链的真人访问数（加列时、访客类型重新判定后各算一次；平时访问时累加）
 async function recountHuman(env) {
   const mark = Number((await getSetting(env, 'agg_mark'))?.value) || 0;
-  await env.DB.prepare(`UPDATE links SET human =
-    COALESCE((SELECT SUM(n) FROM agg_d WHERE dim = '' AND machine = 0 AND link_id = links.id), 0)
+  // 先按短链分组汇总一次（只扫一遍汇总表），不要每条短链各扫一遍，免得短链多时一次用完当天的读取额度
+  await env.DB.prepare(`WITH s AS MATERIALIZED (SELECT link_id, SUM(n) AS n FROM agg_d WHERE dim = '' AND machine = 0 GROUP BY link_id)
+    UPDATE links SET human = COALESCE((SELECT n FROM s WHERE s.link_id = links.id), 0)
     + (SELECT COUNT(*) FROM clicks WHERE link_id = links.id AND is_bot = 0 AND ts >= ?)`).bind(mark).run();
   await setSetting(env, 'human_counted', String(Date.now()));
 }
@@ -391,18 +394,53 @@ async function backfillKinds(env) {
 
 let adminPage = null;
 
+// 后台页面和接口（/admin、/api/*）
+async function adminRequest(request, env, url) {
+  const path = url.pathname;
+  if (env.ADMIN_HOST && url.hostname !== env.ADMIN_HOST) return notFound(request);
+  // Google 授权回调：会话 Cookie 是 SameSite=Strict，从 Google 跳回时浏览器不会带上，
+  // 所以不走登录校验，改由签名的 state（只有已登录的后台才能生成，10 分钟有效）保护
+  if (path === '/api/google/callback') return await googleCallback(env, url);
+  if (path.startsWith('/api/')) return await handleApi(request, env, url);
+  // 后台页面按内容生成 ETag：浏览器每次都来确认，没变就返回 304，不用重新下载整个页面
+  // 替换后的页面和 ETag 只算一次（页面有 500 多 KB，每次请求都替换很浪费）
+  // __I18N_V__：英文翻译脚本的版本号，翻译脚本带上它就可以长期缓存（见 i18nResponse）
+  const sk = env.TURNSTILE_SITEKEY || '';
+  if (adminPage?.sk !== sk) {
+    const html = ADMIN_HTML.replace('__TURNSTILE_SITEKEY__', sk).replace('__VERSION__', VERSION).replaceAll('__I18N_V__', i18nVer('admin'));
+    adminPage = { sk, html, etag: adminEtag(html) };
+  }
+  const { html, etag } = adminPage;
+  if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { etag, 'cache-control': 'no-cache' } });
+  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', etag } });
+}
+
+// 后台页面和接口的安全响应头：不允许被别的网站用框架嵌入（防点击劫持）、不让浏览器猜测内容类型、
+// 跨站时只带出本站域名（和浏览器默认一致，写明是为了不受浏览器差异影响）。响应自己设置过的不覆盖
+const ADMIN_HEADERS = {
+  'x-frame-options': 'DENY', 'content-security-policy': "frame-ancestors 'none'",
+  'x-content-type-options': 'nosniff', 'referrer-policy': 'strict-origin-when-cross-origin',
+};
+function withAdminHeaders(res) {
+  const out = new Response(res.body, res);
+  for (const [k, v] of Object.entries(ADMIN_HEADERS)) if (!out.headers.has(k)) out.headers.set(k, v);
+  return out;
+}
+
 async function handleRedirect(request, env, ctx, url) {
-  const slug = decodeURIComponent(url.pathname.slice(1)).replace(/\/$/, '');
-  if (!SLUG_RE.test(slug)) return notFound();
+  // 截断或乱写的百分号编码（%E4%B8 之类）是坏链接，按“不存在”处理，不要当成服务故障
+  let slug;
+  try { slug = decodeURIComponent(url.pathname.slice(1)).replace(/\/$/, ''); } catch { return notFound(request); }
+  if (!SLUG_RE.test(slug)) return notFound(request);
 
   // 短链和它的跳转规则一次取回（同一个批次，只走一次数据库往返）
   const [lr, tr] = await env.DB.batch([
-    env.DB.prepare('SELECT id, slug, target_url, enabled, pass_query, utm, expires_at, ab_weight FROM links WHERE slug = ?').bind(slug),
+    env.DB.prepare('SELECT id, slug, target_url, enabled, pass_query, utm, expires_at, ab_weight, app_web FROM links WHERE slug = ?').bind(slug),
     env.DB.prepare('SELECT id, url, fallback, countries, devices, ab_of, weight FROM link_targets WHERE link_id = (SELECT id FROM links WHERE slug = ?)').bind(slug),
   ]);
   const link = lr.results[0];
-  if (!link || !link.enabled) return notFound();
-  if (link.expires_at && link.expires_at < Date.now()) return new Response('Link expired', { status: 410 });
+  if (!link || !link.enabled) return notFound(request);
+  if (link.expires_at && link.expires_at < Date.now()) return infoPage('expired', 410, request);
 
   // 按访问者所在国家 / 地区和设备匹配跳转规则（两者都指定的优先），未命中则用默认地址
   const country = request.cf?.country || '';
@@ -421,10 +459,11 @@ async function handleRedirect(request, env, ctx, url) {
   }
   const ruleId = arm ? arm.id : rule ? rule.id : 0;
   const raw = arm ? arm.url : rule ? rule.url : link.target_url;
-  if (!raw) return notConfigured();
+  if (!raw) return notConfigured(request);
 
   const withQuery = (u) => {
-    if (!link.pass_query && !link.utm) return u;
+    // App 地址不改动（各 App 的参数格式不一样，加参数可能打不开）
+    if ((!link.pass_query && !link.utm) || isAppUrl(u)) return u;
     const t = new URL(u);
     if (link.pass_query) {
       for (const [k, v] of url.searchParams) {
@@ -447,14 +486,32 @@ async function handleRedirect(request, env, ctx, url) {
     ctx.waitUntil(logClick(request, env, link.id, url, ruleId).catch((e) => console.error('log failed', e)));
   }
 
+  // 目标是 App 地址：先尝试拉起 App，拉不起再去网页（单独设置的“打不开 App 时去的网页”，否则默认推广地址）
+  if (isAppUrl(target)) {
+    const web = link.app_web ? withQuery(link.app_web) : isWebUrl(link.target_url) ? withQuery(link.target_url) : '';
+    const ua = request.headers.get('user-agent') || '', p = parseUA(ua), inApp = inAppBrowser(ua);
+    // 爬虫、链接预览不执行脚本：有网页就直接去网页
+    if (p.bot && web) return Response.redirect(web, 302);
+    const intent = /^intent:/i.test(target);
+    if (!inApp && intent && deviceKey(p) === 'android') {
+      // 安卓 Chrome 原生支持 intent://：装了就打开 App，没装就去 S.browser_fallback_url
+      return new Response(null, { status: 302, headers: { location: intentWithFallback(target, web), 'cache-control': 'no-store, private' } });
+    }
+    // intent:// 只有安卓能用，其他设备直接去网页
+    if (intent && web) return Response.redirect(web, 302);
+    return appPage(target, web, { inApp, ios: deviceKey(p) === 'ios', en: !/^zh\b/i.test(request.headers.get('accept-language') || '') });
+  }
+
   // 规则开启了“打不开时回退”：先在访客浏览器里探测地区地址，连不上再改去默认地址。
   // 爬虫 / 链接预览不执行脚本，直接跳转；http 地址在 https 页面里无法探测，也直接跳转。
-  if (rule && rule.fallback && link.target_url && request.method === 'GET'
+  // 回退去的地方必须是网址：默认推广地址是 App 地址时，改用“打不开 App 时去的网页”，都没有就不探测（照常 302）
+  const backup = isWebUrl(link.target_url) ? link.target_url : link.app_web || '';
+  if (rule && rule.fallback && backup && request.method === 'GET'
     && target.startsWith('https:') && !parseUA(request.headers.get('user-agent') || '').bot) {
     // 签名里带一个随机数：每次跳转的签名都不同，上报时同一个签名只算一次
     const exp = Date.now() + 10 * 60 * 1000, n = toHex(crypto.getRandomValues(new Uint8Array(8)));
     const sig = await hmac(await sessionSecret(env), `fb|${rule.id}|${exp}|${n}`);
-    return probePage(target, withQuery(link.target_url), { r: rule.id, e: exp, n, s: sig });
+    return probePage(target, withQuery(backup), { r: rule.id, e: exp, n, s: sig }, !prefersZh(request));
   }
 
   return new Response(null, {
@@ -463,11 +520,62 @@ async function handleRedirect(request, env, ctx, url) {
   });
 }
 
+// 打开 App 的过渡页：先尝试拉起 App；约 2.5 秒后页面还在前台（没装 App 或被拦了）就去网页。
+// 页面上一直有“打开 App”和“打开网页”两个按钮：系统弹窗被取消、浏览器要求先点一下时可以手动点。
+// 微信、QQ、微博、抖音等内置浏览器会拦截拉起其他 App，只能提示用户在浏览器里打开。
+const APP_TEXT = {
+  zh: { title: '正在打开 App…', iosTip: '如果弹出“是否打开”，请点“打开”', open: '打开 App', web: '打开网页', retry: '没有打开？点上面的按钮再试一次', noweb: '如果没有反应，请确认已安装对应的 App',
+    guide: '请点击右上角 <b>···</b>，选择<b>在浏览器打开</b>', guideSub: '当前 App 不支持直接打开其他应用' },
+  en: { title: 'Opening the app…', iosTip: 'If asked whether to open the app, tap "Open"', open: 'Open app', web: 'Open website', retry: "Didn't open? Tap the button above to try again", noweb: "If nothing happens, make sure the app is installed",
+    guide: 'Tap <b>···</b> at the top right and choose <b>Open in browser</b>', guideSub: "This app can't open other apps directly" },
+};
+function appPage(target, web, { inApp, ios, en }) {
+  const t = APP_TEXT[en ? 'en' : 'zh'], js = (v) => JSON.stringify(v).replace(/</g, '\\u003c'), attr = (v) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  // 空图标：浏览器不会再单独请求一次 /favicon.ico（多一次 Worker 请求）
+  const html = `<!doctype html><html lang="${en ? 'en' : 'zh-CN'}"><head><meta charset="utf-8"><link rel="icon" href="data:,"><meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${t.title}</title>
+<style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f7f9;color:#0b1020;font:15px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+@media (prefers-color-scheme:dark){body{background:#08090c;color:#e7e9ee}.b2{background:#1a1d24!important;color:#e7e9ee!important;border-color:#2a2e37!important}}
+.w{width:min(320px,calc(100vw - 48px));display:grid;gap:12px;text-align:center}
+.s{display:flex;align-items:center;justify-content:center;gap:10px;color:#868e9e;margin-bottom:8px}
+.d{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:r .8s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+a.b{display:block;padding:13px;border-radius:12px;background:#2f6bff;color:#fff;text-decoration:none;font-weight:600}
+a.b2{background:#fff;color:#0b1020;border:1px solid #e3e6ec}
+.h{color:#868e9e;font-size:13px;min-height:1.4em}
+.g{position:fixed;top:12px;right:16px;left:16px;text-align:right;line-height:1.7}
+.g .ar{font-size:30px;line-height:1;color:#2f6bff}
+.g p{margin:4px 0 0}.g small{color:#868e9e}
+</style></head><body>
+${inApp ? `<div class="g"><div class="ar">↗</div><p>${t.guide}</p><small>${t.guideSub}</small></div>` : ''}
+<div class="w">${inApp ? '' : `<div class="s" id="s"><i class="d"></i>${t.title}</div>${ios ? `<div class="h">${t.iosTip}</div>` : ''}`}
+<a class="b" href="${attr(target)}" id="o">${t.open}</a>
+${web ? `<a class="b b2" href="${attr(web)}" rel="noreferrer">${t.web}</a>` : ''}
+<div class="h" id="h">${web ? '' : t.noweb}</div></div>
+${inApp ? '' : `<script>
+(function () {
+  var app = ${js(target)}, web = ${js(web)}, left = false;
+  function away() { left = true; }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) away(); });
+  window.addEventListener('pagehide', away);
+  window.addEventListener('blur', away);
+  location.href = app;
+  setTimeout(function () {
+    var s = document.getElementById('s'); if (s) s.style.display = 'none';
+    if (left || document.hidden) return;
+    if (web) location.replace(web); else document.getElementById('h').textContent = ${js(t.retry)};
+  }, ${ios ? 2500 : 2000});
+})();
+</script>`}</body></html>`;
+  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store, private', 'referrer-policy': 'no-referrer-when-downgrade' } });
+}
+
 // 过渡页：探测目标站点能否在访客网络中打开（任何 HTTP 响应都算能打开），失败则回退
-function probePage(target, backup, beacon) {
-  const js = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
-  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>正在跳转…</title>
+function probePage(target, backup, beacon, en) {
+  const js = (v) => JSON.stringify(v).replace(/</g, '\\u003c'), t = en ? 'Redirecting…' : '正在跳转…';
+  const html = `<!doctype html><html lang="${en ? 'en' : 'zh-CN'}"><head><meta charset="utf-8"><link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${t}</title>
 <noscript><meta http-equiv="refresh" content="0;url=${target.replace(/"/g, '&quot;')}"></noscript>
 <style>
 body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f7f9;color:#868e9e;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
@@ -475,7 +583,7 @@ body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f7f
 .s{display:flex;align-items:center;gap:10px;opacity:0;transition:opacity .4s}.s.on{opacity:1}
 .d{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:r .8s linear infinite}
 @keyframes r{to{transform:rotate(360deg)}}
-</style></head><body><div class="s" id="s"><i class="d"></i>正在跳转…</div>
+</style></head><body><div class="s" id="s"><i class="d"></i>${t}</div>
 <script>
 (function () {
   var t = ${js(target)}, b = ${js(backup)}, fb = ${js(beacon)}, done = false;
@@ -594,6 +702,10 @@ async function handleApi(request, env, url) {
   const path = url.pathname;
   const method = request.method;
 
+  // 写操作只接受本站后台页面发起的请求：带了 Origin 又不是本站的直接拒绝。
+  // 会话 Cookie 是 SameSite=Strict，但短链域名是主站的子域名时（go.example.com），兄弟子域名上的页面也算“同站”，会带上 Cookie
+  const origin = request.headers.get('origin');
+  if (method !== 'GET' && method !== 'HEAD' && origin && origin !== url.origin) return json({ error: '只接受本站后台发起的请求' }, 403);
   if (path === '/api/login' && method === 'POST') return login(request, env);
   if (path === '/api/login/2fa' && method === 'POST') return loginSecondStep(request, env);
   if (path === '/api/logout' && method === 'POST') {
@@ -614,7 +726,9 @@ async function handleApi(request, env, url) {
 async function authedApi(request, env, url, cred) {
   const path = url.pathname;
   const method = request.method;
-  if (method !== 'GET' && !(request.headers.get('content-type') || '').includes('application/json')) {
+  // 只认 MIME 类型本身是 application/json 的（不能用 includes：text/plain; application/json 的主体是 text/plain，
+  // 跨站表单 / no-cors 请求不用预检就能带上它）。后台的请求都带 application/json，不受影响
+  if (method !== 'GET' && (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase() !== 'application/json') {
     return json({ error: 'content-type must be application/json' }, 415);
   }
 
@@ -643,6 +757,19 @@ async function authedApi(request, env, url, cred) {
     return json(await trackingInfo(env, url));
   }
   if (path === '/api/2fa' && method === 'GET') return json({ enabled: !!cred.totp, since: cred.totp?.at || null });
+  // 短链二维码（SVG）：短链详情和列表里扫码用手机打开；?dl=1 时作为文件下载
+  if (path === '/api/qr' && method === 'GET') {
+    const text = url.searchParams.get('text') || '';
+    if (!text || text.length > 2000) return json({ error: '内容为空或太长' }, 400);
+    const name = (url.searchParams.get('name') || 'qrcode').replace(/[^\w.-]/g, '_').slice(0, 80);
+    // 下载 / 导出 PNG 用来印刷：静区留足 4 格、纠错级别 M（页面上的小图保持紧凑）；带上宽高，导出时不依赖浏览器的默认尺寸
+    const hq = url.searchParams.get('dl') || url.searchParams.get('hq');
+    const svg = renderSVG(text, hq ? { border: 4, ecc: 'M' } : { border: 2 }).replace('<svg ', '<svg width="1024" height="1024" ');
+    return new Response(svg, { headers: {
+      'content-type': 'image/svg+xml', 'cache-control': 'private, max-age=86400',
+      ...(url.searchParams.get('dl') ? { 'content-disposition': `attachment; filename="${name}.svg"` } : {}),
+    } });
+  }
   if (path === '/api/sessions' && method === 'GET') return json(await listSessions(env, cred));
   if (path === '/api/sessions/others' && method === 'DELETE') {
     const r = await env.DB.prepare('DELETE FROM sessions WHERE id != ?').bind(cred.sid).run();
@@ -678,6 +805,9 @@ async function authedApi(request, env, url, cred) {
       googleClient: await google.googleConfigured(env, secret),
       notify: !!(n.tg.enabled || n.email.enabled),
       cloudflare: !!(await cfCreds(env)),
+      // 概览页据此判断定时任务是否停了，不用再请求很重的 /status
+      cronAt: await getSetting(env, 'cron_status').then((r) => JSON.parse(r?.value || 'null')?.at || null).catch(() => null),
+      now: Date.now(),
     });
   }
   if (path === '/api/2fa/setup' && method === 'POST') return totpSetup(request, env, cred);
@@ -761,9 +891,10 @@ async function authedApi(request, env, url, cred) {
   const hc = path.match(/^\/api\/links\/(\d+)\/check$/);
   if (hc && method === 'POST') {
     const id = Number(hc[1]);
-    const l = await env.DB.prepare('SELECT target_url FROM links WHERE id = ?').bind(id).first();
+    const l = await env.DB.prepare('SELECT target_url, app_web FROM links WHERE id = ?').bind(id).first();
     if (!l) return json({ error: 'not found' }, 404);
-    const urls = [...new Set([l.target_url, ...(await loadAllTargets(env, id)).map((t) => t.url)].filter(Boolean))];
+    // App 地址没法从服务器检查，只查网址
+    const urls = [...new Set([l.target_url, l.app_web, ...(await loadAllTargets(env, id)).map((t) => t.url)].filter(isWebUrl))];
     const res = await Promise.all(urls.map((u) => probeUrl(u)));
     for (let i = 0; i < urls.length; i++) await saveHealth(env, urls[i], res[i]);
     return json({ results: urls.map((u, i) => ({ url: u, ...res[i] })), health: Object.fromEntries(await healthOf(env, urls)) });
@@ -785,7 +916,7 @@ async function authedApi(request, env, url, cred) {
   return json({ error: 'not found' }, 404);
 }
 
-// 登录防暴力破解：同一 IP 连续输错 LOGIN_MAX_FAILS 次密码锁定，锁定时长从 15 分钟起逐次加倍（最长 24 小时）
+// 登录防暴力破解：同一 IP（IPv6 按 /64 网段）连续输错 LOGIN_MAX_FAILS 次密码锁定，锁定时长从 15 分钟起逐次加倍（最长 24 小时）
 const LOGIN_MAX_FAILS = 5, LOGIN_LOCK_MS = 15 * 60000, LOGIN_LOCK_MAX = DAY;
 const loginIp = (request) => request.headers.get('cf-connecting-ip') || 'unknown';
 const lockText = (ms) => (ms >= 3600000 ? `${Math.ceil(ms / 3600000)} 小时` : `${Math.ceil(ms / 60000)} 分钟`);
@@ -813,11 +944,13 @@ async function loginFailed(env, ip) {
 
 async function login(request, env) {
   const body = await request.json().catch(() => ({}));
-  const ip = loginIp(request);
+  // 锁定按 IPv4 地址 / IPv6 的 /64 计数（见 guardKey）
+  const ip = guardKey(loginIp(request));
   const locked = await loginGuard(env, ip);
   if (locked) return json({ error: `密码错误次数过多，请 ${lockText(locked)}后再试` }, 429);
   // 配置了 Turnstile 时，先过人机验证再核对密码，防止暴力破解
-  if (env.TURNSTILE_SECRET && !(await verifyTurnstile(env, body.turnstile, request))) {
+  // 前端只在配置了站点密钥时显示人机验证，这里也要两个都配了才校验（只配服务端密钥会把自己锁在外面）
+  if (env.TURNSTILE_SECRET && env.TURNSTILE_SITEKEY && !(await verifyTurnstile(env, body.turnstile, request))) {
     return json({ error: '人机验证未通过，请重试', turnstile: true }, 403);
   }
   const secret = await sessionSecret(env);
@@ -980,7 +1113,7 @@ async function changePassword(request, env, cred) {
   }
   if (next.length < MIN_PASSWORD_LENGTH) return json({ error: `新密码至少 ${MIN_PASSWORD_LENGTH} 位` }, 400);
   if (next.length > 200) return json({ error: '新密码太长' }, 400);
-  if (next === DEFAULT_PASSWORD || next === current) return json({ error: '新密码不能与当前密码或默认密码相同' }, 400);
+  if (WEAK_PASSWORDS.has(next) || next === current) return json({ error: '新密码不能与当前密码或默认密码相同' }, 400);
 
   await setSetting(env, 'admin_password', JSON.stringify(await hashPassword(next)));
   // 密码变化后，旧会话全部失效；给当前浏览器换发新会话
@@ -1002,7 +1135,9 @@ async function credential(env) {
     return { source: 'custom', stamp: `custom:${row.updated_at}${mfa}`, totp, verify: (pw) => verifyPassword(pw, stored) };
   }
   if (env.ADMIN_PASSWORD) {
-    return { source: 'env', stamp: `env${mfa}`, totp, verify: (pw, secret) => safeEqual(pw, env.ADMIN_PASSWORD, secret) };
+    // 早期版本的一键部署会把示例文件里的 change-me 预填成线上密码：当成默认密码处理，登录后强制修改
+    const weak = WEAK_PASSWORDS.has(env.ADMIN_PASSWORD);
+    return { source: weak ? 'default' : 'env', stamp: `env${mfa}`, totp, verify: (pw, secret) => safeEqual(pw, env.ADMIN_PASSWORD, secret) };
   }
   return { source: 'default', stamp: `default${mfa}`, totp, verify: (pw, secret) => safeEqual(pw, DEFAULT_PASSWORD, secret) };
 }
@@ -1048,11 +1183,13 @@ async function authedCredential(request, env) {
   if (!(await safeEqual(sig, await hmac(secret, `${exp}|${sid}|${cred.stamp}`), secret))) return null;
   const row = await env.DB.prepare('SELECT seen_at FROM sessions WHERE id = ?').bind(sid).first();
   if (!row) return null;
-  // 最近使用时间最多 5 分钟写一次，省写入
+  // 最近使用时间最多 5 分钟写一次，省写入。只是给“登录设备”列表看的，写不进去（比如 D1 当天的写入额度用完）也不影响登录：
+  // 不能因为它让后台所有接口都报错，否则连“设置 → Cloudflare 用量”都打不开、没法排查
   if (Date.now() - row.seen_at > 5 * 60000) {
     const cf = request.cf || {};
     await env.DB.prepare('UPDATE sessions SET seen_at = ?, ip = ?, country = ?, city = ? WHERE id = ?')
-      .bind(Date.now(), loginIp(request), cf.country || '', cut(cf.city || '', 80), sid).run();
+      .bind(Date.now(), loginIp(request), cf.country || '', cut(cf.city || '', 80), sid).run()
+      .catch((e) => console.error('session touch failed', e));
   }
   cred.sid = sid;
   return cred;
@@ -1153,7 +1290,8 @@ async function trackerScript(env, url) {
   return new Response(on ? trackerCode(url.hostname) : '/* cligc link: 来源追踪未开启 */', {
     headers: {
       'content-type': 'application/javascript; charset=utf-8',
-      'cache-control': on ? 'public, max-age=3600' : 'public, max-age=300',
+      // 开着时多缓存一阵（浏览器缓存期间再次打开推广页不占 Worker 请求）；关掉后访客已缓存的脚本要等缓存过期
+      'cache-control': on ? 'public, max-age=86400, stale-while-revalidate=604800' : 'public, max-age=300',
       'access-control-allow-origin': '*',
     },
   });
@@ -1237,11 +1375,17 @@ async function validateLinkInput(body, env, currentId) {
     const raw = String(body.target_url ?? '').trim();
     if (raw) {
       const u = normalizeUrl(raw);
-      if (!u) return { error: '默认目标地址必须是合法的 http / https 地址' };
+      if (!u) return { error: '默认推广地址必须是网址（http / https）或 App 地址（如 tg://…）' };
       out.target_url = u;
     } else {
       out.target_url = '';
     }
+  }
+  if (body.app_web !== undefined) {
+    const raw = String(body.app_web ?? '').trim();
+    const u = raw ? normalizeTarget(raw) : '';
+    if (u === null || (u && !isWebUrl(u))) return { error: '“打不开 App 时去的网页”必须是 http / https 网址' };
+    out.app_web = u;
   }
   if (body.title !== undefined) out.title = cut(String(body.title), 200);
   if (body.note !== undefined) out.note = cut(String(body.note), 2000);
@@ -1267,11 +1411,11 @@ async function createLink(request, env) {
 
   const now = Date.now();
   const row = await env.DB.prepare(
-    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, utm, expires_at, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *`
+    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, utm, expires_at, app_web, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?) RETURNING *`
   ).bind(
     data.slug, data.target_url || '', data.title || '', data.note || '',
-    data.enabled ?? 1, data.pass_query ?? 0, data.utm ?? 0, data.expires_at ?? null, now, now
+    data.enabled ?? 1, data.pass_query ?? 0, data.utm ?? 0, data.expires_at ?? null, data.app_web || '', now, now
   ).first();
   await addLog(env, request, row.id, 'create', { slug: row.slug, target_url: row.target_url });
   return json(row, 201);
@@ -1290,9 +1434,9 @@ async function duplicateLink(request, env, id) {
 
   const now = Date.now();
   const row = await env.DB.prepare(
-    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, utm, expires_at, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *`
-  ).bind(data.slug, src.target_url, data.title, src.note, src.enabled, src.pass_query, src.utm || 0, src.expires_at, now, now).first();
+    `INSERT INTO links (slug, target_url, title, note, enabled, pass_query, utm, expires_at, app_web, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?) RETURNING *`
+  ).bind(data.slug, src.target_url, data.title, src.note, src.enabled, src.pass_query, src.utm || 0, src.expires_at, src.app_web || '', now, now).first();
   // 规则和 A/B 分流地址一起复制：先复制规则，再把分流地址挂到新规则上
   if (src.ab_weight) await env.DB.prepare('UPDATE links SET ab_weight = ? WHERE id = ?').bind(src.ab_weight, row.id).run();
   const old = (await env.DB.prepare('SELECT * FROM link_targets WHERE link_id = ? ORDER BY id').bind(id).all()).results;
@@ -1320,23 +1464,29 @@ async function bulkReplace(request, env) {
   if (!to) return json({ error: '请填写替换后的链接' }, 400);
   if (mode === 'exact') {
     to = normalizeUrl(to);
-    if (!to) return json({ error: '替换后的链接必须是合法的 http / https 地址' }, 400);
+    if (!to) return json({ error: '替换后的链接必须是网址（http / https）或 App 地址' }, 400);
   }
   // 完全匹配时同时匹配用户输入和规范化后的写法（如 https://a.com 与 https://a.com/）
   const finds = mode === 'exact' ? [...new Set([find, normalizeUrl(find)].filter(Boolean))] : [find];
   const where = mode === 'exact' ? `IN (${finds.map(() => '?').join(',')})` : '';
-  const [links, rules] = await Promise.all([
+  const [links, rules, webs] = await Promise.all([
     (mode === 'exact'
       ? env.DB.prepare(`SELECT id, slug, title, target_url AS url FROM links WHERE target_url ${where} ORDER BY id`).bind(...finds)
       : env.DB.prepare('SELECT id, slug, title, target_url AS url FROM links WHERE instr(target_url, ?) > 0 ORDER BY id').bind(find)).all(),
     (mode === 'exact'
       ? env.DB.prepare(`SELECT t.id, t.link_id, t.countries, t.url, l.slug FROM link_targets t JOIN links l ON l.id = t.link_id WHERE t.url ${where} ORDER BY t.link_id, t.id`).bind(...finds)
       : env.DB.prepare('SELECT t.id, t.link_id, t.countries, t.url, l.slug FROM link_targets t JOIN links l ON l.id = t.link_id WHERE instr(t.url, ?) > 0 ORDER BY t.link_id, t.id').bind(find)).all(),
+    // “打不开 App 时去的网页”也一起换（比如换域名时）
+    (mode === 'exact'
+      ? env.DB.prepare(`SELECT id, slug, title, app_web AS url FROM links WHERE app_web ${where} ORDER BY id`).bind(...finds)
+      : env.DB.prepare("SELECT id, slug, title, app_web AS url FROM links WHERE app_web != '' AND instr(app_web, ?) > 0 ORDER BY id").bind(find)).all(),
   ]);
   const next = (u) => (mode === 'exact' ? to : u.split(find).join(to));
   const items = [
     ...links.results.map((l) => ({ type: 'link', id: l.id, slug: l.slug, title: l.title, from: l.url, to: next(l.url) })),
     ...rules.results.map((t) => ({ type: 'rule', id: t.id, link_id: t.link_id, slug: t.slug, countries: t.countries.split(',').filter(Boolean), from: t.url, to: next(t.url) })),
+    // 备用网页只能是网址：替换后变成 App 地址的就不动它（不拦整个替换）；替换后不合法的照样报出来
+    ...webs.results.filter((l) => { const n = normalizeUrl(next(l.url)); return !n || isWebUrl(n); }).map((l) => ({ type: 'app_web', id: l.id, link_id: l.id, slug: l.slug, title: l.title, from: l.url, to: next(l.url) })),
   ];
   // 替换后的地址都必须合法
   const bad = items.find((x) => !normalizeUrl(x.to));
@@ -1344,7 +1494,8 @@ async function bulkReplace(request, env) {
     mode, find, replace: to, total: items.length,
     links: items.filter((x) => x.type === 'link').length,
     rules: items.filter((x) => x.type === 'rule').length,
-    affected: new Set(items.map((x) => (x.type === 'link' ? x.id : x.link_id))).size,
+    webs: items.filter((x) => x.type === 'app_web').length,
+    affected: new Set(items.map((x) => (x.type === 'rule' ? x.link_id : x.id))).size,
     invalid: bad ? { slug: bad.slug, to: bad.to } : null,
   };
   if (body.dry !== false) return json({ ...summary, items: items.slice(0, 200) });
@@ -1352,9 +1503,9 @@ async function bulkReplace(request, env) {
   if (bad) return json({ error: `替换后 /${bad.slug} 的地址不合法：${bad.to}` }, 400);
 
   const now = Date.now();
-  const stmts = items.flatMap((x) => (x.type === 'link'
-    ? [env.DB.prepare('UPDATE links SET target_url = ?, updated_at = ? WHERE id = ?').bind(normalizeUrl(x.to), now, x.id),
-      logStmt(env, request, x.id, 'update', { changes: { target_url: [x.from, normalizeUrl(x.to)] }, via: 'replace' })]
+  const stmts = items.flatMap((x) => (x.type === 'link' || x.type === 'app_web'
+    ? [env.DB.prepare(`UPDATE links SET ${x.type === 'link' ? 'target_url' : 'app_web'} = ?, updated_at = ? WHERE id = ?`).bind(normalizeUrl(x.to), now, x.id),
+      logStmt(env, request, x.id, 'update', { changes: { [x.type === 'link' ? 'target_url' : 'app_web']: [x.from, normalizeUrl(x.to)] }, via: 'replace' })]
     : [env.DB.prepare('UPDATE link_targets SET url = ?, updated_at = ? WHERE id = ?').bind(normalizeUrl(x.to), now, x.id),
       logStmt(env, request, x.link_id, 'rule.edit', { before: { id: x.id, url: x.from }, after: { id: x.id, url: normalizeUrl(x.to) }, via: 'replace' })]));
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
@@ -1384,16 +1535,24 @@ async function applyLinkUpdate(env, request, id, data, extra = {}) {
   return { row, logId };
 }
 
+// 删短链：明细、规则、分组、修改记录和汇总放在同一个 batch（一个事务）里，不会只删一半
 async function deleteLink(env, id) {
-  await dropLinkAgg(env, id);
-  await env.DB.batch([
-    env.DB.prepare('DELETE FROM clicks WHERE link_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM link_targets WHERE link_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM link_tags WHERE link_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM link_log WHERE link_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM links WHERE id = ?').bind(id),
-  ]);
-  return json({ ok: true });
+  return deleteLinks(env, [id]).then(() => json({ ok: true }));
+}
+// 一次删一组：每 50 条一个 batch，汇总表每批只扫一遍
+async function deleteLinks(env, ids) {
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50), j = JSON.stringify(chunk), q = 'SELECT value FROM json_each(?)';
+    const since = (await env.DB.prepare(`SELECT MIN(created_at) AS t FROM links WHERE id IN (${q})`).bind(j).first('t')) || 0;
+    await env.DB.batch([
+      ...dropLinkAggStmts(env, chunk, since),
+      env.DB.prepare(`DELETE FROM clicks WHERE link_id IN (${q})`).bind(j),
+      env.DB.prepare(`DELETE FROM link_targets WHERE link_id IN (${q})`).bind(j),
+      env.DB.prepare(`DELETE FROM link_tags WHERE link_id IN (${q})`).bind(j),
+      env.DB.prepare(`DELETE FROM link_log WHERE link_id IN (${q})`).bind(j),
+      env.DB.prepare(`DELETE FROM links WHERE id IN (${q})`).bind(j),
+    ]);
+  }
 }
 
 // 批量操作：启用 / 停用 / 删除 / 加分组 / 移出分组；分组改名、删除分组
@@ -1402,7 +1561,8 @@ async function bulkLinks(request, env) {
   const ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 500);
   const tag = cut(String(b.tag || '').trim(), 40);
   const now = Date.now();
-  const inIds = ids.map(() => '?').join(',');
+  // 一组 id 只占一个绑定参数（D1 每条语句最多 100 个参数，选了很多条时按个数展开会报错）
+  const inIds = 'SELECT value FROM json_each(?)', jIds = JSON.stringify(ids);
   if (b.action === 'renameTag' || b.action === 'dropTag') {
     if (!tag) return json({ error: '分组名不能为空' }, 400);
     const to = cut(String(b.to || '').trim(), 40);
@@ -1418,13 +1578,13 @@ async function bulkLinks(request, env) {
   if (!ids.length) return json({ error: '没有选中短链' }, 400);
   if (b.action === 'enable' || b.action === 'disable') {
     const v = b.action === 'enable' ? 1 : 0;
-    const changed = (await env.DB.prepare(`SELECT id FROM links WHERE enabled != ? AND id IN (${inIds})`).bind(v, ...ids).all()).results;
+    const changed = (await env.DB.prepare(`SELECT id FROM links WHERE enabled != ? AND id IN (${inIds})`).bind(v, jIds).all()).results;
     await env.DB.batch([
-      env.DB.prepare(`UPDATE links SET enabled = ?, updated_at = ? WHERE id IN (${inIds})`).bind(v, now, ...ids),
+      env.DB.prepare(`UPDATE links SET enabled = ?, updated_at = ? WHERE id IN (${inIds})`).bind(v, now, jIds),
       ...changed.map((r) => logStmt(env, request, r.id, 'update', { changes: { enabled: [1 - v, v] }, via: 'bulk' })),
     ]);
   } else if (b.action === 'delete') {
-    for (const id of ids) await deleteLink(env, id);
+    await deleteLinks(env, ids);
   } else if (b.action === 'tag' || b.action === 'untag') {
     if (!tag) return json({ error: '请填写分组名' }, 400);
     const st = ids.map((id) => (b.action === 'tag'
@@ -1443,7 +1603,7 @@ async function getLink(env, id) {
   row.targets = all.filter((t) => t.ab_of < 0).map((t) => ({ ...t, arms: all.filter((a) => a.ab_of === t.id) }));
   row.arms = all.filter((a) => a.ab_of === 0);
   row.tags = (await env.DB.prepare('SELECT tag FROM link_tags WHERE link_id = ? ORDER BY tag').bind(id).all()).results.map((r) => r.tag);
-  row.health = Object.fromEntries(await healthOf(env, [row.target_url, ...all.map((t) => t.url)].filter(Boolean)));
+  row.health = Object.fromEntries(await healthOf(env, [row.target_url, row.app_web, ...all.map((t) => t.url)].filter(isWebUrl)));
   return json(row);
 }
 
@@ -1473,7 +1633,7 @@ async function saveTarget(request, env, linkId, tid) {
 // 校验并保存一条跳转规则；返回 { row } 或 { error }
 async function applyTarget(env, linkId, tid, body, forceId = null) {
   const url = normalizeUrl(String(body.url || '').trim());
-  if (!url) return { error: '目标地址必须是合法的 http / https 地址' };
+  if (!url) return { error: '目标地址必须是网址（http / https）或 App 地址（如 tg://…）' };
   const countries = [...new Set((Array.isArray(body.countries) ? body.countries : [])
     .map((c) => String(c).trim().toUpperCase()))];
   const devices = [...new Set((Array.isArray(body.devices) ? body.devices : []).map(String))].filter((d) => DEVICES.includes(d));
@@ -1550,7 +1710,7 @@ async function applySplit(env, linkId, body, keepIds = false) {
   const clean = [];
   for (const a of arms) {
     const url = normalizeUrl(String(a.url || '').trim());
-    if (!url) return { error: '分流地址必须是合法的 http / https 地址' };
+    if (!url) return { error: '分流地址必须是网址（http / https）或 App 地址（如 tg://…）' };
     const w = Math.round(Number(a.weight));
     if (!(w >= 1 && w <= 100)) return { error: '比例必须是 1–100' };
     clean.push({ id: Number(a.id) || null, url, weight: w, note: cut(String(a.note || ''), 200) });
@@ -1583,7 +1743,7 @@ async function applySplit(env, linkId, body, keepIds = false) {
 }
 
 // ---------------------------------------------------------------- 修改记录
-const LOG_FIELDS = ['slug', 'target_url', 'title', 'note', 'enabled', 'pass_query', 'utm', 'expires_at'];
+const LOG_FIELDS = ['slug', 'target_url', 'title', 'note', 'enabled', 'pass_query', 'utm', 'expires_at', 'app_web'];
 const ruleSnap = (t) => ({ id: t.id, countries: t.countries, devices: t.devices, url: t.url, note: t.note, fallback: t.fallback });
 const armSnap = (a) => ({ id: a.id, url: a.url, weight: a.weight, note: a.note });
 
@@ -1656,14 +1816,8 @@ async function revertLog(request, env, linkId, logId) {
   return json({ ok: true });
 }
 
-function normalizeUrl(raw) {
-  try {
-    const u = new URL(raw);
-    return ['http:', 'https:'].includes(u.protocol) ? u.toString() : null;
-  } catch {
-    return null;
-  }
-}
+// 目标地址：网址（http / https）或 App 地址（tg://、weixin://、intent:// 等，见 lib.js 的 normalizeTarget）
+const normalizeUrl = normalizeTarget;
 
 const SORTS = {
   created: 'id DESC',
@@ -1684,6 +1838,11 @@ async function listLinks(env, url) {
   if (tag === '+none') conds.push('id NOT IN (SELECT link_id FROM link_tags)');
   else if (tag) { params.push(tag); conds.push(`id IN (SELECT link_id FROM link_tags WHERE tag = ?${params.length})`); }
   const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+  // 轻量模式：只要 id / 后缀 / 标题（概览的短链下拉框、⌘K 搜索、取分组名），不算趋势、规则、目标页状态
+  if (url.searchParams.get('lite') === '1') {
+    const { results } = await env.DB.prepare(`SELECT id, slug, title, target_url, enabled FROM links ${where} ORDER BY ${order} LIMIT ${size} OFFSET ${(page - 1) * size}`).bind(...params).all();
+    return json({ items: results, ...(url.searchParams.get('tags') === '1' ? { tags: await linkTagList(env) } : {}) });
+  }
   const [total, rows] = await Promise.all([
     env.DB.prepare(`SELECT COUNT(*) AS n FROM links ${where}`).bind(...params).first('n'),
     env.DB.prepare(`SELECT *, (SELECT COUNT(*) FROM link_targets t WHERE t.link_id = links.id AND t.ab_of < 0) AS rules,
@@ -1695,17 +1854,18 @@ async function listLinks(env, url) {
 
   // 每个短链最近 14 天的每日访问（用于列表里的迷你趋势图）
   if (items.length) {
-    const ids = items.map((l) => l.id);
+    // 一组 id 只占一个绑定参数（D1 每条语句最多 100 个参数，size=100 时按个数展开会超）
+    const ids = items.map((l) => l.id), jIds = JSON.stringify(ids), inIds = 'SELECT value FROM json_each(?)';
     const st = await aggregate(env, tz).catch(() => aggState(env));
     const since = Date.now() - 15 * DAY, atz = st.tz ?? tz;
     const [agg, tail] = await Promise.all([
       env.DB.prepare(
         `SELECT link_id, day AS k, SUM(n) AS n FROM agg_d WHERE dim = '' AND day >= ? AND machine = 0
-         AND link_id IN (${ids.map(() => '?').join(',')}) GROUP BY link_id, day`
-      ).bind(dayKey(since, atz), ...ids).all(),
+         AND link_id IN (${inIds}) GROUP BY link_id, day`
+      ).bind(dayKey(since, atz), jIds).all(),
       env.DB.prepare(
-        `SELECT link_id, ts FROM clicks WHERE ts >= ? AND is_bot = 0 AND link_id IN (${ids.map(() => '?').join(',')})`
-      ).bind(Math.max(st.mark, since), ...ids).all(),
+        `SELECT link_id, ts FROM clicks WHERE ts >= ? AND is_bot = 0 AND link_id IN (${inIds})`
+      ).bind(Math.max(st.mark, since), jIds).all(),
     ]);
     const byId = new Map();
     const add = (lid, k, n) => {
@@ -1718,18 +1878,18 @@ async function listLinks(env, url) {
 
     // 地区规则摘要（列表里鼠标悬停显示）
     const rules = await env.DB.prepare(
-      `SELECT link_id, countries, devices, url, ab_of FROM link_targets WHERE link_id IN (${ids.map(() => '?').join(',')}) ORDER BY id`
-    ).bind(...ids).all();
+      `SELECT link_id, countries, devices, url, ab_of FROM link_targets WHERE link_id IN (${inIds}) ORDER BY id`
+    ).bind(jIds).all();
     for (const l of items) {
       l.ruleList = rules.results.filter((r) => r.link_id === l.id)
         .map((r) => ({ countries: r.countries.split(',').filter(Boolean), devices: (r.devices || '').split(',').filter(Boolean), url: r.url, ab: r.ab_of >= 0 }));
     }
-    const tg = (await env.DB.prepare(`SELECT link_id, tag FROM link_tags WHERE link_id IN (${ids.map(() => '?').join(',')}) ORDER BY tag`).bind(...ids).all()).results;
+    const tg = (await env.DB.prepare(`SELECT link_id, tag FROM link_tags WHERE link_id IN (${inIds}) ORDER BY tag`).bind(jIds).all()).results;
     for (const l of items) l.tags = tg.filter((t) => t.link_id === l.id).map((t) => t.tag);
     // 目标页检查：列出打不开的地址
-    const hm = await healthOf(env, [...new Set(items.flatMap((l) => [l.target_url, ...l.ruleList.map((r) => r.url)]).filter(Boolean))]);
+    const hm = await healthOf(env, [...new Set(items.flatMap((l) => [l.target_url, l.app_web, ...l.ruleList.map((r) => r.url)]).filter(isWebUrl))]);
     for (const l of items) {
-      const urls = [l.target_url, ...l.ruleList.map((r) => r.url)].filter(Boolean);
+      const urls = [l.target_url, l.app_web, ...l.ruleList.map((r) => r.url)].filter(isWebUrl);
       l.down = urls.filter((u) => hm.get(u)?.state === 'down').map((u) => ({ url: u, error: hm.get(u).error, since: hm.get(u).since }));
     }
   }
@@ -1781,18 +1941,23 @@ async function linkClicks(env, id, url) {
   const size = Math.min(200, Math.max(1, Number(url.searchParams.get('size')) || 50));
   const bots = url.searchParams.get('bots') === '1';
   const where = `WHERE link_id = ? ${bots ? '' : 'AND is_bot = 0'}`;
+  // 总数最多数到 CLICKS_COUNT_CAP + 1 条：热门短链的明细很多，每次打开详情、每次翻页都数一遍全部明细太费读取额度。
+  // 超过时 capped = true（界面显示“10,000+ 条”）。
+  // 按 ts DESC, id DESC 排序：直接沿 (link_id, ts) 索引倒着读，只读这一页；按 id 排序要先把这条短链的明细全部读出来再排序
   const [total, rows] = await Promise.all([
-    env.DB.prepare(`SELECT COUNT(*) AS n FROM clicks ${where}`).bind(id).first('n'),
-    env.DB.prepare(`SELECT * FROM clicks ${where} ORDER BY id DESC LIMIT ${size} OFFSET ${(page - 1) * size}`)
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM clicks ${where} LIMIT ${CLICKS_COUNT_CAP + 1})`).bind(id).first('n'),
+    env.DB.prepare(`SELECT * FROM clicks ${where} ORDER BY ts DESC, id DESC LIMIT ${size} OFFSET ${(page - 1) * size}`)
       .bind(id).all(),
   ]);
-  return json({ total, page, size, items: rows.results });
+  return json({ total, capped: total > CLICKS_COUNT_CAP, page, size, items: rows.results });
 }
+const CLICKS_COUNT_CAP = 10000;
 
 async function exportClicks(env, id) {
   const link = await env.DB.prepare('SELECT slug FROM links WHERE id = ?').bind(id).first();
   if (!link) return json({ error: 'not found' }, 404);
-  const rows = (await env.DB.prepare('SELECT * FROM clicks WHERE link_id = ? ORDER BY id DESC LIMIT 100000')
+  // 和明细列表一样按 ts DESC, id DESC：沿索引读，不用先把全部明细读进来再排序
+  const rows = (await env.DB.prepare('SELECT * FROM clicks WHERE link_id = ? ORDER BY ts DESC, id DESC LIMIT 100000')
     .bind(id).all()).results;
   const cols = ['ts', 'source', 'referer', 'utm_source', 'utm_medium', 'utm_campaign', 'ip', 'country',
     'region', 'city', 'asn_org', 'device', 'os', 'browser', 'is_bot', 'kind', 'reason', 'proxy', 'asn', 'tls', 'http', 'lang', 'rule_id', 'ua'];
@@ -1949,6 +2114,7 @@ async function overviewAgg(env, url, { days, tz, bots }) {
   const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
   const q = await aggQuery(env, { days, tz, bots, linkId });
   const { now, dayStart, start, prevStart, firstDay, today, prevFirst, prevLast } = q;
+  const [topDc, topDa] = q.dayIn(firstDay, today);
 
   const [links, activeRows, totals, prev, todayHours, ydayHours, daily, prevDaily, uvDays, heatHours, topRows,
     sources, devices, browsers, oses, countries, recent, kinds, machines] = await Promise.all([
@@ -1963,9 +2129,9 @@ async function overviewAgg(env, url, { days, tz, bots }) {
     q.uvByDay(firstDay, today),
     q.hours(start, now),
     q.all(
-      `SELECT link_id AS k, SUM(n) AS n FROM agg_d WHERE dim = '' AND day >= ? AND day <= ? ${bots ? '' : 'AND machine = 0'}
+      `SELECT link_id AS k, SUM(n) AS n FROM agg_d WHERE dim = '' AND ${topDc} ${bots ? '' : 'AND machine = 0'}
        ${linkId ? 'AND link_id = ?' : ''} GROUP BY link_id ORDER BY n DESC LIMIT 30`,
-      firstDay, today, ...(linkId ? [linkId] : []),
+      ...topDa, ...(linkId ? [linkId] : []),
     ),
     q.top('source', 20), q.top('device', 20), q.top('browser', 20), q.top('os', 20), q.top('country', 20),
     recentClicks(env, bots, linkId),
@@ -2266,7 +2432,8 @@ async function cfUsageRaw(env, force) {
     errors: [d1.error && `D1：${d1.error}`, workers.error && `Workers：${workers.error}`, storage.error && `存储：${storage.error}`].filter(Boolean),
     updatedAt: Date.now(),
   };
-  if (!out.errors.length) await setSetting(env, 'usage_cache', JSON.stringify(out));
+  // 缓存写不进去（D1 写入额度用完时）也照常返回用量：这正是站长最需要看用量的时候
+  if (!out.errors.length) await setSetting(env, 'usage_cache', JSON.stringify(out)).catch((e) => console.error('usage cache failed', e));
   return { ...out, ...cfMeta(cf), planSetting, plan: planSetting === 'auto' ? detected : planSetting };
 }
 
@@ -2465,7 +2632,14 @@ async function shareView(request, env, ctx, url) {
   const hour = Math.floor(Date.now() / 3600000);
   const n = row.hour === hour ? row.hour_n + 1 : 1;
   if (n > SHARE_PER_HOUR) {
-    ctx.waitUntil(logShareView(request, env, row.token, 429).catch(() => {}));
+    // 每小时只记第一次被限流（hour_n 从 60 加到 61 当作标记，条件更新保证并发时也只记一次）；
+    // 之后的 429 不再写数据库：链接泄露后被持续刷，也不会耗掉每天的写入额度、挤掉短链的访问记录
+    if (row.hour === hour && row.hour_n === SHARE_PER_HOUR) {
+      ctx.waitUntil(env.DB.prepare('UPDATE shares SET hour_n = hour_n + 1 WHERE token = ? AND hour = ? AND hour_n = ?')
+        .bind(row.token, hour, SHARE_PER_HOUR).run()
+        .then((r) => (r.meta.changes ? logShareView(request, env, row.token, 429) : null))
+        .catch(() => {}));
+    }
     return text('访问太频繁，请稍后再试。', 429, 'text/plain; charset=utf-8', { 'retry-after': '600' });
   }
   await env.DB.prepare('UPDATE shares SET views = views + 1, last_view = ?, hour = ?, hour_n = ? WHERE token = ?').bind(Date.now(), hour, n, row.token).run();
@@ -2479,7 +2653,8 @@ async function shareView(request, env, ctx, url) {
   return json1 ? text(JSON.stringify(rep, null, 2), 200, 'application/json; charset=utf-8', dl) : text(google.reportMarkdown(rep), 200, undefined, dl);
 }
 
-// 访问明细条数要扫整张表，一天最多数一次（存在 settings）；最早一条走 ts 索引，只读一行
+// 访问明细条数要扫整张表，一天最多数一次（存在 settings）；最早一条走 ts 索引，只读一行。
+// 同一次扫描顺便数出超过保留期、还没删的条数（pending）：整点任务每次最多删 prunePerRun() 条，积压多时要几天才删完，界面据此显示进度
 async function retentionInfo(env) {
   const [days, st, first, cnt] = await Promise.all([
     getSetting(env, 'retention_days'),
@@ -2487,12 +2662,24 @@ async function retentionInfo(env) {
     env.DB.prepare('SELECT ts FROM clicks ORDER BY ts LIMIT 1').first('ts'),
     getSetting(env, 'clicks_count'),
   ]);
-  let count = Number(cnt?.value);
-  if (!cnt || Date.now() - cnt.updated_at > DAY) {
-    count = (await env.DB.prepare('SELECT COUNT(*) AS n FROM clicks').first('n')) || 0;
-    await setSetting(env, 'clicks_count', String(count));
+  const d = Number(days?.value) || 0;
+  let stat = null;
+  try { stat = cnt ? JSON.parse(cnt.value) : null; } catch {}
+  if (typeof stat === 'number') stat = { n: stat, old: null };   // 旧版本只存了总条数
+  let at = cnt?.updated_at || 0;
+  if (!stat || Date.now() - at > DAY) {
+    const cutoff = d ? Math.min(Date.now() - d * DAY, st.mark || 0) : 0;
+    const r = await env.DB.prepare('SELECT COUNT(*) AS n, SUM(ts < ?) AS old FROM clicks').bind(cutoff).first();
+    stat = { n: r?.n || 0, old: r?.old || 0 };
+    at = Date.now();
+    // 只是缓存，写不进去（D1 写入额度用完）也照常返回
+    await setSetting(env, 'clicks_count', JSON.stringify(stat)).catch(() => {});
   }
-  return { days: Number(days?.value) || 0, count, first: first || null, aggregated: st.mark || null };
+  return {
+    days: d, count: stat.n, first: first || null, aggregated: st.mark || null,
+    // 待清理：超过保留期、还没删的明细条数（countedAt 时数的，之后每小时最多删 perHour 条）
+    pending: d ? stat.old : 0, countedAt: at, perHour: await prunePerRun(env),
+  };
 }
 
 async function recentClicks(env, bots, linkId = 0) {
@@ -2777,15 +2964,26 @@ async function buildReport(env, cfg, kind, now, test = false) {
   const { start, end, prev, label } = reportRange(kind, now, cfg.tz);
   const q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
   const all = (st) => st.all().then((r) => r.results);
-  const [cur, before, created, links, sources, countries] = await Promise.all([
+  // 本期的热门短链、来源、国家用一次扫描算出来：按（短链, 来源, 国家）分组计数，在这里再分别汇总取前 5，
+  // 代替原来每个排行各扫一遍明细（月报要读好几遍一整个月的明细）。
+  // 不把明细逐条读进来在内存里算：访问多的站一个月有几十上百万条，Worker 内存放不下；分组后的行数远少于明细条数
+  const [cur, before, created, groups] = await Promise.all([
     q('SELECT COUNT(*) AS n, COUNT(DISTINCT ip) AS u FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0', start, end).first(),
     q('SELECT COUNT(*) AS n, COUNT(DISTINCT ip) AS u FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0', prev, start).first(),
     q('SELECT COUNT(*) AS n FROM links WHERE created_at >= ? AND created_at < ?', start, end).first('n'),
-    all(q(`SELECT l.slug, l.title, COUNT(*) AS n FROM clicks c JOIN links l ON l.id = c.link_id
-           WHERE c.ts >= ? AND c.ts < ? AND c.is_bot = 0 GROUP BY l.id ORDER BY n DESC LIMIT 5`, start, end)),
-    all(q('SELECT source AS k, COUNT(*) AS n FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0 GROUP BY source ORDER BY n DESC LIMIT 5', start, end)),
-    all(q('SELECT country AS k, COUNT(*) AS n FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0 GROUP BY country ORDER BY n DESC LIMIT 5', start, end)),
+    all(q('SELECT link_id, source, country, COUNT(*) AS n FROM clicks WHERE ts >= ? AND ts < ? AND is_bot = 0 GROUP BY link_id, source, country', start, end)),
   ]);
+  const sumBy = (key) => {
+    const m = new Map();
+    for (const g of groups) m.set(g[key], (m.get(g[key]) || 0) + g.n);
+    return [...m].map(([k, n]) => ({ k, n })).sort((a, b) => b.n - a.n);
+  };
+  const sources = sumBy('source').slice(0, 5), countries = sumBy('country').slice(0, 5);
+  // 热门短链：多取几个候选再查名称，查不到的（统计期间刚被删掉的）不算，和原来 JOIN links 的结果一致
+  const cand = sumBy('link_id').slice(0, 10);
+  const meta = cand.length ? new Map((await all(q('SELECT id, slug, title FROM links WHERE id IN (SELECT value FROM json_each(?))',
+    JSON.stringify(cand.map((c) => c.k))))).map((l) => [l.id, l])) : new Map();
+  const links = cand.filter((c) => meta.has(c.k)).slice(0, 5).map((c) => ({ slug: meta.get(c.k).slug, title: meta.get(c.k).title, n: c.n }));
   const nf = new Intl.NumberFormat('en-US');
   const n = (v) => nf.format(v || 0);
   const chg = (a, b) => (!b ? (a ? '新增' : '持平') : a === b ? '持平' : `${a > b ? '↑' : '↓'} ${Math.abs(Math.round(((a - b) / b) * 100))}%`);
@@ -2889,9 +3087,26 @@ function json(data, status = 200, headers = {}) {
   });
 }
 
-// 简单的提示页（短链不存在 / 暂不可用），风格与首页一致
-function infoPage(title, message, status) {
-  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+// 简单的提示页（短链不存在 / 已过期 / 暂不可用 / 服务出错），风格与首页一致。
+// 访客不一定看得懂中文（按国家分流给海外访客用），和 App 过渡页一样按浏览器语言显示中文或英文
+const INFO_TEXT = {
+  notFound: { zh: ['链接不存在', '这个短链接不存在或已被停用，请检查链接是否完整。'], en: ['Link not found', 'This short link does not exist or has been disabled. Please check that the link is complete.'] },
+  notConfigured: { zh: ['链接暂不可用', '该链接在你所在的地区暂未开放，请稍后再试。'], en: ['Link unavailable', 'This link is not available in your region yet. Please try again later.'] },
+  expired: { zh: ['链接已过期', '这个短链接已过期，请联系分享者获取新的链接。'], en: ['Link expired', 'This short link has expired. Please ask whoever shared it for a new link.'] },
+  error: { zh: ['服务暂时不可用', '请稍后再试。'], en: ['Service temporarily unavailable', 'Please try again in a little while.'] },
+  // 只有站长会打开后台：说清楚多半是 D1 免费额度用完了、会自己恢复，免得以为部署坏了去重新部署或删库
+  dbAdmin: { zh: ['数据库暂时不可用', '如果是今天的 D1 免费额度用完了，会在 UTC 0 点（北京时间早上 8 点）自动恢复，不需要重新部署，也不要删除数据库。可在 Cloudflare 控制台 → D1 查看用量。'],
+    en: ['Database temporarily unavailable', "If today's free D1 quota has run out, it resets automatically at 00:00 UTC. There's no need to redeploy or delete the database. Check usage in the Cloudflare dashboard → D1."] },
+};
+// 访客偏好中文：Accept-Language 第一个是 zh 开头的（和 App 过渡页的判断一致）
+const prefersZh = (request) => /^zh\b/i.test(request?.headers.get('accept-language') || '');
+const DB_DOWN = '数据库暂时不可用：如果是今天的 D1 免费额度用完了，会在 UTC 0 点（北京时间早上 8 点）自动恢复，可在 Cloudflare 控制台查看用量';
+// 和后台一样的图标，内联在页面里：浏览器不会再单独请求一次 /favicon.ico
+const ICON_LINK = `<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234b83ff'/%3E%3Cstop offset='1' stop-color='%231f4fd1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M10.5 21.5 21.5 10.5M13.5 10.5h8v8' stroke='%23fff' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">`;
+function infoPage(kind, status, request) {
+  const en = !prefersZh(request);
+  const [title, message] = INFO_TEXT[kind][en ? 'en' : 'zh'];
+  const html = `<!doctype html><html lang="${en ? 'en' : 'zh-CN'}"><head><meta charset="utf-8">${ICON_LINK}
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${title} · cligc</title>
 <style>
 :root{--bg:#f4f5f7;--text:#0d1321;--muted:#6b7385;--line:#e3e6ec;--accent:#2f6bff}
@@ -2907,16 +3122,17 @@ a:hover{color:var(--accent)}
 </style></head><body><main>
 <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4b83ff"/><stop offset="1" stop-color="#1f4fd1"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#g)"/><path d="M10.5 21.5 21.5 10.5M13.5 10.5h8v8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
 <div class="code">${status}</div><h1>${title}</h1><p>${message}</p>
-<a href="/">cligc 短链服务 →</a></main></body></html>`;
-  return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+<a href="/">${en ? 'cligc short links' : 'cligc 短链服务'} →</a></main></body></html>`;
+  // 按 Accept-Language 返回不同语言，告诉缓存要区分
+  return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', vary: 'accept-language' } });
 }
 
-function notConfigured() {
-  return infoPage('链接暂不可用', '该链接在你所在的地区暂未开放，请稍后再试。', 404);
+function notConfigured(request) {
+  return infoPage('notConfigured', 404, request);
 }
 
-function notFound() {
-  return infoPage('链接不存在', '这个短链接不存在或已被停用，请检查链接是否完整。', 404);
+function notFound(request) {
+  return infoPage('notFound', 404, request);
 }
 
 function cut(s, n) {
@@ -2932,8 +3148,9 @@ const HEALTH_BATCH = 25, HEALTH_EVERY = 6 * 3600000, HEALTH_RETRY = 3600000, HEA
 async function healthUrls(env) {
   return (await env.DB.prepare(
     `SELECT target_url AS url FROM links WHERE enabled = 1 AND target_url != ''
+     UNION SELECT app_web FROM links WHERE enabled = 1 AND app_web != ''
      UNION SELECT t.url FROM link_targets t JOIN links l ON l.id = t.link_id WHERE l.enabled = 1`
-  ).all()).results.map((r) => r.url);
+  ).all()).results.map((r) => r.url).filter(isWebUrl);   // App 地址没法从服务器检查
 }
 
 // 检查一个地址，返回 { state, status, error, ms }
@@ -3031,11 +3248,12 @@ ${admin ? `<p style="margin:20px 0 0"><a href="${h(admin)}" style="display:inlin
 // 用到这些地址的短链后缀
 async function healthUsers(env, urls) {
   if (!urls.length) return new Map();
-  const q = urls.map(() => '?').join(',');
+  const q = 'SELECT value FROM json_each(?)', j = JSON.stringify(urls);
   const rows = (await env.DB.prepare(
     `SELECT target_url AS url, slug FROM links WHERE target_url IN (${q})
+     UNION SELECT app_web AS url, slug FROM links WHERE app_web IN (${q})
      UNION SELECT t.url, l.slug FROM link_targets t JOIN links l ON l.id = t.link_id WHERE t.url IN (${q})`
-  ).bind(...urls, ...urls).all()).results;
+  ).bind(j, j, j).all()).results;
   const m = new Map();
   for (const r of rows) { if (!m.has(r.url)) m.set(r.url, []); if (!m.get(r.url).includes(r.slug)) m.get(r.url).push(r.slug); }
   return m;
@@ -3044,6 +3262,6 @@ async function healthUsers(env, urls) {
 // 一个短链的目标地址的检查结果（短链列表 / 详情用）
 async function healthOf(env, urls) {
   if (!urls.length) return new Map();
-  const rows = (await env.DB.prepare(`SELECT * FROM url_health WHERE url IN (${urls.map(() => '?').join(',')})`).bind(...urls).all().catch(() => ({ results: [] }))).results;
+  const rows = (await env.DB.prepare('SELECT * FROM url_health WHERE url IN (SELECT value FROM json_each(?))').bind(JSON.stringify(urls)).all().catch(() => ({ results: [] }))).results;
   return new Map(rows.map((r) => [r.url, { state: r.state, status: r.status, error: r.error, ms: r.ms, checkedAt: r.checked_at, since: r.since }]));
 }

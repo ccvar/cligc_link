@@ -51,6 +51,8 @@
 
 点击上方 **Deploy to Cloudflare** 按钮，按提示授权即可自动创建 Worker 和 D1 数据库。部署完成后访问 `https://<worker 地址>/admin`，用默认密码 **`admin`** 登录，按提示设置新密码即可。
 
+> 部署后的默认地址是 `*.workers.dev`，**在中国大陆通常打不开**。面向国内访客请先[绑定自己的域名](#绑定自己的域名)，之后复制的短链和二维码都用新域名。
+
 ### 方式二：命令行部署
 
 需要 Node.js 18+ 和一个 Cloudflare 账号。
@@ -85,6 +87,8 @@ routes = [
 ```
 
 重新执行 `npx wrangler deploy` 即可。
+
+用一键部署的：在 Cloudflare 控制台打开 **Workers 和 Pages → 你的 Worker → 设置 → 域和路由 → 添加 → 自定义域**，填入域名即可（同样要求域名托管在 Cloudflare）。之后用新域名打开后台，复制的短链和二维码就会用新域名。
 
 ## 升级
 
@@ -126,16 +130,20 @@ npm run upgrade
 
 没设置 `SESSION_SECRET` 时，会话密钥自动生成并存在数据库里；它也用来加密数据库里的 Google 令牌、客户端密钥和 Cloudflare 令牌，所以数据库一旦泄露，这些也能被解开。把**同一个值**改存成 Wrangler Secret，登录状态、已连接的 Google 账号都不受影响：
 
+在项目目录里执行（`<数据库名>` 是 `wrangler.toml` 里的 `database_name`，默认 `cligc-link`）：
+
 ```bash
 # 1. 读出数据库里的密钥，直接通过管道存成 Secret（不会显示在屏幕上）
-npx wrangler d1 execute <数据库名> -c wrangler.prod.toml --remote --json \
+npx wrangler d1 execute <数据库名> --remote --json \
   --command "SELECT value FROM settings WHERE key = 'session_secret'" \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['results'][0]['value'], end='')" \
-  | npx wrangler secret put SESSION_SECRET -c wrangler.prod.toml
+  | node -e "let s='';process.stdin.on('data',(d)=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s)[0].results[0].value))" \
+  | npx wrangler secret put SESSION_SECRET
 
 # 2. 确认后台还能正常使用后，删掉数据库里的副本
-npx wrangler d1 execute <数据库名> -c wrangler.prod.toml --remote --command "DELETE FROM settings WHERE key = 'session_secret'"
+npx wrangler d1 execute <数据库名> --remote --command "DELETE FROM settings WHERE key = 'session_secret'"
 ```
+
+用一键部署、本地没有项目的：在 Cloudflare 控制台打开 **存储和数据库 → D1 → 你的数据库 → 控制台**，执行 `SELECT value FROM settings WHERE key = 'session_secret'` 并复制结果；再打开 **Workers 和 Pages → 你的 Worker → 设置 → 变量和机密 → 添加**，类型选“密钥”，名称填 `SESSION_SECRET`，值粘贴刚才复制的内容并部署。确认后台正常后，回到 D1 控制台执行 `DELETE FROM settings WHERE key = 'session_secret'`。
 
 注意：如果改用一个**新的**密钥，所有设备会退出登录，需要在后台重新填写 Google 客户端 / Cloudflare 令牌、重新连接 Google 账号。
 
@@ -143,19 +151,15 @@ npx wrangler d1 execute <数据库名> -c wrangler.prod.toml --remote --command 
 
 - 生效顺序：后台修改过的密码 > `ADMIN_PASSWORD` > 默认密码 `admin`。
 - 在后台“设置 → 修改密码”可随时修改，新密码以 PBKDF2 加盐哈希保存在 D1 中；修改后其他设备的登录会自动失效。
-- 忘记密码时，删除数据库中保存的密码即可恢复为 `ADMIN_PASSWORD`（未设置则恢复为默认密码 `admin`，登录后需重新设置）：
-
-  ```bash
-  npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key = 'admin_password'"
-  ```
+- 忘记密码时，删除数据库中保存的密码即可恢复为 `ADMIN_PASSWORD`（未设置则恢复为默认密码 `admin`，登录后需重新设置），做法见下面的[进不去后台怎么办](#进不去后台怎么办)。
 
 ### 登录防暴力破解
 
-- 同一 IP 连续输错 5 次密码会被锁定，锁定时长从 15 分钟起逐次加倍，最长 24 小时；登录成功后清零。
+- 同一 IP 连续输错 5 次密码会被锁定，锁定时长从 15 分钟起逐次加倍，最长 24 小时；登录成功后清零。IPv6 按 /64 网段计算（一台服务器通常就有一整个 /64，换个地址不能重新计数）。
 - 密码以 PBKDF2（10 万次迭代）加盐哈希保存，每次输错还会延迟 0.8 秒响应。
 - 配置 Turnstile 后，人机验证在核对密码之前进行，自动化脚本无法批量尝试。
 - 开启两步验证后，即使密码泄露也无法登录；动态码连续输错 5 次锁定 15 分钟。
-- 自己被锁定时，可以等待解锁，或执行 `npx wrangler d1 execute cligc-link --remote --command "DELETE FROM login_guard"` 立即解除。
+- 自己被锁定时，可以等待解锁，或按[进不去后台怎么办](#进不去后台怎么办)立即解除。
 
 ### 登录设备
 
@@ -175,11 +179,27 @@ npx wrangler d1 execute <数据库名> -c wrangler.prod.toml --remote --command 
 
 - 动态码连续输错 5 次锁定 15 分钟；每个动态码只能使用一次。
 - 开启或关闭两步验证后，其他设备上的登录会自动失效。
-- 手机丢失、无法获取动态码时，在你的 Cloudflare 账号下执行以下命令关闭两步验证，然后用密码登录并重新绑定：
+- 手机丢失、无法获取动态码时，按[进不去后台怎么办](#进不去后台怎么办)关闭两步验证，然后用密码登录并重新绑定。
 
-  ```bash
-  npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key IN ('totp', 'mfa_fail')"
-  ```
+### 进不去后台怎么办
+
+忘记密码、被锁定、手机丢失时，在数据库里执行一条 SQL 即可。两种方式任选：
+
+- **Cloudflare 控制台**（不需要命令行，一键部署的也能用）：打开 **存储和数据库 → D1 → 你的数据库 → 控制台**，粘贴下表的 SQL 执行。
+- **命令行**（在项目目录里）：`npx wrangler d1 execute <数据库名> --remote --command "<SQL>"`。`<数据库名>` 是 `wrangler.toml` 里的 `database_name`（默认 `cligc-link`；一键部署时在部署页改过名字的，用你改的名字）。
+
+| 情况 | SQL | 之后 |
+| --- | --- | --- |
+| 忘记密码 | `DELETE FROM settings WHERE key = 'admin_password'` | 用 `ADMIN_PASSWORD`（没设置则用 `admin`）登录，再设置新密码 |
+| 输错密码太多次被锁定 | `DELETE FROM login_guard` | 立即可以重新登录 |
+| 动态码输错太多次被锁定 | `DELETE FROM settings WHERE key = 'mfa_fail'` | 立即可以重新输入动态码（不处理也会在 15 分钟后自动解锁） |
+| 手机丢失，收不到动态码 | `DELETE FROM settings WHERE key IN ('totp', 'mfa_fail')` | 两步验证已关闭，用密码登录后重新绑定 |
+
+例如忘记密码时用命令行：
+
+```bash
+npx wrangler d1 execute cligc-link --remote --command "DELETE FROM settings WHERE key = 'admin_password'"
+```
 
 ### 统计通知（日报 / 周报 / 月报 / 每周 SEO 变化 / 用量预警）
 
@@ -294,7 +314,9 @@ Bot Token、API Key 保存在 D1 中，后台只显示末 4 位。
 
 ### 来源追踪（可选）
 
-访客先从搜索引擎进入你的推广页，再点页面上的短链时，短链只能看到“来自推广页”。在后台“设置 → 来源追踪”开启后，把代码放到推广页上，它会识别访客来自哪个搜索引擎（Google、Bing、百度、搜狗、360、神马等）或广告点击（`gclid` / `msclkid`），并给指向短链的链接加上 `utm_source`：
+访客先从搜索引擎进入你的推广页，再点页面上的短链时，短链只能看到“来自推广页”。在后台“设置 → 来源追踪”开启后，把后台给出的**完整代码**粘贴到推广页里（推荐：在访客浏览器里运行，不占 Worker 请求额度），它会识别访客来自哪个搜索引擎（Google、Bing、百度、搜狗、360、神马等）或广告点击（`gclid` / `msclkid`），并给指向短链的链接加上 `utm_source`：
+
+也可以只放一行 Script 链接，规则更新后不用重新粘贴，但每个新访客加载一次就占一次 Worker 请求（和短链跳转共用免费版每天 10 万次的额度），流量大的页面建议用完整代码：
 
 ```html
 <script src="https://go.example.com/t.js" async></script>
@@ -303,7 +325,7 @@ Bot Token、API Key 保存在 D1 中，后台只显示末 4 位。
 - 只处理指向短链域名的链接；链接上已有的 `src`、`utm_source` 不会被改动。
 - 记住访客首次进入时的来源（sessionStorage），在站内翻页后再点短链也不会丢。
 - 在短链详情页“来源 · utm_source”查看；链接没有 `src` 时，`utm_source` 也会直接计入“来源”。
-- 也可以在后台复制完整代码直接粘贴到页面里。关闭开关后 `/t.js` 不再生效，已粘贴的完整代码不受影响。
+- 关闭开关后 `/t.js` 不再生效（访客浏览器里已缓存的要等缓存过期），已粘贴的完整代码不受影响。
 - 搜索引擎都不再传递搜索关键词，因此只能知道是哪个搜索引擎，看不到具体关键词。
 
 ### 真人 / 机器访问识别
@@ -349,7 +371,7 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 
 - 汇总表：`agg_h`（每小时访问次数）、`agg_d`（每天各维度的访问次数：来源、国家、城市、设备、浏览器、系统、规则命中、访客类型等）、`agg_uv`（每天的独立访客，用 HyperLogLog 估算，误差约 5%）。
 - 汇总在统计请求和每小时的定时任务里增量进行，无需手动操作；访客类型规则调整后会自动按保留的明细重建。
-- 在后台“设置 → 数据保留”可以选择访问明细保留 60 / 90 / 180 / 365 天或永久（默认永久）。超过期限的明细由定时任务每小时清理；趋势、来源、地区等统计读汇总数据，不受影响。访问明细列表、导出 CSV 和定时报告只包含仍保留的明细。
+- 在后台“设置 → 数据保留”可以选择访问明细保留 60 / 90 / 180 / 365 天或永久（默认永久）。超过期限的明细由定时任务每小时清理一批：免费版每次最多 500 条（一天最多约 1.2 万条）；在“Cloudflare 用量”里选了（或自动识别为）付费版时每次最多 2 万条。每删一条明细约占 4 行写入（表本身加 3 个索引），所以免费版清理积压期间每天最多约占 4.8 万行写入，大约是免费额度的一半；积压要删几天取决于积压多少和每天的访问量，后台会显示预计还要多久。每天访问几千次以上的免费版站点，开启前先在“设置 → Cloudflare 用量”看一下写入余量。趋势、来源、地区等统计读汇总数据，不受影响。访问明细列表、导出 CSV 和定时报告只包含仍保留的明细。
 
 ### 站点：GA4 与 Search Console
 
@@ -360,7 +382,7 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 配置（每个部署需要自己的 OAuth 客户端）：
 
 1. 在 [Google Cloud 控制台](https://console.cloud.google.com/) 新建项目，启用 **Google Analytics Admin API**、**Google Analytics Data API**、**Google Search Console API**。
-2. “OAuth 权限请求页面”：用户类型选“外部”，填写应用名称和邮箱，然后点 **发布应用**。未发布（测试状态）的应用授权 7 天后失效；个人使用无需 Google 审核，授权时出现“此应用未经验证”点“继续”即可。
+2. “OAuth 权限请求页面”：用户类型选“外部”，填写应用名称和邮箱，然后点 **发布应用**。未发布（测试状态）的应用授权 7 天后失效；个人使用无需 Google 审核，授权时如果出现“Google 未验证此应用”，点“继续”；没有“继续”按钮时，先点“高级”，再点下面的“转到…（不安全）”。这是你自己创建的应用，可以放心继续。
 3. “凭据 → 创建凭据 → OAuth 客户端 ID”，类型选 **Web 应用**，已获授权的重定向 URI 填 `https://<你的域名>/api/google/callback`。
 4. 打开后台“设置 → Google 集成”，填写客户端 ID 和客户端密钥并保存（密钥加密保存在 D1，之后只显示末 4 位）。
 5. 到“站点”页点“连接 Google 账号”完成授权。
@@ -449,11 +471,11 @@ npm test
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars   # 按需修改本地密码
+cp .dev.vars.example .dev.vars   # 按需去掉行首的 #
 npm run dev                      # http://localhost:8787/admin
 ```
 
-本地开发使用 Cloudflare 提供的 Turnstile 测试密钥，验证总会通过。
+本地默认不启用人机验证、密码是 `admin`；想在本地试 Turnstile，把 `.dev.vars` 里 `TURNSTILE_SITEKEY` 和 `TURNSTILE_SECRET` 两行都取消注释（Cloudflare 提供的测试密钥，验证总会通过）。
 
 ## 项目结构
 
@@ -478,7 +500,11 @@ CHANGELOG.md      更新日志
 
 ## 免费额度
 
-只使用 Workers 和 D1。Cloudflare 免费版每天 10 万次 Worker 请求、D1 每天 500 万行读取 / 10 万行写入、5 GB 存储，个人和小团队通常用不完。每次跳转会写入一条访问记录。
+只使用 Workers 和 D1。Cloudflare 免费版每天 10 万次 Worker 请求、D1 每天 500 万行读取 / 10 万行写入、5 GB 存储，个人和小团队通常用不完。
+
+最先用完的通常是 **D1 写入**：每次访问写一条访问明细，D1 按行计费时它的 3 个索引、自增序号也各算一行，加上短链的访问计数和每小时汇总，**平均每次访问约占 10 行写入**（短链多、访问分散时汇总占得更多）。所以免费版每天大约能完整记录几千到一万次访问。**超过当天的读取或写入额度后，D1 当天不能再查询：短链会显示“暂时不可用”页面，后台也打不开**，UTC 0 点（北京时间早上 8 点）额度重置后自动恢复。后台“设置 → Cloudflare 用量”可以查看用量，在“通知”页可以开启用量预警，快用完时提前提醒。访问量更大时建议升级 Workers 付费版（每月 5 美元，含每月 5000 万行写入）。
+
+另外，删除短链会一并删掉它的全部访问明细，每条约占 4 行写入：一次删掉几万条访问记录就可能直接用完当天的写入额度，让所有短链当天暂停跳转。只是不想让它再跳转的话，先停用。
 
 ## 许可证
 

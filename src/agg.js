@@ -254,29 +254,53 @@ export async function rebuildAgg(env) {
   await setSetting(env, 'agg_mark', fromTs);
 }
 
-export async function dropLinkAgg(env, id) {
-  await env.DB.batch([
-    env.DB.prepare('DELETE FROM agg_h WHERE link_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM agg_d WHERE link_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM agg_uv WHERE link_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM agg_suv WHERE link_id = ?').bind(id),
-  ]);
+// 删除短链时清掉它们的汇总。ids 可以是一组（批量删除时每张表只扫一遍，不是每条短链各扫一遍）；
+// since = 这些短链里最早的创建时间：按小时 / 按天排序的表只从那天往后找（往前多留一天，照顾时区）
+// 返回语句，调用方和删短链的语句放进同一个 batch（同一个事务：要么一起删掉，要么都不删，不会留下删不掉的统计）
+export function dropLinkAggStmts(env, ids, since = 0) {
+  ids = [].concat(ids).map(Number).filter(Boolean);
+  if (!ids.length) return [];
+  const j = JSON.stringify(ids), from = Math.max(0, since - DAY);
+  const inIds = 'link_id IN (SELECT value FROM json_each(?))';
+  return [
+    env.DB.prepare(`DELETE FROM agg_h WHERE hour >= ? AND ${inIds}`).bind(Math.floor(from / HOUR), j),
+    env.DB.prepare(`DELETE FROM agg_d WHERE ${inIds}`).bind(j),
+    env.DB.prepare(`DELETE FROM agg_uv WHERE day >= ? AND ${inIds}`).bind(dayKey(from, 0), j),
+    env.DB.prepare(`DELETE FROM agg_suv WHERE day >= ? AND ${inIds}`).bind(dayKey(from, 0), j),
+  ];
+}
+export async function dropLinkAgg(env, ids, since = 0) {
+  const stmts = dropLinkAggStmts(env, ids, since);
+  if (stmts.length) await env.DB.batch(stmts);
 }
 
-// 按保留天数删除过期明细；尚未汇总的明细不删
+// 按保留天数删除过期明细；尚未汇总的明细不删。
+// D1 免费版每天只有 10 万行写入，删一行明细也算写入（表本身加 3 个索引，约 4 行）：免费版每次整点任务最多删 PRUNE_PER_RUN 条
+// （一天最多约 1.2 万条），第一次开启保留、积压了很多旧明细时分几天慢慢删完，不会一两次就用光当天的写入额度。
+// 付费版（在“Cloudflare 用量”里选了付费版，或自动识别为付费版）额度大得多，每次最多删 PRUNE_PAID 条，访问多的站点也追得上
+export const PRUNE_PER_RUN = 500, PRUNE_PAID = 20000;
+export async function prunePerRun(env) {
+  const plan = (await getSetting(env, 'cf_plan')) || 'auto';
+  if (plan === 'paid') return PRUNE_PAID;
+  if (plan !== 'auto') return PRUNE_PER_RUN;
+  try { return JSON.parse((await getSetting(env, 'usage_cache')) || '{}').detected === 'paid' ? PRUNE_PAID : PRUNE_PER_RUN; } catch { return PRUNE_PER_RUN; }
+}
 export async function pruneClicks(env) {
   const days = Number(await getSetting(env, 'retention_days')) || 0;
   if (!days) return 0;
   const { mark } = await aggState(env);
   const cutoff = Math.min(Date.now() - days * DAY, mark);
   if (!cutoff) return 0;
-  let total = 0;
-  for (let i = 0; i < 20; i++) {
-    const r = await env.DB.prepare('DELETE FROM clicks WHERE id IN (SELECT id FROM clicks WHERE ts < ? ORDER BY ts LIMIT 2000)').bind(cutoff).run();
-    total += r.meta.changes || 0;
-    if ((r.meta.changes || 0) < 2000) break;
+  // 每条语句最多删 2000 条，付费版分几批删
+  const limit = await prunePerRun(env);
+  let n = 0;
+  while (n < limit) {
+    const r = await env.DB.prepare('DELETE FROM clicks WHERE id IN (SELECT id FROM clicks WHERE ts < ? ORDER BY ts LIMIT ?)').bind(cutoff, Math.min(2000, limit - n)).run();
+    const c = r.meta.changes || 0;
+    n += c;
+    if (c < Math.min(2000, limit - n + c)) break;
   }
-  return total;
+  return n;
 }
 
 // ---------------------------------------------------------------- 读取汇总（7 天及以上的范围）
@@ -295,6 +319,13 @@ export async function aggQuery(env, { days, tz, bots, linkId = 0 }) {
   const mc = bots ? '' : 'AND machine = 0';
   const lf = linkId ? 'AND link_id = ?' : '';
   const lb = linkId ? [linkId] : [];
+  // 日期条件。汇总表的主键是 (dim, day, link_id, …) / (day, link_id, …)：day 用范围条件时 link_id 用不上索引，
+  // 查一条短链也要把这段时间全部短链的汇总行读一遍（读取量跟着全站流量涨）。
+  // 查单条短链时改成逐天精确查找（日期列表只占一个绑定参数），只读这条短链自己的行；概览（全部短链）仍用范围
+  const dayList = (from, to) => { const out = []; for (let d = from; d <= to && out.length < 1000; d = addDays(d, 1)) out.push(d); return out; };
+  const dayIn = (from, to, exact = !!linkId) => (exact
+    ? ['day IN (SELECT value FROM json_each(?))', [JSON.stringify(dayList(from, to))]]
+    : ['day >= ? AND day <= ?', [from, to]]);
 
   // 原始明细尾巴：mark 之后的访问（通常不到一小时）
   const tail = mark < now ? (await env.DB.prepare(
@@ -309,9 +340,10 @@ export async function aggQuery(env, { days, tz, bots, linkId = 0 }) {
   async function top(dim, limit = 10, { who = 'auto', key } = {}) {
     const mode = who === 'auto' ? (bots ? 'all' : 'human') : who;
     const clause = mode === 'all' ? '' : mode === 'human' ? 'AND machine = 0' : 'AND machine = 1';
+    const [dc, da] = dayIn(firstDay, today);
     const rows = await all(
-      `SELECT k, SUM(n) AS n FROM agg_d WHERE dim = ? AND day >= ? AND day <= ? ${clause} ${lf} GROUP BY k ORDER BY n DESC LIMIT ${limit + 20}`,
-      dim, firstDay, today, ...lb,
+      `SELECT k, SUM(n) AS n FROM agg_d WHERE dim = ? AND ${dc} ${clause} ${lf} GROUP BY k ORDER BY n DESC LIMIT ${limit + 20}`,
+      dim, ...da, ...lb,
     );
     const m = new Map(rows.map((r) => [r.k, r.n]));
     for (const r of tail) {
@@ -325,20 +357,22 @@ export async function aggQuery(env, { days, tz, bots, linkId = 0 }) {
 
   // 访问次数：按天
   async function daily(from, to, fromTs, toTs, shift = 0) {
+    const [dc, da] = dayIn(from, to);
     const rows = await all(
-      `SELECT day AS k, SUM(n) AS n FROM agg_d WHERE dim = '' AND day >= ? AND day <= ? ${mc} ${lf} GROUP BY day`,
-      from, to, ...lb,
+      `SELECT day AS k, SUM(n) AS n FROM agg_d WHERE dim = '' AND ${dc} ${mc} ${lf} GROUP BY day`,
+      ...da, ...lb,
     );
     const m = new Map(rows.map((r) => [r.k, r.n]));
     for (const r of tailIn(fromTs, toTs)) { const k = dayKey(r.ts, tz); m.set(k, (m.get(k) || 0) + 1); }
     return [...m].map(([k, n]) => ({ k: shift ? addDays(k, shift) : k, n })).sort((a, b) => (a.k < b.k ? -1 : 1));
   }
 
-  // 独立访客：按天合并估算
+  // 独立访客：按天合并估算。这里总是按短链（0 = 全部短链）取，所以概览也逐天精确查找
   async function uvByDay(from, to, lids = [linkId]) {
+    const [dc, da] = dayIn(from, to, true);
     const rows = await all(
-      `SELECT day, link_id, hll FROM agg_uv WHERE day >= ? AND day <= ? ${mc} AND link_id IN (${lids.map(() => '?').join(',')})`,
-      from, to, ...lids,
+      `SELECT day, link_id, hll FROM agg_uv WHERE ${dc} ${mc} AND link_id IN (${lids.map(() => '?').join(',')})`,
+      ...da, ...lids,
     );
     const m = new Map();
     for (const r of rows) {
@@ -353,8 +387,9 @@ export async function aggQuery(env, { days, tz, bots, linkId = 0 }) {
   }
 
   async function total(from, to, fromTs, toTs) {
+    const [dc, da] = dayIn(from, to);
     const [n, uvs] = await Promise.all([
-      env.DB.prepare(`SELECT SUM(n) AS n FROM agg_d WHERE dim = '' AND day >= ? AND day <= ? ${mc} ${lf}`).bind(from, to, ...lb).first('n'),
+      env.DB.prepare(`SELECT SUM(n) AS n FROM agg_d WHERE dim = '' AND ${dc} ${mc} ${lf}`).bind(...da, ...lb).first('n'),
       uvByDay(from, to),
     ]);
     const reg = hllNew();
@@ -366,10 +401,13 @@ export async function aggQuery(env, { days, tz, bots, linkId = 0 }) {
   }
 
   // 按小时的访问次数（用于今日、活跃时段、时段分布）
+  // 单条短链同样逐小时精确查找（主键 (hour, link_id, machine)，理由同 dayIn）
   async function hours(fromTs, toTs) {
+    const lo = Math.floor(fromTs / HOUR), hi = Math.ceil(Math.min(toTs, mark) / HOUR);
+    const hourList = () => { const out = []; for (let h = lo; h < hi; h++) out.push(h); return JSON.stringify(out); };
     const rows = await all(
-      `SELECT hour, SUM(n) AS n FROM agg_h WHERE hour >= ? AND hour < ? ${mc} ${lf} GROUP BY hour`,
-      Math.floor(fromTs / HOUR), Math.ceil(Math.min(toTs, mark) / HOUR), ...lb,
+      `SELECT hour, SUM(n) AS n FROM agg_h WHERE ${linkId ? 'hour IN (SELECT value FROM json_each(?))' : 'hour >= ? AND hour < ?'} ${mc} ${lf} GROUP BY hour`,
+      ...(linkId ? [hourList()] : [lo, hi]), ...lb,
     );
     const out = rows.map((r) => ({ ts: r.hour * HOUR, n: r.n }));
     for (const r of tailIn(Math.max(fromTs, mark), toTs)) out.push({ ts: r.ts, n: 1 });
@@ -378,7 +416,7 @@ export async function aggQuery(env, { days, tz, bots, linkId = 0 }) {
 
   return {
     days, tz, bots, now, dayStart, start, prevStart, today, firstDay, prevFirst, prevLast, mark,
-    tail, tailIn, top, daily, uvByDay, addTailIps, total, hours, all,
+    tail, tailIn, top, daily, uvByDay, addTailIps, total, hours, all, dayIn,
     // 维度 key 的转换
     kinds: async () => (await top('kind', 20, { who: 'all', key: (r) => (r.kind || 'human') + (r.proxy ? ':p' : '') }))
       .map((x) => { const [k, p] = x.k.split(':'); return { k, p: p ? 1 : 0, n: x.n }; }),

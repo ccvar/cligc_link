@@ -113,3 +113,57 @@ test('semverGt 比较版本号', async () => {
   assert.equal(semverGt('1.0.0', '1.0.1'), false);
   assert.equal(semverGt('2.0.0-beta', '1.9.9'), true);
 });
+
+test('目标地址：网址和 App 地址', async () => {
+  const { normalizeTarget, isAppUrl, inAppBrowser, intentWithFallback } = await import('../src/lib.js');
+  assert.equal(normalizeTarget('https://b.com/a?x=1'), 'https://b.com/a?x=1');
+  assert.equal(normalizeTarget('  tg://resolve?domain=cligc '), 'tg://resolve?domain=cligc');
+  assert.equal(normalizeTarget('weixin://'), 'weixin://');
+  assert.equal(normalizeTarget('snssdk1128://user/profile/123'), 'snssdk1128://user/profile/123');
+  assert.equal(normalizeTarget('intent://scan/#Intent;scheme=zxing;package=com.google.zxing.client.android;end'), 'intent://scan/#Intent;scheme=zxing;package=com.google.zxing.client.android;end');
+  // http / https 拼错不能当成 App 地址；很长的网址照常（以前没有长度限制）
+  for (const bad of ['htps://b.com/x', 'hhttps://b.com', 'ttps://b.com', 'htttps://b.com', 'htp://b.com', 'htts://b.com', 'htt://b.com', 'httsp://b.com', 'hppts://b.com']) assert.equal(normalizeTarget(bad), null, bad);
+  for (const ok of ['ssh://x', 'tg://x', 'weixin://', 'spotify:track:1', 'https://http.cat/200', 'https://httpbin.org/get']) assert.ok(normalizeTarget(ok), ok);
+  assert.equal(normalizeTarget('https://https//b.com/x'), null);
+  assert.ok(normalizeTarget('https://b.com/?q=' + 'x'.repeat(3000)));
+  // 网址里的空格照常编码（和以前一样），App 地址里的空格不行
+  assert.equal(normalizeTarget('https://b.com/s?q=a b'), 'https://b.com/s?q=a%20b');
+  // 系统级协议挡掉；正常的 App 协议和 itms-services 不受影响
+  for (const bad of ['search-ms:query=x', 'ms-appinstaller:?source=https://x', 'ms-word:ofe|u|https://x/a.docx', 'MS-MSDT:x']) assert.equal(normalizeTarget(bad), null, bad);
+  assert.equal(normalizeTarget('itms-services://?action=download-manifest&url=https://x/m.plist'), 'itms-services://?action=download-manifest&url=https://x/m.plist');
+  for (const bad of ['javascript:alert(1)', 'JavaScript:alert(1)', 'data:text/html,x', 'file:///etc/passwd', 'vbscript:x', 'tg://a b', 'tg://a\nb', 'http://', 'not a url', '']) {
+    assert.equal(normalizeTarget(bad), null, bad);
+  }
+  assert.ok(isAppUrl('tg://x')); assert.ok(!isAppUrl('https://x.com'));
+  assert.equal(inAppBrowser('Mozilla/5.0 (iPhone) MicroMessenger/8.0.50'), 'wechat');
+  assert.equal(inAppBrowser('Mozilla/5.0 (iPhone) Mobile/15E148 Safari/604.1'), '');
+  assert.equal(intentWithFallback('intent://x#Intent;scheme=a;package=b;end', 'https://w.com/?a=1'),
+    'intent://x#Intent;scheme=a;package=b;S.browser_fallback_url=https%3A%2F%2Fw.com%2F%3Fa%3D1;end');
+  assert.equal(intentWithFallback('intent://x#Intent;scheme=a;end', ''), 'intent://x#Intent;scheme=a;end');
+});
+
+test('登录锁定的计数键：IPv4 用完整地址，IPv6 按 /64', async () => {
+  const { guardKey } = await import('../src/lib.js');
+  assert.equal(guardKey('203.0.113.7'), '203.0.113.7');
+  assert.equal(guardKey('unknown'), 'unknown');
+  // 同一个 /64 里的不同地址（含各种缩写写法）是同一个键
+  const k = guardKey('2001:db8:1234:5678::1');
+  assert.equal(k, '2001:db8:1234:5678::/64');
+  for (const ip of ['2001:db8:1234:5678:abcd:ef01:2345:6789', '2001:0db8:1234:5678:0:0:0:2', '2001:DB8:1234:5678::ffff', '2001:db8:1234:5678::1%eth0']) assert.equal(guardKey(ip), k, ip);
+  // 不同的 /64 不是同一个键；前 64 位里有 :: 缩写的也能展开
+  assert.notEqual(guardKey('2001:db8:1234:5679::1'), k);
+  assert.equal(guardKey('2001:db8::1'), '2001:db8:0:0::/64');
+  assert.equal(guardKey('::1'), '0:0:0:0::/64');
+  // 内嵌 IPv4 的按 IPv4 计
+  assert.equal(guardKey('::ffff:198.51.100.9'), '198.51.100.9');
+});
+
+test('识别数据库错误（D1 额度用完等）', async () => {
+  const { isDbError } = await import('../src/lib.js');
+  assert.ok(isDbError(new Error('D1_ERROR: Exceeded maximum daily rows read')));
+  assert.ok(isDbError(new Error('D1_ERROR: no such table: links: SQLITE_ERROR')));
+  assert.ok(isDbError(new Error('Your account has exceeded the daily limit of rows written for the database')));
+  assert.ok(!isDbError(new Error('Rate limit exceeded')));
+  assert.ok(!isDbError(new TypeError("Cannot read properties of undefined (reading 'x')")));
+  assert.ok(!isDbError(null));
+});

@@ -41,7 +41,9 @@ binding = "DB"
 database_name = "cligc-link"
 database_id = "REPLACE_WITH_YOUR_D1_ID"
 
-# 密钥通过 `npx wrangler secret put <名称>` 设置，不要写在这里：
-#   ADMIN_PASSWORD    后台登录密码（必填）
-#   SESSION_SECRET    会话签名密钥，任意长随机字符串（必填），可用 `openssl rand -hex 32` 生成
+# 密钥通过 `npx wrangler secret put <名称>` 设置，不要写在这里（都是可选的，见 README“配置”）：
+#   ADMIN_PASSWORD    初始后台密码（可选）：不设置时默认为 admin，首次登录会要求修改；在后台改过密码后以后台的为准
+#   SESSION_SECRET    会话签名和凭据加密密钥（可选，建议在首次部署前设置，可用 `openssl rand -hex 32` 生成）。
+#                     不设置时自动生成并保存在数据库里。已经在用的部署不要换成新值：所有设备会退出登录，
+#                     已保存的 Google / Cloudflare / Bing 凭据也会解不开；要改存成 Secret，按 README“把自动生成的会话密钥换成 Secret”用同一个值
 #   TURNSTILE_SECRET  Turnstile 服务端密钥（可选，与 TURNSTILE_SITEKEY 配套）

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS links (
   clicks      INTEGER NOT NULL DEFAULT 0,   -- 全部访问（含机器访问和下面没记明细的高频访问）
   human       INTEGER NOT NULL DEFAULT 0,   -- 其中真人访问
   flood       INTEGER NOT NULL DEFAULT 0,   -- 同一 IP 短时间内反复访问、只计数没记明细的次数
+  app_web     TEXT NOT NULL DEFAULT '',     -- 目标是 App 地址（tg:// 等）时，拉不起 App 去的网页；留空则用默认推广地址
   last_click  INTEGER,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
@@ -188,7 +189,6 @@ CREATE INDEX IF NOT EXISTS g_urls_due ON g_urls (due_at);
 CREATE INDEX IF NOT EXISTS g_urls_bdue ON g_urls (b_due_at);
 -- 站点列表按日期范围读每日数据；清理任务按时间删缓存和修改记录
 CREATE INDEX IF NOT EXISTS g_daily_date ON g_daily (date);
-CREATE INDEX IF NOT EXISTS g_cache_at ON g_cache (at);
 -- 站点地图：Sitemaps API 的结果，每天刷新一次；同时记下当天网址检查用掉的配额（每个资源每天 2000 次）
 CREATE TABLE IF NOT EXISTS g_sitemaps (
   host     TEXT PRIMARY KEY,
@@ -217,6 +217,7 @@ CREATE TABLE IF NOT EXISTS g_cache (
   v   TEXT NOT NULL,
   at  INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS g_cache_at ON g_cache (at);
 
 -- AI 分析链接：只读，只能看创建时选定的站点；token 即访问凭据
 CREATE TABLE IF NOT EXISTS shares (

@@ -7,8 +7,10 @@ export function installI18n(dict) {
   const pats = [];
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for (const [k, v] of Object.entries(dict)) {
-    if (!k.includes('{}')) { exact.set(k, v); continue; }
-    const parts = k.split('{}');
+    // 匹配前会把原文里的空白（含换行）合并成一个空格，词条也按同样方式处理才对得上；译文保留原来的换行
+    const nk = k.replace(/\s+/g, ' ').trim();
+    if (!k.includes('{}')) { exact.set(k, v); if (nk !== k) exact.set(nk, v); continue; }
+    const parts = nk.split('{}');
     pats.push({ re: new RegExp('^' + parts.map(esc).join('([\\s\\S]+?)') + '$'), v, w: parts.join('').length });
   }
   pats.sort((a, b) => b.w - a.w);
@@ -19,8 +21,8 @@ export function installI18n(dict) {
   };
   const SEP = /(\s*(?:·|、|，|：|；|（|）|\n|\s\/\s|→|——)\s*)/;
   const SEPMAP = { '、': ', ', '，': ', ', '：': ': ', '；': '; ', '（': ' (', '）': ')', '——': ' — ' };
-  const SING = { addresses: 'address', 'split addresses': 'split address', 'redirect rules': 'redirect rule', 'target URLs': 'target URL', 'default URLs': 'default URL', 'human clicks': 'human click', 'visit records': 'visit record', 'unique visitors': 'unique visitor', 'other devices': 'other device', 'extra variants': 'extra variant', 'active links': 'active link', 'countries / regions': 'country / region' };
-  const ONE = /(^|[^\d.,])1 (split addresses|redirect rules|target URLs|default URLs|human clicks|visit records|unique visitors|other devices|extra variants|active links|countries \/ regions|addresses|rules|visits|links|sites|devices|accounts|visitors|days|hours|records|times|variants|steps|items|places|subscriptions|minutes|seconds)\b/g;
+  const SING = { addresses: 'address', 'split addresses': 'split address', 'redirect rules': 'redirect rule', 'target URLs': 'target URL', 'default URLs': 'default URL', 'human clicks': 'human click', 'visit records': 'visit record', 'unique visitors': 'unique visitor', 'other devices': 'other device', 'extra variants': 'extra variant', 'active links': 'active link', 'backup websites': 'backup website', 'countries / regions': 'country / region' };
+  const ONE = /(^|[^\d.,])1 (split addresses|redirect rules|target URLs|default URLs|human clicks|visit records|unique visitors|other devices|extra variants|active links|backup websites|countries \/ regions|addresses|rules|visits|links|sites|devices|accounts|visitors|days|hours|records|times|variants|steps|items|places|subscriptions|minutes|seconds)\b/g;
   const cache = new Map();
   function tr(text) {
     if (!text || !CJK.test(text)) return text;

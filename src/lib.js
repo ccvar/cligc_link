@@ -110,6 +110,46 @@ export function parseUA(ua) {
   return { browser, os, device, bot };
 }
 
+// ---------------------------------------------------------------- 目标地址：网址或 App 地址
+// App 地址：自定义协议（tg://、weixin://、snssdk1128:// 等）和安卓的 intent://；能执行脚本、读本地文件的协议一律不允许
+// 另外挡掉能被拿来钓鱼、装软件或打开本机文件的 Windows / Office 系统协议
+const BLOCKED_SCHEMES = new Set(['javascript', 'data', 'file', 'vbscript', 'blob', 'about', 'chrome', 'chrome-extension', 'filesystem', 'view-source', 'ws', 'wss', 'jar', 'resource', 'moz-extension',
+  'search-ms', 'search', 'ms-msdt', 'ms-officecmd', 'ms-appinstaller', 'ms-cxh', 'ms-cxh-full', 'ms-word', 'ms-excel', 'ms-powerpoint', 'ms-visio', 'ms-access',
+  'ms-project', 'ms-publisher', 'ms-spd', 'ms-infopath', 'shell', 'hcp', 'its', 'ms-its', 'mk']);
+export const isWebUrl = (u) => /^https?:\/\//i.test(u || '');
+export const isAppUrl = (u) => !!u && !isWebUrl(u);
+// 像是 http / https 拼错的协议名：常见写法，或者只由 h p s t 组成、同时有 h 和 t 的短词（没有真实 App 用这种协议名）
+export const isHttpTypoScheme = (sc) => sc !== 'http' && sc !== 'https'
+  && (/^(h+t+p+s*|ht+ps?|ttps?|htp)s?$/.test(sc) || (/^[hpst]{3,7}$/.test(sc) && sc.includes('h') && sc.includes('t')));
+// 合法的目标地址：网址返回规范化后的写法，App 地址原样返回（只去掉首尾空白）；不合法返回 null
+export function normalizeTarget(raw) {
+  const v = String(raw ?? '').trim();
+  if (!v) return null;
+  let u;
+  try { u = new URL(v); } catch { return null; }
+  const scheme = u.protocol.slice(0, -1).toLowerCase();
+  // 网址：交给 URL 规范化（空格等会被编码，和以前一样）
+  // 主机名是 http / https 一类的，多半是漏了冒号（https//b.com 被补成 https://https//b.com）
+  if (scheme === 'http' || scheme === 'https') return u.hostname && !/^https?$/.test(u.hostname) && !isHttpTypoScheme(u.hostname) ? u.toString() : null;
+  // http / https 拼错（htps:、hhttps:、ttps:、htts: 等）不能当成 App 地址收下，否则一拼错链接就悄悄失效
+  if (isHttpTypoScheme(scheme)) return null;
+  // App 地址原样保存，所以不能含空白和控制字符（会被拼进 Location 头），长度也限制一下
+  if (v.length > 2000 || /[\s\x00-\x1f\x7f]/.test(v) || !/^[a-z][a-z0-9+.-]*$/.test(scheme) || BLOCKED_SCHEMES.has(scheme)) return null;
+  return v;
+}
+// 会拦截跳转到其他 App 的内置浏览器（只能提示用户“在浏览器打开”）
+const IN_APP = [[/micromessenger/i, 'wechat'], [/\bqq\/[\d.]+/i, 'qq'], [/weibo/i, 'weibo'], [/aweme|bytedancewebview|bytelocale/i, 'douyin'],
+  [/xhsdiscover/i, 'xiaohongshu'], [/dingtalk/i, 'dingtalk']];
+export function inAppBrowser(ua) {
+  const hit = IN_APP.find(([re]) => re.test(ua || ''));
+  return hit ? hit[1] : '';
+}
+// 安卓的 intent:// 地址：Chrome 拉不起 App 时会自己去 S.browser_fallback_url；没写的话补上备用网页
+export function intentWithFallback(intent, web) {
+  if (!web || /S\.browser_fallback_url=/i.test(intent) || !/;end\b/i.test(intent)) return intent;
+  return intent.replace(/;end\b/i, `;S.browser_fallback_url=${encodeURIComponent(web)};end`);
+}
+
 // 跳转规则里的设备：ios / android / desktop（Windows、macOS、Linux 电脑），其他为 other
 export const DEVICES = ['ios', 'android', 'desktop'];
 export function deviceKey(p) {
@@ -208,3 +248,24 @@ export function semverGt(a, b) {
   for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
   return false;
 }
+
+// ---------------------------------------------------------------- 登录防暴力破解的计数键
+// IPv4 按完整地址计数；IPv6 按前 64 位（/64）计数：一台 VPS 通常分到一整个 /64，
+// 按完整地址计数的话，换个地址就能再试 5 次，等于没有锁定。会话和修改记录里仍显示完整 IP，这里只用于锁定
+export function guardKey(ip) {
+  ip = String(ip || '').trim().toLowerCase().replace(/%.*$/, '');
+  if (!ip.includes(':')) return ip;
+  // ::ffff:1.2.3.4 这类内嵌 IPv4 的地址，按里面的 IPv4 计数（不然所有这类地址会挤进同一个 /64）
+  const v4 = ip.match(/(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (v4) return v4[1];
+  const [h, t] = ip.split('::');
+  const a = h ? h.split(':') : [], b = t ? t.split(':') : [];
+  const g = t === undefined ? a : [...a, ...Array(Math.max(0, 8 - a.length - b.length)).fill('0'), ...b];
+  return g.slice(0, 4).map((x) => (parseInt(x, 16) || 0).toString(16)).join(':') + '::/64';
+}
+
+// D1 出错（最常见的是免费版当天的读写额度用完）：后台接口返回能看懂的说明，访客看到提示页而不是 JSON 原文
+export const isDbError = (err) => {
+  const m = String(err?.message || err || '');
+  return /\bD1_|\bD1\b|SQLITE_/i.test(m) || (/exceed|limit|quota/i.test(m) && /database|rows? (read|written)|storage/i.test(m));
+};

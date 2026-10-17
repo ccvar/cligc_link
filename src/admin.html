@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#f4f5f7">
+<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0c10" media="(prefers-color-scheme: dark)">
 <title>cligc 短链</title>
 <script>
 // 界面语言：手动选过的优先，否则跟随浏览器；英文时先加载翻译脚本，页面渲染前就生效
@@ -12,7 +13,7 @@
   var l; try { l = JSON.parse(localStorage.getItem('sl:lang')); } catch (e) {}
   if (l !== 'zh' && l !== 'en') l = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
   window.LANG = l;
-  if (l === 'en') document.write('<script src="/admin/i18n.en.js"><\/script>');
+  if (l === 'en') document.write('<script src="/admin/i18n.en.js?v=__I18N_V__"><\/script>');
 })();
 </script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234b83ff'/%3E%3Cstop offset='1' stop-color='%231f4fd1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M10.5 21.5 21.5 10.5M13.5 10.5h8v8' stroke='%23fff' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -22,7 +23,8 @@
   --app-max: 1440px;
   --side: #f4f5f7; --main: #ffffff;
   --panel: #ffffff; --panel-2: #f8f9fb; --sunken: #f2f4f7;
-  --text: #0d1321; --text-2: #4a5263; --muted: #8a92a3; --faint: #b8bec9;
+  /* --muted 用于大量 12–13px 的说明文字：在白底、侧栏灰底和 --sunken 上都要有 4.5:1 的对比度（WCAG AA） */
+  --text: #0d1321; --text-2: #4a5263; --muted: #687082; --faint: #b8bec9;
   --line: #e9ebf0; --line-2: #f1f2f5;
   --accent: #2f6bff; --accent-2: #edf2ff; --accent-3: #d9e4ff; --accent-ink: #1d4fd8;
   --violet: #7c5cff; --teal: #12b5a5; --amber: #f2a93b; --rose: #e26d9c; --sky: #0ea5e9;
@@ -30,7 +32,7 @@
   --shadow-1: 0 1px 2px rgba(13,19,33,.04);
   --shadow-2: 0 1px 2px rgba(13,19,33,.04), 0 6px 20px -6px rgba(13,19,33,.08);
   --shadow-3: 0 24px 48px -12px rgba(13,19,33,.22);
-  --r-sm: 8px; --r: 12px; --r-lg: 16px;
+  --r-lg: 16px;
   --ease: cubic-bezier(.2,.7,.2,1); --ease-out: cubic-bezier(.16,1,.3,1);
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -40,7 +42,8 @@
   :root {
     --side: #0a0c10; --main: #111318;
     --panel: #16191f; --panel-2: #1a1e25; --sunken: #1d2129;
-    --text: #edeff3; --text-2: #b4bac6; --muted: #7c8494; --faint: #4c5361;
+    /* --muted 略提亮：在 --sunken 上（分段按钮、未配置标签等）也够 4.5:1 */
+    --text: #edeff3; --text-2: #b4bac6; --muted: #808898; --faint: #4c5361;
     --line: #242831; --line-2: #1e222a;
     --accent: #5f8fff; --accent-2: #18223a; --accent-3: #22325a; --accent-ink: #94b4ff;
     --violet: #9d85ff; --teal: #2fd0bf;
@@ -67,6 +70,7 @@ html, body { margin: 0; height: 100%; }
 .topbar::before { content: ""; position: absolute; inset: 0; width: 35%; background: linear-gradient(90deg, transparent, var(--accent), var(--violet)); animation: bootBar 1s ease-in-out infinite; }
 .topbar.on { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .boot-m svg, .boot-b i, .topbar::before { animation-duration: 3s; } }
+.sp { flex: 1; }
 body { font: 14px/1.55 var(--sans); background: var(--side); color: var(--text);
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
 a { color: inherit; text-decoration: none; }
@@ -91,7 +95,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 
 /* 入场：内容依次浮现 */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
-@keyframes fade { from { opacity: 0; } }
 @keyframes grow { from { transform: scaleX(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(15,159,90,.45); } 100% { box-shadow: 0 0 0 8px rgba(15,159,90,0); } }
@@ -104,11 +107,15 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 /* ================================================================ shell：左侧灰色侧栏 + 右侧白色主区 */
 :root { --side-w: 224px; --cp: 18px; }   /* --cp：卡片左右内边距（与指标卡片一致） */
 .shell { display: grid; grid-template-columns: max(var(--side-w), calc((100% - var(--app-max)) / 2 + var(--side-w))) minmax(0, 1fr); min-height: 100vh; }
+/* 兜底：贴右边的按钮，平时隐藏（opacity: 0）的提示气泡也会伸出页面、撑出整页横向滚动条。
+   clip 不会变成滚动容器，侧栏等 sticky 照常；裁在 .shell（视口两侧）而不是 .main，侧栏上方的气泡不受影响 */
+.shell { overflow-x: clip; }
 .side { position: sticky; z-index: 6; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 28px 14px 20px calc(100% - var(--side-w) + 16px); }
 .side-head { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
 .wordmark { font-weight: 720; font-size: 18px; letter-spacing: -.025em; }
 .collapse { margin-left: auto; width: 28px; height: 28px; border: 0; background: none; color: var(--faint); cursor: pointer; border-radius: 8px; display: grid; place-items: center; transition: color .15s, background .15s; }
-.collapse:hover { color: var(--text); background: rgba(13,19,33,.05); }
+/* 悬停底色用文字色混出来：深色模式下自动变成浅色叠层，不再是看不见的深色 rgba */
+.collapse:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
 .product { margin: 18px 8px 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
 .product b { display: block; font-size: 13px; font-weight: 600; }
 .product span { color: var(--muted); font-size: 12px; }
@@ -117,7 +124,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .nav a { position: relative; display: flex; align-items: center; gap: 11px; height: 42px; padding: 0 12px; border-radius: 10px; color: var(--text-2); font-size: 14px; font-weight: 500;
   transition: color .15s, background .15s; }
 .nav a svg.i { width: 18px; height: 18px; stroke-width: 1.8; transition: transform .2s var(--ease); }
-.nav a:hover { color: var(--text); background: rgba(13,19,33,.04); }
+.nav a:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
 .nav a:hover svg.i { transform: translateX(1px); }
 .nav a.on { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(13,19,33,.06), 0 6px 16px -8px rgba(13,19,33,.12); }
 .nav a.on svg.i { color: var(--accent); }
@@ -157,7 +164,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 @media (hover: none) { [data-tip]::after { display: none; } }   /* 触屏用点按显示的浮动提示 */
 /* 侧栏导航只在收起时提示 */
 .shell:not(.mini) .side [data-tip-at="right"]::after { display: none; }
-@media (hover: none) { [data-tip]::after { display: none; } }
 .side .foot .host i { width: 6px; height: 6px; border-radius: 50%; background: var(--good); flex: none; }
 .main { min-width: 0; background: var(--main); min-height: 100vh; box-shadow: -1px 0 0 var(--line); }
 .wrap { max-width: calc(var(--app-max) - var(--side-w)); padding: 36px 44px 96px; }
@@ -426,6 +432,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .kmix-p { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 12.5px; color: var(--text-2); }
 .kmix-p svg { color: var(--accent); flex: none; }
 .kmix-p b { font-variant-numeric: tabular-nums; }
+/* 说明文字整句包在一个 span 里：flex 下散开的文字节点会各自成为一列，被挤成竖排 */
+.kmix-p > span, .rp-pr > span { min-width: 0; }
+.rp-pr span svg { vertical-align: -2px; }
 .mtbl td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .mtbl .kt { margin-left: 0; }
 .kt.bot { color: var(--muted); background: var(--sunken); }
@@ -443,7 +452,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .bmix-h span:first-child { color: var(--text-2); font-weight: 600; }
 .bmix-bar { display: flex; gap: 3px; height: 8px; }
 .bmix-bar i { min-width: 4px; border-radius: 3px; transform-origin: left; animation: grow .8s var(--ease-out) both; animation-delay: calc(.15s + var(--j) * 60ms); }
-.bmix-l { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 12px; margin-top: 10px; }
+/* 每格至少 100px，放不下 3 列就自动换成 2 列，避免“Chrome / Windows”被截成 Chr… */
+.bmix-l { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px 12px; margin-top: 10px; }
 .bmix-l .x { display: flex; align-items: center; gap: 6px; font-size: 12.5px; min-width: 0; }
 .bmix-l .x i { width: 7px; height: 7px; border-radius: 2px; flex: none; }
 .bmix-l .x span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -504,7 +514,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .tl .n { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
 .tl .u { text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .tl .t { text-align: right; color: var(--muted); font-size: 12px; white-space: nowrap; }
-@media (max-width: 760px) { .tl .tr { grid-template-columns: 24px minmax(0, 1fr) 56px; padding: 12px 16px; } .tl .c-bar, .tl .u, .tl .t { display: none; } }
+/* 概览里 #home .tl .c-bar 是带 ID 的选择器，这里也要带上，否则手机上占比列不隐藏，访问数被挤到下一行 */
+@media (max-width: 760px) { .tl .tr { grid-template-columns: 24px minmax(0, 1fr) 56px; padding: 12px 16px; } .tl .c-bar, .tl .u, .tl .t, #home .tl .c-bar, #home .tl .tr.th .c-bar { display: none; } }
 
 /* ================================================================ links list */
 .quick { display: grid; grid-template-columns: 250px minmax(0, 1fr) auto; gap: 10px; }
@@ -524,11 +535,11 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 /* 列表工具栏里的搜索框、下拉、分段按钮、按钮统一 36px 高 */
 .lh .search .input { height: 36px; }
 .lh .seg button { height: 30px; }
-.lrow { display: grid; grid-template-columns: minmax(0, 1fr) 100px 76px 96px 72px 144px; gap: 16px; align-items: center;
+.lrow { display: grid; grid-template-columns: minmax(0, 1fr) 100px 76px 96px 72px 182px; gap: 16px; align-items: center;
   padding: 14px var(--cp); border-top: 1px solid var(--line-2); cursor: pointer; transition: background .15s; }
 .lrow:hover { background: var(--panel-2); }
 .lrow.hd { cursor: default; color: var(--muted); font-size: 12px; padding-top: 10px; padding-bottom: 10px; background: none; }
-.lrow .su { font-family: var(--mono); font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 0; font-size: 13.5px; }
+.lrow .su { font-family: var(--mono); font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 0; font-size: 13.5px; overflow-wrap: anywhere; min-width: 0; }
 .lrow .tt { color: var(--text-2); font-weight: 500; font-family: var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .lrow .tg { color: var(--muted); font-size: 12.5px; margin-top: 3px; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .lrow .tg > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -536,6 +547,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .lrow .tm { color: var(--muted); font-size: 12.5px; }
 .lrow .acts { display: flex; gap: 2px; justify-content: flex-end; opacity: .55; transition: opacity .15s; }
 .lrow:hover .acts, .lrow:focus-within .acts { opacity: 1; }
+/* 最右边那个按钮的提示气泡靠右对齐，不要伸出页面（平时隐藏的气泡也会撑出横向滚动条） */
+.lrow .acts > [data-tip]:last-child::after { left: auto; right: 0; transform: translate(0, 4px); }
+.lrow .acts > [data-tip]:last-child:hover::after, .lrow .acts > [data-tip]:last-child:focus-visible::after { transform: none; }
 .lrow .c-main { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
 .lrow.hd .c-main { align-items: center; }
 .lck { flex: none; display: grid; place-items: center; width: 18px; height: 20px; cursor: pointer; }
@@ -552,12 +566,18 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .lbulk[hidden] { display: none; }
 .lbulk .sp { flex: 1; }
 .lrow.flash { animation: flash 1.8s var(--ease) both; }
+/* 中等宽度（笔记本小屏、平板横屏）：先收起“近 14 天”和“最后访问”两列，给短链和目标地址留出位置 */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .lrow { grid-template-columns: minmax(0, 1fr) 76px 96px 182px; }
+  .lrow .c-spark, .lrow .c-last { display: none; }
+}
 @media (max-width: 760px) {
   .lrow { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 14px 16px; }
   .lrow.hd, .lrow .c-spark, .lrow .c-last { display: none; }
   .lrow .c-status { grid-column: 1; grid-row: 2; }
   .lrow .c-clicks { grid-column: 2; grid-row: 1; }
   .lrow .acts { grid-column: 2; grid-row: 2; opacity: 1; }
+  .lrow .acts a[href^="#/link/"] { display: none; }   /* 点整行就能进详情，手机上省掉统计按钮，给短链列留出位置 */
 }
 .spark { width: 100px; height: 28px; color: var(--accent); display: block; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; height: 22px; padding: 0 9px; border-radius: 999px; font-weight: 550; white-space: nowrap; }
@@ -582,7 +602,47 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .hero { padding: 24px; display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; position: relative; overflow: hidden; }
 .hero::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--violet)); }
 .hero .info { flex: 1; min-width: 260px; }
-.hero .ttl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--text-2); font-weight: 550; }
+/* 详情页右上：操作按钮下面放二维码，手机扫码访问 */
+.hero-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+@media (max-width: 760px) { .hero-side { align-items: flex-start; } .hero-qr { align-items: flex-start !important; } }
+.hero-qr { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-top: 6px; padding: 0; border: 0; background: none; cursor: zoom-in; color: var(--muted); font: inherit; font-size: 12px; }
+.hero-qr img { width: 84px; height: 84px; padding: 4px; border-radius: 10px; border: 1px solid var(--line); background: #fff; transition: border-color .15s, box-shadow .15s; }
+.hero-qr:hover img, .hero-qr:focus-visible img { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow: var(--shadow-2); }
+.hero-qr:focus-visible { outline: none; }
+.hero-qr span { display: inline-flex; align-items: center; gap: 4px; }
+/* .hero 为了裁出顶部色条设了 overflow: hidden，二维码的提示气泡居中时会被卡片边缘切掉（英文更长）：
+   宽屏二维码贴右边，气泡靠右对齐；窄屏二维码贴左边，气泡靠左对齐 */
+@media (min-width: 761px) {
+  .hero-qr[data-tip]::after { left: auto; right: 0; transform: translate(0, 4px); }
+}
+@media (max-width: 760px) {
+  .hero-qr[data-tip]::after { left: 0; transform: translate(0, 4px); }
+}
+.hero-qr[data-tip]:hover::after, .hero-qr[data-tip]:focus-visible::after { transform: none; }
+.qr-d { text-align: center; }
+/* 目标地址：前面的“网页 / App”类型下拉 */
+.field .pre.tgt { overflow: visible; }
+.tgt-k { flex: none; align-self: stretch; display: flex; }
+.field .pre.tgt .input { border-radius: 0 9px 9px 0; }
+.tgt-k .combo-btn { min-width: 0; height: 100%; min-height: 38px; padding: 0 9px 0 12px; gap: 6px; border: 0; border-right: 1px solid var(--line); border-radius: 9px 0 0 9px;
+  background: var(--panel-2); color: var(--text-2); font-size: 13px; font-weight: 500; }
+.tgt-k .combo-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, var(--panel-2)); }
+.tgt-k .combo-btn[aria-expanded="true"] { box-shadow: none; color: var(--text); }
+.tgt-k .combo-btn .nm { max-width: none; }
+.tgt-k .combo-btn > svg { width: 13px; height: 13px; }
+.tgt-app { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.tgt-app[hidden], .opt[hidden], .field[hidden] { display: none; }
+.tgt-app .combo-btn { min-width: 0; height: 32px; font-size: 12.5px; color: var(--accent-ink); }
+/* 带上 .field：否则会被后面同样权重的 .field .hint { margin-top: 6px } 盖掉 */
+.tgt-app .hint, .field .tgt-app .hint { margin: 0; }
+.hr-a .app-p { margin-left: 6px; }
+.app-p { flex: none; white-space: nowrap; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 5px; color: var(--violet); background: color-mix(in srgb, var(--violet) 12%, transparent); }
+.qr-d .qr-u { margin: -4px 0 14px; color: var(--text-2); word-break: break-all; font-family: var(--mono); font-size: 13px; }
+.qr-d .hint { margin: 0 0 18px; color: var(--muted); font-size: 12.5px; }
+.dialog.qr-d { top: max(16px, min(22vh, calc(100vh - 500px))); max-height: calc(100vh - 32px); overflow: auto; }
+.qr-big { display: block; width: 220px; height: 220px; margin: 0 auto 10px; padding: 8px; border-radius: 14px; border: 1px solid var(--line); background: #fff; image-rendering: pixelated; }
+.qr-d .row { text-align: left; }
+.hero .ttl { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; color: var(--text-2); font-weight: 550; }
 .hero .short { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--mono); font-size: 22px; font-weight: 650; letter-spacing: -.01em; margin: 8px 0 10px; word-break: break-all; }
 .hero .target { display: flex; align-items: center; gap: 6px; color: var(--text-2); word-break: break-all; }
 .hero .target a { transition: color .15s; }
@@ -601,7 +661,6 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 @media (max-width: 640px) { .hr-c { max-width: 120px; } }
 .hero .meta { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
 .hero .ttl-t { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hero .ttl { flex-wrap: nowrap; }
 .hero-note { margin-top: 4px; max-width: 760px; color: var(--text-2); font-size: 12.5px; line-height: 1.6;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 /* 访问明细：表格限高，表头固定 */
@@ -631,6 +690,8 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
   .tbl.vt th:nth-child(4) { width: 22%; } .tbl.vt th:nth-child(5) { width: 15%; } .tbl.vt th:nth-child(6) { width: 16%; }
 }
 .tbl-wrap { max-height: 640px; overflow: auto; }
+/* 手机上不要表格内的纵向滚动（会“吃掉”页面滚动）；横向照常滚动，长度由分页（每页 30 条）限制 */
+@media (max-width: 760px) { .tbl-wrap { max-height: none; } }
 .tbl-wrap thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line); border-bottom: 0; }
 .hero .acts { display: flex; gap: 8px; }
 .builder { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
@@ -710,7 +771,7 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .ab-r a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ab-r a:hover { color: var(--accent-ink); }
 .ab-k { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; background: var(--c, var(--accent)); }
-.ab-r:nth-child(1) .ab-k { --c: var(--accent); } .ab-r:nth-child(2) .ab-k { --c: var(--violet); } .ab-r:nth-child(3) .ab-k { --c: var(--teal); } .ab-r:nth-child(4) .ab-k { --c: var(--warn); } .ab-r:nth-child(5) .ab-k { --c: #e11d48; }
+.ab-r:nth-child(1) .ab-k { --c: var(--accent); } .ab-r:nth-child(2) .ab-k { --c: var(--violet); } .ab-r:nth-child(3) .ab-k { --c: var(--teal); } .ab-r:nth-child(4) .ab-k { --c: var(--warn); } .ab-r:nth-child(5) .ab-k { --c: var(--rose); }   /* 和编辑抽屉里的 COLORS 一致 */
 .ab-w { font-variant-numeric: tabular-nums; color: var(--muted); }
 .ab-n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ab-n b { color: var(--text); font-weight: 650; }
@@ -719,6 +780,8 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .abd-bar { display: flex; height: 26px; border-radius: 8px; overflow: hidden; gap: 2px; margin-bottom: 16px; }
 .abd-bar i { display: grid; place-items: center; min-width: 0; transition: flex .25s var(--ease-out); }
 .abd-bar b { font-size: 11.5px; font-weight: 650; color: #fff; white-space: nowrap; overflow: hidden; padding: 0 4px; }
+/* 深色模式下青色、琥珀色都很浅，白字只有约 2:1，改用深色字 */
+@media (prefers-color-scheme: dark) { .ab-k, .abd-bar b { color: var(--side); } }
 .abd { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
 .abd-r { display: grid; grid-template-columns: 22px minmax(0, 1fr) 96px 34px; gap: 10px; align-items: start; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
 .abd-r .ab-k { width: 22px; height: 22px; margin-top: 7px; }
@@ -729,6 +792,8 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .abd-w .input { padding-right: 8px; text-align: right; }
 .abd-w span { font-size: 11.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
 .abd-w span::before { content: '占 '; }
+/* CSS 生成的文字不经过英文词典，英文界面单独写 */
+html[lang="en"] .abd-w span::before { content: 'Share '; }
 .input.sm { height: 30px; font-size: 12.5px; }
 .abd-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .abd-acts .hint { margin-left: auto; }
@@ -746,6 +811,7 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .lg-c svg { color: var(--faint); }
 .lg-f { color: var(--muted); white-space: nowrap; }
 .lg-f::after { content: '：'; }
+html[lang="en"] .lg-f::after { content: ':'; }
 .lg-o, .lg-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lg-o { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent); }
 .lg-m { margin-top: 6px; font-size: 12px; color: var(--muted); }
@@ -855,7 +921,7 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .ai-sh { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ai-sh b { flex: 0 1 auto; min-width: 0; }
 .ai-st .ai-hs { display: flex; gap: 4px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
-.ai-hs i { font-style: normal; font-size: 11.5px; padding: 1px 6px; border-radius: 5px; background: var(--soft, rgba(127,127,127,.12)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.ai-hs i { font-style: normal; font-size: 11.5px; padding: 1px 6px; border-radius: 5px; background: rgba(127,127,127,.12); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
 .ai-hs i.more { flex: none; cursor: default; color: var(--text, inherit); }
 .ai-ag { display: inline-flex; gap: 4px; margin-left: 6px; }
 .ai-ag i { font-style: normal; font-size: 11px; padding: 1px 6px; border-radius: 5px; background: color-mix(in srgb, var(--violet) 12%, transparent); color: var(--violet); }
@@ -932,8 +998,7 @@ details[open] > summary::before { transform: rotate(90deg); }
 .use-who { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
 .use-who span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .use-who i { width: 7px; height: 7px; border-radius: 2px; flex: none; }
-.use-who.r { flex-direction: column; align-items: flex-end; gap: 2px; margin-top: 4px; }
-.use-who.r { align-items: stretch; }
+.use-who.r { flex-direction: column; align-items: stretch; gap: 2px; margin-top: 4px; }
 .use-who.r span { display: flex; justify-content: flex-end; gap: 5px; max-width: 100%; min-width: 0; }
 .use-who.r em { font-style: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .use-top { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 0; }
@@ -1121,6 +1186,7 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .setup-i.ok { background: var(--panel-2); }
 .setup-i.ok .setup-c { border-color: var(--good); background: var(--good); color: #fff; }
 .setup-i.ok b { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent); }
+.nstat .sp { flex: 1; }
 .nstat.warn { background: color-mix(in srgb, var(--amber) 13%, transparent); color: color-mix(in srgb, var(--amber) 70%, var(--text)); }
 #nwarn:empty, #nstat:empty { display: none; }
 
@@ -1208,6 +1274,13 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .pop .opts { overflow: auto; max-height: 264px; padding: 4px; overscroll-behavior: contain; }
 .pop .og { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .04em; }
 .pop .oi { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+/* 常用 App 的品牌图标：品牌色圆角方块 + 白色（浅色品牌用深色）图形，和手机上的 App 图标一个感觉 */
+.app-ic { flex: none; width: 20px; height: 20px; border-radius: 5px; display: inline-grid; place-items: center; background: var(--c, var(--sunken)); color: var(--g, var(--muted));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / .06); }
+.app-ic svg { width: 12px; height: 12px; fill: currentColor; display: block; }
+.app-ic b { font-size: 11px; font-weight: 700; line-height: 1; }
+.app-ic.none svg { width: 12px; height: 12px; fill: none; }
+@media (prefers-color-scheme: dark) { .app-ic { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .14); } }
 .pop .oi .f { width: 18px; font-size: 14px; }
 .pop .oi > svg { width: 13px; height: 13px; }
 .pop .oi .ot { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1225,7 +1298,8 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .sim .res b { min-width: 4.5em; }
 @media (max-width: 760px) {
   .rule { grid-template-columns: 38px minmax(0, 1fr) auto; padding: 14px 16px; } .rule .rh { display: none; }
-  .sim { padding: 14px 16px; } .sim .combo { flex: 1; min-width: 0; } .sim .res { flex-basis: 100%; }
+  /* 下拉按钮本身至少 136px：容器不能比它窄，否则按钮会压住后面的“，用”和设备分段 */
+  .sim { padding: 14px 16px; } .sim .combo { flex: 1 1 140px; min-width: 136px; } .sim .res { flex-basis: 100%; }
 }
 
 /* 国家选择器 */
@@ -1269,12 +1343,14 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .rb[hidden] { display: none; }
 
 /* ================================================================ overlay */
-.ov { position: fixed; inset: 0; background: rgba(13,19,33,.32); backdrop-filter: blur(2px); z-index: 30; animation: fade .2s var(--ease) both; }
+.ov { position: fixed; inset: 0; background: rgba(13,19,33,.32); backdrop-filter: blur(2px); z-index: 31; animation: fade .2s var(--ease) both; }
+/* 深色模式下深蓝灰遮罩叠在深色页面上几乎不变暗，抽屉、对话框和页面分不开 */
+@media (prefers-color-scheme: dark) { .ov { background: rgba(0,0,0,.5); } }
 /* ⌘K */
 .kbar-b { display: flex; align-items: center; gap: 11px; height: 42px; margin: 0 0 14px; padding: 0 10px 0 12px; border: 0; border-radius: 10px; background: none;
   color: var(--text-2); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .15s, color .15s; width: 100%; }
 .kbar-b svg.i { width: 18px; height: 18px; stroke-width: 1.8; }
-.kbar-b:hover { color: var(--text); background: rgba(13,19,33,.04); }
+.kbar-b:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
 .kbar-b kbd { opacity: .7; transition: opacity .15s; }
 .kbar-b:hover kbd { opacity: 1; }
 .kbar-b span { flex: 1; text-align: left; }
@@ -1313,7 +1389,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .field .hint { margin-top: 6px; }
 .field .pre { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; transition: border-color .15s, box-shadow .15s; }
 .field .pre:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-2); }
-.field .pre span { padding: 0 10px; color: var(--muted); background: var(--panel-2); height: 38px; display: flex; align-items: center; border-right: 1px solid var(--line); white-space: nowrap; font-size: 13px; }
+.field .pre > span:not(.tgt-k) { padding: 0 10px; color: var(--muted); background: var(--panel-2); height: 38px; display: flex; align-items: center; border-right: 1px solid var(--line); white-space: nowrap; font-size: 13px; }
 .field .pre .input { border: 0; box-shadow: none !important; border-radius: 0; }
 .opt { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: background .15s; }
 .opt:hover { background: var(--panel-2); }
@@ -1356,7 +1432,6 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .g-connect h2 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.02em; }
 .g-connect p { margin: 0; max-width: 520px; color: var(--text-2); line-height: 1.8; }
 .g-logo { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-1, 0 1px 2px rgba(0,0,0,.05)); }
-.g-rng { }
 .g-lf .combo-btn .nm { max-width: 12em; }
 .gtg { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 6px; border: 0; font: inherit; font-size: 11.5px;
   background: color-mix(in srgb, var(--teal) 13%, transparent); color: color-mix(in srgb, var(--teal) 75%, var(--text)); white-space: nowrap; }
@@ -1377,6 +1452,9 @@ button.gtg { cursor: pointer; }
 .g-sync { width: 36px; height: 36px; color: var(--text-2); }
 .ph-acts { display: flex; align-items: center; gap: 4px; }
 .ph-acts .g-prog { margin-right: 6px; }
+/* 页头最右边的按钮（如“立即同步”）提示气泡靠右对齐，不要伸出页面 */
+.ph-acts > [data-tip]:last-child::after { left: auto; right: 0; transform: translate(0, 4px); }
+.ph-acts > [data-tip]:last-child:hover::after, .ph-acts > [data-tip]:last-child:focus-visible::after { transform: none; }
 .g-sync.busy svg { animation: spin .9s linear infinite; }
 .g-sync.stopping { opacity: .5; pointer-events: none; }
 .g-op { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); }
@@ -1415,6 +1493,13 @@ button.gtg { cursor: pointer; }
 .tbl.gl tbody tr { cursor: pointer; }
 .tbl.gl .gh { display: flex; align-items: center; font-weight: 600; font-family: var(--mono); font-size: 13px; }
 .tbl.gl .gsp { width: 120px; } .tbl.gl .gsp svg { width: 110px; height: 28px; display: block; color: var(--accent); }
+/* 11 列在常见笔记本宽度下放不下，最右边的“会话趋势”会被藏到横向滚动里（滚动条在几千像素高的表格底部）：收紧列间距和趋势图 */
+@media (max-width: 1440px) {
+  .tbl.gl th, .tbl.gl td { padding-left: 10px; padding-right: 10px; }
+  .tbl.gl th:first-child, .tbl.gl td:first-child { padding-left: var(--cp); }
+  .tbl.gl th:last-child, .tbl.gl td:last-child { padding-right: var(--cp); }
+  .tbl.gl .gsp { width: 84px; } .tbl.gl .gsp svg { width: 76px; }
+}
 .gtag { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; margin-right: 5px; border-radius: 4px; font-size: 10.5px; font-weight: 650; vertical-align: 1px; }
 .gm { display: flex; align-items: center; gap: 5px; margin-top: 3px; white-space: nowrap; }
 .gm .gtag { flex: none; }
@@ -1478,6 +1563,8 @@ button.gtg { cursor: pointer; }
 #g-ga .donut { width: 148px; height: 148px; }
 #g-ga .donut .ctr b { font-size: 24px; }
 #g-ga .dlg { gap: 10px; }
+/* 两栏并排、卡片较窄时（笔记本小窗口、横屏平板），图例放到环形图下面，不再被挤成一字一行 */
+@media (min-width: 961px) and (max-width: 1180px) { #g-ga .donut-w { flex-direction: column; align-items: stretch; } #g-ga .donut { margin: 0 auto; } }
 /* 站点详情：GA4 / Search Console 两行数据卡 */
 .kstrip.g8 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .kstrip.g8 .kc { border-left: 1px solid var(--line-2); border-top: 0; }
@@ -1535,7 +1622,6 @@ button.gtg { cursor: pointer; }
 /* 详情页：数据来源 */
 .g-src { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; }
 .g-src .gico { width: 24px; height: 24px; border-radius: 6px; }
-.g-src .gico.off { filter: grayscale(1); opacity: .35; }
 .g-src .g-si { margin-left: 10px; }
 .g-si { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .g-si .sm { margin-left: 2px; }
@@ -1561,6 +1647,14 @@ button.gtg { cursor: pointer; }
 .tbl.gt th:first-child { width: 46%; }
 .tbl.gt td { overflow: hidden; }
 .tbl.gt td .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 手机、以及两栏并排的中等宽度下，数字列只剩十几像素，“100.0%”被截成“100.(”：收紧列间距；5 列的表（搜索词、页面等）首列让出宽度
+   （首列放不下时照旧省略，悬停能看全文）。网页索引表（.ix-t）、站点地图表（.ix-sm）有自己的列宽，短链表（.gsl-t）可以横向滚动 */
+@media (max-width: 640px), (min-width: 961px) and (max-width: 1280px) {
+  .tbl.gt:not(.ix-t) th, .tbl.gt:not(.ix-t) td { padding-left: 6px; padding-right: 6px; }
+  .tbl.gt:not(.ix-t) th:first-child, .tbl.gt:not(.ix-t) td:first-child { padding-left: var(--cp); }
+  .tbl.gt:not(.ix-t) th:last-child, .tbl.gt:not(.ix-t) td:last-child { padding-right: var(--cp); }
+  .tbl.gt:not(.ix-t):not(.ix-sm):not(.gsl-t) th:first-child:nth-last-child(n+5) { width: 24%; }
+}
 .dialog.dup p { margin-bottom: 18px; }
 .dialog.dup .field { margin-bottom: 16px; }
 .dialog.dup .row { margin-top: 22px; }
@@ -1665,7 +1759,8 @@ html.masked input:focus { filter: none; }
 .gd.ix-pg { color: var(--muted); }
 #g-idx .card-h { gap: 10px; flex-wrap: wrap; }
 .ix-g { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 22px; align-items: start; }
-@media (max-width: 900px) { .ix-g { grid-template-columns: minmax(0, 1fr); } }
+/* 1180px 以下网址表放到汇总下面占满整行：左右并排时表格只剩三百多像素，5 列放不下（状态列被挤到看不见） */
+@media (max-width: 1180px) { .ix-g { grid-template-columns: minmax(0, 1fr); } }
 .ix-sum { display: grid; gap: 12px; min-width: 0; }
 .ix-n { display: flex; gap: 8px; }
 .ix-k { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; background: var(--sunken); display: grid; gap: 2px; }
@@ -1689,7 +1784,7 @@ html.masked input:focus { filter: none; }
 .ix-main { min-width: 0; }
 .ix-scr { max-height: 440px; }
 .ix-t { table-layout: fixed; }
-.ix-t th:nth-child(2) { width: 38%; } .ix-t th:nth-child(3) { width: 84px; } .ix-t th:nth-child(4) { width: 72px; }
+.ix-t th:nth-child(2) { width: 38%; } .ix-t th:nth-child(3) { width: 84px; } .ix-t th:nth-child(4) { width: 96px; }
 @media (max-width: 600px) {
   .ix-t:not(.hasb):not(.nog) th:nth-child(3), .ix-t:not(.hasb):not(.nog) td:nth-child(3), .ix-t.hasb:not(.nog) th:nth-child(4), .ix-t.hasb:not(.nog) td:nth-child(4), .ix-sm th:nth-child(4), .ix-sm td:nth-child(4), .ix-sm th:nth-child(5), .ix-sm td:nth-child(5) { display: none; }
   .ix-t th:nth-child(2) { width: 42%; } .ix-sm th:nth-child(2) { width: 34%; } .ix-sm th:nth-child(3) { width: 52px; }
@@ -1706,8 +1801,19 @@ html.masked input:focus { filter: none; }
 .ix-st.wait i { background: transparent; border: 1.5px dashed var(--faint); }
 .ix-a { text-align: right; white-space: nowrap; }
 .ix-a .btn + .btn { margin-left: 2px; }
-.ix-t.hasb th:nth-child(2), .ix-t.hasb th:nth-child(3) { width: 26%; } .ix-t.hasb th:nth-child(4) { width: 84px; } .ix-t.hasb th:last-child { width: 100px; }
+.ix-t.hasb th:nth-child(2), .ix-t.hasb th:nth-child(3) { width: 26%; } .ix-t.hasb th:nth-child(4) { width: 84px; }
 .ix-t.nog th:nth-child(2) { width: 34%; } .ix-t.nog th:last-child { width: 72px; }
+/* 操作列按按钮个数定宽（每个 30px，间隔 2px，再加左右内边距 14 + 18），窄了最右边的按钮会被裁掉一截：
+   只接 Google 或只接 Bing 是 2 个（上面 nth-child(4) / 这里 nog.hasb），两个都接是 3 个 */
+.ix-t.hasb th:last-child { width: 128px; }
+.ix-t.nog.hasb th:last-child { width: 96px; }
+/* 手机上收紧列间距、Google / Bing 两列收窄，给网址列多留一点（要写在上面这些列宽之后才能覆盖） */
+@media (max-width: 600px) {
+  .ix-t th, .ix-t td { padding-left: 6px; padding-right: 6px; }
+  .ix-t.hasb:not(.nog) th:nth-child(2), .ix-t.hasb:not(.nog) th:nth-child(3) { width: 22%; }
+  .ix-t.hasb th:last-child { width: 120px; }
+  .ix-t:not(.hasb):not(.nog) th:nth-child(4), .ix-t.nog.hasb th:last-child { width: 88px; }
+}
 .ix-box { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
 .ix-bh { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .ix-sub { font-size: 11px; white-space: nowrap; }
@@ -1809,7 +1915,8 @@ if (MASK.on) { document.documentElement.classList.add('masked'); document.addEve
 const I = {
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   home: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
-  dup: '<rect x="8" y="8" width="14" height="14" rx="2.5"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/><path d="M15 12v6M12 15h6"/>',
+  // 生成副本：一个分成两个的分叉图标，和“复制”（两个叠放的方块）一眼区分开
+  dup: '<circle cx="12" cy="5.5" r="2.5"/><circle cx="6" cy="18.5" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M12 8v4M6 16v-1.5A2.5 2.5 0 0 1 8.5 12h7a2.5 2.5 0 0 1 2.5 2.5V16"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   ext: '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>',   // 在新窗口打开：只有右上箭头，不带方框
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
@@ -1820,6 +1927,7 @@ const I = {
   back: '<path d="m15 18-6-6 6-6"/>',
   code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
   stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2.5"/>',
+  qr: '<rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.2"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.2"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.2"/><path d="M14 14h2.5v2.5H14zM20.5 14v.01M14 20.5h.01M17.5 20.5h3v-3"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.3M12 17h.01"/>',
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
@@ -2004,7 +2112,10 @@ function busy(d) {
   else bar.classList.remove('on');
 }
 
+// 概览页“开始使用”的数据缓存（见 setupData）；任何修改操作都可能完成其中一步，所以非 GET 请求一律作废
+let setupMemo = null;
 async function api(path, opts = {}) {
+  if (opts.method && opts.method !== 'GET') setupMemo = null;
   const quiet = path.startsWith('/recent');
   if (!quiet) busy(1);
   let res;
@@ -2016,7 +2127,8 @@ async function api(path, opts = {}) {
       credentials: 'same-origin',
     });
   } finally { if (!quiet) busy(-1); }
-  if (res.status === 401 && path !== '/login') { renderLogin(); throw new Error('unauthorized'); }
+  // 登录和两步验证本身返回 401 是“密码 / 动态码不对”，要把错误显示在当前步骤，不能踢回登录页
+  if (res.status === 401 && path !== '/login' && path !== '/login/2fa') { renderLogin(); throw new Error('unauthorized'); }
   const data = await res.json().catch(() => ({}));
   if (res.status === 403 && data.mustChange) { renderSetPassword(); throw new Error('unauthorized'); }
   if (!res.ok) throw new Error(data.error || res.statusText);
@@ -2025,6 +2137,7 @@ async function api(path, opts = {}) {
 
 // kind：ok / warn / bad。停留时间按文字长度加长，出错和警告至少 5 秒，免得长的错误信息还没看完就消失
 function toast(msg, kind = 'ok') {
+  if (msg === 'unauthorized') return;   // 登录过期：已经回到登录页，不用再弹英文的内部标记
   const el = document.createElement('div');
   el.className = 'toast' + (kind === 'bad' ? ' bad' : kind === 'warn' ? ' warn' : '');
   el.setAttribute('role', kind === 'ok' ? 'status' : 'alert');
@@ -2035,10 +2148,19 @@ function toast(msg, kind = 'ok') {
 }
 
 async function copy(text, label = '已复制', btn) {
+  let ok = true;
   try { await navigator.clipboard.writeText(text); }
   catch {
-    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); } catch {} ta.remove();
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+  }
+  // 浏览器不让复制（比如 Safari 在网络请求之后自动复制）：别假装成功
+  if (!ok) {
+    if (/并复制$/.test(label)) toast(`${label.replace(/并复制$/, '')}，浏览器不允许自动复制，请点“复制”按钮`, 'warn');
+    else manualCopy(text);
+    return false;
   }
   if (btn) {
     const tip = btn.dataset.tip;
@@ -2047,6 +2169,23 @@ async function copy(text, label = '已复制', btn) {
     btn._t = setTimeout(() => { btn.classList.remove('done'); if (btn._tip) btn.dataset.tip = btn._tip; }, 1400);
   }
   toast(`${label}  ${text.length > 60 ? text.slice(0, 60) + '…' : text}`);
+  return true;
+}
+
+// 浏览器不让写剪贴板时：把完整内容放进一个已选中的文本框，让用户自己按 ⌘C / 长按复制
+function manualCopy(text) {
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const d = document.createElement('div'); d.className = 'dialog'; d.setAttribute('role', 'dialog');
+  d.innerHTML = `<h3>请手动复制</h3><p>浏览器不允许自动复制，内容已经选中，按 ⌘C / Ctrl+C（手机上长按）复制。</p>
+    <textarea class="textarea" readonly rows="${Math.min(10, Math.max(2, Math.ceil(text.length / 40)))}" style="width:100%;font-size:12.5px"></textarea>
+    <div class="row" style="margin-top:12px"><button class="btn primary" data-no>关闭</button></div>`;
+  const ta = d.querySelector('textarea'); ta.value = text;
+  const done = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') done(); };
+  d._dismiss = done; ov.onclick = done; d.querySelector('[data-no]').onclick = done;
+  document.addEventListener('keydown', onKey);
+  document.body.append(ov, d);
+  ta.focus(); ta.select();
 }
 
 function confirmDialog({ title, text, ok = '确定', danger = false }) {
@@ -2056,29 +2195,277 @@ function confirmDialog({ title, text, ok = '确定', danger = false }) {
     d.innerHTML = `<h3>${esc(title)}</h3><p>${esc(text)}</p><div class="row">
       <button class="btn" data-no>取消</button><button class="btn primary" ${danger ? 'style="background:var(--bad)"' : ''} data-ok>${esc(ok)}</button></div>`;
     const done = (v) => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+    d._dismiss = () => done(false);
     const onKey = (e) => { if (e.key === 'Escape') done(false); };
     ov.onclick = () => done(false);
     d.querySelector('[data-no]').onclick = () => done(false);
     d.querySelector('[data-ok]').onclick = () => done(true);
     document.addEventListener('keydown', onKey);
     document.body.append(ov, d);
-    d.querySelector('[data-ok]').focus();
+    // 危险操作默认聚焦“取消”：回车按久了自动连发，也不会直接确认删除
+    d.querySelector(danger ? '[data-no]' : '[data-ok]').focus();
   });
 }
 
-// 复制短链：输入新后缀，其余配置和地区规则原样复制
+// 弹层（抽屉、对话框、搜索面板）共用的焦点管理，不用每个弹层各写一遍：
+// 打开时记住是从哪个按钮打开的，关掉后把焦点还回去（键盘和读屏用户不用从页面开头重新找）；
+// 打开期间 Tab / Shift+Tab 只在最上面一层里循环，不会跑到被遮住的页面上。Esc 仍由各弹层自己处理
+{
+  const MODAL = '.drawer, .dialog, .kbar';
+  const topModal = () => [...document.querySelectorAll(`body > :is(${MODAL})`)].pop() || null;
+  // 最近获得焦点或被点到的元素（Safari 点按钮不会让按钮获得焦点，所以按下时也记一下）
+  const recent = [];
+  const note = (el) => {
+    if (!el || el === document.body) return;
+    const i = recent.indexOf(el);
+    if (i >= 0) recent.splice(i, 1);
+    recent.push(el);
+    if (recent.length > 8) recent.shift();
+  };
+  document.addEventListener('focusin', (e) => note(e.target), true);
+  document.addEventListener('pointerdown', (e) => note(e.target.closest?.('button, a[href], input, select, textarea, [tabindex]')), true);
+  let hid = 0;
+  new MutationObserver((muts) => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (n.nodeType !== 1 || !n.matches(MODAL)) continue;
+        // 打开它之前的焦点：最近一个还在页面上、又不在这个弹层里的元素
+        n._ret = [...recent].reverse().find((el) => el.isConnected && !n.contains(el)) || null;
+        if (n.matches('[role=dialog], [role=alertdialog]') && !n.hasAttribute('aria-modal')) n.setAttribute('aria-modal', 'true');
+        const h = !n.hasAttribute('aria-label') && !n.hasAttribute('aria-labelledby') && n.querySelector('h2, h3');
+        if (h) { h.id = h.id || `mh${++hid}`; n.setAttribute('aria-labelledby', h.id); }
+      }
+      for (const n of m.removedNodes) {
+        const ret = n.nodeType === 1 && n._ret;
+        if (!ret || !ret.isConnected) continue;
+        // 关闭时如果代码已经把焦点放到别处（或又打开了新的弹层），就不抢
+        const a = document.activeElement, t = topModal();
+        if ((!a || a === document.body || !a.isConnected) && (!t || t.contains(ret))) ret.focus({ preventScroll: true });
+      }
+    }
+  }).observe(document.body, { childList: true });
+  const TABBABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    const m = topModal();
+    if (!m) return;
+    const a = document.activeElement;
+    // 挂在 body 上的下拉选项、浮层自己处理按键
+    if (a && !m.contains(a) && a.closest('.menu, .pop')) return;
+    // 看得见的可聚焦元素；同一组单选框只算选中的那个（和浏览器的 Tab 顺序一致）
+    const list = [...m.querySelectorAll(TABBABLE)].filter((el) => el.getClientRects().length
+      && !(el.type === 'radio' && !el.checked && el.name && m.querySelector(`input[type=radio][name="${CSS.escape(el.name)}"]:checked`)));
+    if (!list.length) { e.preventDefault(); return; }
+    const first = list[0], last = list[list.length - 1];
+    if (!m.contains(a) || a === m || (e.shiftKey ? a === first : a === last)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+  });
+}
+
+// 目标地址：没写协议的补上 https://；已经写了协议的（包括 tg://、weixin://、tel: 这类 App 地址）原样保留。
+// 只有像“域名:端口”（localhost:8080、b.com:8443）时才不算协议
+const withScheme = (v) => {
+  v = String(v || '').trim();
+  const hostPort = /^(localhost|[a-z0-9-]+(\.[a-z0-9-]+)+):\d/i.test(v);
+  return !v || (!hostPort && /^[a-z][a-z0-9+.-]*:/i.test(v)) ? v : 'https://' + v;
+};
+const isAppUrl = (u) => !!u && !/^https?:\/\//i.test(u);
+// 常见 App 地址：点一下填进输入框，再把花括号里的占位换成自己的（具体格式以各 App 官方文档为准）。
+// 占位词跟着界面语言走；用花括号括起来，提交时只认花括号，不会误拦地址里正常的中文
+const HW = EN ? { name: 'username', uid: 'user-ID', item: 'item-ID', appid: 'app-ID', phone: 'country-code-and-number', pkg: 'package-name', scheme: 'scheme', path: 'path', bv: 'BV-ID', id: 'ID' }
+  : { name: '用户名', uid: '用户ID', item: '商品ID', appid: '应用ID', phone: '国家码手机号', pkg: '包名', scheme: '协议', path: '路径', bv: 'BV号', id: 'ID' };
+const ah = (k) => `{${HW[k]}}`;
+const APP_EXAMPLES = [
+  ['中国大陆', [['微信', 'weixin://', 'wechat weixin'], ['支付宝', 'alipays://', 'alipay'], ['淘宝', `taobao://item.taobao.com/item.htm?id=${ah('item')}`, 'taobao'], ['京东', 'openapp.jdmobile://', 'jd jingdong'],
+    ['拼多多', `pinduoduo://com.xunmeng.pinduoduo/goods.html?goods_id=${ah('item')}`, 'pinduoduo pdd'], ['抖音', `snssdk1128://user/profile/${ah('uid')}`, 'douyin tiktok'], ['快手', `kwai://profile/${ah('uid')}`, 'kuaishou kwai'],
+    ['小红书', `xhsdiscover://user/${ah('uid')}`, 'xiaohongshu rednote xhs'], ['微博', `sinaweibo://userinfo?uid=${ah('uid')}`, 'weibo'], ['B 站', `bilibili://video/${ah('bv')}`, 'bilibili'], ['QQ', 'mqq://', 'qq tencent'], ['美团', 'imeituan://', 'meituan']]],
+  ['国际', [['Telegram', `tg://resolve?domain=${ah('name')}`], ['WhatsApp', `whatsapp://send?phone=${ah('phone')}`], ['X / Twitter', `twitter://user?screen_name=${ah('name')}`],
+    ['Instagram', `instagram://user?username=${ah('name')}`], ['Facebook', 'fb://'], ['YouTube', 'youtube://'], ['LINE', `line://ti/p/@${ah('id')}`], ['Discord', 'discord://'],
+    ['Spotify', 'spotify:'], ['Snapchat', `snapchat://add/${ah('name')}`]]],
+  ['应用商店', [['App Store', `itms-apps://apps.apple.com/app/id${ah('appid')}`, 'ios apple'], ['Google Play', `market://details?id=${ah('pkg')}`, 'android google'],
+    ['安卓 intent', `intent://${ah('path')}#Intent;scheme=${ah('scheme')};package=${ah('pkg')};end`, 'android anzhuo']]],
+];
+// 详情页：App 地址后面标一个“App”，悬停说明拉不起时去哪
+const appPill = (link, u) => (isAppUrl(u) ? `<span class="app-p" data-tipf-always data-tipf="${esc(`App 地址：访问时先尝试打开 App\n打不开时去：${link.app_web || (isAppUrl(link.target_url) ? '' : link.target_url) || '（没有备用网页，只显示“打开 App”按钮）'}`)}">App</span>` : '');
+// 目标地址输入框：前面是“网页 / App”类型下拉。默认网页，和普通输入框一样；
+// 切到 App 后提示文字换成 tg://…，下面出现“选择常用 App”（带搜索），选中就填进模板并选中要替换的部分
+// 常用 App 的图标：来自开源图标库 Simple Icons（CC0 协议，simple-icons.org），只取了下拉里用到的几个；商标归各自品牌所有。
+// 打包在页面里，不用访问外部网站（国内也能正常显示）。图库里没有的（京东、拼多多）用品牌色加首字
+const APP_ICON = {
+  wechat: ['07C160', 'M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.27-.027-.407-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z'],
+  alipay: ['1677FF', 'M19.695 15.07c3.426 1.158 4.203 1.22 4.203 1.22V3.846c0-2.124-1.705-3.845-3.81-3.845H3.914C1.808.001.102 1.722.102 3.846v16.31c0 2.123 1.706 3.845 3.813 3.845h16.173c2.105 0 3.81-1.722 3.81-3.845v-.157s-6.19-2.602-9.315-4.119c-2.096 2.602-4.8 4.181-7.607 4.181-4.75 0-6.361-4.19-4.112-6.949.49-.602 1.324-1.175 2.617-1.497 2.025-.502 5.247.313 8.266 1.317a16.796 16.796 0 0 0 1.341-3.302H5.781v-.952h4.799V6.975H4.77v-.953h5.81V3.591s0-.409.411-.409h2.347v2.84h5.744v.951h-5.744v1.704h4.69a19.453 19.453 0 0 1-1.986 5.06c1.424.52 2.702 1.011 3.654 1.333m-13.81-2.032c-.596.06-1.71.325-2.321.869-1.83 1.608-.735 4.55 2.968 4.55 2.151 0 4.301-1.388 5.99-3.61-2.403-1.182-4.438-2.028-6.637-1.809'],
+  taobao: ['E94F20', 'M21.3099 9.9008c.5285 0 .9584.4284.9584.9589 0 .5276-.4299.958-.9584.958-.5276 0-.9585-.4304-.9585-.958 0-.5305.4309-.959.9585-.959zm2.3899 3.0462h-10.408v-.9595h4.15V9.7591h-2.8869v-.768h2.8868v-.9234h-2.508v.2034h-1.6418V5.3733h1.6418v.3497c.4945-.0607 1.463-.1814 2.5175-.2956v-.8257h1.8522v.6408c.9249-.0807 1.753-.1312 2.211-.1112 1.489.0716 2.4449.2816 2.485 1.273.0356.989-1.4244 1.9043-1.4244 1.9043l-.4509-.4338v.1929h-2.8116v.9233h3.229v.768h-3.229v2.2285h4.3873v.9595zM21.5259 7.299l-.0115-.0115s1.3722-.7595.3427-1.272c-.8633-.43-5.5346.3056-6.9234.6257v.6578h6.5922zM1.8822 6.4166c.5515 0 .9985-.449.9985-1 0-.5531-.447-.9995-.9985-.9995a.9984.9984 0 00-1.001.9995c0 .551.4463 1 1.001 1zm3.4094-.8596c.252-.4364.3717-.7195.3717-.7195l-1.466-.4123S3.6068 6.3546 2.5527 7.253c0 0 1.0195.5897 1.0095.5732a9.6444 9.6444 0 00.782-.8793c.2345-.1017.4585-.198.6794-.2876-.2715.487-.7094 1.219-1.1478 1.6809l.6178.5385s.4198-.4033.8792-.8907h.5246v.8993H3.8557v.7204h2.0416v1.7235c-.025 0-.0521 0-.0782-.002-.224-.0106-.5751-.0476-.7124-.265-.1678-.2636-.044-.7496-.0346-1.0457H3.6608l-.0496.026s-.517 2.3142 1.489 2.2621c1.8793.0521 2.9544-.523 3.4725-.9178l.2064.7645 1.1583-.4825-.785-1.9183-.941.292.1764.6574c-.2415.1809-.518.3157-.8187.4134V9.6076h1.995v-.7204h-1.995v-.8993h2.003v-.72h-3.557c.2565-.3111.4589-.5982.5095-.78L5.9058 6.32c2.6603-.9519 4.1408-.7886 4.1278.773v4.1128s.1568 1.4124-1.461 1.3107l-.8757-.188-.207.8307s3.7822 1.0812 4.0913-1.8246c.3096-2.9058-.0767-4.7576-.0767-4.7576s-.3451-2.6824-6.213-1.02zM.0582 12.1534l1.5867.9905c1.0967-2.3813 1.0265-2.0657 1.302-2.92.2832-.8737.3453-1.54-.1362-2.023-.6172-.6197-.6844-.6773-1.6017-1.3582L.5487 7.8562l1.2164.7576s.8141.4153.4274 1.1903c-.3617.7375-2.1343 2.3493-2.1343 2.3493zm19.94 6.8484s-.0186.523-.6704.523c-.5892 0-.6363-.4113-.6363-.4113-.2485.2996-.6207.4549-1.0696.4549-.7606 0-1.2961-.5135-1.2961-1.2896 0-.786.5576-1.28 1.3983-1.28.3832 0 .725.1462.9258.4037.0066-.0706.0136-.1362.0136-.1968 0-.5622-.3092-.8127-1.01-.8127-.3382 0-.6659.0486-1.0136.1408.1107-.219.1924-.3793.2971-.4574.1202-.0972.4294-.1408.9419-.1408 1.269 0 1.742.4259 1.742 1.4279v1.2024c0 .3161.033.4359.3772.4359zm-1.3272-.745c0-.4815-.2555-.747-.6378-.747-.4043 0-.6668.2825-.6668.7595 0 .467.2775.7615.6533.7615.3882 0 .6513-.275.6513-.774zm5.2706-.501c0 1.1528-.6924 1.8271-1.7786 1.8271-1.0957 0-1.7766-.6743-1.7766-1.8271 0-1.1584.6809-1.8252 1.7766-1.8252 1.0862 0 1.7786.6719 1.7786 1.8252zm-1.0867 0c0-.8693-.237-1.2997-.692-1.2997-.4734 0-.6938.4304-.6938 1.2997 0 .8662.2204 1.299.6939 1.299.467 0 .6919-.4328.6919-1.299zm-7.1313-.0441c0 1.1703-.6534 1.8567-1.5767 1.8567-.4233 0-.8056-.1633-1.0466-.47 0 0-.1082.4264-.6618.4264-.6884 0-.6644-.523-.6644-.523.3868.0165.3758-.2145.3758-.436v-2.8862c0-.3552-.0742-.4795-.4269-.4865.0136-.1072.0777-.5376.6789-.5376.8156 0 .7615.9149.7615.9149v.786c.229-.268.5516-.3942.9905-.3942.9624 0 1.5697.6447 1.5697 1.7495zm-1.0937.0806c0-.8983-.2716-1.3557-.7616-1.3557-.4393 0-.74.3968-.74 1.1047v.3602c0 .7205.3152 1.1168.7631 1.1168.477 0 .7385-.4134.7385-1.226zm-3.2425-.0365c0 1.1528-.688 1.8271-1.7806 1.8271-1.0937 0-1.7726-.6743-1.7726-1.8271 0-1.1584.6789-1.8252 1.7726-1.8252 1.0927 0 1.7806.6719 1.7806 1.8252zm-1.0832 0c0-.8693-.236-1.2997-.6974-1.2997-.467 0-.6874.4304-.6874 1.2997 0 .8662.2205 1.299.6874 1.299.469 0 .6974-.4328.6974-1.299zm-5.9895-2.716c-.268.0782-.7901.0972-1.5516.0972-.925 0-1.5391-.039-1.8543-.039-.5195 0-.7254.1342-.9088.6592.3006-.1017.6729-.1087 1.1353-.1087.3512 0 .4108.0431.4108.2941V18.846c0 .2821.1178.6789.7255.6789.7104 0 .8346-.526.8346-.526-.3552-.007-.4248-.1313-.4248-.4865V15.952c0-.2675.1012-.2795.471-.2795.1252 0 .2094.007.2605.007.545 0 .6883-.1047.9018-.6398zm3.1303 3.962s-.018.523-.6664.523c-.556 0-.6403-.4113-.6403-.4113-.248.2996-.6207.4549-1.0656.4549-.7655 0-1.2996-.5135-1.2996-1.2896 0-.786.557-1.28 1.3993-1.28.3843 0 .7274.1462.9258.4037.0036-.0706.0106-.1362.0106-.1968 0-.5622-.3051-.8127-1.007-.8127-.3382 0-.6669.0486-1.015.1408.1131-.219.1923-.3793.2945-.4574.1293-.0972.4329-.1408.9469-.1408 1.265 0 1.746.4259 1.746 1.4279v1.2024c0 .3161.0276.4359.3708.4359zm-1.3262-.745c0-.4815-.2555-.747-.6378-.747-.4013 0-.6668.2825-.6668.7595 0 .467.279.7615.6513.7615.3893 0 .6533-.275.6533-.774z'],
+  tiktok: ['000000', 'M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z'],
+  kuaishou: ['FF4906', 'M18.315 12.264c2.33 0 4.218 1.88 4.218 4.2V19.8c0 2.32-1.888 4.2-4.218 4.2h-6.202a4.218 4.218 0 0 1-4.023-2.938l-3.676 1.833a2.04 2.04 0 0 1-2.731-.903 2.015 2.015 0 0 1-.216-.907v-5.94a2.03 2.03 0 0 1 2.035-2.024 2.044 2.044 0 0 1 .919.218l3.673 1.85a4.218 4.218 0 0 1 4.02-2.925zm-.062 2.162h-6.078c-1.153 0-2.09.921-2.108 2.065v3.247c0 1.148.925 2.081 2.073 2.1h6.113c1.153 0 2.09-.922 2.109-2.065v-3.247a2.104 2.104 0 0 0-2.074-2.1zM4.18 15.72a.554.554 0 0 0-.555.542v3.734a.556.556 0 0 0 .798.496l.01-.004 3.463-1.756V17.51l-3.467-1.73a.557.557 0 0 0-.249-.06zM9.28 0a5.667 5.667 0 0 1 4.98 2.965 4.921 4.921 0 0 1 3.36-1.317c2.714 0 4.913 2.177 4.913 4.863 0 2.686-2.2 4.863-4.912 4.863a4.921 4.921 0 0 1-3.996-2.034 5.651 5.651 0 0 1-4.345 2.034c-3.131 0-5.67-2.546-5.67-5.687C3.61 2.546 6.149 0 9.28 0Zm8.34 3.926c-1.441 0-2.61 1.157-2.61 2.585s1.169 2.585 2.61 2.585c1.443 0 2.612-1.157 2.612-2.585s-1.169-2.585-2.611-2.585zM9.28 2.287a3.395 3.395 0 0 0-3.39 3.4c0 1.877 1.518 3.4 3.39 3.4a3.395 3.395 0 0 0 3.39-3.4c0-1.878-1.518-3.4-3.39-3.4z'],
+  xiaohongshu: ['FF2442', 'M22.405 9.879c.002.016.01.02.07.019h.725a.797.797 0 0 0 .78-.972.794.794 0 0 0-.884-.618.795.795 0 0 0-.692.794c0 .101-.002.666.001.777zm-11.509 4.808c-.203.001-1.353.004-1.685.003a2.528 2.528 0 0 1-.766-.126.025.025 0 0 0-.03.014L7.7 16.127a.025.025 0 0 0 .01.032c.111.06.336.124.495.124.66.01 1.32.002 1.981 0 .01 0 .02-.006.023-.015l.712-1.545a.025.025 0 0 0-.024-.036zM.477 9.91c-.071 0-.076.002-.076.01a.834.834 0 0 0-.01.08c-.027.397-.038.495-.234 3.06-.012.24-.034.389-.135.607-.026.057-.033.042.003.112.046.092.681 1.523.787 1.74.008.015.011.02.017.02.008 0 .033-.026.047-.044.147-.187.268-.391.371-.606.306-.635.44-1.325.486-1.706.014-.11.021-.22.03-.33l.204-2.616.022-.293c.003-.029 0-.033-.03-.034zm7.203 3.757a1.427 1.427 0 0 1-.135-.607c-.004-.084-.031-.39-.235-3.06a.443.443 0 0 0-.01-.082c-.004-.011-.052-.008-.076-.008h-1.48c-.03.001-.034.005-.03.034l.021.293c.076.982.153 1.964.233 2.946.05.4.186 1.085.487 1.706.103.215.223.419.37.606.015.018.037.051.048.049.02-.003.742-1.642.804-1.765.036-.07.03-.055.003-.112zm3.861-.913h-.872a.126.126 0 0 1-.116-.178l1.178-2.625a.025.025 0 0 0-.023-.035l-1.318-.003a.148.148 0 0 1-.135-.21l.876-1.954a.025.025 0 0 0-.023-.035h-1.56c-.01 0-.02.006-.024.015l-.926 2.068c-.085.169-.314.634-.399.938a.534.534 0 0 0-.02.191.46.46 0 0 0 .23.378.981.981 0 0 0 .46.119h.59c.041 0-.688 1.482-.834 1.972a.53.53 0 0 0-.023.172.465.465 0 0 0 .23.398c.15.092.342.12.475.12l1.66-.001c.01 0 .02-.006.023-.015l.575-1.28a.025.025 0 0 0-.024-.035zm-6.93-4.937H3.1a.032.032 0 0 0-.034.033c0 1.048-.01 2.795-.01 6.829 0 .288-.269.262-.28.262h-.74c-.04.001-.044.004-.04.047.001.037.465 1.064.555 1.263.01.02.03.033.051.033.157.003.767.009.938-.014.153-.02.3-.06.438-.132.3-.156.49-.419.595-.765.052-.172.075-.353.075-.533.002-2.33 0-4.66-.007-6.991a.032.032 0 0 0-.032-.032zm11.784 6.896c0-.014-.01-.021-.024-.022h-1.465c-.048-.001-.049-.002-.05-.049v-4.66c0-.072-.005-.07.07-.07h.863c.08 0 .075.004.075-.074V8.393c0-.082.006-.076-.08-.076h-3.5c-.064 0-.075-.006-.075.073v1.445c0 .083-.006.077.08.077h.854c.075 0 .07-.004.07.07v4.624c0 .095.008.084-.085.084-.37 0-1.11-.002-1.304 0-.048.001-.06.03-.06.03l-.697 1.519s-.014.025-.008.036c.006.01.013.008.058.008 1.748.003 3.495.002 5.243.002.03-.001.034-.006.035-.033v-1.539zm4.177-3.43c0 .013-.007.023-.02.024-.346.006-.692.004-1.037.004-.014-.002-.022-.01-.022-.024-.005-.434-.007-.869-.01-1.303 0-.072-.006-.071.07-.07l.733-.003c.041 0 .081.002.12.015.093.025.16.107.165.204.006.431.002 1.153.001 1.153zm2.67.244a1.953 1.953 0 0 0-.883-.222h-.18c-.04-.001-.04-.003-.042-.04V10.21c0-.132-.007-.263-.025-.394a1.823 1.823 0 0 0-.153-.53 1.533 1.533 0 0 0-.677-.71 2.167 2.167 0 0 0-1-.258c-.153-.003-.567 0-.72 0-.07 0-.068.004-.068-.065V7.76c0-.031-.01-.041-.046-.039H17.93s-.016 0-.023.007c-.006.006-.008.012-.008.023v.546c-.008.036-.057.015-.082.022h-.95c-.022.002-.028.008-.03.032v1.481c0 .09-.004.082.082.082h.913c.082 0 .072.128.072.128V11.19s.003.117-.06.117h-1.482c-.068 0-.06.082-.06.082v1.445s-.01.068.064.068h1.457c.082 0 .076-.006.076.079v3.225c0 .088-.007.081.082.081h1.43c.09 0 .082.007.082-.08v-3.27c0-.029.006-.035.033-.035l2.323-.003c.098 0 .191.02.28.061a.46.46 0 0 1 .274.407c.008.395.003.79.003 1.185 0 .259-.107.367-.33.367h-1.218c-.023.002-.029.008-.028.033.184.437.374.871.57 1.303a.045.045 0 0 0 .04.026c.17.005.34.002.51.003.15-.002.517.004.666-.01a2.03 2.03 0 0 0 .408-.075c.59-.18.975-.698.976-1.313v-1.981c0-.128-.01-.254-.034-.38 0 .078-.029-.641-.724-.998z'],
+  sinaweibo: ['E6162D', 'M10.098 20.323c-3.977.391-7.414-1.406-7.672-4.02-.259-2.609 2.759-5.047 6.74-5.441 3.979-.394 7.413 1.404 7.671 4.018.259 2.6-2.759 5.049-6.737 5.439l-.002.004zM9.05 17.219c-.384.616-1.208.884-1.829.602-.612-.279-.793-.991-.406-1.593.379-.595 1.176-.861 1.793-.601.622.263.82.972.442 1.592zm1.27-1.627c-.141.237-.449.353-.689.253-.236-.09-.313-.361-.177-.586.138-.227.436-.346.672-.24.239.09.315.36.18.601l.014-.028zm.176-2.719c-1.893-.493-4.033.45-4.857 2.118-.836 1.704-.026 3.591 1.886 4.21 1.983.64 4.318-.341 5.132-2.179.8-1.793-.201-3.642-2.161-4.149zm7.563-1.224c-.346-.105-.57-.18-.405-.615.375-.977.42-1.804 0-2.404-.781-1.112-2.915-1.053-5.364-.03 0 0-.766.331-.571-.271.376-1.217.315-2.224-.27-2.809-1.338-1.337-4.869.045-7.888 3.08C1.309 10.87 0 13.273 0 15.348c0 3.981 5.099 6.395 10.086 6.395 6.536 0 10.888-3.801 10.888-6.82 0-1.822-1.547-2.854-2.915-3.284v.01zm1.908-5.092c-.766-.856-1.908-1.187-2.96-.962-.436.09-.706.511-.616.932.09.42.511.691.932.602.511-.105 1.067.044 1.442.465.376.421.466.977.316 1.473-.136.406.089.856.51.992.405.119.857-.105.992-.512.33-1.021.12-2.178-.646-3.035l.03.045zm2.418-2.195c-1.576-1.757-3.905-2.419-6.054-1.968-.496.104-.812.587-.706 1.081.104.496.586.813 1.082.707 1.532-.331 3.185.15 4.296 1.383 1.112 1.246 1.429 2.943.947 4.416-.165.48.106 1.007.586 1.157.479.165.991-.104 1.157-.586.675-2.088.241-4.478-1.338-6.235l.03.045z'],
+  bilibili: ['00A1D6', 'M17.813 4.653h.854c1.51.054 2.769.578 3.773 1.574 1.004.995 1.524 2.249 1.56 3.76v7.36c-.036 1.51-.556 2.769-1.56 3.773s-2.262 1.524-3.773 1.56H5.333c-1.51-.036-2.769-.556-3.773-1.56S.036 18.858 0 17.347v-7.36c.036-1.511.556-2.765 1.56-3.76 1.004-.996 2.262-1.52 3.773-1.574h.774l-1.174-1.12a1.234 1.234 0 0 1-.373-.906c0-.356.124-.658.373-.907l.027-.027c.267-.249.573-.373.92-.373.347 0 .653.124.92.373L9.653 4.44c.071.071.134.142.187.213h4.267a.836.836 0 0 1 .16-.213l2.853-2.747c.267-.249.573-.373.92-.373.347 0 .662.151.929.4.267.249.391.551.391.907 0 .355-.124.657-.373.906zM5.333 7.24c-.746.018-1.373.276-1.88.773-.506.498-.769 1.13-.786 1.894v7.52c.017.764.28 1.395.786 1.893.507.498 1.134.756 1.88.773h13.334c.746-.017 1.373-.275 1.88-.773.506-.498.769-1.129.786-1.893v-7.52c-.017-.765-.28-1.396-.786-1.894-.507-.497-1.134-.755-1.88-.773zM8 11.107c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c0-.373.129-.689.386-.947.258-.257.574-.386.947-.386zm8 0c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c.017-.391.15-.711.4-.96.249-.249.56-.373.933-.373Z'],
+  qq: ['1EBAFC', 'M21.395 15.035a40 40 0 0 0-.803-2.264l-1.079-2.695c.001-.032.014-.562.014-.836C19.526 4.632 17.351 0 12 0S4.474 4.632 4.474 9.241c0 .274.013.804.014.836l-1.08 2.695a39 39 0 0 0-.802 2.264c-1.021 3.283-.69 4.643-.438 4.673.54.065 2.103-2.472 2.103-2.472 0 1.469.756 3.387 2.394 4.771-.612.188-1.363.479-1.845.835-.434.32-.379.646-.301.778.343.578 5.883.369 7.482.189 1.6.18 7.14.389 7.483-.189.078-.132.132-.458-.301-.778-.483-.356-1.233-.646-1.846-.836 1.637-1.384 2.393-3.302 2.393-4.771 0 0 1.563 2.537 2.103 2.472.251-.03.581-1.39-.438-4.673'],
+  meituan: ['FFD100', 'M6.923 0c-2.408 0-3.28.25-4.16.721A4.906 4.907 0 0 0 .722 2.763C.25 3.643 0 4.516 0 6.923v10.154c0 2.407.25 3.28.72 4.16a4.905 4.906 0 0 0 2.042 2.042c.88.47 1.752.721 4.16.721h10.156c2.407 0 3.28-.25 4.16-.721a4.906 4.907 0 0 0 2.04-2.042c.471-.88.722-1.753.722-4.16V6.923c0-2.407-.25-3.28-.722-4.16A4.906 4.907 0 0 0 21.238.72C20.357.251 19.484 0 17.077 0ZM4.17 7.51h1.084c.04.24.07.488.11.737h3.47c.05-.25.08-.497.1-.736h1.105a9.849 9.85 0 0 1-.09.736h1.562v.866H7.62v.696h3.642v.855h-3.64v.667h3.64v.854h-3.64v.816h3.89v.865H7.88c.775.935 2.218 1.532 3.78 1.651l-.538.936c-1.442-.17-3.103-.846-4.028-2.04-.856 1.194-2.487 1.92-4.525 2.07l.318-1.005c1.382-.02 2.814-.736 3.431-1.612h-3.62v-.865h3.86v-.816h-3.64v-.854h3.64v-.667h-3.64v-.855h3.64v-.697H2.7v-.866h1.56zm8.603.182h7.976c.358 0 .567.198.567.547v8.146H13.33c-.358 0-.557-.199-.557-.547zm1.044.885V15.5h6.455V8.577Zm3.999.476h1.024v.756h.975v.835h-.975V13c0 .806-.1 1.402-.318 2.02h-1.113c.338-.717.408-1.224.408-1.99v-2.387h-.935c-.14 1.541-.736 3.451-1.363 4.376h-1.134c.607-.855 1.303-2.526 1.472-4.376h-1.512v-.835h3.472z'],
+  telegram: ['26A5E4', 'M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z'],
+  whatsapp: ['25D366', 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z'],
+  x: ['000000', 'M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z'],
+  instagram: ['FF0069', 'M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077'],
+  facebook: ['0866FF', 'M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z'],
+  youtube: ['FF0000', 'M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z'],
+  line: ['00C300', 'M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314'],
+  discord: ['5865F2', 'M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z'],
+  spotify: ['1ED760', 'M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'],
+  snapchat: ['FFFC00', 'M12.206.793c.99 0 4.347.276 5.93 3.821.529 1.193.403 3.219.299 4.847l-.003.06c-.012.18-.022.345-.03.51.075.045.203.09.401.09.3-.016.659-.12 1.033-.301.165-.088.344-.104.464-.104.182 0 .359.029.509.09.45.149.734.479.734.838.015.449-.39.839-1.213 1.168-.089.029-.209.075-.344.119-.45.135-1.139.36-1.333.81-.09.224-.061.524.12.868l.015.015c.06.136 1.526 3.475 4.791 4.014.255.044.435.27.42.509 0 .075-.015.149-.045.225-.24.569-1.273.988-3.146 1.271-.059.091-.12.375-.164.57-.029.179-.074.36-.134.553-.076.271-.27.405-.555.405h-.03c-.135 0-.313-.031-.538-.074-.36-.075-.765-.135-1.273-.135-.3 0-.599.015-.913.074-.6.104-1.123.464-1.723.884-.853.599-1.826 1.288-3.294 1.288-.06 0-.119-.015-.18-.015h-.149c-1.468 0-2.427-.675-3.279-1.288-.599-.42-1.107-.779-1.707-.884-.314-.045-.629-.074-.928-.074-.54 0-.958.089-1.272.149-.211.043-.391.074-.54.074-.374 0-.523-.224-.583-.42-.061-.192-.09-.389-.135-.567-.046-.181-.105-.494-.166-.57-1.918-.222-2.95-.642-3.189-1.226-.031-.063-.052-.15-.055-.225-.015-.243.165-.465.42-.509 3.264-.54 4.73-3.879 4.791-4.02l.016-.029c.18-.345.224-.645.119-.869-.195-.434-.884-.658-1.332-.809-.121-.029-.24-.074-.346-.119-1.107-.435-1.257-.93-1.197-1.273.09-.479.674-.793 1.168-.793.146 0 .27.029.383.074.42.194.789.3 1.104.3.234 0 .384-.06.465-.105l-.046-.569c-.098-1.626-.225-3.651.307-4.837C7.392 1.077 10.739.807 11.727.807l.419-.015h.06z'],
+  appstore: ['0D96F6', 'M8.8086 14.9194l6.1107-11.0368c.0837-.1513.1682-.302.2437-.4584.0685-.142.1267-.2854.1646-.4403.0803-.3259.0588-.6656-.066-.9767-.1238-.3095-.3417-.5678-.6201-.7355a1.4175 1.4175 0 0 0-.921-.1924c-.3207.043-.6135.1935-.8443.4288-.1094.1118-.1996.2361-.2832.369-.092.1463-.175.2979-.259.4492l-.3864.6979-.3865-.6979c-.0837-.1515-.1667-.303-.2587-.4492-.0837-.1329-.1739-.2572-.2835-.369-.2305-.2353-.5233-.3857-.844-.429a1.4181 1.4181 0 0 0-.921.1926c-.2784.1677-.4964.426-.6203.7355-.1246.311-.1461.6508-.066.9767.038.155.0962.2984.1648.4403.0753.1564.1598.307.2437.4584l1.248 2.2543-4.8625 8.7825H2.0295c-.1676 0-.3351-.0007-.5026.0092-.1522.009-.3004.0284-.448.0714-.3108.0906-.5822.2798-.7783.548-.195.2665-.3006.5929-.3006.9279 0 .3352.1057.6612.3006.9277.196.2683.4675.4575.7782.548.1477.043.296.0623.4481.0715.1675.01.335.009.5026.009h13.0974c.0171-.0357.059-.1294.1-.2697.415-1.4151-.6156-2.843-2.0347-2.843zM3.113 18.5418l-.7922 1.5008c-.0818.1553-.1644.31-.2384.4705-.067.1458-.124.293-.1611.452-.0785.3346-.0576.6834.0645 1.0029.1212.3175.3346.583.607.7549.2727.172.5891.2416.9013.1975.3139-.044.6005-.1986.8263-.4402.1072-.1148.1954-.2424.2772-.3787.0902-.1503.1714-.3059.2535-.4612L6 19.4636c-.0896-.149-.9473-1.4704-2.887-.9218m20.5861-3.0056a1.4707 1.4707 0 0 0-.779-.5407c-.1476-.0425-.2961-.0616-.4483-.0705-.1678-.0099-.3352-.0091-.503-.0091H18.648l-4.3891-7.817c-.6655.7005-.9632 1.485-1.0773 2.1976-.1655 1.0333.0367 2.0934.546 3.0004l5.2741 9.3933c.084.1494.167.299.2591.4435.0837.131.1739.2537.2836.364.231.2323.5238.3809.8449.4232.3192.0424.643-.0244.9217-.1899.2784-.1653.4968-.4204.621-.7257.1246-.3072.146-.6425.0658-.9641-.0381-.1529-.0962-.2945-.165-.4346-.0753-.1543-.1598-.303-.2438-.4524l-1.216-2.1662h1.596c.1677 0 .3351.0009.5029-.009.1522-.009.3007-.028.4483-.0705a1.4707 1.4707 0 0 0 .779-.5407A1.5386 1.5386 0 0 0 24 16.452a1.539 1.539 0 0 0-.3009-.9158Z'],
+  googleplay: ['414141', 'M22.018 13.298l-3.919 2.218-3.515-3.493 3.543-3.521 3.891 2.202a1.49 1.49 0 0 1 0 2.594zM1.337.924a1.486 1.486 0 0 0-.112.568v21.017c0 .217.045.419.124.6l11.155-11.087L1.337.924zm12.207 10.065l3.258-3.238L3.45.195a1.466 1.466 0 0 0-.946-.179l11.04 10.973zm0 2.067l-11 10.933c.298.036.612-.016.906-.183l13.324-7.54-3.23-3.21z'],
+  android: ['3DDC84', 'M18.4395 5.5586c-.675 1.1664-1.352 2.3318-2.0274 3.498-.0366-.0155-.0742-.0286-.1113-.043-1.8249-.6957-3.484-.8-4.42-.787-1.8551.0185-3.3544.4643-4.2597.8203-.084-.1494-1.7526-3.021-2.0215-3.4864a1.1451 1.1451 0 0 0-.1406-.1914c-.3312-.364-.9054-.4859-1.379-.203-.475.282-.7136.9361-.3886 1.5019 1.9466 3.3696-.0966-.2158 1.9473 3.3593.0172.031-.4946.2642-1.3926 1.0177C2.8987 12.176.452 14.772 0 18.9902h24c-.119-1.1108-.3686-2.099-.7461-3.0683-.7438-1.9118-1.8435-3.2928-2.7402-4.1836a12.1048 12.1048 0 0 0-2.1309-1.6875c.6594-1.122 1.312-2.2559 1.9649-3.3848.2077-.3615.1886-.7956-.0079-1.1191a1.1001 1.1001 0 0 0-.8515-.5332c-.5225-.0536-.9392.3128-1.0488.5449zm-.0391 8.461c.3944.5926.324 1.3306-.1563 1.6503-.4799.3197-1.188.0985-1.582-.4941-.3944-.5927-.324-1.3307.1563-1.6504.4727-.315 1.1812-.1086 1.582.4941zM7.207 13.5273c.4803.3197.5506 1.0577.1563 1.6504-.394.5926-1.1038.8138-1.584.4941-.48-.3197-.5503-1.0577-.1563-1.6504.4008-.6021 1.1087-.8106 1.584-.4941z'],
+};
+const APP_ICON_OF = { '微信': 'wechat', '支付宝': 'alipay', '淘宝': 'taobao', '抖音': 'tiktok', '快手': 'kuaishou', '小红书': 'xiaohongshu', '微博': 'sinaweibo', 'B 站': 'bilibili', 'QQ': 'qq', '美团': 'meituan',
+  Telegram: 'telegram', WhatsApp: 'whatsapp', 'X / Twitter': 'x', Instagram: 'instagram', Facebook: 'facebook', YouTube: 'youtube', LINE: 'line', Discord: 'discord', Spotify: 'spotify', Snapchat: 'snapchat',
+  'App Store': 'appstore', 'Google Play': 'googleplay', '安卓 intent': 'android' };
+const APP_LETTER = { '京东': ['E1251B', '京'], '拼多多': ['E02E24', '拼'] };
+// 浅色的品牌色（黄色等）上用深色图形，其余用白色
+const lightHex = (h) => { const n = parseInt(h, 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.62; };
+function appIcon(name) {
+  const k = APP_ICON_OF[name], ic = k && APP_ICON[k], lt = !ic && APP_LETTER[name];
+  if (!ic && !lt) return '<span class="app-ic none"></span>';
+  const hex = ic ? ic[0] : lt[0], fg = lightHex(hex) ? '#1a1a1a' : '#fff';
+  return `<span class="app-ic" style="--c:#${hex};--g:${fg}" aria-hidden="true">${ic ? `<svg viewBox="0 0 24 24"><path d="${ic[1]}"/></svg>` : `<b>${lt[1]}</b>`}</span>`;
+}
+const APP_NAME = new Map(APP_EXAMPLES.flatMap(([, list]) => list.map(([n, v]) => [v, n])));
+function targetField({ id, name, value = '', placeholder, required = false, backup = '下面“打不开 App 时去的网页”，没填就去默认推广地址' }) {
+  return `<div class="pre tgt"><span class="tgt-k" data-tgt-k="${id}"></span>
+      <input class="input" id="${id}" name="${name}" placeholder="${esc(placeholder)}" value="${esc(value)}"${required ? ' required' : ''} spellcheck="false" autocomplete="off"></div>
+    <div class="tgt-app" data-tgt-app="${id}" hidden><div class="combo tgt-pick"></div>
+      <span class="hint">列表里没有的 App，直接在上面填它的地址（如 okx://…）。访客没装 App 时会去${backup}；在微信、QQ 等 App 里打开时，会提示“在浏览器打开”并给出打开网页的按钮。有官方网页链接的 App（如 t.me/用户名、wa.me/手机号），直接用“网站”类型更稳。</span></div>`;
+}
+// 模板里要替换成实际内容的占位（花括号括起来的部分；提交时检查，没换掉就提示并选中）
+const HW_ALL = ['用户名', '用户ID', '商品ID', '应用ID', '国家码手机号', '包名', '协议', '路径', 'BV号', 'ID', 'username', 'user-ID', 'item-ID', 'app-ID', 'country-code-and-number', 'package-name', 'scheme', 'path', 'BV-ID'];
+const APP_HOLE = new RegExp(`\\{(${HW_ALL.join('|')})\\}`);
+// 没有类型下拉的输入框（快速创建、A/B 分流）：只拦 http / https 明显拼错的情况，tg:// 这类 App 地址照常能用
+// 也抓漏了冒号的写法：https//b.com 会被补成 https://https//b.com
+const typoScheme = (sc) => sc !== 'http' && sc !== 'https' && (/^(h+t+p+s*|ht+ps?|ttps?|htp)s?$/.test(sc) || (/^[hpst]{3,7}$/.test(sc) && sc.includes('h') && sc.includes('t')));
+const httpTypo = (v) => {
+  v = String(v || '');
+  const m = /^([a-z][a-z0-9+.-]*):/i.exec(v);
+  if (m && typoScheme(m[1].toLowerCase())) return true;
+  // 主机名是 http / https 一类的（https//b.com 被补成 https://https//b.com）
+  const host = /^https?:\/\/([^/:;?#]+)/i.exec(v)?.[1]?.toLowerCase();
+  return !!host && (/^https?$/.test(host) || typoScheme(host));
+};
+function bindTarget(root, id, onKind = () => {}) {
+  const input = root.querySelector('#' + id), app = root.querySelector(`[data-tgt-app="${id}"]`), web0 = input.placeholder;
+  let kind = isAppUrl(input.value) ? 'app' : 'web';
+  // 来回切换类型时记住各自填过的地址，切回来能还原（不会把原来的推广地址弄丢）
+  const memo = { web: '', app: '' };
+  const set = (k, user) => {
+    if (user && k !== kind) {
+      memo[kind] = input.value;
+      const v = input.value.trim();
+      if (!v || isAppUrl(withScheme(v)) !== (k === 'app')) {
+        input.value = memo[k] || '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    kind = k;
+    input.placeholder = k === 'app' ? `tg://resolve?domain=${HW.name}` : web0;
+    app.hidden = k !== 'app';
+    onKind(k);
+    if (user) input.focus();
+  };
+  dropdown(root.querySelector(`[data-tgt-k="${id}"]`), {
+    value: kind, aria: '地址类型', minWidth: 230,
+    groups: () => [['', ['web', 'app']]],
+    button: (v) => `<span class="nm">${v === 'app' ? 'App' : '网站'}</span>`,
+    option: (v) => `<span class="ot">${v === 'app' ? '打开 App<small>tg:// · weixin:// · intent://…</small>' : '网站<small>https://…</small>'}</span>`,
+    onChange: (v) => set(v, true),
+  });
+  dropdown(app.querySelector('.tgt-pick'), {
+    value: null, repeat: true, aria: '选择常用 App', search: '搜索 App，或输入协议头如 okx', empty: '没有这个 App，可以直接在上面填写地址', minWidth: 300, maxWidth: 380,
+    groups: (q) => {
+      const out = APP_EXAMPLES.map(([g, list]) => [g, list.filter(([n, v, al]) => !q || `${n} ${al || ''}`.toLowerCase().includes(q) || v.toLowerCase().includes(q)).map(([, v]) => v)]).filter(([, l]) => l.length);
+      // 列表里搜不到：输入的像协议头（字母开头，字母数字和 + . -）就提供“使用 xxx://”
+      const sc = q.replace(/:\/*$/, '');
+      if (!out.length && /^[a-z][a-z0-9+.-]*$/.test(sc) && !['http', 'https', 'javascript', 'data', 'file', 'vbscript'].includes(sc)) out.push(['自定义协议头', [`${sc}://`]]);
+      return out;
+    },
+    button: () => `${ic('search', 14)}<span class="nm">选择常用 App</span>`,
+    option: (v, q) => `${APP_NAME.has(v) ? appIcon(APP_NAME.get(v)) : `<span class="app-ic none">${ic('link', 12)}</span>`}<span class="ot">${APP_NAME.has(v) ? hl(T(APP_NAME.get(v)), q) : '使用'}<small class="mono">${esc(v)}</small></span>`,
+    onChange: (v) => {
+      input.value = v;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      // 选中第一个要替换的占位词（用户名 / ID 等）
+      const m = APP_HOLE.exec(v);
+      input.focus();
+      if (m) input.setSelectionRange(m.index, m.index + m[0].length);
+    },
+  });
+  set(kind);
+  const value = () => (kind === 'app' ? input.value.trim() : withScheme(input.value));
+  // 提交前检查：返回要显示的错误（并把光标放到出错的位置），没问题返回空
+  const check = () => {
+    const v = value();
+    if (!v) return '';
+    if (kind === 'app') {
+      if (!isAppUrl(v)) return '请填写 App 地址，例如 tg://resolve?domain=用户名；普通网址请把类型切回“网站”';
+      const m = APP_HOLE.exec(v);
+      if (m) { const i = input.value.indexOf(m[0]); input.focus(); if (i >= 0) input.setSelectionRange(i, i + m[0].length); return `请把地址里的“${m[0]}”换成实际内容`; }
+    } else if (httpTypo(v)) {
+      input.focus();
+      return '网址的 http / https 好像拼错了，请检查一下';
+    } else if (!/^https?:\/\//i.test(v)) {
+      input.focus();
+      return '这看起来是 App 地址；要打开 App 请把类型切到“App”，网址请以 https:// 开头';
+    }
+    return '';
+  };
+  return { value, kind: () => kind, check };
+}
+
+// 短链二维码：放大查看，下载 SVG / PNG（扫码打开会记录一次访问）
+const qrSrc = (text, extra = '') => `/api/qr?text=${encodeURIComponent(text)}${extra}`;
+function qrDialog(slug) {
+  const url = shortUrl(slug), name = `qr-${slug}`;
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const d = document.createElement('div'); d.className = 'dialog qr-d'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', '二维码');
+  d.innerHTML = `<h3>二维码</h3><p class="mono qr-u">${esc(shortDisp(slug))}</p>
+    <img class="qr-big" src="${esc(qrSrc(url))}" alt="${esc(url)}" width="220" height="220">
+    <p class="hint">用手机扫码打开短链（会记录一次访问）${ON_WORKERS_DEV ? '<br><span class="warn">当前是 workers.dev 域名，中国大陆通常打不开，建议先绑定自己的域名</span>' : ''}</p>
+    <div class="row"><a class="btn" href="${esc(qrSrc(url, `&dl=1&name=${encodeURIComponent(name)}`))}" download>${ic('dl', 15)}SVG</a>
+      <button class="btn" data-png>${ic('dl', 15)}PNG</button><span class="sp"></span><button class="btn primary" data-no>关闭</button></div>`;
+  const done = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') done(); };
+  ov.onclick = done;
+  d.querySelector('[data-no]').onclick = done;
+  // PNG：把 SVG 画到 1024px 的画布上再导出（印刷、发群更清楚）
+  d.querySelector('[data-png]').onclick = async () => {
+    try {
+      const img = new Image();
+      img.src = URL.createObjectURL(await (await fetch(qrSrc(url, '&hq=1'))).blob());
+      await img.decode();
+      const c = document.createElement('canvas'); c.width = c.height = 1024;
+      const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, 1024, 1024);
+      URL.revokeObjectURL(img.src);
+      const a = document.createElement('a'); a.download = `${name}.png`; a.href = c.toDataURL('image/png'); a.click();
+    } catch (err) { toast(err.message, 'bad'); }
+  };
+  document.addEventListener('keydown', onKey);
+  document.body.append(ov, d);
+  d.querySelector('[data-no]').focus();
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-qr]');
+  if (b) { e.preventDefault(); e.stopPropagation(); qrDialog(b.dataset.qr); }
+});
+
+// 生成副本：输入新后缀，其余配置和地区规则原样复制（和旁边“复制”网址到剪贴板的按钮区分开，叫“生成副本”）
 function duplicateDialog(src, onDone) {
   const ov = document.createElement('div'); ov.className = 'ov';
   const d = document.createElement('form'); d.className = 'dialog dup'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
   const what = [src.target_url && '推广地址', src.rules && `${src.rules} 条跳转规则`, src.arms && 'A/B 分流', '有效期等设置'].filter(Boolean).join('、');
-  d.innerHTML = `<h3>复制短链</h3>
+  d.innerHTML = `<h3>生成副本</h3>
     <p>复制 <b class="mono">/${esc(src.slug)}</b> 的${esc(what)}，生成一个新短链。访问记录不会复制。</p>
     <div class="field"><label for="dup-s">新短链后缀</label>
       <div class="pre"><span>${esc(HOST)}/</span><input class="input" id="dup-s" name="slug" placeholder="留空自动生成" autocomplete="off" spellcheck="false"></div>
       <div class="err" id="dup-e" hidden></div></div>
     <div class="field"><label for="dup-t">标题 <span class="hint" style="font-weight:400">可选</span></label>
       <input class="input" id="dup-t" name="title" maxlength="200" placeholder="方便自己识别，如：春季活动 · 知乎" value="${esc(src.title || '')}" autocomplete="off"></div>
-    <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary" data-ok>${ic('dup', 15)}复制</button></div>`;
+    <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary" data-ok>${ic('dup', 15)}生成副本</button></div>`;
   const inp = d.querySelector('#dup-s'), err = d.querySelector('#dup-e'), ok = d.querySelector('[data-ok]');
   const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
@@ -2091,7 +2478,7 @@ function duplicateDialog(src, onDone) {
     try {
       const link = await api(`/links/${src.id}/duplicate`, { method: 'POST', body: { slug: inp.value.trim(), title: d.querySelector('#dup-t').value.trim() } });
       close();
-      toast(`已复制为 /${link.slug}`);
+      toast(`已生成副本 /${link.slug}`);
       onDone(link);
     } catch (e2) {
       err.textContent = e2.message; err.hidden = false; inp.classList.add('bad'); inp.focus();
@@ -2254,14 +2641,14 @@ function shell(active, inner) {
       <button type="button" class="kbar-b" id="kbar-b" data-tip="搜索短链、站点和设置" data-tip-at="right" aria-label="搜索和快速跳转">${ic('search')}<span>搜索</span><kbd>${IS_MAC ? '⌘' : 'Ctrl '}K</kbd></button>
       <div class="nav-label">工作台</div>
       <nav class="nav">
-        <a href="#/" class="${active === 'home' ? 'on' : ''}" data-tip="概览" data-tip-at="right">${ic('home')}<span>概览</span></a>
-        <a href="#/links" class="${active === 'links' ? 'on' : ''}" data-tip="短链" data-tip-at="right">${ic('link')}<span>短链</span></a>
-        <a href="#/sites" class="${active === 'sites' ? 'on' : ''}" data-tip="站点" data-tip-at="right">${ic('globe')}<span>站点</span></a>
-        <a href="#/notify" class="${active === 'notify' ? 'on' : ''}" data-tip="通知" data-tip-at="right">${ic('bell')}<span>通知</span></a>
+        <a href="#/" class="${active === 'home' ? 'on' : ''}" data-tip="概览" data-tip-at="right" aria-label="概览">${ic('home')}<span>概览</span></a>
+        <a href="#/links" class="${active === 'links' ? 'on' : ''}" data-tip="短链" data-tip-at="right" aria-label="短链">${ic('link')}<span>短链</span></a>
+        <a href="#/sites" class="${active === 'sites' ? 'on' : ''}" data-tip="站点" data-tip-at="right" aria-label="站点">${ic('globe')}<span>站点</span></a>
+        <a href="#/notify" class="${active === 'notify' ? 'on' : ''}" data-tip="通知" data-tip-at="right" aria-label="通知">${ic('bell')}<span>通知</span></a>
       </nav>
       <button class="btn ghost icon acct" id="acct" aria-label="账号菜单" aria-haspopup="menu" aria-expanded="false">${ic('user', 19)}</button>
       <div class="foot">
-        <a class="btn ghost ${active === 'settings' ? 'on' : ''}" href="#/settings" data-tip="设置" data-tip-at="right">${ic('gear', 18)}<span>设置</span></a>
+        <a class="btn ghost ${active === 'settings' ? 'on' : ''}" href="#/settings" data-tip="设置" data-tip-at="right" aria-label="设置">${ic('gear', 18)}<span>设置</span></a>
         <div class="host"><i title="服务运行中"></i><span class="hn" data-tip="${esc(`${HOST} · v${APP_VERSION}`)}" data-tip-at="right">${esc(HOST)}</span><span class="ver">v${esc(APP_VERSION)}</span>
           <button class="out" id="logout" data-tip="退出登录" aria-label="退出登录">${ic('out', 15)}</button></div>
       </div>
@@ -2351,11 +2738,12 @@ function buckets(rows, prevRows) {
   return out;
 }
 
+// Y 轴上限：画 5 条刻度（0、¼、½、¾、满），所以按“每格”取整，保证每个刻度都是整数
+// （以前按上限取整，50 会出现 12.5 / 37.5，显示成 13 / 38）。m ≤ 4 时仍是 4
 function niceMax(m) {
-  if (m <= 4) return 4;
-  const p = Math.pow(10, Math.floor(Math.log10(m)));
-  for (const s of [1, 2, 2.5, 5, 10]) if (s * p >= m) return s * p;
-  return 10 * p;
+  const raw = Math.max(1, m / 4), p = 10 ** Math.floor(Math.log10(raw));
+  const s = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((s) => Number.isInteger(s * p) && s * p >= raw);
+  return 4 * s * p;
 }
 
 // 平滑曲线（单调三次插值，不会冲出数据范围）
@@ -2471,6 +2859,14 @@ function kpiSpark(values, color, prev) {
     ${pl ? `<path d="${pl}" fill="none" stroke="var(--faint)" stroke-width="1.3" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ''}
     <path d="${line}" fill="none" stroke="${color}" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>`;
 }
+
+// 按段取平均，把很长的序列压到 m 个点（表格里 110px 宽的小趋势图画 365 段曲线既看不出区别，又拖慢搜索）
+const downsample = (a, m = 60) => (a.length <= m ? a : Array.from({ length: m }, (_, i) => {
+  const s = Math.floor((i * a.length) / m), e = Math.floor(((i + 1) * a.length) / m);
+  let t = 0;
+  for (let j = s; j < e; j++) t += a[j];
+  return t / (e - s);
+}));
 
 function sparkline(rows) {
   const map = new Map((rows || []).map((r) => [r.k, r.n]));
@@ -2623,6 +3019,7 @@ function bindPasswordForm(root, current, onDone) {
 // 仍在使用默认密码：必须先设置新密码
 function renderSetPassword(current = '') {
   clearInterval(liveTimer);
+  closeOverlays();
   $app.innerHTML = `<div class="login"><form class="card" id="f">
     <div class="brand">${mark(34)}<span class="wordmark">cligc</span></div>
     <h1>设置管理员密码</h1>
@@ -2681,7 +3078,9 @@ function renderCodeStep(ticket) {
 
 // 侧栏“两步验证”：开启（验证密码 → 扫码 → 输入动态码确认）/ 关闭
 async function openMfaDialog(onDone = () => {}) {
-  const st = await api('/2fa');
+  // 读取状态失败时提示出来，不然点了按钮没有任何反应
+  const st = await api('/2fa').catch((ex) => { toast(ex.message, 'bad'); return null; });
+  if (!st) return;
   const ov = document.createElement('div'); ov.className = 'ov';
   const d = document.createElement('form'); d.className = 'dialog pw-dialog mfa-dialog'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
   const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
@@ -2772,6 +3171,7 @@ function loadTurnstile() {
 
 function renderLogin() {
   clearInterval(liveTimer);
+  closeOverlays();
   $app.innerHTML = `<div class="login"><form class="card" id="f">
     <div class="brand">${mark(34)}<span class="wordmark">cligc</span></div>
     <h1>欢迎回来</h1>
@@ -2833,7 +3233,7 @@ function kindMix(items) {
   const rows = ['human', 'suspect', 'bot'].map((k) => ({ k, n: m.get(k) || 0 }));
   return `<div class="kmix"><div class="bmix-bar">${rows.filter((r) => r.n).map((r, i) => `<i style="flex:${r.n};background:${KIND[r.k][1]};--j:${i}" title="${KIND[r.k][0]} · ${num(r.n)} 次"></i>`).join('')}</div>
     <div class="kmix-l">${rows.map((r) => `<div class="x"><i style="background:${KIND[r.k][1]}"></i><span>${KIND[r.k][0]}</span><b>${num(r.n)}</b><em>${Math.round((r.n / sum) * 100)}%</em></div>`).join('')}</div>
-    ${proxyCount(items) ? `<div class="kmix-p">${ic('globe', 13)}其中 <b>${num(proxyCount(items))}</b> 次真人访问经 VPN / 代理（占真人 ${Math.round((proxyCount(items) / Math.max(1, m.get('human') || 0)) * 100)}%）</div>` : ''}</div>`;
+    ${proxyCount(items) ? `<div class="kmix-p">${ic('globe', 13)}<span>其中 <b>${num(proxyCount(items))}</b> 次真人访问经 VPN / 代理（占真人 ${Math.round((proxyCount(items) / Math.max(1, m.get('human') || 0)) * 100)}%）</span></div>` : ''}</div>`;
 }
 
 function feedItems(items, newIds = new Set()) {
@@ -2940,9 +3340,13 @@ async function renderHome(token) {
     </div>`);
   bindRange(route);
   const linkQs = () => (state.link ? '&link=' + state.link : '');
-  let d, list;
+  // “开始使用”、定时任务提醒和站点摘要和主数据并行请求：首屏一次排好，不再在主内容出来后插卡片把页面往下推。
+  // 站点摘要只在看全部短链、且连过 Google 时请求（/setup 读不到时照旧请求）
+  const setupP = setupData();
+  const sitesP = state.link ? null : setupP.then((s) => (s && !s.google ? null : api('/google/sites?days=' + homeSitesDays()).catch(() => null)));
+  let d, list, st;
   try {
-    [d, list] = await Promise.all([api('/overview?' + rangeQs() + linkQs()), api('/links?size=100&sort=clicks')]);
+    [d, list, st] = await Promise.all([api('/overview?' + rangeQs() + linkQs()), api('/links?size=100&sort=clicks&lite=1'), setupP]);
   } catch (err) {
     // 选中的短链已被删除：回到全部
     if (state.link && err.message === '短链不存在') { state.link = ''; store.set('ovlink', ''); return route(); }
@@ -2966,7 +3370,7 @@ async function renderHome(token) {
   const avg = d.totals.total / state.days;
   const prevAvg = d.prev.total / state.days;
   const topSum = d.topLinks.reduce((a, b) => a + b.n, 0) || 1;
-  root.innerHTML = `
+  root.innerHTML = `${st && cronLate(st.now, st.cronAt) ? cronBannerHtml(st.cronAt) : ''}${setupCardHtml(st)}
     <section class="card kstrip rv">
       <div class="kc">
         <div class="kc-h"><span class="l"><i class="dot" style="background:var(--accent)"></i>访问次数</span>${delta(d.totals.total, d.prev.total)}</div>
@@ -3002,6 +3406,7 @@ async function renderHome(token) {
         <div class="kc-m"><i style="width:${Math.round((d.activeLinks / Math.max(1, d.links)) * 100)}%"></i></div>
       </div>`}
     </section>
+    ${sitesP && st?.google ? `<div id="home-sites">${skel(150)}</div>` : ''}
 
     <div class="g-main top">
       <section class="card rv">
@@ -3039,9 +3444,10 @@ async function renderHome(token) {
     ${machinesCard(d)}`;
   reveal(root);
   countUp(root);
-  setupCard(root, token);
-  homeSitesCard(root, token);
-  cronBanner(root, token);
+  bindSetupCard(root);
+  if (sitesP) homeSitesCard(root, token, sitesP);
+  if (!st || !('cronAt' in st)) cronBanner(root, token);
+  workersDevBanner(root);
   mountChart(document.getElementById('ch-home'), series, [
     { id: 'n', key: 'n', label: '访问次数', color: 'var(--accent)', type: 'area' },
     { id: 'u', key: 'u', label: '独立访客', color: 'var(--violet)', type: 'line' },
@@ -3064,12 +3470,15 @@ async function renderHome(token) {
 }
 
 // ---------------------------------------------------------------- links
-// 概览页：站点（GA4 + Search Console）摘要，区间跟随概览换算到最接近的站点区间
-async function homeSitesCard(root, token) {
-  if (state.link) return;   // 只看单个短链时不显示全部站点的摘要
-  const days = state.days <= 7 ? 7 : state.days;
-  const d = await api('/google/sites?days=' + days).catch(() => null);
-  if (!d?.items?.length || token !== routeToken) return;
+// 概览页：站点（GA4 + Search Console）摘要，区间跟随概览换算到最接近的站点区间。
+// dataP 和概览主数据并行请求；连过 Google 时首屏先放一个占位，数据回来后原地替换（或去掉），不把下面的内容往下推
+const homeSitesDays = () => (state.days <= 7 ? 7 : state.days);
+async function homeSitesCard(root, token, dataP) {
+  const ph = root.querySelector('#home-sites');
+  const d = await dataP;
+  if (token !== routeToken) return;
+  if (!d?.items?.length) { ph?.remove(); return; }
+  const days = homeSitesDays();
   const S = (f) => d.items.reduce((a, x) => a + (f(x) || 0), 0);
   const ses = S((x) => x.cur.ga?.sessions), pses = S((x) => x.prev.ga?.sessions);
   const clk = S((x) => x.cur.gsc?.clicks), pclk = S((x) => x.prev.gsc?.clicks);
@@ -3085,29 +3494,54 @@ async function homeSitesCard(root, token) {
     <div class="hs-b">
       <div class="hs-ks">${kc('会话', ses, gDelta(ses, pses))}${kc('搜索点击', clk, gDelta(clk, pclk))}${kc('搜索展示', imp, gDelta(imp, pimp))}${kc('短链点击', lk, gDelta(lk, plk))}</div>
       <div class="hs-top">${top.map((x) => `<a class="hs-r" href="#/site/${encodeURIComponent(x.host)}"><span class="mono">${esc(x.host)}</span>
-        <span class="hs-sp">${kpiSpark(x.spark.map((p) => p.n), 'var(--accent)')}</span><b>${num(x.cur.ga.sessions)}</b>${x.prev.ga ? gDelta(x.cur.ga.sessions, x.prev.ga.sessions) : '<span></span>'}</a>`).join('')}</div>
+        <span class="hs-sp">${kpiSpark(downsample(x.spark.map((p) => p.n)), 'var(--accent)')}</span><b>${num(x.cur.ga.sessions)}</b>${x.prev.ga ? gDelta(x.cur.ga.sessions, x.prev.ga.sessions) : '<span></span>'}</a>`).join('')}</div>
     </div>`;
-  // 放在指标卡片下面
+  // 放在指标卡片下面（有占位就替换占位）
   const strip = root.querySelector('.kstrip');
-  strip ? strip.after(el) : root.prepend(el);
+  ph ? ph.replaceWith(el) : strip ? strip.after(el) : root.prepend(el);
 }
 
-// 概览页顶部的“开始使用”清单：全部完成或点了“不再显示”后不再出现
+// 概览页“开始使用”清单和定时任务提醒的数据（/setup，只读设置，很轻）：和主数据一起请求、一起渲染，
+// 免得首屏出来后再被插到顶部的卡片往下推。切换范围、短链时 5 分钟内复用；任何修改操作（非 GET 请求）后作废，见 api()
+const setupData = () => {
+  if (!setupMemo || Date.now() - setupMemo.at > 300000) {
+    const memo = { at: Date.now() };
+    memo.p = api('/setup').catch(() => { if (setupMemo === memo) setupMemo = null; return null; });
+    setupMemo = memo;
+  }
+  return setupMemo.p;
+};
+
 // 概览页：定时任务超过 3 小时没运行（汇总、同步、通知都会停）时在顶部提示
+const cronLate = (now, at) => !!at && now - at > 3 * 3600000;
+const cronBannerHtml = (at) => `<div class="nstat bad rv">${ic('alert', 15)}<span>定时任务已经 ${ago(at).replace('前', '')}没有运行了：访问汇总、Google 同步和通知都会暂停。</span><span class="sp" style="flex:1"></span><a class="btn sm" href="#/settings" data-acc="sys">查看系统状态</a></div>`;
+// 服务端的 /setup 还没带 cronAt 时（旧版本）：退回到单独读 /status
 async function cronBanner(root, token) {
   const st = await api('/status').catch(() => null);
-  if (!st?.cron || token !== routeToken || st.now - st.cron.at < 3 * 3600000) return;
-  const el = document.createElement('div');
-  el.className = 'nstat bad rv';
-  el.innerHTML = `${ic('alert', 15)}<span>定时任务已经 ${ago(st.cron.at).replace('前', '')}没有运行了：访问汇总、Google 同步和通知都会暂停。</span><span class="sp" style="flex:1"></span><a class="btn sm" href="#/settings" data-acc="sys">查看系统状态</a>`;
+  if (!st?.cron || token !== routeToken || !cronLate(st.now, st.cron.at)) return;
+  const box = document.createElement('div');
+  box.innerHTML = cronBannerHtml(st.cron.at);
+  const el = box.firstElementChild;
   el.querySelector('a').onclick = () => store.set('set:open', 'sys');
   root.prepend(el);
 }
 
-async function setupCard(root, token) {
-  if (store.get('setup:hide', false)) return;
-  const st = await api('/setup').catch(() => null);
-  if (!st || token !== routeToken) return;
+// 通过 *.workers.dev 打开后台时提醒：复制的短链和二维码也是这个域名，中国大陆通常打不开
+const ON_WORKERS_DEV = location.hostname.endsWith('.workers.dev');
+function workersDevBanner(root) {
+  if (!ON_WORKERS_DEV || store.get('wd:hide', false)) return;
+  const el = document.createElement('div');
+  el.className = 'nstat warn rv';
+  el.innerHTML = `${ic('alert', 15)}<span>当前用 workers.dev 域名打开后台，复制的短链和二维码也是这个域名，<b>中国大陆通常打不开</b>。面向国内访客请先绑定自己的域名，再用新域名打开后台。</span><span class="sp"></span><a class="btn sm" href="${EN ? 'https://github.com/ccvar/cligc_link/blob/main/README.en.md#use-your-own-domain' : 'https://github.com/ccvar/cligc_link#绑定自己的域名'}" target="_blank" rel="noopener">怎么绑定</a><button type="button" class="btn sm ghost icon" aria-label="不再提示" data-tipf-always data-tipf="不再提示">${ic('x', 14)}</button>`;
+  el.querySelector('button').onclick = () => { store.set('wd:hide', true); el.remove(); };
+  // 放在指标卡片上面（定时任务提醒和“开始使用”之下）
+  const strip = root.querySelector('.kstrip');
+  strip ? strip.before(el) : root.prepend(el);
+}
+
+// 概览页顶部的“开始使用”清单：全部完成或点了“不再显示”后不再出现
+function setupCardHtml(st) {
+  if (!st || store.get('setup:hide', false)) return '';
   const steps = [
     ['link', '创建第一个短链', '把推广链接变成短链，统计每次访问', '#/links?new'],
     ['mfa', '开启两步验证', '密码泄露也登不进后台', '#/settings', 'mfa'],
@@ -3116,22 +3550,24 @@ async function setupCard(root, token) {
     ['cloudflare', '填写 Cloudflare 凭据', '在后台看账户用量，快超出时提醒', '#/settings', 'use'],
   ];
   const done = steps.filter(([k]) => st[k]).length;
-  if (done === steps.length) return;
-  const el = document.createElement('section');
-  el.className = 'card rv setup';
+  if (done === steps.length) return '';
   // 只给没完成的步骤卡片；完成的收成标题里的一行“✓ …”
   const todo = steps.filter(([k]) => !st[k]), ok = steps.filter(([k]) => st[k]);
-  el.innerHTML = `<div class="card-h"><h3>开始使用</h3><span class="sub">已完成 ${done} / ${steps.length}</span>
+  return `<section class="card rv setup"><div class="card-h"><h3>开始使用</h3><span class="sub">已完成 ${done} / ${steps.length}</span>
       ${ok.length ? `<span class="setup-ok">${ok.map(([, t]) => `<i>${ic('check', 11)}${t}</i>`).join('')}</span>` : ''}<span class="sp"></span>
       <div class="setup-p"><i style="width:${(done / steps.length) * 100}%"></i></div>
       <button type="button" class="hr-more" data-hide>不再显示</button></div>
     <div class="setup-l" style="--n:${todo.length}">${todo.map(([k, t, d, href, acc]) => `<a class="setup-i" href="${href}"${acc ? ` data-acc="${acc}"` : ''}>
-      <span class="setup-c"></span><div><b>${t}</b><span>${d}</span></div>${ic('chev', 14)}</a>`).join('')}</div>`;
-  el.querySelector('[data-hide]').onclick = () => { store.set('setup:hide', true); el.remove(); };
-  el.querySelectorAll('[data-acc]').forEach((a) => (a.onclick = () => store.set('set:open', a.dataset.acc)));
-  root.prepend(el);
+      <span class="setup-c"></span><div><b>${t}</b><span>${d}</span></div>${ic('chev', 14)}</a>`).join('')}</div></section>`;
+}
+// “开始使用”和定时任务提醒里的按钮：去设置页时展开对应的那一项
+function bindSetupCard(root) {
+  const el = root.querySelector('.setup');
+  if (el) el.querySelector('[data-hide]').onclick = () => { store.set('setup:hide', true); el.remove(); };
+  root.querySelectorAll('.setup [data-acc], .nstat [data-acc]').forEach((a) => (a.onclick = () => store.set('set:open', a.dataset.acc)));
 }
 
+let linksSeq = 0;
 async function renderLinks(token, opts = {}) {
   const page = document.getElementById('lpage');
   if (!page) {
@@ -3139,7 +3575,7 @@ async function renderLinks(token, opts = {}) {
       <div class="stack">
         <section class="rv">
           <form class="quick" id="quick">
-            <div class="slug"><span>${esc(HOST)}/</span><input name="slug" placeholder="后缀（可选）" autocomplete="off" aria-label="短链后缀"></div>
+            <div class="slug"><span>${esc(HOST)}/</span><input name="slug" placeholder="后缀（留空自动生成）" autocomplete="off" aria-label="短链后缀"></div>
             <input class="input" name="target_url" placeholder="默认推广地址（可选，之后也能设置）" autocomplete="off" aria-label="默认推广地址">
             <button class="btn primary">${ic('plus')}创建短链</button>
           </form>
@@ -3147,13 +3583,13 @@ async function renderLinks(token, opts = {}) {
         </section>
         <section class="card rv" id="lpage">
           <div class="lh">
-            <div class="search">${ic('search')}<input class="input" id="q" placeholder="搜索短链、目标地址、标题" value="${esc(listState.q)}" aria-label="搜索"><span class="kbd">/</span></div>
+            <div class="search">${ic('search')}<input class="input" id="q" placeholder="搜索短链、目标地址、标题" value="${esc(listState.q)}" aria-label="搜索"><span class="kbd" ${listState.q ? 'hidden' : ''}>/</span><button type="button" class="s-clear" id="qx" aria-label="清除搜索" ${listState.q ? '' : 'hidden'}>${ic('x', 14)}</button></div>
             <div class="combo g-lf" id="ltag"></div>
             <span class="sp"></span>
             <div class="seg" id="sort">${[['created', '最新创建'], ['clicks', '访问最多'], ['last_click', '最近访问']]
               .map(([k, l]) => `<button data-s="${k}" class="${k === listState.sort ? 'on' : ''}">${l}</button>`).join('')}</div>
             <button class="btn" id="bulk" aria-label="批量替换目标地址">${ic('swap')}<span class="hide-m">批量替换</span></button>
-            <button class="btn" id="add">${ic('plus')}<span class="hide-m">高级创建</span></button>
+            <button class="btn" id="add" aria-label="高级创建" data-tip="高级创建（标题、备注、有效期等）">${ic('plus')}<span class="hide-m">高级创建</span></button>
           </div>
           <div id="lbody">${skel(280)}</div>
           <div class="lbulk" id="lbulk" hidden></div>
@@ -3162,8 +3598,10 @@ async function renderLinks(token, opts = {}) {
     reveal(document.getElementById('page'));
     bindLinksChrome();
   }
+  // 搜索、排序、筛选、翻页都用同一个 routeToken：再按请求序号丢掉比后发请求更晚回来的旧结果
+  const my = ++linksSeq;
   const d = await api(`/links?q=${encodeURIComponent(listState.q)}&page=${listState.page}&size=20&sort=${listState.sort}&tz=${TZ}&tag=${encodeURIComponent(listState.tag)}`);
-  if (token !== routeToken) return;
+  if (token !== routeToken || my !== linksSeq) return;
   // 选中的分组被删除 / 改名后不存在了：恢复成全部
   if (listState.tag && listState.tag !== '+none' && !(d.tags || []).some((t) => t.tag === listState.tag)) { listState.tag = ''; return renderLinks(token, opts); }
   linkTagFilter(document.getElementById('ltag'), d.tags || []);
@@ -3173,7 +3611,7 @@ async function renderLinks(token, opts = {}) {
   const pages = Math.max(1, Math.ceil(d.total / d.size));
   const body = document.getElementById('lbody');
   body.innerHTML = d.items.length ? `
-    <div class="lrow hd"><span class="c-main"><label class="lck" aria-label="全选本页"><input type="checkbox" id="lall" ${d.items.length && d.items.every((l) => listState.sel.has(l.id)) ? 'checked' : ''}></label>短链 / 目标地址</span><span class="c-spark">近 14 天</span><span style="text-align:right" data-tipf-always data-tipf="自创建以来的真人访问；爬虫和可疑访问不算，鼠标移到数字上可以看含机器访问的总数">真人访问</span><span>最后访问</span><span>状态</span><span></span></div>
+    <div class="lrow hd"><span class="c-main"><label class="lck" aria-label="全选本页"><input type="checkbox" id="lall" ${d.items.length && d.items.every((l) => listState.sel.has(l.id)) ? 'checked' : ''}></label>短链 / 目标地址</span><span class="c-spark">近 14 天</span><span style="text-align:right" data-tipf-always data-tipf="自创建以来的真人访问；爬虫和可疑访问不算，鼠标移到数字上可以看含机器访问的总数">真人访问</span><span class="c-last">最后访问</span><span>状态</span><span></span></div>
     ${d.items.map((l) => `
     <div class="lrow ${listState.flash === l.id ? 'flash' : ''}${listState.sel.has(l.id) ? ' sel-r' : ''}" data-go="${l.id}" tabindex="0">
       <div class="c-main"><label class="lck" aria-label="选择 ${esc(l.slug)}"><input type="checkbox" data-sel="${l.id}" ${listState.sel.has(l.id) ? 'checked' : ''}></label><div style="min-width:0">
@@ -3186,17 +3624,25 @@ async function renderLinks(token, opts = {}) {
       <div class="c-status">${statusPill(l)}${l.down?.length ? `<span class="pill bad-p hc-p" data-tipf-always data-tipf="${esc(l.down.map((x) => `${x.url}：${x.error}`).join('\n'))}">目标异常</span>` : ''}</div>
       <div class="acts">
         ${copyBtn(shortUrl(l.slug))}
-        <button class="btn ghost icon" data-tip="复制短链" aria-label="复制短链" data-dup="${l.id}">${ic('dup')}</button>
+        <button class="btn ghost icon" data-tip="生成副本" aria-label="生成副本" data-dup="${l.id}">${ic('dup')}</button>
         <button class="btn ghost icon" data-tip="编辑" aria-label="编辑" data-edit="${l.id}">${ic('edit')}</button>
         <a class="btn ghost icon" data-tip="访问统计" aria-label="访问统计" href="#/link/${l.id}">${ic('chart')}</a>
+        <button class="btn ghost icon" data-tip="二维码（手机扫码打开）" aria-label="二维码" data-qr="${esc(l.slug)}">${ic('qr')}</button>
       </div>
     </div>`).join('')}
     ${d.total > 0 ? `<div class="pager"><span>共 ${num(d.total)} 条</span>
       ${pages > 1 ? `<div class="g"><button class="btn sm" id="prev" ${listState.page <= 1 ? 'disabled' : ''}>上一页</button>
       <span class="tnum">${listState.page} / ${pages}</span>
       <button class="btn sm" id="next" ${listState.page >= pages ? 'disabled' : ''}>下一页</button></div>` : ''}</div>` : ''}`
-    : `<div class="empty" style="padding:56px">${ic(listState.q || listState.tag ? 'search' : 'link')}${listState.q ? `没有找到包含 “${esc(listState.q)}” 的短链` : listState.tag ? '这个分组里没有短链' : '还没有短链，在上方粘贴一个推广链接试试'}</div>`;
+    : `<div class="empty" style="padding:56px">${ic(listState.q || listState.tag ? 'search' : 'link')}${listState.q ? `没有找到包含 “${esc(listState.q)}” 的短链` : listState.tag ? '这个分组里没有短链' : '还没有短链，在上方粘贴一个推广链接试试'}${listState.q || listState.tag ? `<div style="margin-top:12px"><button type="button" class="btn sm" data-reset>${listState.q ? '清除搜索' : '查看全部分组'}</button></div>` : ''}</div>`;
   listState.flash = null;
+  // 搜索词和分组筛选离开页面后还会保留：空结果时给一个一键恢复成全部的入口，免得以为短链丢了
+  body.querySelector('[data-reset]')?.addEventListener('click', () => {
+    listState.q = ''; listState.tag = ''; listState.page = 1;
+    const q = document.getElementById('q');
+    if (q) { q.value = ''; syncLinkSearch(); }
+    renderLinks(routeToken);
+  });
 
   // 勾选 / 全选 / 批量操作栏
   body.querySelectorAll('[data-sel]').forEach((c) => (c.onchange = () => {
@@ -3298,10 +3744,20 @@ function bulkBar(d) {
   }));
 }
 
+// 短链搜索框右侧：有内容时显示清除按钮，没内容时显示 "/" 快捷键提示
+function syncLinkSearch() {
+  const q = document.getElementById('q'), qx = document.getElementById('qx');
+  if (!q || !qx) return;
+  qx.hidden = !q.value;
+  q.parentElement.querySelector('.kbd').hidden = !!q.value;
+}
+
 function bindLinksChrome() {
-  const q = document.getElementById('q');
+  const q = document.getElementById('q'), qx = document.getElementById('qx');
   let t;
-  q.oninput = () => { clearTimeout(t); t = setTimeout(() => { listState.q = q.value.trim(); listState.page = 1; renderLinks(routeToken); }, 250); };
+  q.oninput = () => { syncLinkSearch(); clearTimeout(t); t = setTimeout(() => { listState.q = q.value.trim(); listState.page = 1; renderLinks(routeToken); }, 250); };
+  qx.onclick = () => { clearTimeout(t); q.value = ''; syncLinkSearch(); listState.q = ''; listState.page = 1; renderLinks(routeToken); q.focus(); };
+  q.onkeydown = (e) => { if (e.key === 'Escape' && q.value) { e.stopPropagation(); qx.click(); } };
   const sort = document.getElementById('sort');
   segThumb(sort);
   sort.querySelectorAll('button').forEach((b) => (b.onclick = () => {
@@ -3315,10 +3771,10 @@ function bindLinksChrome() {
 
   const form = document.getElementById('quick');
   const qSlug = form.querySelector('[name=slug]'), qTarget = form.querySelector('[name=target_url]'), qBtn = form.querySelector('button');
-  // 后缀和默认地址至少填一个才能创建
+  // 后缀和默认地址至少填一个才能创建。按钮不禁用：触屏上看不到 title，灰掉的按钮没有任何说明；
+  // 都没填时点一下，提交里会弹出提示并把光标放到后缀框
   const syncQuick = () => {
     const empty = !qSlug.value.trim() && !qTarget.value.trim();
-    qBtn.disabled = empty;
     qBtn.title = empty ? '请填写短链后缀或默认推广地址' : '';
   };
   qSlug.oninput = qTarget.oninput = syncQuick;
@@ -3327,8 +3783,8 @@ function bindLinksChrome() {
     e.preventDefault();
     if (!qSlug.value.trim() && !qTarget.value.trim()) { toast('请填写短链后缀或默认推广地址', 'bad'); qSlug.focus(); return; }
     const f = new FormData(form);
-    let target = String(f.get('target_url')).trim();
-    if (target && !/^https?:\/\//i.test(target)) target = 'https://' + target;
+    const target = withScheme(String(f.get('target_url')).trim());
+    if (httpTypo(target)) { toast('网址的 http / https 好像拼错了，请检查一下', 'bad'); qTarget.focus(); return; }
     const btn = qBtn; btn.disabled = true;
     try {
       const link = await api('/links', { method: 'POST', body: { target_url: target, slug: String(f.get('slug')).trim() } });
@@ -3341,7 +3797,7 @@ function bindLinksChrome() {
         ${copyBtn(shortUrl(link.slug), 'btn sm', '复制')}
         <button class="btn sm" id="qedit">${ic('edit', 14)}补充标题</button></div>`;
       document.getElementById('qedit').onclick = () => openDrawer(link, () => renderLinks(routeToken));
-      listState.flash = link.id; listState.q = ''; listState.page = 1; q.value = '';
+      listState.flash = link.id; listState.q = ''; listState.page = 1; q.value = ''; syncLinkSearch();
       if (listState.sort !== 'created') {
         listState.sort = 'created';
         sort.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.s === 'created'));
@@ -3349,7 +3805,7 @@ function bindLinksChrome() {
       }
       renderLinks(routeToken);
     } catch (err) { toast(err.message, 'bad'); }
-    finally { syncQuick(); }
+    finally { qBtn.disabled = false; syncQuick(); }
   };
 }
 
@@ -3424,10 +3880,10 @@ function openBulkReplace(onDone) {
     go.textContent = `替换 ${num(d.total)} 处`;
     go.disabled = !ti.value.trim() || !!d.invalid;
     res.innerHTML = `
-      <div class="bulk-stat"><div><b>${num(d.links)}</b><span>个默认地址</span></div><div><b>${num(d.rules)}</b><span>条规则 / 分流地址</span></div><div><b>${num(d.affected)}</b><span>个短链受影响</span></div></div>
+      <div class="bulk-stat"><div><b>${num(d.links)}</b><span>个默认地址</span></div><div><b>${num(d.rules)}</b><span>条规则 / 分流地址</span></div>${d.webs ? `<div><b>${num(d.webs)}</b><span>个备用网页</span></div>` : ''}<div><b>${num(d.affected)}</b><span>个短链受影响</span></div></div>
       ${d.invalid ? `<div class="bulk-bad">${ic('info', 15)}替换后 /${esc(d.invalid.slug)} 的地址不合法：<code>${esc(d.invalid.to)}</code></div>` : ''}
       <div class="bulk-list">${d.items.map((x) => `<div class="bi">
-        <div class="bi-h"><span class="mono">/${esc(x.slug)}</span><span class="bi-t">${x.type === 'link' ? '默认地址' : esc(ruleText(x))}</span></div>
+        <div class="bi-h"><span class="mono">/${esc(x.slug)}</span><span class="bi-t">${x.type === 'link' ? '默认地址' : x.type === 'app_web' ? '打不开 App 时去的网页' : esc(ruleText(x))}</span></div>
         <div class="bi-u from" title="${esc(x.from)}">${mark(x.from, fi.value.trim(), 'del')}</div>
         <div class="bi-u to" title="${esc(x.to)}">${ic('arrow', 12)}<span>${ti.value.trim() ? mark(x.to, ti.value.trim(), 'add') : '<em>填写“替换为”后显示</em>'}</span></div>
       </div>`).join('')}</div>
@@ -3441,7 +3897,8 @@ function openBulkReplace(onDone) {
       const my = ++seq;
       try {
         let to = ti.value.trim();
-        if (mode === 'exact' && to && !/^https?:\/\//i.test(to)) to = 'https://' + to;
+        if (mode === 'exact') to = withScheme(to);
+        if (mode === 'exact' && to && httpTypo(to)) { res.innerHTML = `<div class="bulk-bad">${ic('info', 15)}网址的 http / https 好像拼错了，请检查一下</div>`; go.disabled = true; return; }
         const d = await api('/links/replace', { method: 'POST', body: { mode, find, replace: to || (mode === 'exact' ? 'https://placeholder.invalid/' : find), dry: true } });
         if (my === seq) render(d);
       } catch (err) {
@@ -3456,10 +3913,11 @@ function openBulkReplace(onDone) {
     e.preventDefault();
     if (!last || !last.total) return;
     let to = ti.value.trim();
-    if (mode === 'exact' && !/^https?:\/\//i.test(to)) to = 'https://' + to;
+    if (mode === 'exact') to = withScheme(to);
+    if (mode === 'exact' && httpTypo(to)) { toast('网址的 http / https 好像拼错了，请检查一下', 'bad'); return; }
     const ok = await confirmDialog({
       title: `替换 ${num(last.total)} 处地址？`,
-      text: `会修改 ${last.affected} 个短链：${last.links} 个默认地址、${last.rules} 条规则 / 分流地址。替换后立即生效，之后的访问都会跳到新地址。`,
+      text: `会修改 ${last.affected} 个短链：${last.links} 个默认地址、${last.rules} 条规则 / 分流地址${last.webs ? `、${last.webs} 个备用网页` : ''}。替换后立即生效，之后的访问都会跳到新地址。`,
       ok: '确认替换',
     });
     if (!ok) return;
@@ -3483,6 +3941,22 @@ function toLocalInput(ts) {
   return `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// 表单抽屉：点遮罩时如果有没保存的修改，不直接关掉（免得一下子丢了填好的内容），轻轻晃一下并提示；Esc、取消、× 照常关闭
+// 搜索框和按搜索过滤出来的列表不算修改（已选的国家等由 extra 记录）
+const formSnap = (root, extra = () => '') => JSON.stringify([...root.querySelectorAll('input, textarea, select')].filter((e) => !e.closest('.psearch, .plist, .pop'))
+  .map((e) => (e.type === 'checkbox' || e.type === 'radio' ? e.checked : e.value))) + extra();
+const unsavedNudge = (dr) => {
+  dr.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-8px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }], { duration: 260 });
+  toast(`有没保存的修改：点“${dr.querySelector('.df .primary')?.textContent.trim() || '保存'}”，或点“取消”放弃`, 'warn');
+};
+function guardOverlay(ov, dr, close, extra) {
+  const s0 = formSnap(dr, extra);
+  dr._dismiss = close;
+  ov.onclick = () => {
+    if (formSnap(dr, extra) === s0) return close();
+    unsavedNudge(dr);
+  };
+}
 function openDrawer(link, onDone) {
   const isNew = !link;
   link = link || { slug: '', target_url: '', title: '', note: '', enabled: 1, pass_query: 0, utm: 0, expires_at: null };
@@ -3495,8 +3969,11 @@ function openDrawer(link, onDone) {
         <div class="pre"><span>${esc(HOST)}/</span><input class="input" id="f-s" name="slug" placeholder="${isNew ? '留空自动生成' : ''}" value="${esc(link.slug)}"></div>
         <div class="hint">字母、数字、- 或 _${isNew ? '' : '。修改后旧短链会失效'}</div></div>
       <div class="field"><label for="f-t">默认推广地址 <span class="hint" style="font-weight:400">可选</span></label>
-        <input class="input" id="f-t" name="target_url" placeholder="https://b.com/promo?id=123" value="${esc(link.target_url)}">
+        ${targetField({ id: 'f-t', name: 'target_url', value: link.target_url, placeholder: 'https://b.com/promo?id=123' })}
         <div class="hint">没有命中任何地区规则的访问会跳到这里；留空则这些访问显示“链接暂不可用”</div></div>
+      <div class="field" id="f-aw-w" hidden><label for="f-aw">打不开 App 时去的网页 <span class="hint" style="font-weight:400">可选</span></label>
+        <input class="input" id="f-aw" name="app_web" placeholder="https://b.com/download" value="${esc(link.app_web || '')}">
+        <div class="hint">目标是 App 地址时，先尝试打开 App，没装或打不开就去这个网页（比如官网或下载页）；留空则去默认推广地址</div></div>
       <div class="field"><label for="f-ti">标题</label><input class="input" id="f-ti" name="title" placeholder="方便自己辨认，例如：B 站双十一推广" value="${esc(link.title)}"></div>
       <div class="field"><label for="f-n">备注</label><textarea class="textarea" id="f-n" name="note" rows="2">${esc(link.note)}</textarea></div>
       <div class="field"><label for="f-e">过期时间</label><input class="input" id="f-e" type="datetime-local" name="expires_at" value="${toLocalInput(link.expires_at)}">
@@ -3518,7 +3995,7 @@ function openDrawer(link, onDone) {
   const close = () => { ov.remove(); dr.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.dialog')) close(); };
   document.addEventListener('keydown', onKey);
-  ov.onclick = close;
+  ov.onclick = close;   // 下面绑定好地址类型后再换成 guardOverlay
   dr.querySelectorAll('[data-close]').forEach((b) => (b.onclick = close));
   document.body.append(ov, dr);
   dr.querySelector(isNew ? '[name=slug]' : '[name=target_url]').focus();
@@ -3526,20 +4003,32 @@ function openDrawer(link, onDone) {
   // 新建时，后缀和默认推广地址至少填一个
   const dSlug = dr.querySelector('[name=slug]'), dTarget = dr.querySelector('[name=target_url]'), dBtn = dr.querySelector('.df .primary');
   const bothEmpty = () => !dSlug.value.trim() && !dTarget.value.trim();
+  // 和快速创建一样不禁用按钮（触屏上看不到 title），都没填时提交会在下面显示原因
   const syncDrawer = () => {
     if (!isNew) return;
-    dBtn.disabled = bothEmpty();
-    dBtn.title = dBtn.disabled ? '请填写短链后缀或默认推广地址' : '';
+    dBtn.title = bothEmpty() ? '请填写短链后缀或默认推广地址' : '';
   };
   dSlug.addEventListener('input', syncDrawer);
   dTarget.addEventListener('input', syncDrawer);
+  // 默认推广地址选了 App（或跳转规则里有 App 地址）时，显示“打不开 App 时去的网页”
+  // 从列表打开时只有 ruleList，从详情打开时有 targets
+  const awKeep = !!link.app_web || (link.targets || link.ruleList || []).some((t) => isAppUrl(t.url));
+  const dKind = bindTarget(dr, 'f-t', (k) => { dr.querySelector('#f-aw-w').hidden = k !== 'app' && !awKeep; });
+  guardOverlay(ov, dr, close);
   syncDrawer();
 
   const del = dr.querySelector('[data-del]');
   if (del) del.onclick = async () => {
-    const ok = await confirmDialog({ title: `删除 /${link.slug}？`, text: '短链和它的全部访问记录都会被删除，无法恢复。', ok: '删除', danger: true });
+    // 访问记录多时提醒：删除明细每条都算 D1 写入；只是不想再跳转的话停用就行
+    const many = (link.clicks || 0) - (link.flood || 0) > 2000;
+    const ok = await confirmDialog({ title: `删除 /${link.slug}？`, text: many
+      ? `短链和它的 ${num(link.clicks - (link.flood || 0))} 条访问记录都会被删除，无法恢复。每删一条约占 4 行 D1 写入，免费版每天 10 万行，用完后当天所有短链都会暂时打不开；只是不想让它再跳转的话，可以改为停用。`
+      : '短链和它的全部访问记录都会被删除，无法恢复。', ok: '删除', danger: true });
     if (!ok) return;
-    await api('/links/' + link.id, { method: 'DELETE' });
+    // 删除失败（网络、会话过期等）要提示出来，不然点了确认像是没反应
+    del.disabled = true;
+    try { await api('/links/' + link.id, { method: 'DELETE' }); }
+    catch (ex) { toast(ex.message, 'bad'); del.disabled = false; return; }
     close(); toast('已删除');
     if (location.hash.startsWith('#/link/')) location.hash = '#/links'; else onDone();
   };
@@ -3547,15 +4036,25 @@ function openDrawer(link, onDone) {
   dr.onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(dr);
-    let target = String(f.get('target_url')).trim();
-    if (target && !/^https?:\/\//i.test(target)) target = 'https://' + target;
+    const target = dKind.value();
+    const terr = dKind.check();
+    if (terr) { dr.querySelector('.err').textContent = terr; return; }
+    const aw = withScheme(f.get('app_web') || '');
+    if (aw && (httpTypo(aw) || isAppUrl(aw))) { dr.querySelector('.err').textContent = '“打不开 App 时去的网页”要填网址（https://…），而且 http / https 不能拼错'; dr.querySelector('#f-aw').focus(); return; }
     const body = {
-      target_url: target, slug: String(f.get('slug')).trim(), title: f.get('title'), note: f.get('note'),
+      target_url: target, app_web: aw, slug: String(f.get('slug')).trim(), title: f.get('title'), note: f.get('note'),
       enabled: f.get('enabled') === 'on', pass_query: f.get('pass_query') === 'on', utm: f.get('utm') === 'on',
       expires_at: f.get('expires_at') ? new Date(f.get('expires_at')).getTime() : null,
     };
     if (isNew && bothEmpty()) { dr.querySelector('.err').textContent = '请填写短链后缀或默认推广地址'; dSlug.focus(); return; }
     if (!isNew && !body.slug) delete body.slug;
+    // 改后缀：旧短链和已经印出去的二维码会立即 404（服务端不保留旧后缀），保存前确认一次。
+    // 后缀格式不对时不弹，直接交给服务端报错
+    if (!isNew && body.slug && body.slug !== link.slug && /^[A-Za-z0-9_-]{1,64}$/.test(body.slug)
+      && !(await confirmDialog({ title: `把 /${link.slug} 改成 /${body.slug}？`, text: '旧短链和已经发出去、印出去的二维码会立即打不开（返回 404）。', ok: '确认修改', danger: true }))) {
+      dSlug.focus();
+      return;
+    }
     const btn = dBtn; btn.disabled = true;
     try {
       const saved = await api(isNew ? '/links' : '/links/' + link.id, { method: isNew ? 'POST' : 'PUT', body });
@@ -3611,12 +4110,19 @@ async function linkSitesCard(token, id) {
 
 async function renderLink(token, id) {
   shell('links', `<a class="back" href="#/links">${ic('back', 14)}全部短链</a><div class="stack">${skel(150)}<div class="kpis">${skel(150, 4)}</div>${skel(360)}</div>`);
-  const [link, s, c] = await Promise.all([
+  const [link, s, c0] = await Promise.all([
     api('/links/' + id),
     api(`/links/${id}/stats?` + rangeQs()),
     api(`/links/${id}/clicks?page=${clickState.page}&size=30&bots=${state.bots ? 1 : 0}`),
   ]);
   if (token !== routeToken) return;
+  // 翻到后面几页后关掉“含机器访问”，总页数变少：退回到最后一页，不要显示成“还没有访问记录”
+  let c = c0;
+  if (!c.items.length && c.total && clickState.page > 1) {
+    clickState.page = Math.max(1, Math.ceil(c.total / c.size));
+    c = await api(`/links/${id}/clicks?page=${clickState.page}&size=30&bots=${state.bots ? 1 : 0}`);
+    if (token !== routeToken) return;
+  }
   setTitle(`/${link.slug} · 短链`);
   const bindLinkTags = () => {
     const box = document.getElementById('g-tags');
@@ -3638,7 +4144,7 @@ async function renderLink(token, id) {
       try {
         const r = await api(`/links/${link.id}/check`, { method: 'POST' });
         const bad = r.results.filter((x) => x.state === 'down');
-        toast(bad.length ? `${bad.length} 个目标地址打不开：${bad[0].error}` : `${r.results.length} 个目标地址检查完毕`, bad.length ? 'bad' : 'ok');
+        toast(bad.length ? `${bad.length} 个目标地址打不开：${bad[0].error}` : r.results.length ? `${r.results.length} 个目标地址检查完毕` : '目标都是 App 地址，没法从服务器检查', bad.length ? 'bad' : 'ok');
         route();
       } catch (ex) { toast(ex.message, 'bad'); b.disabled = false; b.classList.remove('busy'); }
     };
@@ -3647,7 +4153,32 @@ async function renderLink(token, id) {
   // 访问明细里的 A/B 版本：分流地址 ID → 版本
   const dest = new Map();
   for (const p of [0, ...link.targets.map((t) => t.id)]) (splitOf(link, p) || []).slice(1).forEach((x) => dest.set(x.id, { ...x, parent: p ? link.targets.find((t) => t.id === p) : null }));
-  const pages = Math.max(1, Math.ceil(c.total / c.size));
+  // 访问明细：翻页时只换这一块（不重拉统计、不重绘整页，滚动位置不跳）
+  const clicksHtml = (c, anim = true) => {
+    const pages = Math.max(1, Math.ceil(c.total / c.size));
+    return `<section class="card${anim ? ' rv' : ''}" id="lk-clicks">
+        <div class="card-h"><h3>访问明细</h3><span class="sp"></span><span class="sub">共 ${c.capped ? num(10000) + '+' : num(c.total)} 条</span></div>
+        ${c.items.length ? `<div class="scroll tbl-wrap"><table class="tbl vt">
+          <thead><tr><th>来源 / 时间</th><th>地区</th><th>跳转到</th><th>设备</th><th>IP</th><th>Referer</th></tr></thead>
+          <tbody>${c.items.map((r) => `<tr>
+            <td><div data-tipf="${esc(r.source + (r.utm_campaign ? ' · ' + r.utm_campaign : ''))}">${esc(r.source)}${r.utm_campaign ? `<span class="sm"> · ${esc(r.utm_campaign)}</span>` : ''}</div>
+              <div class="sm"><span data-tipf="${esc(fmtTime(r.ts))}" data-tipf-always>${ago(r.ts)} · ${shortTime(r.ts)}</span></div></td>
+            <td><div>${esc(country(r.country))}</div><div class="sm" data-tipf="${esc([r.region, r.city].filter(Boolean).join(' · '))}">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
+            <td>${(() => {
+              const arm = r.rule_id && dest.get(r.rule_id);
+              if (arm && arm.k) return `<div>A/B 版本 ${arm.k}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(arm.url)}">${esc(arm.parent ? ruleText(arm.parent) : '默认地址')} · ${esc(bareUrl(arm.url))}</div>`;
+              const t = link.targets.find((x) => x.id === r.rule_id);
+              return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '跳转规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (bareUrl(link.target_url) || '—'))}</div>`; })()}</td>
+            <td data-tipf="${esc(r.ua)}" data-tipf-always><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r, false)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div>${(r.kind && r.kind !== 'human') || r.proxy ? (r.reason ? `<div class="kr ${r.kind === 'human' ? 'proxy' : r.kind} ell" data-tipf="${esc(r.reason)}">${esc(r.reason)}</div>` : '') : ''}</td>
+            <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:200px" data-tipf-always data-tipf="${esc([r.asn ? 'AS' + r.asn : '', r.asn_org].filter(Boolean).join(' · '))}">${esc(r.asn_org || '—')}</div></td>
+            <td class="ell" data-tipf="${esc(r.referer)}">${r.referer ? esc(bareUrl(r.referer)) : '<span class="sm">—</span>'}</td>
+          </tr>`).join('')}</tbody></table></div>
+          ${pages > 1 ? `<div class="pager"><span class="tnum">${c.capped ? `第 ${clickState.page} 页` : `第 ${clickState.page} / ${pages} 页`}</span><div class="g">
+            <button class="btn sm" id="prev" ${clickState.page <= 1 ? 'disabled' : ''}>上一页</button>
+            <button class="btn sm" id="next" ${(c.capped ? c.items.length < c.size : clickState.page >= pages) ? 'disabled' : ''}>下一页</button></div></div>` : ''}`
+          : `<div class="empty" style="padding:48px">${ic('inbox')}还没有访问记录</div>`}
+      </section>`;
+  };
   const hourMax = Math.max(1, ...s.hourly.map((h) => h.n));
   const hourMap = new Map(s.hourly.map((h) => [h.k, h.n]));
   const campaigns = s.campaigns.filter((x) => x.k);
@@ -3662,16 +4193,18 @@ async function renderLink(token, id) {
           <div class="short">${esc(shortDisp(link.slug))}
             ${copyBtn(url, 'btn sm', '复制')}
             <a class="btn sm ghost icon" href="${esc(url)}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 15)}</a></div>
-          ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>${healthDot(link.health?.[link.target_url])}${abChip(link, 0)}` : '<span class="warn">未设置默认推广地址</span>'}<button type="button" class="hr-more" data-panel-open="rules">${link.arms?.length ? 'A/B 分流' : '按地区 / 设备分流'} ${ic('chev', 12)}</button></div>`}
+          ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>${healthDot(link.health?.[link.target_url])}${appPill(link, link.target_url)}${abChip(link, 0)}` : '<span class="warn">未设置默认推广地址</span>'}<button type="button" class="hr-more" data-panel-open="rules">${link.arms?.length ? 'A/B 分流' : '按地区 / 设备分流'} ${ic('chev', 12)}</button></div>`}
           <div class="meta">创建于 ${fmtTime(link.created_at)}${link.expires_at ? ` · 过期时间 ${fmtTime(link.expires_at)}` : ''}${link.pass_query ? ' · 透传参数' : ''}${link.utm ? ' · 转化追踪' : ''}${link.target_url || link.targets.length ? ` · <button type="button" class="hr-more" id="hc-run">${ic('refresh', 12)}检查目标页</button>` : ''}${siteTagsBar('', link.tags || [])}</div>
           ${link.note ? `<div class="hero-note" title="${esc(link.note)}">${esc(link.note)}</div>` : ''}
         </div>
-        <div class="acts">
+        <div class="hero-side"><div class="acts">
           <button class="btn" data-panel-open="rules">${ic('route')}跳转规则${link.targets.length ? `<span class="cnt">${link.targets.length}</span>` : ''}</button>
           <button class="btn" data-panel-open="builder">${ic('link')}投放链接</button>
           <button class="btn" id="edit">${ic('edit')}编辑</button>
-          <button class="btn icon" data-panel-open="log" data-tip="修改记录" aria-label="修改记录">${ic('history')}</button>
-          <a class="btn icon" href="/api/links/${link.id}/export" data-tip="导出 CSV" aria-label="导出 CSV">${ic('dl')}</a>
+          <button class="btn icon" data-panel-open="log" data-tip="修改记录" data-tip-at="bottom" aria-label="修改记录">${ic('history')}</button>
+          <a class="btn icon" href="/api/links/${link.id}/export" data-tip="导出 CSV" data-tip-at="bottom" aria-label="导出 CSV">${ic('dl')}</a></div>
+          <button type="button" class="hero-qr" data-qr="${esc(link.slug)}" data-tip="点击放大、下载" aria-label="二维码，点击放大">
+            <img src="${esc(qrSrc(url))}" alt="" width="84" height="84"><span>${ic('qr', 12)}手机扫码访问</span></button>
         </div>
       </section>
 
@@ -3753,28 +4286,7 @@ async function renderLink(token, id) {
 
 
       <div id="lk-gs"></div>
-      <section class="card rv">
-        <div class="card-h"><h3>访问明细</h3><span class="sp"></span><span class="sub">共 ${num(c.total)} 条</span></div>
-        ${c.items.length ? `<div class="scroll tbl-wrap"><table class="tbl vt">
-          <thead><tr><th>来源 / 时间</th><th>地区</th><th>跳转到</th><th>设备</th><th>IP</th><th>Referer</th></tr></thead>
-          <tbody>${c.items.map((r) => `<tr>
-            <td><div data-tipf="${esc(r.source + (r.utm_campaign ? ' · ' + r.utm_campaign : ''))}">${esc(r.source)}${r.utm_campaign ? `<span class="sm"> · ${esc(r.utm_campaign)}</span>` : ''}</div>
-              <div class="sm"><span data-tipf="${esc(fmtTime(r.ts))}" data-tipf-always>${ago(r.ts)} · ${shortTime(r.ts)}</span></div></td>
-            <td><div>${esc(country(r.country))}</div><div class="sm" data-tipf="${esc([r.region, r.city].filter(Boolean).join(' · '))}">${esc([r.region, r.city].filter(Boolean).join(' · ')) || '—'}</div></td>
-            <td>${(() => {
-              const arm = r.rule_id && dest.get(r.rule_id);
-              if (arm && arm.k) return `<div>A/B 版本 ${arm.k}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(arm.url)}">${esc(arm.parent ? ruleText(arm.parent) : '默认地址')} · ${esc(bareUrl(arm.url))}</div>`;
-              const t = link.targets.find((x) => x.id === r.rule_id);
-              return r.rule_id && !t ? '<span class="sm">已删除的规则</span>' : `<div>${t ? '跳转规则' : '默认地址'}</div><div class="sm ell" style="max-width:200px" data-tipf="${esc(t ? t.url : link.target_url)}">${esc(t ? ruleText(t) : (bareUrl(link.target_url) || '—'))}</div>`; })()}</td>
-            <td data-tipf="${esc(r.ua)}" data-tipf-always><div>${esc(r.os)} · ${esc(r.browser)}${kindTag(r, false)}</div><div class="sm">${esc(devName(r.device))}${r.lang ? ' · ' + esc(r.lang) : ''}</div>${(r.kind && r.kind !== 'human') || r.proxy ? (r.reason ? `<div class="kr ${r.kind === 'human' ? 'proxy' : r.kind} ell" data-tipf="${esc(r.reason)}">${esc(r.reason)}</div>` : '') : ''}</td>
-            <td><div style="font-family:var(--mono);font-size:12.5px">${esc(r.ip)}</div><div class="sm ell" style="max-width:200px" data-tipf-always data-tipf="${esc([r.asn ? 'AS' + r.asn : '', r.asn_org].filter(Boolean).join(' · '))}">${esc(r.asn_org || '—')}</div></td>
-            <td class="ell" data-tipf="${esc(r.referer)}">${r.referer ? esc(bareUrl(r.referer)) : '<span class="sm">—</span>'}</td>
-          </tr>`).join('')}</tbody></table></div>
-          ${pages > 1 ? `<div class="pager"><span class="tnum">第 ${clickState.page} / ${pages} 页</span><div class="g">
-            <button class="btn sm" id="prev" ${clickState.page <= 1 ? 'disabled' : ''}>上一页</button>
-            <button class="btn sm" id="next" ${clickState.page >= pages ? 'disabled' : ''}>下一页</button></div></div>` : ''}`
-          : `<div class="empty" style="padding:48px">${ic('inbox')}还没有访问记录</div>`}
-      </section>
+      ${clicksHtml(c)}
     </div>`;
 
   const page = document.getElementById('page');
@@ -3789,9 +4301,32 @@ async function renderLink(token, id) {
   ], document.getElementById('lg'));
   document.getElementById('edit').onclick = () => openDrawer(link, (saved) => saved ? route() : null);
   bindRules(link);
-  const prev = document.getElementById('prev'), next = document.getElementById('next');
-  if (prev) prev.onclick = () => { clickState.page--; route(); };
-  if (next) next.onclick = () => { clickState.page++; route(); };
+  let clickSeq = 0;
+  const bindPager = () => {
+    const go = async (dp) => {
+      const my = ++clickSeq, want = clickState.page + dp;
+      const btns = [...document.querySelectorAll('#lk-clicks .pager button')], was = btns.map((b) => b.disabled);
+      btns.forEach((b) => (b.disabled = true));
+      try {
+        const c2 = await api(`/links/${id}/clicks?page=${want}&size=30&bots=${state.bots ? 1 : 0}`);
+        if (my !== clickSeq || token !== routeToken) return;
+        // 这一页没数据了（期间有记录被清理）：留在当前页
+        if (!c2.items.length && c2.total && want > 1) { btns.forEach((b, i) => (b.disabled = was[i])); return; }
+        clickState.page = want;
+        const sec = document.getElementById('lk-clicks');
+        if (!sec) return;
+        sec.outerHTML = clicksHtml(c2, false);
+        bindPager();
+        // 换页后让明细的开头在视野里（只在它跑到屏幕上方时才滚）
+        const el = document.getElementById('lk-clicks');
+        if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: 'start' });
+      } catch (ex) { toast(ex.message, 'bad'); btns.forEach((b, i) => (b.disabled = was[i])); }
+    };
+    const prev = document.getElementById('prev'), next = document.getElementById('next');
+    if (prev) prev.onclick = () => go(-1);
+    if (next) next.onclick = () => go(1);
+  };
+  bindPager();
 
   // 顶部按钮打开侧边面板；面板已打开时（如刚保存了规则）用新数据刷新
   document.querySelectorAll('[data-panel-open]').forEach((b) => (b.onclick = () => openLinkPanel(b.dataset.panelOpen, link, s)));
@@ -3806,6 +4341,7 @@ function openLinkPanel(kind, link, s) {
   const dr = document.createElement('div'); dr.className = 'drawer panel'; dr.dataset.panel = kind;
   dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-modal', 'true');
   const close = () => { ov.remove(); dr.remove(); document.removeEventListener('keydown', onKey); };
+  dr._dismiss = close;
   // 规则编辑抽屉、确认框叠在上面时，Esc 先关上层
   const onKey = (e) => { if (e.key === 'Escape' && [...document.querySelectorAll('.drawer')].pop() === dr && !document.querySelector('.dialog')) close(); };
   dr._close = close;
@@ -3934,7 +4470,7 @@ function dropdown(root, o) {
   const choose = (v) => {
     close();
     btn.focus();
-    if (v === value) return;
+    if (v === value && !o.repeat) return;
     value = v; paint(); o.onChange && o.onChange(v);
   };
   const onKey = (e) => {
@@ -3943,7 +4479,8 @@ function dropdown(root, o) {
       if (items.length) { act = (act + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; mark(true); }
     } else if (e.key === 'Enter' || (!input && e.key === ' ')) { e.preventDefault(); if (items.length) choose(items[act]); }
     else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); btn.focus(); }
-    else if (e.key === 'Tab') close();
+    // Tab：收起选项，焦点回到下拉按钮，浏览器再从按钮往后移（选项框被移除后焦点不会丢到页面开头）
+    else if (e.key === 'Tab') { close(); btn.focus(); }
   };
   const outside = (e) => { if (pop && !pop.contains(e.target) && !root.contains(e.target)) close(); };
   const onScroll = (e) => { if (pop && !pop.contains(e.target)) place(); };
@@ -4045,7 +4582,7 @@ function rulesCard(link, s) {
     <div class="rules-bar"><span class="sub">按访问者所在国家 / 地区或设备跳到不同地址 · 命中数为最近 ${rangeLabel()}</span><span class="sp"></span>
       <button class="btn sm primary" id="radd">${ic('plus', 14)}添加跳转规则</button></div>
     <div class="rules">${rows || `<div class="none">${ic('route', 18)}还没有跳转规则，所有访问都会跳到默认地址。可以为中国、港澳台、北美等地区分别设置推广地址，或让 iOS / Android / 电脑访客去不同的地址（如 App Store、Google Play）。</div>`}${def}</div>
-    ${link.arms?.length || link.targets.some((t) => t.arms?.length) ? '' : `<div class="hint rp-pr">${ic('split', 13)}想比较几个落地页的效果？点 ${ic('split', 13)} 按比例把访问分到几个地址（A/B 测试）。</div>`}
+    ${link.arms?.length || link.targets.some((t) => t.arms?.length) ? '' : `<div class="hint rp-pr">${ic('split', 13)}<span>想比较几个落地页的效果？点 ${ic('split', 13)} 按比例把访问分到几个地址（A/B 测试）。</span></div>`}
     ${link.targets.length > 1 && link.targets.some((t) => t.devices?.length) ? `<div class="hint rp-pr">${ic('info', 13)}同时命中多条时：同时指定国家和设备的规则优先，其次只按设备的，再次只按国家的。</div>` : ''}
     <div class="sim"><span>如果访客来自</span>
       <div class="combo" id="sim"></div><span>，用</span>
@@ -4059,7 +4596,7 @@ function rulesCard(link, s) {
 function heroRoutes(link) {
   const MAX = 4;
   // 地址和检查状态点包在一起，占网格里的同一格
-  const url = (u, parent) => u ? `<span class="hr-a"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u)}</a>${healthDot(link.health?.[u])}${abChip(link, parent)}</span>` : '<span class="warn">未设置，会显示“链接暂不可用”</span>';
+  const url = (u, parent) => u ? `<span class="hr-a"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u)}</a>${healthDot(link.health?.[u])}${appPill(link, u)}${abChip(link, parent)}</span>` : '<span class="warn">未设置，会显示“链接暂不可用”</span>';
   const rows = link.targets.slice(0, MAX).map((t) => `<div class="hr-r"><span class="hr-c" title="${esc(t.countries.map(cname).join("、"))}">${esc(ruleText(t))}</span>${ic('arrow', 13)}${url(t.url, t.id)}</div>`).join('');
   const more = link.targets.length > MAX ? `<button type="button" class="hr-more" data-panel-open="rules">还有 ${link.targets.length - MAX} 条规则 ${ic('chev', 12)}</button>` : '';
   return `<div class="hroutes">${rows}${more}<div class="hr-r def"><span class="hr-c">其他地区</span>${ic('arrow', 13)}<span class="hr-u">${url(link.target_url, 0)}<button type="button" class="hr-more" data-panel-open="rules">管理规则 ${ic('chev', 12)}</button></span></div></div>`;
@@ -4099,7 +4636,8 @@ function bindRules(link) {
     const t = link.targets.find((x) => x.id == b.dataset.rdel);
     const ok = await confirmDialog({ title: '删除这条规则？', text: `${ruleText(t)} 的访问之后会跳到默认地址${t.arms?.length ? '，这条规则的 A/B 分流也会一起删除' : ''}。已有的访问记录会保留，可以在“修改记录”里撤销。`, ok: '删除', danger: true });
     if (!ok) return;
-    await api(`/links/${link.id}/targets/${t.id}`, { method: 'DELETE' });
+    try { await api(`/links/${link.id}/targets/${t.id}`, { method: 'DELETE' }); }
+    catch (ex) { toast(ex.message, 'bad'); return; }
     toast('规则已删除');
     route();
   }));
@@ -4137,12 +4675,12 @@ function openRuleDrawer(link, rule) {
         <div class="plist" id="pl"></div>
         <div class="hint" style="margin-top:6px">按访问者 IP 所在的国家 / 地区匹配。同一类规则里，一个国家只能属于一条。</div></div>
       <div class="field"><label for="r-u">跳转到</label>
-        <input class="input" id="r-u" name="url" required placeholder="https://b.com/promo-cn" value="${esc(rule ? rule.url : '')}"></div>
+        ${targetField({ id: 'r-u', name: 'url', value: rule ? rule.url : '', placeholder: 'https://b.com/promo-cn', required: true, backup: '短链“编辑”里设置的“打不开 App 时去的网页”，没设置就去默认推广地址' })}</div>
       <div class="field"><label for="r-n">备注 <span class="hint" style="font-weight:400">可选</span></label>
         <input class="input" id="r-n" name="note" placeholder="例如：国内渠道落地页" value="${esc(rule ? rule.note : '')}"></div>
-      <label class="opt"><div class="tx"><b>打不开时回退到默认地址</b>
+      <label class="opt" id="r-fb-w"><div class="tx"><b>打不开时回退到默认地址</b>
         <span class="hint">跳转前先在访客的网络里检测这个地址能否打开，打不开就改去默认地址。能打开时只多约 0.2–1 秒，打不开时最多等 2.5 秒。仅支持 https 地址。</span>
-        ${link.target_url ? '' : '<span class="hint warn" style="display:block;margin-top:4px">当前短链还没有默认地址，设置后这个开关才会生效。</span>'}</div>
+        ${(link.target_url && !isAppUrl(link.target_url) ? link.target_url : link.app_web) ? '' : `<span class="hint warn" style="display:block;margin-top:4px">${link.target_url ? '默认地址是 App，且没有设置“打不开 App 时去的网页”，这个开关不会生效。' : '当前短链还没有默认地址，设置后这个开关才会生效。'}</span>`}</div>
         <span class="switch"><input type="checkbox" id="r-fb" ${rule ? (rule.fallback ? 'checked' : '') : 'checked'}><span class="t"></span></span></label>
       <div class="err" role="alert"></div>
     </div>
@@ -4154,7 +4692,7 @@ function openRuleDrawer(link, rule) {
   const close = () => { ov.remove(); dr.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.dialog')) close(); };
   document.addEventListener('keydown', onKey);
-  ov.onclick = close;
+  ov.onclick = close;   // 下面绑定好地址类型后再换成 guardOverlay
   dr.querySelectorAll('[data-close]').forEach((b) => (b.onclick = close));
   document.body.append(ov, dr);
 
@@ -4195,18 +4733,22 @@ function openRuleDrawer(link, rule) {
   }));
   ps.oninput = renderList;
   renderSel(); renderList();
+  // App 地址不走网页探测，“打不开时回退”对它不起作用，App 模式下先藏起来
+  const rKind = bindTarget(dr, 'r-u', (k) => { dr.querySelector('#r-fb-w').hidden = k === 'app'; });
+  guardOverlay(ov, dr, close, () => [...selected].sort().join() + '|' + [...devs].sort().join());
   (isNew ? ps : dr.querySelector('#r-u')).focus();
 
   dr.onsubmit = async (e) => {
     e.preventDefault();
     const err = dr.querySelector('.err');
     if (!selected.size && !devs.size) { err.textContent = '请至少选择一个国家 / 地区或设备'; return; }
-    let url = dr.querySelector('#r-u').value.trim();
-    if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const url = rKind.value();
+    const terr = rKind.check();
+    if (terr) { err.textContent = terr; return; }
     const btn = dr.querySelector('.df .primary'); btn.disabled = true;
     try {
       await api(`/links/${link.id}/targets${isNew ? '' : '/' + rule.id}`, {
-        method: isNew ? 'POST' : 'PUT', body: { countries: [...selected], devices: [...devs], url, note: dr.querySelector('#r-n').value, fallback: dr.querySelector('#r-fb').checked },
+        method: isNew ? 'POST' : 'PUT', body: { countries: [...selected], devices: [...devs], url, note: dr.querySelector('#r-n').value, fallback: rKind.kind() !== 'app' && dr.querySelector('#r-fb').checked },
       });
       close(); toast(isNew ? '规则已添加' : '规则已保存');
       route();
@@ -4215,7 +4757,7 @@ function openRuleDrawer(link, rule) {
 }
 
 // ---------------------------------------------------------------- 修改记录
-const LOG_FIELD = { slug: '后缀', target_url: '默认地址', title: '标题', note: '备注', enabled: '状态', pass_query: '透传参数', utm: '转化追踪', expires_at: '过期时间' };
+const LOG_FIELD = { slug: '后缀', target_url: '默认地址', title: '标题', note: '备注', enabled: '状态', pass_query: '透传参数', utm: '转化追踪', expires_at: '过期时间', app_web: '打不开 App 时去的网页' };
 const logVal = (f, v) => {
   if (f === 'enabled') return v ? '启用' : '停用';
   if (f === 'pass_query' || f === 'utm') return v ? '开' : '关';
@@ -4323,7 +4865,10 @@ function openSplitDrawer(link, parent) {
   const close = () => { ov.remove(); dr.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape' && [...document.querySelectorAll('.drawer')].pop() === dr && !document.querySelector('.dialog')) close(); };
   document.addEventListener('keydown', onKey);
-  ov.onclick = close;
+  // 有没保存的修改时，点遮罩不关（比例、地址都在 pw / arms 里）
+  let abS0 = null;
+  ov.onclick = () => { if (abS0 === null || JSON.stringify([pw, arms]) === abS0) return close(); unsavedNudge(dr); };
+  dr._dismiss = close;
   dr.querySelectorAll('[data-close]').forEach((b) => (b.onclick = close));
   document.body.append(ov, dr);
 
@@ -4358,6 +4903,7 @@ function openSplitDrawer(link, parent) {
   dr.querySelector('#abd-add').onclick = () => { arms.push({ url: '', weight: Math.max(1, Math.round(100 / (arms.length + 2))), note: '' }); draw(); list.querySelector(`[data-u="${arms.length - 1}"]`).focus(); };
   dr.querySelector('#abd-eq').onclick = () => { pw = 50; arms.forEach((a) => (a.weight = 50)); draw(); };
   draw();
+  abS0 = JSON.stringify([pw, arms]);
   setTimeout(() => list.querySelector('[data-u="0"]')?.focus(), 30);
   const save = async (body, msg) => {
     const btn = dr.querySelector('.df .primary'); btn.disabled = true;
@@ -4371,7 +4917,8 @@ function openSplitDrawer(link, parent) {
   };
   dr.onsubmit = (e) => {
     e.preventDefault();
-    const body = { parent, weight: pw, arms: arms.map((a) => ({ ...a, url: /^https?:\/\//i.test(a.url.trim()) ? a.url.trim() : 'https://' + a.url.trim() })) };
+    const body = { parent, weight: pw, arms: arms.map((a) => ({ ...a, url: withScheme(a.url) })) };
+    if (body.arms.some((a) => httpTypo(a.url))) { dr.querySelector('.err').textContent = '有地址的 http / https 好像拼错了，请检查一下'; return; }
     if ([pw, ...arms.map((a) => a.weight)].some((w) => !(w >= 1 && w <= 100))) { dr.querySelector('.err').textContent = '每个版本的比例都要在 1–100 之间'; return; }
     save(body, had ? '分流已保存' : '已开始 A/B 分流');
   };
@@ -4526,12 +5073,17 @@ function bindGRange(rerender) {
 const maskEmail = (e) => String(e || '').replace(/^(.{1,2})[^@]*(@.*)$/, '$1•••$2');
 const mailTip = (e) => `<span data-tipf-always data-tipf="${esc(e)}">${esc(maskEmail(e))}</span>`;
 
-// 授权回来后的提示
+// 授权回来后的提示。只认本标签页刚从后台发起的授权（googleConnect 里留的标记）：
+// 否则任何人都能发一个 #/sites?google=任意文字 的链接，让真后台弹出伪造的红色“系统错误”
 function googleFlash() {
   const m = location.hash.match(/[?&]google=([^&]*)/);
   if (!m) return;
-  const v = decodeURIComponent(m[1]);
+  let v = '';
+  try { v = decodeURIComponent(m[1]); } catch {}
   history.replaceState(null, '', '#/sites');
+  let mine = false;
+  try { mine = sessionStorage.getItem('gauth') === '1'; sessionStorage.removeItem('gauth'); } catch {}
+  if (!mine || !v) return;
   if (v === 'ok') toast('Google 账号已连接，正在同步站点数据'); else toast(v, 'bad');
 }
 
@@ -4551,7 +5103,7 @@ async function googleSyncAll(onProgress, stopped) {
 const googleSteps = () => `<ol class="use-steps">
   <li>打开 <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener"><b>Google Cloud 控制台</b></a>，新建一个项目。</li>
   <li>在“API 和服务 → 库”里启用 <b>Google Analytics Admin API</b>、<b>Google Analytics Data API</b>、<b>Google Search Console API</b>。</li>
-  <li>“OAuth 权限请求页面”：用户类型选 <b>外部</b>，填好应用名称和邮箱；然后点 <b>发布应用</b>（否则授权 7 天就会失效）。个人使用无需 Google 审核，授权时点“继续”即可。</li>
+  <li>“OAuth 权限请求页面”：用户类型选 <b>外部</b>，填好应用名称和邮箱；然后点 <b>发布应用</b>（否则授权 7 天就会失效）。个人使用无需 Google 审核：授权时如果出现“Google 未验证此应用”，点“继续”；没有“继续”按钮时，先点“高级”，再点下面的“转到…（不安全）”。这是你自己创建的应用，可以放心继续。</li>
   <li>“凭据 → 创建凭据 → OAuth 客户端 ID”：类型选 <b>Web 应用</b>，已获授权的重定向 URI 填：<div class="use-cmd"><code>${esc(location.origin)}/api/google/callback</code>${copyBtn(`${location.origin}/api/google/callback`, 'btn sm ghost icon')}</div></li>
   <li>创建后会显示 <b>客户端 ID</b> 和 <b>客户端密钥</b>，填到下一步。</li></ol>`;
 
@@ -4601,7 +5153,11 @@ function bindGoogleConfig(root, st, onSaved) {
 // 去 Google 授权（添加账号 / 重新连接都走这里，Google 会让用户选择账号）
 async function googleConnect(btn) {
   if (btn) btn.disabled = true;
-  try { location.href = (await api('/google/auth')).url; } catch (err) { toast(err.message, 'bad'); if (btn) btn.disabled = false; }
+  try {
+    const { url } = await api('/google/auth');
+    try { sessionStorage.setItem('gauth', '1'); } catch {}   // 回来时 googleFlash 只显示带这个标记的结果
+    location.href = url;
+  } catch (err) { toast(err.message, 'bad'); if (btn) btn.disabled = false; }
 }
 
 // 按短链筛选：只看某个短链跳转到的站点（默认地址和各条地区规则的域名）
@@ -4856,7 +5412,7 @@ const SITE_TAGS = {
 };
 const LINK_TAGS = {
   noun: '短链',
-  list: async () => (await api('/links?size=1')).tags || [],
+  list: async () => (await api('/links?size=1&lite=1&tags=1')).tags || [],
   rename: (tag, to) => api('/links/bulk', { method: 'POST', body: { action: 'renameTag', tag, to } }),
   drop: (tag) => api('/links/bulk', { method: 'POST', body: { action: 'dropTag', tag } }),
 };
@@ -4864,12 +5420,15 @@ async function tagManageDialog(onDone, src = SITE_TAGS) {
   const ov = document.createElement('div'); ov.className = 'ov';
   const d = document.createElement('div'); d.className = 'dialog tag-d'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
   const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); onDone(); };
+  d._dismiss = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };   // 换页时只关掉，不刷新列表
   const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.dialog:not(.tag-d)')) close(); };
   ov.onclick = close;
   document.addEventListener('keydown', onKey);
   document.body.append(ov, d);
   const draw = async () => {
-    const tags = await src.list();
+    // 读不到分组：提示并关掉，免得留下一个空白对话框
+    const tags = await src.list().catch((ex) => { toast(ex.message, 'bad'); return null; });
+    if (!tags) { d._dismiss(); return; }   // 读取失败：只关掉对话框，不重新渲染列表（用户可能已经换到别的页面）
     d.innerHTML = `<h3>管理分组</h3><p>改名时如果填了已有的分组名，两个分组会合并。删除分组不会删除${src.noun}。</p>
       <div class="tg-list">${tags.map((t) => `<div class="tg-r"><span class="gtg">${esc(t.tag)}</span><span class="hint">${t.n} 个${src.noun}</span><span class="sp"></span>
         <button type="button" class="btn sm ghost" data-ren="${esc(t.tag)}">${ic('edit', 14)}改名</button>
@@ -5132,7 +5691,10 @@ function renderGoogleSettings(box, st, onState) {
   }));
 }
 
+// 站点列表 / 站点详情：切换时间范围等会用同一个 routeToken 重新加载，按请求序号丢掉较慢的旧结果
+let sitesSeq = 0, siteSeq = 0;
 async function renderSites(token) {
+  const my = ++sitesSeq;
   // 接了 Bing 时标题和说明带上 Bing（记住上次的结果，首屏也不会闪）
   const head = (extra = '', picker = false) => `<header class="ph"><div><div class="kicker">${store.get('g:bing', false) ? 'Google · Bing' : 'Google'}</div>
       ${picker ? `<div class="ov-title"><h1>站点</h1><span class="ov-sep" aria-hidden="true">/</span><div class="combo ov-link" id="g-acct"></div>${store.get('g:bing', false) ? seSeg() : ''}</div>` : '<h1>站点</h1>'}
@@ -5140,7 +5702,7 @@ async function renderSites(token) {
     <span class="sp"></span>${extra ? `<div class="ph-acts">${extra}</div>` : ''}</header>`;
   shell('sites', `${head()}<div class="stack">${skel(64)}${skel(360)}</div>`);
   const st = await api('/google/status');
-  if (token !== routeToken) return;
+  if (token !== routeToken || my !== sitesSeq) return;
   googleFlash();
   const page = document.getElementById('page');
 
@@ -5160,7 +5722,7 @@ async function renderSites(token) {
     page.innerHTML = `${head()}<section class="card rv g-connect"><div class="card-b">
       <div class="g-logo">${BRAND.google(30)}</div>
       <h2>连接 Google 账号</h2>
-      <p>授权后，账号下所有的 GA4 媒体资源和 Search Console 站点会自动出现在这里，按域名配对。可以连接多个账号。<br>只申请<b>只读</b>权限，不会修改你的任何设置；令牌加密保存在你自己的数据库里，可在设置里随时断开。</p>
+      <p>授权后，账号下所有的 GA4 媒体资源和 Search Console 站点会自动出现在这里，按域名配对。可以连接多个账号。<br>GA4 只申请只读权限；Search Console 需要“查看和管理”权限，只用于在后台提交站点地图，不会改动其他设置。令牌加密保存在你自己的数据库里，可在设置里随时断开。</p>
       <button class="btn primary" id="g-connect">${ic('link', 15)}连接 Google 账号</button></div></section>`;
     reveal(page);
     document.getElementById('g-connect').onclick = (e) => googleConnect(e.currentTarget);
@@ -5168,7 +5730,7 @@ async function renderSites(token) {
   }
 
   const d = await api('/google/sites?days=' + gState.days);
-  if (token !== routeToken) return;
+  if (token !== routeToken || my !== sitesSeq) return;
   const hasBing = d.items.some((x) => x.bing);
   if (!hasBing) gState.se = 'google';
   store.set('g:bing', hasBing);
@@ -5187,6 +5749,13 @@ async function renderSites(token) {
   reveal(page);
   bindGRange(() => renderSites(routeToken));
   const list = document.getElementById('g-list');
+  // 每行的会话趋势图：搜索 / 筛选 / 排序时整张表会重画，图只生成一次（降采样、去掉淡入，重画时不闪）
+  const sparks = new WeakMap();
+  const sparkOf = (x) => {
+    let h = sparks.get(x);
+    if (h == null) { h = kpiSpark(downsample(x.spark.map((p) => p.n)), 'var(--accent)').replace(/ style="animation:[^"]*"/, ''); sparks.set(x, h); }
+    return h;
+  };
   let lastRows = d.items;
   // 表格上方的汇总：跟随账号筛选和搜索
   const sumStrip = (rows) => {
@@ -5293,7 +5862,7 @@ async function renderSites(token) {
           <td class="num">${sc ? pct1(sc.ctr) : '—'}</td>
           <td class="num">${sc?.position != null ? sc.position.toFixed(1) : '—'}${sc?.position != null && ps?.position != null ? gDelta(sc.position, ps.position, true) : ''}</td>
           <td class="num">${idxCell(x)}</td>
-          <td class="gsp">${x.spark.length ? kpiSpark(x.spark.map((p) => p.n), 'var(--accent)') : ''}</td></tr>`;
+          <td class="gsp">${x.spark.length ? sparkOf(x) : ''}</td></tr>`;
       }).join('')}</tbody></table></div>`
       : `<div class="empty" style="padding:48px">${ic('inbox')}${d.items.length ? '没有匹配的站点' : '账号下还没有找到 GA4 媒体资源或 Search Console 站点'}</div>`;
     sumStrip(rows);
@@ -5770,9 +6339,10 @@ function mountBingCrawl(d) {
 }
 
 async function renderSite(token, host) {
+  const my = ++siteSeq;
   shell('sites', `<a class="back" href="#/sites">${ic('back', 14)}全部站点</a><div class="stack">${skel(120)}${skel(320)}</div>`);
   const d = await api(`/google/site?host=${encodeURIComponent(host)}&days=${gState.days}`);
-  if (token !== routeToken) return;
+  if (token !== routeToken || my !== siteSeq) return;
   // GA4 汇总优先用现查结果（含区间去重用户数）；现查失败时退回到已同步的每日数据
   const fromDaily = (x) => (x ? { users: null, newUsers: null, sessions: x.sessions, views: x.views, keyEvents: x.keyEvents, engagement: x.engagement, duration: null } : null);
   const ga = d.ga?.totals?.cur || fromDaily(d.cur.ga), gp = d.ga?.totals?.prev || fromDaily(d.prev.ga), sc = d.cur.gsc, sp = d.prev.gsc;
@@ -5957,7 +6527,7 @@ async function renderSettings(token) {
         <ul class="set-list">
           <li>${ic('check', 14)}支持 Google Authenticator、Microsoft Authenticator、1Password 等</li>
           <li>${ic('check', 14)}动态码连续输错 5 次锁定 15 分钟</li>
-          <li>${ic('check', 14)}手机丢失可在 Cloudflare 账号下用命令关闭（见 README）</li>
+          <li>${ic('check', 14)}手机丢失时，可以在 Cloudflare 控制台的 D1 控制台里关闭（<a href="${EN ? 'https://github.com/ccvar/cligc_link/blob/main/README.en.md#locked-out-of-the-admin' : 'https://github.com/ccvar/cligc_link#进不去后台怎么办'}" target="_blank" rel="noopener">查看做法</a>）</li>
         </ul>
         <button class="btn ${mfa.enabled ? 'danger' : 'primary'}" id="mfa-btn">${ic('shield', 15)}${mfa.enabled ? '关闭两步验证' : '开启两步验证'}</button>`)}
       ${item('dev', 'desk', 'dev', '登录设备', sessionsSummary(ses), sessionsPill(ses), '')}
@@ -6322,13 +6892,20 @@ function renderRetention(box, r, onState) {
     <ul class="set-list" style="margin-top:16px">
       <li>${ic('check', 14)}当前保存了 <b>${num(r.count)}</b> 条访问明细${r.first ? `，最早一条是 ${fmtTime(r.first)}` : ''}</li>
       <li>${ic('check', 14)}统计数据已汇总到 ${r.aggregated ? fmtTime(r.aggregated) : '—'}，之后的访问实时读取</li>
-      <li>${ic('check', 14)}超过期限的明细由定时任务每小时清理一次；最短 60 天，保证月报有完整数据</li>
+      <li>${ic('check', 14)}超过期限的明细由定时任务每小时清理一批（最多 ${num(r.perHour || 500)} 条，免得一次用完当天的写入额度）；最短 60 天，保证月报有完整数据</li>
+      ${r.days && r.pending ? (() => {
+        // 待清理条数一天统计一次：按统计之后过了几个整点估算还剩多少，再估一下要多久
+        const per = r.perHour || 500, left = r.pending - Math.floor((Date.now() - (r.countedAt || Date.now())) / 3600000) * per;
+        if (left <= 0) return `<li>${ic('check', 14)}旧明细应该已经清理完了（明天重新统计后更新）</li>`;
+        const h = Math.ceil(left / per);
+        return `<li>${ic('history', 14)}还有约 <b>${num(left)}</b> 条超过保留期的明细待清理，预计还要 ${h < 24 ? `${h} 小时` : `${Math.ceil(h / 24)} 天`}（访问多时会更久）</li>`;
+      })() : ''}
     </ul>`;
   segThumb(box.querySelector('#ret-seg'));
   box.querySelectorAll('#ret-seg button').forEach((b) => (b.onclick = async () => {
     const days = Number(b.dataset.d);
     if (days && (!r.days || days < r.days)) {
-      const ok = await confirmDialog({ title: `只保留最近 ${days} 天的访问明细？`, text: `超过 ${days} 天的访问明细会在下一个整点删除，无法恢复。趋势、来源、地区等统计不受影响。`, ok: '确认' });
+      const ok = await confirmDialog({ title: `只保留最近 ${days} 天的访问明细？`, text: `超过 ${days} 天的访问明细会从下一个整点开始分批删除，无法恢复。趋势、来源、地区等统计不受影响。`, ok: '确认' });
       if (!ok) return;
     }
     try {
@@ -6519,13 +7096,15 @@ function renderBingSettings(box, b, onState) {
   };
 }
 
+// 安装方式：默认推荐完整代码。Script 链接（/t.js）由 Worker 返回，推广页每个新访客都会用掉一次 Worker 请求额度
+// （和短链跳转共用，免费版每天 10 万次），流量大时可能挤掉短链跳转；完整代码在访客浏览器里运行，不占额度
 function renderTracking(box, t, onState) {
-  const tab = store.get('trk:tab', 0);
-  const snippet = [t.script, t.code];
+  const tab = store.get('trk:tab2', 0);
+  const snippet = [t.code, t.script];
   box.innerHTML = `
     <div class="trk">
       <label class="opt trk-sw"><div class="tx"><b>开启来源追踪</b>
-        <span class="hint">关闭后，Script 链接不再生效；已粘贴到页面的完整代码不受影响。</span></div>
+        <span class="hint">关闭后，Script 链接不再生效（访客浏览器里已缓存的脚本要等缓存过期）；已粘贴到页面的完整代码不受影响。</span></div>
         <span class="switch"><input type="checkbox" id="trk-on" ${t.enabled ? 'checked' : ''}><span class="t"></span></span></label>
       <div class="trk-flow"><span>${ic('search', 14)}Google / 百度…</span>${ic('arrow', 14)}<span>${ic('globe', 14)}你的推广页</span>${ic('arrow', 14)}<span class="hl">${ic('link', 14)}${esc(HOST)}/xxx<b>?utm_source=google</b></span></div>
       <ul class="set-list">
@@ -6536,10 +7115,10 @@ function renderTracking(box, t, onState) {
       </ul>
       ${t.enabled ? `
       <div class="trk-code">
-        <div class="trk-h"><div class="tabs" id="trk-tabs">${['Script 链接（推荐）', '完整代码'].map((l, i) => `<button type="button" class="${i === tab ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <div class="trk-h"><div class="tabs" id="trk-tabs">${['完整代码（推荐）', 'Script 链接'].map((l, i) => `<button type="button" class="${i === tab ? 'on' : ''}">${l}</button>`).join('')}</div>
           <span class="sp"></span>${copyBtn(snippet[tab], 'btn sm', '复制代码')}</div>
         <pre class="code">${esc(snippet[tab])}</pre>
-        <div class="hint">${tab === 0 ? '放到推广页的 &lt;head&gt; 或 &lt;/body&gt; 前。以后升级识别规则，页面不用改。' : '直接粘贴到推广页里，不依赖短链服务加载脚本。'}</div>
+        <div class="hint">${tab === 0 ? '直接粘贴到推广页的 &lt;head&gt; 或 &lt;/body&gt; 前。在访客浏览器里运行，不占用 Worker 请求额度；以后识别规则有更新时，重新复制粘贴一次即可。' : '放到推广页的 &lt;head&gt; 或 &lt;/body&gt; 前。以后升级识别规则，页面不用改；但每个新访客加载脚本都会占用一次 Worker 请求额度（和短链跳转共用，免费版每天 10 万次），流量大的页面建议用完整代码。'}</div>
       </div>` : `<div class="trk-off">${ic('info', 15)}开启后显示安装代码。</div>`}
     </div>`;
   box.querySelector('#trk-on').onchange = async (e) => {
@@ -6550,7 +7129,7 @@ function renderTracking(box, t, onState) {
       renderTracking(box, d, onState);
     } catch (err) { e.target.checked = !e.target.checked; toast(err.message, 'bad'); }
   };
-  box.querySelectorAll('#trk-tabs button').forEach((b, i) => (b.onclick = () => { store.set('trk:tab', i); renderTracking(box, t, onState); }));
+  box.querySelectorAll('#trk-tabs button').forEach((b, i) => (b.onclick = () => { store.set('trk:tab2', i); renderTracking(box, t, onState); }));
 }
 
 // ---------------------------------------------------------------- 通知
@@ -6930,6 +7509,7 @@ function openKbar() {
     <div class="kbar-l" id="kbar-l" role="listbox"></div>
     <div class="kbar-f"><span><kbd>↑</kbd><kbd>↓</kbd>选择</span><span><kbd>↵</kbd>打开</span><span><kbd>Esc</kbd>关闭</span></div>`;
   const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey, true); };
+  d._dismiss = close;   // 换页 / 回到登录页时关掉，并把捕获阶段的按键监听一起去掉
   const input = d.querySelector('input'), list = d.querySelector('#kbar-l');
   let items = [], sel = 0, seq = 0, linkHits = [];
   const go = (it) => { close(); it.run(); };
@@ -6969,7 +7549,7 @@ function openKbar() {
     clearTimeout(timer);
     const my = ++seq, q = input.value.trim();
     timer = setTimeout(async () => {
-      const r = await api(`/links?size=6&${q ? 'q=' + encodeURIComponent(q) : 'sort=last_click'}`).catch(() => ({ items: [] }));
+      const r = await api(`/links?size=6&lite=1&${q ? 'q=' + encodeURIComponent(q) : 'sort=last_click'}`).catch(() => ({ items: [] }));
       if (my !== seq || !d.isConnected) return;
       linkHits = r.items.map((l) => ({ g: q ? '短链' : '最近访问的短链', icon: 'link', t: '/' + l.slug, sub: l.title || bareUrl(l.target_url),
         badge: l.enabled ? '' : '<span class="pill off">已停用</span>', run: () => (location.hash = '#/link/' + l.id) }));
@@ -6999,15 +7579,32 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// 列表页的 "/" 快捷键聚焦搜索
+// 列表页的 "/" 快捷键聚焦搜索（开着抽屉、对话框时不跳到被遮住的搜索框）
 document.addEventListener('keydown', (e) => {
-  if (e.key === '/' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName) && document.getElementById('q')) {
+  if (e.key === '/' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName) && document.getElementById('q') && !document.querySelector('.drawer, .dialog, .kbar')) {
     e.preventDefault(); document.getElementById('q').focus();
   }
 });
 
+// 换到别的页面（或回到登录页）时，把还开着的抽屉、对话框、菜单一起关掉，免得留在新页面上面
+function closeOverlays() {
+  document.querySelectorAll('.drawer, .dialog, .kbar, .menu, .pop').forEach((x) => (x._dismiss ? x._dismiss() : x.remove()));
+  document.querySelectorAll('body > .ov').forEach((x) => x.remove());
+}
+let lastPath = location.hash.split('?')[0];
+window.addEventListener('hashchange', () => {
+  const p = location.hash.split('?')[0];
+  if (p !== lastPath) closeOverlays();
+  lastPath = p;
+});
 window.addEventListener('hashchange', route);
-api('/me').then((d) => (d.mustChange ? renderSetPassword() : route())).catch(() => {});
+api('/me').then((d) => (d.mustChange ? renderSetPassword() : route())).catch((e) => {
+  if (e.message === 'unauthorized') return;
+  // 打不开（比如 D1 当天额度用完、断网）：把原因留在加载页上，并给一个重试按钮，不要一直转圈
+  toast(e.message, 'bad');
+  const b = $app.querySelector('.boot');
+  if (b) b.innerHTML = `<div class="boot-t" style="max-width:min(420px,calc(100vw - 48px));text-align:center">${esc(e.message)}</div><button class="btn sm" onclick="location.reload()">重试</button>`;
+});
 </script>
 </body>
 </html>
