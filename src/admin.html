@@ -1706,6 +1706,7 @@ html.masked input:focus { filter: none; }
 .ix-box { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
 .ix-bh { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .ix-sub { font-size: 11px; white-space: nowrap; }
+.ix-all { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .ix-done { display: flex; align-items: center; gap: 4px; margin-top: -4px; cursor: help; }
 .ix-bh .ix-q { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ix-box .ix-k b { font-size: 18px; }
@@ -5540,6 +5541,7 @@ function idxUrlsView(d, f, reason) {
         <div class="ix-k no"><span>${ic('info', 13)}未收录</span><b>${num(bNo)}</b></div>
         ${bWait ? `<div class="ix-k wait"><span>${ic('history', 13)}待检查</span><b>${num(bWait)}</b></div>` : ''}</div>
       ${ixDone(bYes, bNo, d.urls.length, d.maxUrls, 'Bing', 'Bing Webmaster 后台')}
+      ${bg.inIndex ? `<div class="hint ix-done" data-tipf-always data-tipf="Bing 抓取统计里全站“索引中”的网页数（最近一天），和 Bing Webmaster 后台的数字一致；上面的已收录 / 未收录是逐个检查收集到的网址得出的">全站索引中 <b class="ix-all">${num(bg.inIndex)}</b> 个网页${ic('help', 12)}</div>` : ''}
       <button type="button" class="btn sm" id="ix-bsub" ${bCand && bg.quota !== 0 ? '' : 'disabled'} data-tipf-always data-tipf="${esc(bg.quota === 0 ? '今天的 Bing 提交配额已用完' : `提交 ${bCand} 个网址给 Bing（未收录或未检查，且 30 天内没提交过）${bg.quota != null ? `\n今天剩余配额 ${bg.quota}` : ''}`)}">${ic('send', 13)}提交到 Bing${bCand ? `<small>${num(bg.quota != null ? Math.min(bCand, bg.quota) : bCand)}</small>` : ''}</button>
       ${bg.issues ? `<div class="hint ix-err" data-tipf-always data-tipf="${esc(bg.issues)}">${ic('alert', 13)}<span class="ell">${esc(bg.issues)}</span></div>` : ''}
     </div>` : '';

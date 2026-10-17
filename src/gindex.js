@@ -414,6 +414,8 @@ export async function siteIndex(env, secret, host) {
     bing: s.bing_site ? {
       site: s.bing_site, feeds: JSON.parse(m?.b_feeds || '[]'), issues: m?.b_error || '', auto: await bing.bingAuto(env),
       quota: m && m.b_quota >= 0 && ymd(m.b_quota_at) === today() ? m.b_quota : null,
+      // Bing 抓取统计里全站“索引中”的网页数（和 Bing Webmaster 后台一致；逐个检查的只是收集到的网址）
+      inIndex: (await env.DB.prepare('SELECT b_in_index FROM g_sites WHERE host = ?').bind(host).first('b_in_index')) || 0,
     } : null,
     urls: urls.map((r) => ({ url: r.url, src: r.src, state: r.state, fetch: r.fetch, robots: r.robots, indexing: r.indexing, canon: r.canon,
       crawledAt: r.crawled_at || null, checkedAt: r.checked_at || null, error: r.error, indexed: r.checked_at && r.state ? isIndexed(r) : null, problem: hasProblem(r),
