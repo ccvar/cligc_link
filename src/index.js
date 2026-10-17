@@ -106,11 +106,11 @@ export default {
 async function systemStatus(env) {
   const get = async (k) => (await getSetting(env, k))?.value ?? null;
   const parse = (v) => { try { return v ? JSON.parse(v) : null; } catch { return null; } };
-  const [cron, mark, suv, nstat, n, accts, sites, cf] = await Promise.all([
+  const [cron, mark, suv, nstat, n, accts, sites, cf, cronManual] = await Promise.all([
     get('cron_status').then(parse), get('agg_mark'), get('suv_mark'), get('notify_status').then(parse), getNotify(env),
     env.DB.prepare('SELECT email, error, found_at FROM g_accounts').all().then((r) => r.results).catch(() => []),
     env.DB.prepare('SELECT COUNT(*) AS n, MAX(synced_at) AS last, SUM(synced_at = 0) AS pending, SUM(error != \'\') AS errors FROM g_sites').first().catch(() => null),
-    cfCreds(env),
+    cfCreds(env), get('cron_manual').then(parse),
   ]);
   const health = await env.DB.prepare(
     `SELECT COUNT(*) AS n, SUM(state = 'down') AS down, MAX(checked_at) AS last FROM url_health WHERE url IN (
@@ -118,7 +118,7 @@ async function systemStatus(env) {
        UNION SELECT t.url FROM link_targets t JOIN links l ON l.id = t.link_id WHERE l.enabled = 1)`
   ).first().catch(() => null);
   return {
-    now: Date.now(), cron, aggMark: Number(mark) || null, backfillDone: suv === 'done',
+    now: Date.now(), cron, cronManual, aggMark: Number(mark) || null, backfillDone: suv === 'done',
     google: { accounts: accts.length, accountErrors: accts.filter((a) => a.error).map((a) => ({ email: a.email, error: a.error })), sites: sites?.n || 0, lastSync: sites?.last || null, pending: sites?.pending || 0, siteErrors: sites?.errors || 0 },
     notify: { channels: [n.tg.enabled && 'Telegram', n.email.enabled && '邮件'].filter(Boolean), last: nstat },
     usage: { configured: !!cf, alert: !!n.usage.enabled },
@@ -128,8 +128,10 @@ async function systemStatus(env) {
 
 // ---------------------------------------------------------------- 定时任务
 // 每一步单独计时、单独捕获错误（一步失败不影响后面的步骤），结果记在 settings.cron_status，后台“系统状态”里显示
-async function runCron(env, at = Date.now()) {
+// manual：后台“立即运行一次”——不发推送通知，Google / 网页索引每步少做一点，结果另存在 settings.cron_manual（不影响“定时任务是否正常”的判断）
+async function runCron(env, at = Date.now(), { manual = false } = {}) {
   const t0 = Date.now(), steps = {};
+  await setSetting(env, 'cron_running', String(t0)).catch(() => {});
   const step = async (name, fn) => {
     const s0 = Date.now();
     try { const info = await fn(); steps[name] = { ok: true, ms: Date.now() - s0, ...(info && typeof info === 'object' ? { info } : {}) }; }
@@ -151,7 +153,7 @@ async function runCron(env, at = Date.now()) {
   await step('google', async () => {
     const gsec = await sessionSecret(env);
     if (!(await google.googleConfigured(env, gsec))) return { skipped: true };
-    return await google.syncBatch(env, gsec, { limit: 10 });
+    return await google.syncBatch(env, gsec, { limit: manual ? 5 : 10 });
   });
   // Bing Webmaster：每日点击 / 展示、索引网页数
   await step('bing', async () => bing.syncBatch(env, await sessionSecret(env)));
@@ -159,12 +161,17 @@ async function runCron(env, at = Date.now()) {
   await step('gindex', async () => {
     const gsec = await sessionSecret(env);
     if (!(await google.googleConfigured(env, gsec)) && !(await bing.bingCreds(env, gsec))) return { skipped: true };
-    return await gindex.cronBatch(env, gsec);
+    return await gindex.cronBatch(env, gsec, manual ? { budgetMs: 40000, bingBudget: 20000, autoSubmit: false } : {});
   });
   await step('health', () => runHealthChecks(env));
-  await step('notify', () => runNotifications(env, at));
-  await step('usage', () => runUsageAlert(env));
-  await setSetting(env, 'cron_status', JSON.stringify({ at: t0, ms: Date.now() - t0, steps })).catch(() => {});
+  if (!manual) {
+    await step('notify', () => runNotifications(env, at));
+    await step('usage', () => runUsageAlert(env));
+  }
+  const result = { at: t0, ms: Date.now() - t0, steps, ...(manual ? { manual: true } : {}) };
+  await setSetting(env, manual ? 'cron_manual' : 'cron_status', JSON.stringify(result)).catch(() => {});
+  await env.DB.prepare("DELETE FROM settings WHERE key = 'cron_running'").run().catch(() => {});
+  return result;
 }
 
 // ---------------------------------------------------------------- 首次运行自动建表
@@ -485,6 +492,13 @@ async function authedApi(request, env, url, cred) {
     return json({ ok: true });
   }
   if (path === '/api/status' && method === 'GET') return json(await systemStatus(env));
+  // 立即运行一次定时任务（同一时间只跑一个；正在跑的超过 15 分钟视为已中断）
+  if (path === '/api/cron/run' && method === 'POST') {
+    const running = Number((await getSetting(env, 'cron_running'))?.value) || 0;
+    if (running > Date.now() - 15 * 60000) return json({ error: `定时任务正在运行（${Math.round((Date.now() - running) / 1000)} 秒前开始），稍后再试` }, 409);
+    const result = await runCron(env, Date.now(), { manual: true });
+    return json({ result, status: await systemStatus(env) });
+  }
   // 概览页的“开始使用”清单：各项是否已完成（只读设置，不请求外部接口）
   if (path === '/api/setup' && method === 'GET') {
     const n = await getNotify(env);

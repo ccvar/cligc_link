@@ -289,7 +289,7 @@ const idxSites = async (env, host) => new Map((await env.DB.prepare(
 const bingKey = async (env, secret) => (await bing.bingCreds(env, secret))?.key || '';
 
 // 刷新几个站点的站点地图，再检查一批到期的网址（Google 和 Bing 各一批）
-export async function cronBatch(env, secret, { budgetMs = 100000 } = {}) {
+export async function cronBatch(env, secret, { budgetMs = 100000, bingBudget = B_BUDGET, autoSubmit = true } = {}) {
   const deadline = Date.now() + budgetMs;
   const sites = await idxSites(env);
   if (!sites.size) return { skipped: true };
@@ -301,14 +301,14 @@ export async function cronBatch(env, secret, { budgetMs = 100000 } = {}) {
   let refreshed = 0;
   for (const { host } of stale) {
     if (Date.now() > deadline - 40000) break;
-    try { await refreshSite(env, secret, sites.get(host), bkey, { auto: true }); refreshed++; } catch (e) { console.error('sitemap refresh', host, e); }
+    try { await refreshSite(env, secret, sites.get(host), bkey, { auto: autoSubmit }); refreshed++; } catch (e) { console.error('sitemap refresh', host, e); }
   }
   const due = (await env.DB.prepare('SELECT host, url FROM g_urls WHERE due_at <= ? ORDER BY due_at LIMIT ?').bind(Date.now(), RUN_LIMIT).all()).results;
   const g = due.length ? await inspectRows(env, secret, sites, due, deadline) : { done: 0, failed: 0 };
   let b = { done: 0, failed: 0 };
   if (bkey) {
     const bdue = (await env.DB.prepare('SELECT host, url FROM g_urls WHERE b_due_at <= ? ORDER BY b_due_at LIMIT ?').bind(Date.now(), B_RUN_LIMIT).all()).results;
-    if (bdue.length) b = await bingRows(env, bkey, sites, bdue, Date.now() + B_BUDGET);
+    if (bdue.length) b = await bingRows(env, bkey, sites, bdue, Date.now() + bingBudget);
   }
   return { refreshed, inspected: g.done, failed: g.failed, bing: b.done, bingFailed: b.failed };
 }

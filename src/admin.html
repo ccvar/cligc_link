@@ -706,7 +706,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .hc-p { margin-left: 6px; }
 .lrow .c-status { display: flex; flex-wrap: wrap; gap: 4px; }
 .hc-i { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
-#hc-run.busy svg, #use-re.busy svg, #ix-chk.busy svg, [data-ixi].busy svg, #bing-sync.busy svg, [data-ixb].busy svg { animation: spin .9s linear infinite; }
+#hc-run.busy svg, #sys-run.busy svg, #use-re.busy svg, #ix-chk.busy svg, [data-ixi].busy svg, #bing-sync.busy svg, [data-ixb].busy svg { animation: spin .9s linear infinite; }
 .devs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .dv { display: grid; justify-items: start; gap: 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; font: inherit; }
 .dv svg { color: var(--muted); }
@@ -1636,6 +1636,8 @@ button.gtg { cursor: pointer; }
 .seg button:focus:not(:focus-visible) { outline: none; }
 /* Bing 设置卡片的错误原因 */
 .b-warn { color: var(--warn); } .b-bad { color: var(--bad); }
+/* 系统状态：立即运行一次 */
+.sys-run { margin-top: 14px; }
 /* 脱敏开关 */
 .mask-btn.on { color: var(--accent); background: var(--accent-2); }
 /* Bing 抓取 */
@@ -5055,7 +5057,11 @@ const sysSummary = (st) => {
   return bad.length ? `${bad.map((x) => x.t).join('、')}异常` : warn.length ? `${warn.length} 项需要注意：${warn.map((x) => x.t).join('、')}` : `定时任务、汇总${st.google.accounts ? '、Google 同步' : ''}都正常`;
 };
 const sysBody = (st) => `<div class="sys-l">${sysChecks(st).map((x) => `<div class="sys-r ${x.lv}"><span class="sys-i">${ic(x.lv === 'ok' ? 'check' : 'alert', 13)}</span><b>${x.t}</b><span>${esc(x.d)}</span></div>`).join('')}</div>
-  ${st.cron ? `<details class="wz-more" style="margin-top:12px"><summary>上次定时任务的各个步骤</summary><div class="sys-steps">${Object.entries(st.cron.steps).map(([k, v]) => `<span class="${v.ok ? '' : 'bad'}">${esc(k)} · ${v.ok ? `${v.ms} ms` : esc(v.error)}</span>`).join('')}</div></details>` : ''}`;
+  ${st.cron ? `<details class="wz-more" style="margin-top:12px"><summary>上次定时任务的各个步骤</summary>${cronSteps(st.cron)}</details>` : ''}
+  ${st.cronManual ? `<details class="wz-more" style="margin-top:8px"><summary>最近一次手动运行（${ago(st.cronManual.at)}，耗时 ${(st.cronManual.ms / 1000).toFixed(1)} 秒）</summary>${cronSteps(st.cronManual)}</details>` : ''}
+  <div class="sys-run"><button type="button" class="btn sm" id="sys-run" data-tipf-always data-tipf="按定时任务的步骤立即跑一遍：访问汇总、Google / Bing 同步、网页索引检查、目标页检查。不发推送通知、不自动提交网址给 Bing，每步比整点那次少做一些。请求从你当前访问的 Cloudflare 节点发出">${ic('refresh', 14)}立即运行一次</button></div>`;
+// 定时任务各步骤的耗时 / 错误
+const cronSteps = (c) => `<div class="sys-steps">${Object.entries(c.steps).map(([k, v]) => `<span class="${v.ok ? '' : 'bad'}">${esc(k)} · ${v.ok ? `${v.ms} ms` : esc(v.error)}</span>`).join('')}</div>`;
 
 // 打开设置页并展开某一项
 function goSettings(id) { store.set('set:open', id); location.hash = '#/settings'; }
@@ -5860,6 +5866,21 @@ async function renderSettings(token) {
     page.querySelector('[data-sub="dev"]').innerHTML = sessionsSummary(d);
   });
   renderTracking(document.getElementById('acc-trk'), trk, (on) => { page.querySelector('[data-st="trk"]').innerHTML = pill(on); });
+  const sysBox = document.getElementById('acc-sys');
+  if (sysBox) sysBox.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#sys-run');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true; btn.classList.add('busy');
+    const label = btn.lastChild; label.textContent = '运行中…（约 1–2 分钟）';
+    try {
+      const d = await api('/cron/run', { method: 'POST' });
+      const bad = Object.entries(d.result.steps).filter(([, v]) => !v.ok);
+      sysBox.innerHTML = sysBody(d.status);
+      page.querySelector('[data-st="sys"]').innerHTML = sysPill(d.status);
+      page.querySelector('[data-sub="sys"]').innerHTML = sysSummary(d.status);
+      toast(bad.length ? `运行完成，${bad.length} 个步骤出错：${bad.map(([k]) => k).join('、')}` : `运行完成，用时 ${(d.result.ms / 1000).toFixed(1)} 秒`, bad.length ? 'bad' : 'ok');
+    } catch (err) { toast(err.message, 'bad'); btn.disabled = false; btn.classList.remove('busy'); label.textContent = '立即运行一次'; }
+  });
   renderGoogleSettings(document.getElementById('acc-goo'), goo, (g) => {
     page.querySelector('[data-st="goo"]').innerHTML = googlePill(g);
     page.querySelector('[data-sub="goo"]').innerHTML = googleSummary(g);
