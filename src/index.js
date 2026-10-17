@@ -272,7 +272,7 @@ async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}
 // 每个 Worker 实例只执行一次；表已存在时 CREATE ... IF NOT EXISTS 不会有影响
 // 数据库版本：表结构（schema.sql 的内容）或下面 migrate() 里的补列有变化时才真正执行，平时每个实例只读一行设置。
 // 改了 migrate() 里的补列逻辑时把 MIGRATE_REV 加一
-const MIGRATE_REV = 3;
+const MIGRATE_REV = 4;
 const hashStr = (t) => { let h = 2166136261; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619); return (h >>> 0).toString(36); };
 const SCHEMA_VER = `${hashStr(SCHEMA_SQL)}-${MIGRATE_REV}`;
 let schemaReady = null;
@@ -315,6 +315,7 @@ async function migrate(env) {
   const lcols = (await env.DB.prepare('PRAGMA table_info(links)').all()).results.map((c) => c.name);
   if (!lcols.includes('utm')) await env.DB.prepare('ALTER TABLE links ADD COLUMN utm INTEGER NOT NULL DEFAULT 0').run();
   if (!lcols.includes('ab_weight')) await env.DB.prepare('ALTER TABLE links ADD COLUMN ab_weight INTEGER NOT NULL DEFAULT 0').run();
+  for (const c of ['human', 'flood']) if (!lcols.includes(c)) await env.DB.prepare(`ALTER TABLE links ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`).run();
   const gcols = (await env.DB.prepare('PRAGMA table_info(g_sites)').all()).results.map((c) => c.name);
   for (const c of ['ga4_acct', 'gsc_acct']) {
     if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`).run();
@@ -336,6 +337,16 @@ async function migrate(env) {
   }
   // 判定规则更新时提高版本号，旧记录重新检查一次；平时不扫描整张表
   if ((await getSetting(env, 'kind_backfilled'))?.value !== KIND_VER) await backfillKinds(env);
+  if (!(await getSetting(env, 'human_counted'))) await recountHuman(env);
+}
+
+// 按汇总表 + 汇总之后的明细重算每个短链的真人访问数（加列时、访客类型重新判定后各算一次；平时访问时累加）
+async function recountHuman(env) {
+  const mark = Number((await getSetting(env, 'agg_mark'))?.value) || 0;
+  await env.DB.prepare(`UPDATE links SET human =
+    COALESCE((SELECT SUM(n) FROM agg_d WHERE dim = '' AND machine = 0 AND link_id = links.id), 0)
+    + (SELECT COUNT(*) FROM clicks WHERE link_id = links.id AND is_bot = 0 AND ts >= ?)`).bind(mark).run();
+  await setSetting(env, 'human_counted', String(Date.now()));
 }
 
 // 按已有的 IP、运营商、User-Agent、语言补算旧访问记录的访客类型（每次最多处理 2 万条，下次启动继续）
@@ -372,7 +383,7 @@ async function backfillKinds(env) {
   }
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
   if (rows.length < 20000) await setSetting(env, 'kind_backfilled', KIND_VER);
-  if (rows.length) await rebuildAgg(env);
+  if (rows.length) { await rebuildAgg(env); await recountHuman(env); }
 }
 
 // ---------------------------------------------------------------- 跳转
@@ -497,6 +508,7 @@ async function recordFallback(request, env) {
   return new Response(null, { status: 204 });
 }
 
+const FLOOD_PER_MIN = 10;
 async function logClick(request, env, linkId, url, ruleId) {
   const h = request.headers;
   const cf = request.cf || {};
@@ -513,6 +525,11 @@ async function logClick(request, env, linkId, url, ruleId) {
   const ip = h.get('cf-connecting-ip') || '';
   const recent = 1 + (await env.DB.prepare('SELECT COUNT(*) AS n FROM clicks WHERE link_id = ? AND ts > ? AND ip = ?')
     .bind(linkId, now - 60000, ip).first('n'));
+  // 防刷：同一 IP 对同一短链 1 分钟内超过 FLOOD_PER_MIN 次，照常跳转，但不再记明细，只计数（免得被刷爆数据库写入）
+  if (recent > FLOOD_PER_MIN) {
+    await env.DB.prepare('UPDATE links SET clicks = clicks + 1, flood = flood + 1, last_click = ? WHERE id = ?').bind(now, linkId).run();
+    return;
+  }
   const visit = classifyVisit({
     ua, hasLang: h.has('accept-language'), lang: h.get('accept-language') || '', country: cf.country || '',
     asnOrg: cf.asOrganization || '', asn: Number(cf.asn) || 0, recent,
@@ -533,7 +550,7 @@ async function logClick(request, env, linkId, url, ruleId) {
       cut((h.get('accept-language') || '').split(',')[0], 32),
       ruleId, visit.kind, cut(visit.reason, 300), Number(cf.asn) || 0, cut(cf.tlsVersion || '', 16), cut(cf.httpProtocol || '', 16), visit.proxy
     ),
-    env.DB.prepare('UPDATE links SET clicks = clicks + 1, last_click = ? WHERE id = ?').bind(now, linkId),
+    env.DB.prepare('UPDATE links SET clicks = clicks + 1, human = human + ?, last_click = ? WHERE id = ?').bind(visit.kind === 'human' ? 1 : 0, now, linkId),
   ]);
 }
 
@@ -1610,7 +1627,7 @@ function normalizeUrl(raw) {
 
 const SORTS = {
   created: 'id DESC',
-  clicks: 'clicks DESC, id DESC',
+  clicks: 'human DESC, clicks DESC, id DESC',
   last_click: 'last_click IS NULL, last_click DESC, id DESC',
 };
 

@@ -1873,6 +1873,11 @@ const T = (s) => (EN && window.T ? window.T(s) : s);
 const nf = new Intl.NumberFormat(EN ? 'en-US' : 'zh-CN');
 const num = (n) => nf.format(Math.round(n || 0));
 const shortUrl = (slug) => `${ORIGIN}/${slug}`;
+// 短链访问数的说明：真人 / 含机器访问的总数 / 高频访问只计数没记明细的次数
+function clickTip(l) {
+  return [`真人访问 ${num(l.human)} 次`, `含爬虫和可疑访问共 ${num(l.clicks)} 次`,
+    l.flood ? `其中 ${num(l.flood)} 次是同一 IP 1 分钟内超过 10 次的反复访问，照常跳转但没记明细（防刷）` : ''].filter(Boolean).join('\n');
+}
 const shortDisp = (slug) => `${HOST}/${slug}`;
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -3163,7 +3168,7 @@ async function renderLinks(token, opts = {}) {
   const pages = Math.max(1, Math.ceil(d.total / d.size));
   const body = document.getElementById('lbody');
   body.innerHTML = d.items.length ? `
-    <div class="lrow hd"><span class="c-main"><label class="lck" aria-label="全选本页"><input type="checkbox" id="lall" ${d.items.length && d.items.every((l) => listState.sel.has(l.id)) ? 'checked' : ''}></label>短链 / 目标地址</span><span class="c-spark">近 14 天</span><span style="text-align:right">累计访问</span><span>最后访问</span><span>状态</span><span></span></div>
+    <div class="lrow hd"><span class="c-main"><label class="lck" aria-label="全选本页"><input type="checkbox" id="lall" ${d.items.length && d.items.every((l) => listState.sel.has(l.id)) ? 'checked' : ''}></label>短链 / 目标地址</span><span class="c-spark">近 14 天</span><span style="text-align:right" data-tipf-always data-tipf="自创建以来的真人访问；爬虫和可疑访问不算，鼠标移到数字上可以看含机器访问的总数">真人访问</span><span>最后访问</span><span>状态</span><span></span></div>
     ${d.items.map((l) => `
     <div class="lrow ${listState.flash === l.id ? 'flash' : ''}${listState.sel.has(l.id) ? ' sel-r' : ''}" data-go="${l.id}" tabindex="0">
       <div class="c-main"><label class="lck" aria-label="选择 ${esc(l.slug)}"><input type="checkbox" data-sel="${l.id}" ${listState.sel.has(l.id) ? 'checked' : ''}></label><div style="min-width:0">
@@ -3171,7 +3176,7 @@ async function renderLinks(token, opts = {}) {
         <div class="tg">${l.rules ? `<span class="rb has-pop" tabindex="0">${ic('route')}${l.rules} 条跳转规则${rulePop(l)}</span>` : ''}${l.arms ? `<span class="rb ab-rb" data-tipf-always data-tipf="${esc(`按比例分到 ${l.arms} 个额外版本（A/B 测试）`)}">${ic('split')}A/B</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
       </div></div>
       <div class="c-spark">${sparkline(l.spark)}</div>
-      <div class="num c-clicks">${num(l.clicks)}</div>
+      <div class="num c-clicks"${l.clicks !== l.human ? ` data-tipf-always data-tipf="${esc(clickTip(l))}"` : ''}>${num(l.human)}</div>
       <div class="tm c-last" title="${esc(fmtTime(l.last_click))}">${ago(l.last_click)}</div>
       <div class="c-status">${statusPill(l)}${l.down?.length ? `<span class="pill bad-p hc-p" data-tipf-always data-tipf="${esc(l.down.map((x) => `${x.url}：${x.error}`).join('\n'))}">目标异常</span>` : ''}</div>
       <div class="acts">
@@ -3281,7 +3286,7 @@ function bulkBar(d) {
       return tag && run('untag', { tag }, `已移出“${tag}”`);
     }
     if (a === 'delete') {
-      const clicks = chosen.reduce((s2, l) => s2 + (l.clicks || 0), 0);
+      const clicks = chosen.reduce((s2, l) => s2 + (l.clicks || 0) - (l.flood || 0), 0);
       const ok = await confirmDialog({ title: `删除 ${ids.length} 个短链？`, text: `会同时删除它们的跳转规则和 ${num(clicks)} 条访问记录，无法恢复。`, ok: '删除', danger: true });
       return ok && run('delete', {}, `已删除 ${ids.length} 个短链`);
     }
@@ -3679,13 +3684,13 @@ async function renderLink(token, id) {
           <div class="kc-d">按 IP 去重</div>
         </div>
         <div class="kc">
-          <div class="kc-h"><span class="l"><i class="dot" style="background:var(--teal)"></i>累计访问</span></div>
-          <div class="kc-v"><b data-count="${link.clicks}">0</b><span class="kc-sp">${kpiSpark(series.reduce((a, x) => (a.push((a.at(-1) || 0) + x.n), a), []), 'var(--teal)')}</span></div>
-          <div class="kc-d">自创建以来，含机器访问</div>
+          <div class="kc-h"><span class="l"><i class="dot" style="background:var(--teal)"></i>累计真人访问</span></div>
+          <div class="kc-v"><b data-count="${link.human}">0</b><span class="kc-sp">${kpiSpark(series.reduce((a, x) => (a.push((a.at(-1) || 0) + x.n), a), []), 'var(--teal)')}</span></div>
+          <div class="kc-d"${link.flood ? ` data-tipf-always data-tipf="${esc(clickTip(link))}"` : ''}>自创建以来 · 含机器访问共 ${num(link.clicks)} 次${link.flood ? ` · ${num(link.flood)} 次高频未记录` : ''}</div>
         </div>
         <div class="kc">
-          <div class="kc-h"><span class="l">日均访问</span></div>
-          <div class="kc-v"><b>${num(link.clicks / Math.max(1, Math.ceil((Date.now() - link.created_at) / 86400000)))}</b><small>次 / 天</small></div>
+          <div class="kc-h"><span class="l">日均真人访问</span></div>
+          <div class="kc-v"><b>${num(link.human / Math.max(1, Math.ceil((Date.now() - link.created_at) / 86400000)))}</b><small>次 / 天</small></div>
           <div class="kc-d">已运行 ${num(Math.max(1, Math.ceil((Date.now() - link.created_at) / 86400000)))} 天</div>
         </div>
         <div class="kc">

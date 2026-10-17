@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS links (
   utm         INTEGER NOT NULL DEFAULT 0,  -- 转化追踪：跳转时加上 utm_source=cligc&utm_medium=shortlink&utm_campaign=<后缀>
   ab_weight   INTEGER NOT NULL DEFAULT 0,  -- 默认地址参与 A/B 分流时它自己的比例
   expires_at  INTEGER,                     -- 过期时间（毫秒时间戳），NULL 为永久
-  clicks      INTEGER NOT NULL DEFAULT 0,
+  clicks      INTEGER NOT NULL DEFAULT 0,   -- 全部访问（含机器访问和下面没记明细的高频访问）
+  human       INTEGER NOT NULL DEFAULT 0,   -- 其中真人访问
+  flood       INTEGER NOT NULL DEFAULT 0,   -- 同一 IP 短时间内反复访问、只计数没记明细的次数
   last_click  INTEGER,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
