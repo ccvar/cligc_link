@@ -1642,6 +1642,7 @@ button.gtg { cursor: pointer; }
 .key-ro code { font-family: var(--mono); font-size: 13px; }
 .key-ro .btn { margin-left: -4px; }
 /* 代理地址示例：地址 + 复制 + 填入 */
+.bp-head { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; font-size: 13px; }
 .bp-url { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 .bp-url code { font-family: var(--mono); font-size: 12.5px; padding: 5px 9px; border-radius: 7px; background: var(--sunken); word-break: break-all; }
 /* Bing 设置卡片的错误原因 */
@@ -6258,19 +6259,20 @@ const bingCode = (k, title, text) => `<div class="trk-h" style="margin-top:10px"
 const bingProxyHelp = (b) => {
   const path = bingProxyPath(b), host = bingProxyHost(b.proxy) || BING_HOST0;
   return `<details class="wz-more"><summary>怎么搭代理</summary>
-  <p class="set-p" style="margin-top:8px">Bing 会按来源 IP 限流，Cloudflare 的出口 IP 是很多网站共用的，常被拦下（提示“按 IP 限流”）。在你自己的服务器上加一条转发，让 Bing 请求从那台机器发出：</p>
-  <ol class="use-steps">
+  <p class="set-p" style="margin-top:8px">Bing 会按来源 IP 限流，Cloudflare 的出口 IP 是很多网站共用的，常被拦下（提示“按 IP 限流”）。在你自己的服务器上加一条转发，让 Bing 请求从那台机器发出。</p>
+  <div class="bp-head"><b>推荐的代理地址</b><span class="hint">点“填入”后输入你的域名，下面的配置会实时跟着变；路径里的随机字符已经生成好了，别人猜不到</span></div>
+  <div class="bp-url"><code data-bp="url">https://${esc(host)}${esc(path)}</code>${copyBtn(`https://${host}${path}`, 'btn sm', '复制').replace('<button ', '<button data-bp-copy ')}
+    <button type="button" class="btn sm" id="bing-fill" data-tipf-always data-tipf="填进上面的代理地址输入框，并选中域名部分，直接输入你的域名即可">${ic('edit', 14)}填入</button></div>
+  <ol class="use-steps" style="margin-top:14px">
     <li>准备一个域名（例如 <code>${esc(BING_HOST0)}</code>），加一条 A 记录指向服务器 IP；托管在 Cloudflare 的话先设成<b>仅 DNS</b>（灰色云朵）。</li>
     <li>服务器防火墙放开 80 和 443 端口（申请 https 证书要用）。</li>
-    <li>把上面的代理地址填好（下面的配置会自动换成你的域名），复制配置加到服务器上，然后重载。</li>
+    <li>复制下面的配置加到服务器上（域名和路径已经和代理地址一致），然后重载。</li>
     <li>用下面的命令自测：返回 <code>InvalidApiKey</code> 就说明转发通了（这是 Bing 本身的回复）。</li>
   </ol>
   ${bingCode('caddy', 'Caddy（推荐，自动申请证书）', BING_CADDY(host, path))}
   ${bingCode('nginx', 'nginx', BING_NGINX(host, path))}
   ${bingCode('test', '自测', BING_TEST(host, path))}
-  <p class="hint" style="margin-top:8px">路径里的随机字符已经生成好了，别人猜不到，不会被借用。已有站点的话，也可以只把中间转发那段放进现有站点里。配好后代理地址填：</p>
-  <div class="bp-url"><code data-bp="url">https://${esc(host)}${esc(path)}</code>${copyBtn(`https://${host}${path}`, 'btn sm', '复制').replace('<button ', '<button data-bp-copy ')}
-    <button type="button" class="btn sm" id="bing-fill" data-tipf-always data-tipf="填进上面的代理地址，并选中域名部分，直接输入你的域名即可">${ic('edit', 14)}填入</button></div>
+  <p class="hint" style="margin-top:12px">已有站点的话，也可以只把中间转发那段放进现有站点里。</p>
 </details>`;
 };
 // 输入代理地址时，示例配置里的域名跟着变
