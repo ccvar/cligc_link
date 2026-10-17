@@ -7,6 +7,8 @@ import { installI18n } from './i18n/client.js';
 import { renderSVG } from 'uqr';
 import { EmailMessage } from 'cloudflare:email';
 import * as google from './google.js';
+import * as gindex from './gindex.js';
+import * as bing from './bing.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, backfillSourceUv, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
@@ -151,6 +153,14 @@ async function runCron(env, at = Date.now()) {
     if (!(await google.googleConfigured(env, gsec))) return { skipped: true };
     return await google.syncBatch(env, gsec, { limit: 10 });
   });
+  // Bing Webmaster：每日点击 / 展示、索引网页数
+  await step('bing', async () => bing.syncBatch(env, await sessionSecret(env)));
+  // 站点地图 + 网页索引检查（Google 和 Bing，每次最多约 100 秒）
+  await step('gindex', async () => {
+    const gsec = await sessionSecret(env);
+    if (!(await google.googleConfigured(env, gsec)) && !(await bing.bingCreds(env, gsec))) return { skipped: true };
+    return await gindex.cronBatch(env, gsec);
+  });
   await step('health', () => runHealthChecks(env));
   await step('notify', () => runNotifications(env, at));
   await step('usage', () => runUsageAlert(env));
@@ -200,8 +210,12 @@ async function migrate(env) {
     if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`).run();
   }
   if (!gcols.includes('ch_at')) await env.DB.prepare('ALTER TABLE g_sites ADD COLUMN ch_at INTEGER NOT NULL DEFAULT 0').run();
+  for (const [c, def] of [['bing_site', "TEXT NOT NULL DEFAULT ''"], ['b_synced_at', 'INTEGER NOT NULL DEFAULT 0'], ['b_error', "TEXT NOT NULL DEFAULT ''"], ['b_in_index', 'INTEGER NOT NULL DEFAULT 0']]) {
+    if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} ${def}`).run();
+  }
   const dcols = (await env.DB.prepare('PRAGMA table_info(g_daily)').all()).results.map((c) => c.name);
   if (!dcols.includes('channels')) await env.DB.prepare('ALTER TABLE g_daily ADD COLUMN channels TEXT').run();
+  for (const c of ['b_clicks', 'b_impressions']) if (!dcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_daily ADD COLUMN ${c} INTEGER`).run();
   for (const [c, def] of [['kind', "TEXT NOT NULL DEFAULT ''"], ['reason', "TEXT NOT NULL DEFAULT ''"],
     ['asn', 'INTEGER NOT NULL DEFAULT 0'], ['tls', "TEXT NOT NULL DEFAULT ''"], ['http', "TEXT NOT NULL DEFAULT ''"],
     ['proxy', 'INTEGER NOT NULL DEFAULT 0']]) {
@@ -492,6 +506,7 @@ async function authedApi(request, env, url, cred) {
   if (path === '/api/overview' && method === 'GET') return overview(env, url);
   if (path === '/api/retention' && method === 'GET') return json(await retentionInfo(env));
   if (path.startsWith('/api/google/')) return googleApi(request, env, url);
+  if (path.startsWith('/api/bing/')) return bingApi(request, env, url);
   if (path === '/api/shares' && method === 'GET') return json(await listShares(env, url));
   if (path === '/api/shares' && method === 'POST') return createShare(request, env, url);
   if (path.startsWith('/api/shares/') && path.endsWith('/views') && method === 'GET') {
@@ -2083,6 +2098,23 @@ async function googleApi(request, env, url) {
       const r = await google.deleteGoogleConfig(env, secret);
       return r.error ? json(r, 400) : json(await google.status(env, secret));
     }
+    // 网页索引：站点地图、网址检查结果（只关联了 Bing 的站点也走这里，所以放在 Google 客户端检查之前）
+    const ihost = String(url.searchParams.get('host') || '');
+    if (path === '/api/google/index' && method === 'GET') {
+      const d = await gindex.siteIndex(env, secret, ihost);
+      return d.error ? json(d, 404) : json(d);
+    }
+    if (path.startsWith('/api/google/index/') && method === 'POST') {
+      const b = await request.json().catch(() => ({}));
+      const host = String(b.host || '');
+      const r = path === '/api/google/index/check' ? await gindex.checkNow(env, secret, host)
+        : path === '/api/google/index/inspect' ? await gindex.inspectUrl(env, secret, host, String(b.url || ''), b.which === 'bing' ? 'bing' : 'google')
+        : path === '/api/google/index/submit' ? await gindex.submitSitemap(env, secret, host, String(b.path || ''))
+        : path === '/api/google/index/bing-feed' ? await gindex.bingFeed(env, secret, host, String(b.path || ''))
+        : path === '/api/google/index/bing-submit' ? await gindex.bingSubmitNow(env, secret, host, b.url ? String(b.url) : '')
+        : { error: 'not found' };
+      return r.error ? json(r, 400) : json({ ...r, index: await gindex.siteIndex(env, secret, host) });
+    }
     if (!(await google.googleConfigured(env, secret))) return json({ error: '未配置 Google OAuth 客户端' }, 400);
     if (path === '/api/google/auth') return json({ url: await google.authUrl(env, url.origin, secret, hmac) });
     if (path === '/api/google/sync' && method === 'POST') {
@@ -2112,6 +2144,34 @@ async function googleApi(request, env, url) {
     if (path === '/api/google/site') {
       const d = await google.siteDetail(env, secret, String(url.searchParams.get('host') || ''), days);
       return d.error ? json(d, 404) : json(d);
+    }
+  } catch (err) {
+    return json({ error: err.message || String(err) }, 500);
+  }
+  return json({ error: 'not found' }, 404);
+}
+
+// Bing Webmaster：API Key 配置、状态、自动提交开关、立即同步
+async function bingApi(request, env, url) {
+  const path = url.pathname, method = request.method;
+  const secret = await sessionSecret(env);
+  try {
+    if (path === '/api/bing/status') return json(await bing.status(env, secret));
+    if (path === '/api/bing/config' && method === 'PUT') {
+      const r = await bing.saveBingConfig(env, secret, await request.json().catch(() => ({})));
+      if (r.error) return json(r, 400);
+      await bing.syncBatch(env, secret, { limit: 10, cutoff: Date.now(), deadline: Date.now() + 15000 }).catch(() => {});
+      return json(await bing.status(env, secret));
+    }
+    if (path === '/api/bing/config' && method === 'DELETE') { await bing.deleteBingConfig(env); return json(await bing.status(env, secret)); }
+    if (path === '/api/bing/auto' && method === 'PUT') {
+      await bing.setBingAuto(env, !!(await request.json().catch(() => ({}))).on);
+      return json(await bing.status(env, secret));
+    }
+    if (path === '/api/bing/sync' && method === 'POST') {
+      await bing.discover(env, secret);
+      const r = await bing.syncBatch(env, secret, { limit: 20, cutoff: Date.now() - 60000, deadline: Date.now() + 20000 });
+      return json({ ...r, ...(await bing.status(env, secret)) });
     }
   } catch (err) {
     return json({ error: err.message || String(err) }, 500);
@@ -2446,7 +2506,7 @@ function buildSeoDigest(cfg, g, test = false) {
   ].filter(([, items]) => items.length);
   const head = [
     `${g.sites} 个站点 · 搜索 ${md(g.range.from)}–${md(g.range.to)} 对比上一周（Search Console 数据延迟约 3 天），会话 ${md(g.gaRange.from)}–${md(g.gaRange.to)}`,
-    `搜索点击 ${n(t.clicks)}（${chg(t.clicks, t.prevClicks)}） · 展示 ${n(t.impressions)}（${chg(t.impressions, t.prevImpressions)}） · 会话 ${n(t.sessions)}（${chg(t.sessions, t.prevSessions)}）`,
+    `搜索点击 ${n(t.clicks)}（${chg(t.clicks, t.prevClicks)}） · 展示 ${n(t.impressions)}（${chg(t.impressions, t.prevImpressions)}）${g.bing ? ` · Bing 点击 ${n(t.bingClicks)}（${chg(t.bingClicks, t.prevBingClicks)}）` : ''} · 会话 ${n(t.sessions)}（${chg(t.sessions, t.prevSessions)}）`,
   ];
   const tg = [`🔎 <b>${h(title)}</b>`, ...head.map(h), '',
     ...sections.flatMap(([k, items]) => [`<b>${h(k)}</b>`, ...items.map((x) => `• ${h(x)}`), '']),

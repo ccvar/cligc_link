@@ -34,6 +34,9 @@
 - **Source tracking**: Referer is recorded automatically; an optional landing-page snippet detects which search engine visitors came from; generate `?src=` links for each channel so sources are clear even without a Referer. `utm_source` / `utm_campaign` are supported too.
 - **Analytics**: visit trends (with previous-period comparison), unique visitors, today's visits, sources, countries / cities, devices / OS / browsers, a weekday × hour heatmap, a live visit feed, rule hits, human / bot / suspicious detection, and CSV export.
 - **Site analytics (GA4 + Search Console)**: connect one or more Google accounts; all sites are merged by domain with users, sessions, key events, search clicks / impressions / CTR / position and their changes, over 7 days to 12 months; summary cards with trends and traffic share; groups, sort by growth, CSV export.
+- **Bing Webmaster**: paste one API key to add Bing clicks, impressions, query / page rankings and crawl stats, merged with Google's data by domain; the site list's search columns switch between Google / Bing / combined. Page indexing checks whether each URL is in Bing's index, and missing ones can be submitted to Bing by hand or automatically every day (within Bing's daily quota). ChatGPT search, Copilot and DuckDuckGo all use Bing's index.
+- **Page indexing**: lists sitemaps (Google / Bing, one-click submit) and checks every URL from the sitemaps and search results for whether it's indexed and why not; the site list shows indexed counts.
+- **Masked screenshots**: the eye icon on the overview and sites pages shows every domain as `bl•••.com`, handy for sharing screenshots.
 - **Connected to short links**: count each site's short link clicks, unique visitors and **click-out rate** by visit source (`?src=` / Referer), and see which sites each link goes to. Optional **conversion tracking** adds utm parameters to redirects so GA4 shows each link's arrival sessions and key events.
 - **AI analysis links**: pick sites and generate a read-only report link to send with a prompt to ChatGPT / Claude; the report pre-computes SEO opportunities such as queries at positions 4–20 and low-CTR / declining / new queries. Expires after 7 days by default, hides sensitive info, logs every open, revocable anytime.
 - **Weekly SEO changes**: every Monday, the sites with the biggest click changes and the queries that dropped out of or are close to the top 10.
@@ -334,7 +337,9 @@ Every visit records a row. Stats pages (ranges of 7 days or more) read hourly / 
 
 ### Sites: GA4 and Search Console
 
-After connecting a Google account on the "Sites" page, every GA4 property and Search Console site in the account is listed (paired by domain), with users, sessions, key events, search clicks, impressions, CTR, average position and trends; site pages have daily trends, query / page / country / device rankings (queries show their position change from the previous period and can be filtered to positions 4–20, low CTR, declining and new), GA4 source / medium / page rankings and live users. Read-only access only.
+After connecting a Google account on the "Sites" page, every GA4 property and Search Console site in the account is listed (paired by domain), with users, sessions, key events, search clicks, impressions, CTR, average position and trends; site pages have daily trends, query / page / country / device rankings (queries show their position change from the previous period and can be filtered to positions 4–20, low CTR, declining and new), GA4 source / medium / page rankings and live users.
+
+The "Page indexing" card on a site page lists sitemaps (status, errors, last read, one-click resubmit) and uses the URL Inspection API to check each URL from the sitemaps and search results (up to 500 per site; the scheduled task checks a batch every hour and re-checks indexed URLs weekly), summarizing indexed / not indexed and the reasons; each URL links to Search Console to request indexing. GA4 asks for read-only access; Search Console asks for `webmasters` (read + submit sitemaps) — accounts connected earlier with read-only access just need to reconnect once.
 
 Setup (each deployment needs its own OAuth client):
 
@@ -366,6 +371,15 @@ Site list results are cached for 5 minutes and invalidated automatically when Go
 You can connect several Google accounts: click "Add account" at the top right of the "Sites" page and pick another account when authorizing; connected accounts are listed under "Settings → Google integration", where you can disconnect or reconnect them. Sites from all accounts are merged by domain (GA4 can come from one account and Search Console from another; when several accounts see the same site, the earliest connected account is used), and the list can be filtered by account. Each account can be disconnected separately, deleting only sites and data that come from it; if one account's authorization expires, only that account is affected — click "Reconnect".
 
 Refresh tokens are stored in D1, encrypted with the session secret. Daily data is synced in hourly batches by the scheduled job (each site at most every 6 hours; the first sync backfills 16 months, Search Console's retention limit); rankings and live users on site pages are queried on open and cached for an hour. Ranges are the last 7 / 14 / 28 days or 3 / 6 / 12 months, through yesterday, compared with the previous period (no comparison for 12 months); Search Console data is usually 2–3 days behind.
+
+### Bing Webmaster
+
+Add your sites in [Bing Webmaster Tools](https://www.bing.com/webmasters) (sites verified in Search Console can be imported in one click), generate a key under **Settings (gear) → API access → API Key**, and paste it into "Settings → Bing Webmaster" in the admin. Then:
+
+- The scheduled job lists the Bing account's sites daily and merges them with GA4 / GSC by domain; daily clicks / impressions and "pages in index" sync every 12 hours.
+- Site pages gain Bing cards, a trend line, query / page rankings (weekly in Bing) and crawl stats / crawl issues.
+- The Page indexing card uses `GetUrlInfo` to check whether each URL is in Bing's index (Bing rate-limits this tightly, so about 36 URLs an hour; indexed URLs are re-checked every 30 days, others weekly) and can submit URLs one by one or in bulk; "Auto-submit" is on by default and submits URLs not in the index (and not submitted in the last 30 days) daily within the quota.
+- AI analysis reports and the weekly SEO changes include Bing data too.
 
 ### AI analysis links
 

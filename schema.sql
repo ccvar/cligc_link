@@ -136,6 +136,10 @@ CREATE TABLE IF NOT EXISTS g_sites (
   users         TEXT NOT NULL DEFAULT '',   -- 区间去重用户数 JSON（7 / 28 / 90 天）
   synced_at     INTEGER NOT NULL DEFAULT 0,
   ch_at         INTEGER NOT NULL DEFAULT 0,   -- 渠道占比数据补齐的时间（0 = 还没补）
+  bing_site     TEXT NOT NULL DEFAULT '',   -- Bing Webmaster 站点，如 https://example.com/
+  b_synced_at   INTEGER NOT NULL DEFAULT 0,
+  b_error       TEXT NOT NULL DEFAULT '',
+  b_in_index    INTEGER NOT NULL DEFAULT 0,   -- Bing 抓取统计里最新的“索引中的网页数”
   error         TEXT NOT NULL DEFAULT '',
   updated_at    INTEGER NOT NULL DEFAULT 0
 );
@@ -145,7 +149,52 @@ CREATE TABLE IF NOT EXISTS g_daily (
   users        INTEGER, sessions INTEGER, views INTEGER, key_events REAL, engagement REAL,   -- GA4
   clicks       INTEGER, impressions INTEGER, ctr REAL, position REAL,                       -- GSC
   channels     TEXT,                                                                         -- GA4 渠道分组会话数 JSON
+  b_clicks     INTEGER, b_impressions INTEGER,                                               -- Bing
   PRIMARY KEY (host, date)
+);
+-- 网页索引：站点地图里的网址 + 在搜索结果里出现过的网址，用 URL Inspection API 逐个检查（定时任务分批，每个网址几天查一次）
+CREATE TABLE IF NOT EXISTS g_urls (
+  host        TEXT NOT NULL,
+  url         TEXT NOT NULL,
+  src         INTEGER NOT NULL DEFAULT 1,   -- 1 = 在站点地图里，2 = 只在搜索结果里出现过，3 = 两者都有
+  state       TEXT NOT NULL DEFAULT '',     -- coverageState 原文，如 Submitted and indexed
+  verdict     TEXT NOT NULL DEFAULT '',     -- PASS / NEUTRAL / FAIL / PARTIAL
+  fetch       TEXT NOT NULL DEFAULT '',     -- pageFetchState
+  robots      TEXT NOT NULL DEFAULT '',     -- robotsTxtState
+  indexing    TEXT NOT NULL DEFAULT '',     -- indexingState（是否被 noindex 阻止）
+  canon       TEXT NOT NULL DEFAULT '',     -- Google 选择的规范网址（和网址本身不同时）
+  crawled_at  INTEGER NOT NULL DEFAULT 0,
+  checked_at  INTEGER NOT NULL DEFAULT 0,
+  due_at      INTEGER NOT NULL DEFAULT 0,   -- 下次检查时间
+  error       TEXT NOT NULL DEFAULT '',
+  b_state     TEXT NOT NULL DEFAULT '',     -- Bing：yes 已收录 / no 未收录 / err 检查出错 / 空 = 还没查
+  b_crawled_at INTEGER NOT NULL DEFAULT 0,
+  b_checked_at INTEGER NOT NULL DEFAULT 0,
+  b_due_at    INTEGER NOT NULL DEFAULT 0,
+  b_submitted_at INTEGER NOT NULL DEFAULT 0,  -- 上次提交给 Bing 的时间
+  b_error     TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (host, url)
+);
+CREATE INDEX IF NOT EXISTS g_urls_due ON g_urls (due_at);
+CREATE INDEX IF NOT EXISTS g_urls_bdue ON g_urls (b_due_at);
+-- 站点地图：Sitemaps API 的结果，每天刷新一次；同时记下当天网址检查用掉的配额（每个资源每天 2000 次）
+CREATE TABLE IF NOT EXISTS g_sitemaps (
+  host     TEXT PRIMARY KEY,
+  list     TEXT NOT NULL DEFAULT '[]',
+  urls     INTEGER NOT NULL DEFAULT 0,      -- 解析出的网址数（去重后）
+  error    TEXT NOT NULL DEFAULT '',
+  at       INTEGER NOT NULL DEFAULT 0,
+  q_day    TEXT NOT NULL DEFAULT '',
+  q_n      INTEGER NOT NULL DEFAULT 0,
+  n_urls   INTEGER NOT NULL DEFAULT 0,      -- 检查列表里的网址数（站点列表显示用，检查后更新）
+  n_yes    INTEGER NOT NULL DEFAULT 0,      -- 其中已编入
+  n_done   INTEGER NOT NULL DEFAULT 0,      -- 其中已检查出结果
+  nb_yes   INTEGER NOT NULL DEFAULT 0,      -- Bing 已收录
+  nb_done  INTEGER NOT NULL DEFAULT 0,      -- Bing 已检查
+  b_feeds  TEXT NOT NULL DEFAULT '[]',      -- Bing 的站点地图（GetFeeds）
+  b_error  TEXT NOT NULL DEFAULT '',
+  b_quota  INTEGER NOT NULL DEFAULT -1,     -- Bing 今天剩余的提交配额（-1 = 未知）
+  b_quota_at INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS g_cache (
   k   TEXT PRIMARY KEY,

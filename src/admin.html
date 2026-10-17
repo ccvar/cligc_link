@@ -702,7 +702,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .hc-p { margin-left: 6px; }
 .lrow .c-status { display: flex; flex-wrap: wrap; gap: 4px; }
 .hc-i { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
-#hc-run.busy svg, #use-re.busy svg { animation: spin .9s linear infinite; }
+#hc-run.busy svg, #use-re.busy svg, #ix-chk.busy svg, [data-ixi].busy svg, #bing-sync.busy svg, [data-ixb].busy svg { animation: spin .9s linear infinite; }
 .devs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .dv { display: grid; justify-items: start; gap: 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; font: inherit; }
 .dv svg { color: var(--muted); }
@@ -1616,6 +1616,91 @@ button.gtg { cursor: pointer; }
 .sk { background: linear-gradient(90deg, var(--line-2), var(--sunken), var(--line-2)); background-size: 200% 100%; animation: sk 1.4s infinite linear; border-radius: var(--r-lg); }
 @keyframes sk { to { background-position: -200% 0; } }
 @media (max-width: 760px) { .hide-m { display: none !important; } }
+
+/* 汇总卡片的来源图标 */
+.ov-title .g-se { margin-left: 12px; padding: 2px; border-radius: 9px; }
+.g-se button { white-space: nowrap; height: 26px; padding: 0 10px; font-size: 12.5px; }
+.g-se .thumb { top: 2px; bottom: 2px; }
+@media (max-width: 600px) { .ov-title .g-se { margin-left: 0; } }
+.se-ic { display: inline-flex; flex: none; gap: 1px; margin-right: 5px; vertical-align: -2px; }
+/* 标签放不下时省略，涨跌幅始终完整显示 */
+.kc-h .l { min-width: 0; }
+.kc-h .l .kl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.kc-h > :not(.l) { flex: none; }
+.seg button:focus:not(:focus-visible) { outline: none; }
+/* 脱敏开关 */
+.mask-btn.on { color: var(--accent); background: var(--accent-2); }
+/* Bing 抓取 */
+.bk-n { display: flex; gap: 8px; margin-bottom: 12px; }
+.ix-k.bad b { color: var(--bad); }
+.chart.xs { height: 140px; }
+.bk-h { margin: 16px 0 6px; font-size: 13px; font-weight: 600; display: flex; gap: 6px; align-items: baseline; }
+.bk-h small { color: var(--muted); font-weight: 500; }
+.bk-iss { max-height: 220px; }
+#b-sc .card-h h3, #b-cr .card-h h3 { display: flex; align-items: center; gap: 7px; }
+/* 网页索引 */
+.ix-of { color: var(--muted); font-size: 12px; margin-left: 1px; }
+.gd.ix-pg { color: var(--muted); }
+#g-idx .card-h { gap: 10px; flex-wrap: wrap; }
+.ix-g { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 900px) { .ix-g { grid-template-columns: minmax(0, 1fr); } }
+.ix-sum { display: grid; gap: 12px; min-width: 0; }
+.ix-n { display: flex; gap: 8px; }
+.ix-k { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; background: var(--sunken); display: grid; gap: 2px; }
+.ix-k span { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.ix-k b { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.ix-k small { font-size: 11.5px; color: var(--muted); }
+.ix-k small.bad { color: var(--bad); }
+.ix-k.yes span { color: var(--good); }
+.ix-bar { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: repeating-linear-gradient(-45deg, var(--line) 0 4px, transparent 4px 8px); }
+.ix-bar i { display: block; height: 100%; }
+.ix-bar i.yes { background: var(--good); }
+.ix-bar i.no { background: var(--faint); }
+.ix-rs { display: grid; gap: 2px; }
+.ix-rh { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); padding: 0 8px 4px; border-bottom: 1px solid var(--line-2); }
+.ix-r { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border: 0; border-radius: 7px; background: none; color: var(--text); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; min-width: 0; }
+.ix-r:hover { background: var(--sunken); }
+.ix-r.on { background: var(--accent-2); color: var(--accent-ink); }
+.ix-r .ell { flex: 1; min-width: 0; }
+.ix-r b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ix-r.bad .ell::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--bad); margin-right: 7px; vertical-align: 1px; }
+.ix-main { min-width: 0; }
+.ix-scr { max-height: 440px; }
+.ix-t { table-layout: fixed; }
+.ix-t th:nth-child(2) { width: 38%; } .ix-t th:nth-child(3) { width: 84px; } .ix-t th:nth-child(4) { width: 72px; }
+@media (max-width: 600px) {
+  .ix-t:not(.hasb):not(.nog) th:nth-child(3), .ix-t:not(.hasb):not(.nog) td:nth-child(3), .ix-t.hasb:not(.nog) th:nth-child(4), .ix-t.hasb:not(.nog) td:nth-child(4), .ix-sm th:nth-child(4), .ix-sm td:nth-child(4), .ix-sm th:nth-child(5), .ix-sm td:nth-child(5) { display: none; }
+  .ix-t th:nth-child(2) { width: 42%; } .ix-sm th:nth-child(2) { width: 34%; } .ix-sm th:nth-child(3) { width: 52px; }
+}
+.ix-u { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ix-u a { color: inherit; text-decoration: none; min-width: 0; }
+.ix-u a:hover { color: var(--accent); }
+.ix-tag { flex: none; font-style: normal; font-size: 11px; padding: 0 6px; line-height: 18px; border-radius: 5px; background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber); }
+.ix-st { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-width: 0; font-size: 12.5px; }
+.ix-st i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.ix-st.yes i { background: var(--good); }
+.ix-st.bad i { background: var(--bad); }
+.ix-st.bad { color: var(--bad); }
+.ix-st.wait i { background: transparent; border: 1.5px dashed var(--faint); }
+.ix-a { text-align: right; white-space: nowrap; }
+.ix-a .btn + .btn { margin-left: 2px; }
+.ix-t.hasb th:nth-child(2), .ix-t.hasb th:nth-child(3) { width: 26%; } .ix-t.hasb th:nth-child(4) { width: 84px; } .ix-t.hasb th:last-child { width: 100px; }
+.ix-t.nog th:nth-child(2) { width: 34%; } .ix-t.nog th:last-child { width: 72px; }
+.ix-bing { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.ix-bh { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ix-bing .ix-k b { font-size: 18px; }
+.ix-bing #ix-bsub { justify-self: start; }
+#ix-bsub small { margin-left: 4px; color: var(--muted); }
+.ix-bt { display: flex; align-items: center; gap: 6px; margin: 22px 0 10px; font-size: 13.5px; }
+.ix-sm { table-layout: fixed; }
+.ix-sm th:nth-child(2) { width: 150px; } .ix-sm th:nth-child(3), .ix-sm th:nth-child(4), .ix-sm th:nth-child(5) { width: 84px; } .ix-sm th:nth-child(6) { width: 96px; }
+.ix-sm td:first-child { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ix-sm td:first-child a { color: inherit; text-decoration: none; min-width: 0; }
+.ix-auth { margin-bottom: 12px; align-items: center; }
+.ix-err { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--amber); margin: 0; }
+.ix-err svg { flex: none; }
+.ix-err .ell { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ix-sm + .hint, .ix-auth + .ix-err { margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -1639,6 +1724,57 @@ const state = { days: store.get('days', 28), bots: store.get('bots', false), lin
 const listState = { q: '', page: 1, sort: store.get('sort', 'created'), flash: null, tag: '', sel: new Set() };
 const clickState = { page: 1 };
 let liveTimer = null;
+
+// ---------------------------------------------------------------- 脱敏（截图分享用）
+// 开启后，页面上所有域名（文字、图表、提示）显示为 bl•••.com；只改显示，不改数据。刷新后保持。
+const MASK = { on: store.get('mask', false) };
+// 最后一段是 TLD；文件名（sitemap.xml、robots.txt 之类）不算域名
+const MASK_RE = /\b((?:[a-z0-9-]+\.)*)([a-z0-9][a-z0-9-]*)\.((?!(?:xml|txt|html?|js|css|json|png|jpe?g|gif|svg|webp|ico|gz|php|md|csv|pdf|zip)\b)[a-z]{2,24})\b/gi;
+const SLD = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac']);   // example.co.uk：遮 example 而不是 co
+function maskText(t) {
+  return t.replace(MASK_RE, (m, sub, name, tld) => {
+    if (SLD.has(name.toLowerCase()) && sub) {
+      const parts = sub.slice(0, -1).split('.'), main = parts.pop();
+      return `${parts.length ? parts.join('.') + '.' : ''}${main.slice(0, 2)}•••.${name}.${tld}`;
+    }
+    return `${sub}${name.slice(0, 2)}•••.${tld}`;
+  });
+}
+const MASK_ATTRS = ['data-tipf', 'data-tip', 'title', 'aria-label'];
+function maskNode(root) {
+  if (!MASK.on) return;
+  const fix = (n) => {
+    if (n.nodeType === 3) { if (!n.parentElement?.closest('input,textarea')) { const v = maskText(n.data); if (v !== n.data) n.data = v; } return; }
+    if (n.nodeType !== 1) return;
+    for (const a of MASK_ATTRS) { const v = n.getAttribute(a); if (v) { const w = maskText(v); if (w !== v) n.setAttribute(a, w); } }
+  };
+  fix(root);
+  if (root.nodeType !== 1) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let n;
+  while ((n = w.nextNode())) fix(n);
+  if (root.nodeName === 'TITLE' || root === document.documentElement) document.title = maskText(document.title);
+}
+new MutationObserver((muts) => {
+  if (!MASK.on) return;
+  for (const m of muts) {
+    if (m.type === 'childList') m.addedNodes.forEach(maskNode);
+    else maskNode(m.target);
+  }
+}).observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: MASK_ATTRS });
+const maskBtn = () => `<button type="button" class="btn ghost icon mask-btn${MASK.on ? ' on' : ''}" data-mask aria-pressed="${MASK.on}" aria-label="脱敏显示"
+  data-tip="${MASK.on ? '已脱敏：域名只显示前两个字符，点击恢复' : '脱敏：隐藏域名，方便截图分享'}">${ic(MASK.on ? 'eyeoff' : 'eye', 17)}</button>`;
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mask]');
+  if (!b) return;
+  MASK.on = !MASK.on;
+  store.set('mask', MASK.on);
+  toast(MASK.on ? '已开启脱敏显示' : '已恢复显示域名');
+  // 开启：直接改当前页面；关闭：重新渲染当前页，恢复原文
+  if (MASK.on) { document.querySelectorAll('[data-mask]').forEach((x) => { x.outerHTML = maskBtn(); }); maskNode(document.body); }
+  else route();
+});
+if (MASK.on) document.addEventListener('DOMContentLoaded', () => maskNode(document.body));
 
 // ---------------------------------------------------------------- icons
 const I = {
@@ -1667,6 +1803,8 @@ const I = {
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
   ai: '<path d="M12 3.5 13.9 8.6 19 10.5 13.9 12.4 12 17.5 10.1 12.4 5 10.5 10.1 8.6z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>',
   lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff: '<path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-2.6 3.4M6.6 6.6C3.7 8.3 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m3 3 18 18"/>',
   key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>',
@@ -2123,6 +2261,7 @@ function shell(active, inner) {
 
 function rangeBar() {
   return `<div class="toolbar">
+    ${maskBtn()}
     <label class="switch" title="爬虫，以及机房 IP、缺少浏览器特征、高频访问等可疑访问"><input type="checkbox" id="bots" ${state.bots ? 'checked' : ''}><span class="t"></span>含机器访问</label>
     <div class="seg" id="range" role="tablist">${RANGES
       .map(([d, l]) => `<button role="tab" data-d="${d}" class="${d === state.days ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -4219,7 +4358,25 @@ function openSplitDrawer(link, parent) {
 }
 
 // ---------------------------------------------------------------- 站点（GA4 + Search Console）
-const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), acct: '', link: '', tag: '' };
+const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), acct: '', link: '', tag: '', se: store.get('g:se', 'google') };
+// 站点列表搜索列的数据来源：google / bing / all（合计）；Bing 没有按天的平均排名，合计时排名只看 Google
+const SE_NAME = { google: 'Google', bing: 'Bing', all: '合计' };
+function SE(x, k = 'cur') {
+  const g = x[k]?.gsc, b = x[k]?.bing;
+  if (gState.se === 'bing') return b ? { ...b, position: null } : null;
+  if (gState.se === 'all') {
+    if (!g && !b) return null;
+    const c = (g?.clicks || 0) + (b?.clicks || 0), i = (g?.impressions || 0) + (b?.impressions || 0);
+    return { clicks: c, impressions: i, ctr: i ? c / i : 0, position: g?.impressions ? g.position : null };
+  }
+  return g;
+}
+// 搜索数据来源切换：放在标题“站点 / 账号”后面
+const seSeg = () => `<div class="seg g-se" id="g-se" data-tipf-always data-tipf="搜索点击、展示、点击率、排名和已编入几列的数据来源">${Object.entries(SE_NAME).map(([k, l]) => `<button data-e="${k}" class="${k === gState.se ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+// 汇总卡片标签前的来源图标：只有 Google 时不显示
+const seIcons = () => (gState.se === 'bing' ? `<span class="se-ic" data-tipf-always data-tipf="Bing">${BRAND.bing(12)}</span>`
+  : gState.se === 'all' ? `<span class="se-ic" data-tipf-always data-tipf="Google + Bing">${BRAND.gsc(12)}${BRAND.bing(12)}</span>` : '');
+const seDay = (p) => (gState.se === 'bing' ? [p.bc || 0, p.bi || 0] : gState.se === 'all' ? [(p.c || 0) + (p.bc || 0), (p.i || 0) + (p.bi || 0)] : [p.c || 0, p.i || 0]);
 const pctD = (a, b) => (b ? (a - b) / b : null);
 const gDelta = (a, b, inverse = false) => {
   const d = pctD(a, b);
@@ -4798,6 +4955,8 @@ function googleAcctPicker(root, accts, items, onFilter) {
 
 // 品牌标志（用于标识集成的服务，保留原色）
 const BRAND = {
+  // Bing（简化的官方标志）
+  bing: (n) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.2 1.8l4.3 1.5v14.9l6-3.5-2.9-1.4-1.8-4.6 9.4 3.3v4.8L9.5 22.2 5.2 19.8z" fill="#00809D"/></svg>`,
   // Google Analytics：三根圆角柱
   ga: (n) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" aria-hidden="true">
     <rect x="16" y="1.5" width="6" height="21" rx="3" fill="#F9AB00"/><rect x="9" y="9" width="6" height="13.5" rx="3" fill="#E37400"/><circle cx="5" cy="19.5" r="3" fill="#E37400"/></svg>`,
@@ -4824,14 +4983,16 @@ function exportSitesCsv(rows, d) {
   const cell = (v) => { const t = v == null ? '' : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
   const r2 = (v) => (v == null ? '' : Math.round(v * 100) / 100);
   const head = ['站点', 'GA4 媒体资源', 'Search Console', '用户', '上期用户', '会话', '上期会话', '关键事件', '互动率',
-    '搜索点击', '上期搜索点击', '展示', '上期展示', '点击率', '平均排名', '短链点击（真人）', '短链访客', '点出率'].map(T);
+    '搜索点击', '上期搜索点击', '展示', '上期展示', '点击率', '平均排名', '短链点击（真人）', '短链访客', '点出率', '已编入', '已检查网址', '网址数', 'Bing 点击', '上期 Bing 点击', 'Bing 展示', 'Bing 已收录', 'Bing 索引中网页'].map(T);
   const lines = [head.map(cell).join(',')];
   for (const x of rows) {
     const ga = x.cur.ga, pg = x.prev.ga, sc = x.cur.gsc, ps = x.prev.gsc;
     const lh = x.linksFrom.reduce((a, l) => a + l.human, 0);
     lines.push([x.host, x.ga4?.name || '', x.gsc || '', x.users, x.prevUsers, ga?.sessions, pg?.sessions, ga?.keyEvents, ga ? r2(ga.engagement * 100) + '%' : '',
       sc?.clicks, ps?.clicks, sc?.impressions, ps?.impressions, sc ? r2(sc.ctr * 100) + '%' : '', sc?.impressions ? r2(sc.position) : '',
-      lh || '', x.linksFromVisitors ?? '', ga?.sessions && lh ? r2((lh / ga.sessions) * 100) + '%' : ''].map(cell).join(','));
+      lh || '', x.linksFromVisitors ?? '', ga?.sessions && lh ? r2((lh / ga.sessions) * 100) + '%' : '',
+      x.index?.done ? x.index.yes : '', x.index?.done ?? '', x.index?.urls ?? '',
+      x.cur.bing?.clicks ?? '', x.prev.bing?.clicks ?? '', x.cur.bing?.impressions ?? '', x.index?.bdone ? x.index.byes : '', x.bing ? x.bingInIndex : ''].map(cell).join(','));
   }
   const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
@@ -4849,7 +5010,7 @@ function sysChecks(st) {
   const out = [];
   const steps = c?.steps || {};
   const failed = Object.entries(steps).filter(([, v]) => !v.ok);
-  const NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', notify: '推送通知', usage: '用量预警', health: '目标页检查' };
+  const NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', bing: 'Bing 同步', gindex: '网页索引检查', notify: '推送通知', usage: '用量预警', health: '目标页检查' };
   out.push(!c ? { lv: 'warn', t: '定时任务', d: '还没有运行记录（部署后每小时整点运行一次）' }
     : now - c.at > 3 * H ? { lv: 'bad', t: '定时任务', d: `上次运行在 ${ago(c.at)}，超过 3 小时没有运行，请检查 wrangler.toml 里的 [triggers] crons` }
     : failed.length ? { lv: 'bad', t: '定时任务', d: `${ago(c.at)}运行，${failed.map(([k, v]) => `${NAME[k] || k}失败：${v.error}`).join('；')}` }
@@ -4915,7 +5076,8 @@ function renderGoogleSettings(box, st, onState) {
         <span class="g-acc-i">${ic(a.error ? 'alert' : 'check', 14)}</span>
         <div class="g-acc-t"><b>${a.email ? mailTip(a.email) : esc(a.id)}</b>
           <span>${a.error ? esc(a.error) : [n(a.ga4, 'GA4'), n(a.gsc, 'GSC'), `连接于 ${fmtTime(a.connectedAt)}`].filter(Boolean).join(' · ')}</span></div>
-        ${a.error ? '<button type="button" class="btn sm" data-re>重新连接</button>' : ''}
+        ${a.error ? '<button type="button" class="btn sm" data-re>重新连接</button>'
+          : !a.canSubmit && a.gsc ? '<button type="button" class="btn sm" data-re data-tipf-always data-tipf="早先只授予了 Search Console 只读权限；重新授权一次后，才能在后台提交站点地图">重新授权</button>' : ''}
         <button type="button" class="btn sm ghost danger-t" data-off="${esc(a.id)}" data-mail="${esc(a.email)}">断开</button></div>`).join('')}</div>
         <p class="hint" style="margin-top:10px">所有账号的站点按域名合并显示；多个账号都能看到同一个站点时，用最早连接的账号的数据。添加账号请到 <a href="#/sites">站点</a> 页。</p>`
       : `<p class="set-p">还没有连接账号，到 <a href="#/sites">站点</a> 页连接 Google 账号。</p>`}` : ''}`;
@@ -4933,9 +5095,10 @@ function renderGoogleSettings(box, st, onState) {
 }
 
 async function renderSites(token) {
-  const head = (extra = '', picker = false) => `<header class="ph"><div><div class="kicker">Google</div>
-      ${picker ? '<div class="ov-title"><h1>站点</h1><span class="ov-sep" aria-hidden="true">/</span><div class="combo ov-link" id="g-acct"></div></div>' : '<h1>站点</h1>'}
-      <div class="sub">账号下所有网站的 GA4 访问和 Google 搜索表现</div></div>
+  // 接了 Bing 时标题和说明带上 Bing（记住上次的结果，首屏也不会闪）
+  const head = (extra = '', picker = false) => `<header class="ph"><div><div class="kicker">${store.get('g:bing', false) ? 'Google · Bing' : 'Google'}</div>
+      ${picker ? `<div class="ov-title"><h1>站点</h1><span class="ov-sep" aria-hidden="true">/</span><div class="combo ov-link" id="g-acct"></div>${store.get('g:bing', false) ? seSeg() : ''}</div>` : '<h1>站点</h1>'}
+      <div class="sub">${store.get('g:bing', false) ? '账号下所有网站的 GA4 访问和 Google / Bing 搜索表现' : '账号下所有网站的 GA4 访问和 Google 搜索表现'}</div></div>
     <span class="sp"></span>${extra ? `<div class="ph-acts">${extra}</div>` : ''}</header>`;
   shell('sites', `${head()}<div class="stack">${skel(64)}${skel(360)}</div>`);
   const st = await api('/google/status');
@@ -4968,9 +5131,12 @@ async function renderSites(token) {
 
   const d = await api('/google/sites?days=' + gState.days);
   if (token !== routeToken) return;
+  const hasBing = d.items.some((x) => x.bing);
+  if (!hasBing) gState.se = 'google';
+  store.set('g:bing', hasBing);
   const accts = st.accounts || [], many = accts.length > 1, bad = accts.some((a) => a.error);
   if (gState.acct && !accts.some((a) => a.id === gState.acct)) gState.acct = '';
-  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden><span></span></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="立即同步" aria-label="立即同步">${ic('refresh', 17)}</button>`, true)}
+  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden><span></span></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="立即同步" aria-label="立即同步">${ic('refresh', 17)}</button>`, true)}
     ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<span>${esc(st.error)}</span><span class="sp"></span><button type="button" class="btn sm" id="g-re">重新连接</button></div>` : ''}
     ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
     <section class="card kstrip gs rv" id="g-sum"></section>
@@ -4991,9 +5157,11 @@ async function renderSites(token) {
     const ses = S((x) => x.cur.ga?.sessions), pses = S((x) => x.prev.ga?.sessions);
     const usr = S((x) => x.users), pusr = S((x) => x.prevUsers);
     const kev = S((x) => x.cur.ga?.keyEvents);
-    const clk = S((x) => x.cur.gsc?.clicks), pclk = S((x) => x.prev.gsc?.clicks), imp = S((x) => x.cur.gsc?.impressions), pimp = S((x) => x.prev.gsc?.impressions);
+    const clk = S((x) => SE(x)?.clicks), pclk = S((x) => SE(x, 'prev')?.clicks), imp = S((x) => SE(x)?.impressions), pimp = S((x) => SE(x, 'prev')?.impressions);
+    // 平均排名只用 Google 的（Bing 没有按天的排名）
+    const gimp = S((x) => x.cur.gsc?.impressions), gpimp = S((x) => x.prev.gsc?.impressions);
     const posw = S((x) => (x.cur.gsc ? x.cur.gsc.position * x.cur.gsc.impressions : 0)), pposw = S((x) => (x.prev.gsc ? x.prev.gsc.position * x.prev.gsc.impressions : 0));
-    const pos = imp ? posw / imp : null, ppos = pimp ? pposw / pimp : null;
+    const pos = gState.se !== 'bing' && gimp ? posw / gimp : null, ppos = gpimp ? pposw / gpimp : null;
     // 短链点击：从这些站点点出去的短链（按访问来源匹配站点）
     const lnk = rows.flatMap((x) => x.linksFrom).filter((l) => !gState.link || gState.link === 'any' || String(l.id) === gState.link);
     const lh = lnk.reduce((a, l) => a + l.human, 0), lph = lnk.reduce((a, l) => a + l.prevHuman, 0);
@@ -5017,7 +5185,7 @@ async function renderSites(token) {
       return days.map((k) => m.get(k) || 0);
     };
     const sSes = series((x) => x.spark.map((p) => [p.k, p.n])), sUsr = series((x) => x.spark.map((p) => [p.k, p.u || 0]));
-    const sClk = series((x) => x.spark.map((p) => [p.k, p.c])), sImp = series((x) => x.spark.map((p) => [p.k, p.i || 0])), sLnk = series((x) => x.linksFrom.filter((l) => !gState.link || gState.link === 'any' || String(l.id) === gState.link).flatMap((l) => Object.entries(l.daily || {})));
+    const sClk = series((x) => x.spark.map((p) => [p.k, seDay(p)[0]])), sImp = series((x) => x.spark.map((p) => [p.k, seDay(p)[1]])), sLnk = series((x) => x.linksFrom.filter((l) => !gState.link || gState.link === 'any' || String(l.id) === gState.link).flatMap((l) => Object.entries(l.daily || {})));
     const pm = new Map();
     for (const x of rows) for (const p of x.prevSpark || []) pm.set(p.k, (pm.get(p.k) || 0) + p.n);
     const shift = (k, n) => new Date(Date.parse(k) - n * 86400000).toISOString().slice(0, 10);
@@ -5032,12 +5200,12 @@ async function renderSites(token) {
       <div class="gsb-l">${top.slice(0, 3).map((x, i) => `<span><i style="background:${COL[i]}"></i>${esc(nm(x))} ${pctText(val(x) / tot)}</span>`).join('')}</div>` : '';
     document.getElementById('g-sum').innerHTML = [
       gKc('站点', num(rows.length), '', hasP ? `<span class="gup">↑ ${up}</span> 增长 · <span class="gdn">↓ ${down}</span> 下降 · ${active} 个有访问` : `${active} 个有访问`,
-        `GA4 ${rows.filter((x) => x.ga4).length} 个 · Search Console ${rows.filter((x) => x.gsc).length} 个；色条为${byS ? '会话' : '搜索点击'}占比`, bar),
+        `GA4 ${rows.filter((x) => x.ga4).length} 个 · Search Console ${rows.filter((x) => x.gsc).length} 个${hasBing ? ` · Bing ${rows.filter((x) => x.bing).length} 个` : ''}；色条为${byS ? '会话' : '搜索点击'}占比`, bar),
       gKc('用户', num(usr), hasP ? gDelta(usr, pusr) : '', '各站点相加', '各站点的用户数直接相加，同一个人访问多个站点会重复计算；趋势为每天的用户数', kpiSpark(sUsr, 'var(--violet)')),
       gKc('会话', num(ses), hasP ? gDelta(ses, pses) : '', `关键事件 ${num(kev)}`, sPrev ? '虚线为上一周期' : '', kpiSpark(sSes, 'var(--accent)', sPrev)),
-      gKc('搜索点击', num(clk), hasP ? gDelta(clk, pclk) : '', imp ? `点击率 ${pct1(clk / imp)}` : '暂无搜索数据', '', kpiSpark(sClk, 'var(--teal)')),
-      gKc('搜索展示', num(imp), hasP ? gDelta(imp, pimp) : '', pos != null ? `平均排名 ${pos.toFixed(1)}${hasP && ppos != null ? ` ${gDelta(pos, ppos, true)}` : ''}` : '暂无搜索数据',
-        'Search Console 的展示次数；平均排名按展示加权，数字越小越靠前', kpiSpark(sImp, '#0ea5e9')),
+      gKc('搜索点击', num(clk), hasP ? gDelta(clk, pclk) : '', `${seIcons()}${imp ? `点击率 ${pct1(clk / imp)}` : '暂无搜索数据'}`, '', kpiSpark(sClk, 'var(--teal)')),
+      gKc('搜索展示', num(imp), hasP ? gDelta(imp, pimp) : '', `${seIcons()}${pos != null ? `${gState.se === 'all' ? 'Google ' : ''}平均排名 ${pos.toFixed(1)}${hasP && ppos != null ? ` ${gDelta(pos, ppos, true)}` : ''}` : imp ? '' : '暂无搜索数据'}`,
+        gState.se === 'bing' ? 'Bing 的展示次数（Bing 没有按天的平均排名）' : gState.se === 'all' ? 'Google 和 Bing 的展示次数相加；平均排名只算 Google' : 'Search Console 的展示次数；平均排名按展示加权，数字越小越靠前', kpiSpark(sImp, '#0ea5e9')),
       chCard(rows),
       gKc('短链点击', num(lh), hasP ? gDelta(lh, lph) : '', lids ? `${lv ? `${num(lv)} 位访客 · ` : ''}${lids} 个短链${ses ? ` · 点出率 ${pct1(lh / ses)}` : ''}` : '这些站点还没有点出的短链',
         '从这些站点点出去的短链真人点击：按短链访问的来源（src 参数或 Referer 域名）匹配站点。访客按 IP 去重（估算，误差约 5%），多个站点的访客直接相加。点出率 = 短链点击 ÷ 会话', sLnk.some(Boolean) ? kpiSpark(sLnk, 'var(--amber)') : ''),
@@ -5054,23 +5222,26 @@ async function renderSites(token) {
         : x.linksFrom.some((l) => String(l.id) === gState.link) || x.links.some((l) => String(l.id) === gState.link))));
     // 按增长：用户比上一周期增加的人数（绝对值，避免小站点百分比虚高）；没有上一周期时按用户数
     const growth = (x) => (x.users == null ? -Infinity : x.prevUsers == null ? x.users : x.users - x.prevUsers);
-    const key = (x) => (gState.sort === 'clicks' ? x.cur.gsc?.clicks ?? -1 : gState.sort === 'host' ? 0 : gState.sort === 'growth' ? growth(x) : x.cur.ga?.sessions ?? -1);
+    const key = (x) => (gState.sort === 'clicks' ? SE(x)?.clicks ?? -1 : gState.sort === 'host' ? 0 : gState.sort === 'growth' ? growth(x) : x.cur.ga?.sessions ?? -1);
     rows.sort((a, b) => (gState.sort === 'host' ? a.host.localeCompare(b.host) : key(b) - key(a)));
     // 占比：按搜索点击排序时看点击占比，否则看会话占比
     const byClicks = gState.sort === 'clicks';
-    const shareOf = (x) => (byClicks ? x.cur.gsc?.clicks : x.cur.ga?.sessions) || 0;
+    const shareOf = (x) => (byClicks ? SE(x)?.clicks : x.cur.ga?.sessions) || 0;
     const shareSum = rows.reduce((a, x) => a + shareOf(x), 0);
     list.innerHTML = rows.length ? `<div class="gl-wrap"><table class="tbl gl">
-      <thead><tr><th>站点</th><th class="r">用户</th><th class="r">会话</th><th>${byClicks ? '点击占比' : '会话占比'}</th><th class="r">关键事件</th><th class="r">搜索点击</th><th class="r">展示</th><th class="r">点击率</th><th class="r">排名</th><th>会话趋势</th></tr></thead>
+      <thead><tr><th>站点</th><th class="r">用户</th><th class="r">会话</th><th>${byClicks ? '点击占比' : '会话占比'}</th><th class="r">关键事件</th><th class="r">搜索点击</th><th class="r">展示</th><th class="r">点击率</th><th class="r">排名</th>${gState.se === 'bing' ? '<th class="r" data-tipf-always data-tipf="站点地图和搜索结果里的网址中，已被 Bing 收录的数量；还没逐个检查时显示 Bing 抓取统计里的索引网页数">已收录</th>'
+        : `<th class="r" data-tipf-always data-tipf="${gState.se === 'all' ? '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量；下面一行是 Bing 已收录的数量' : '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量'}">已编入</th>`}<th>会话趋势</th></tr></thead>
       <tbody>${rows.map((x) => {
-        const ga = x.cur.ga, pg = x.prev.ga, sc = x.cur.gsc, ps = x.prev.gsc;
+        const ga = x.cur.ga, pg = x.prev.ga, sc = SE(x), ps = SE(x, 'prev');
         return `<tr data-host="${esc(x.host)}" tabindex="0">
           <td><div class="gh">${esc(x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host)}</div>
             <div class="sm gm">${x.tags.length ? `${x.tags.slice(0, 2).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}${x.tags.length > 2 ? `<span class="gtg sm-t" data-tipf-always data-tipf="${esc(x.tags.join('、'))}">+${x.tags.length - 2}</span>` : ''}` : ''}${x.ga4
               ? `<span class="gico" data-tipf-always data-tipf="${esc(`Google Analytics 4：${x.ga4.account} / ${x.ga4.name}（${x.ga4.property}）${many ? ` · 来自 ${x.ga4.email}` : ''}`)}">${BRAND.ga(14)}</span>${sameName(x.ga4.name, x.host) ? '' : `<span class="gnm">${esc(x.ga4.name)}</span>`}`
               : `<span class="gico off" data-tipf-always data-tipf="未关联 Google Analytics 4">${BRAND.ga(14)}</span>`}${x.gsc
               ? `<span class="gico" data-tipf-always data-tipf="${esc(`Search Console：${x.gsc}${many ? ` · 来自 ${x.gscEmail}` : ''}`)}">${BRAND.gsc(14)}</span>`
-              : `<span class="gico off" data-tipf-always data-tipf="未关联 Search Console">${BRAND.gsc(14)}</span>`}${x.linksFrom.length ? (() => {
+              : `<span class="gico off" data-tipf-always data-tipf="未关联 Search Console">${BRAND.gsc(14)}</span>`}${hasBing ? (x.bing
+              ? `<span class="gico" data-tipf-always data-tipf="${esc(`Bing Webmaster：${x.bing}${x.bingError ? `\n同步出错：${x.bingError}` : ''}`)}">${BRAND.bing(14)}</span>`
+              : `<span class="gico off" data-tipf-always data-tipf="未关联 Bing Webmaster">${BRAND.bing(14)}</span>`) : ''}${x.linksFrom.length ? (() => {
               const h = x.linksFrom.reduce((a, l) => a + l.human, 0), ses = x.cur.ga?.sessions;
               const tip = `${G_LABEL()}从这个站点点出 ${x.linksFrom.length} 个短链，真人点击 ${num(h)}${x.linksFromVisitors ? `（${num(x.linksFromVisitors)} 位访客）` : ''}${ses ? `，点出率 ${pct1(h / ses)}` : ''}：${x.linksFrom.slice(0, 3).map((l) => `/${l.slug} ${num(l.human)}`).join('、')}${x.linksFrom.length > 3 ? ' …' : ''}`;
               return `<span class="gsl" data-tipf-always data-tipf="${esc(tip)}">${ic('link', 12)}${num(h)}</span>`;
@@ -5082,7 +5253,8 @@ async function renderSites(token) {
           <td class="num">${sc ? num(sc.clicks) : '—'}${sc && ps ? gDelta(sc.clicks, ps.clicks) : ''}</td>
           <td class="num">${sc ? num(sc.impressions) : '—'}</td>
           <td class="num">${sc ? pct1(sc.ctr) : '—'}</td>
-          <td class="num">${sc && sc.impressions ? sc.position.toFixed(1) : '—'}${sc && ps && ps.impressions ? gDelta(sc.position, ps.position, true) : ''}</td>
+          <td class="num">${sc?.position != null ? sc.position.toFixed(1) : '—'}${sc?.position != null && ps?.position != null ? gDelta(sc.position, ps.position, true) : ''}</td>
+          <td class="num">${idxCell(x)}</td>
           <td class="gsp">${x.spark.length ? kpiSpark(x.spark.map((p) => p.n), 'var(--accent)') : ''}</td></tr>`;
       }).join('')}</tbody></table></div>`
       : `<div class="empty" style="padding:48px">${ic('inbox')}${d.items.length ? '没有匹配的站点' : '账号下还没有找到 GA4 媒体资源或 Search Console 站点'}</div>`;
@@ -5101,6 +5273,15 @@ async function renderSites(token) {
   let t; qi.oninput = () => { qx.hidden = !qi.value; clearTimeout(t); t = setTimeout(() => { gState.q = qi.value.trim(); draw(); }, 150); };
   qx.onclick = () => { qi.value = ''; qx.hidden = true; gState.q = ''; draw(); qi.focus(); };
   qi.onkeydown = (e) => { if (e.key === 'Escape' && qi.value) { e.stopPropagation(); qx.click(); } };
+  const seEl = document.getElementById('g-se');
+  if (seEl) {
+    seEl.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+      gState.se = b.dataset.e; store.set('g:se', gState.se);
+      seEl.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      segThumb(seEl); draw();
+    }));
+    setTimeout(() => segThumb(seEl), 0);
+  }
   const sortSeg = document.getElementById('g-sort');
   segThumb(sortSeg);
   sortSeg.querySelectorAll('button').forEach((b) => (b.onclick = () => {
@@ -5177,6 +5358,271 @@ function siteLinksCard(d) {
   return fromCard + toCard;
 }
 
+// ---------------------------------------------------------------- 网页索引（站点详情页）
+// 数据来自 URL Inspection API：站点地图和搜索结果里的网址逐个检查，定时任务每小时查一批
+const IDX_STATE = {
+  'submitted and indexed': '已提交并编入索引',
+  'indexed, not submitted in sitemap': '已编入索引，但未提交到站点地图',
+  'indexed, though blocked by robots.txt': '已编入索引，尽管遭到 robots.txt 屏蔽',
+  'crawled - currently not indexed': '已抓取 - 尚未编入索引',
+  'discovered - currently not indexed': '已发现 - 尚未编入索引',
+  'duplicate without user-selected canonical': '重复网页，用户未选定规范网页',
+  'duplicate, google chose different canonical than user': '重复网页，Google 选择的规范网页与用户指定的不同',
+  'duplicate, submitted url not selected as canonical': '重复网页，提交的网址未被选为规范网址',
+  'alternate page with proper canonical tag': '备用网页（有适当的规范标记）',
+  'excluded by noindex tag': '已被“noindex”标记排除',
+  'submitted url marked noindex': '已被“noindex”标记排除',
+  'blocked by robots.txt': '被 robots.txt 屏蔽',
+  'page with redirect': '网页会自动重定向',
+  'not found (404)': '未找到 (404)',
+  'soft 404': '软 404',
+  'server error (5xx)': '服务器错误 (5xx)',
+  'redirect error': '重定向错误',
+  'blocked due to unauthorized request (401)': '由于未授权请求 (401) 而被屏蔽',
+  'blocked due to access forbidden (403)': '由于访问遭禁 (403) 而被屏蔽',
+  'blocked due to other 4xx issue': '由于出现其他 4xx 问题而被屏蔽',
+  'blocked by page removal tool': '被网页移除工具屏蔽',
+  'url is unknown to google': 'Google 尚未发现此网址',
+};
+const idxState = (r) => {
+  if (!r.checkedAt) return '待检查';
+  if (r.error && !r.state) return '检查失败';
+  const k = String(r.state || '').toLowerCase().replace(/[‘’'"“”]/g, '');
+  return IDX_STATE[k] || r.state || (r.indexed ? '已编入索引' : '未编入索引');
+};
+const gscInspectUrl = (d, url) => `https://search.google.com/search-console/inspect?resource_id=${encodeURIComponent(d.site)}&id=${encodeURIComponent(url)}${d.email ? `&authuser=${encodeURIComponent(d.email)}` : ''}`;
+const gscSitemapsUrl = (d) => `https://search.google.com/search-console/sitemaps?resource_id=${encodeURIComponent(d.site)}${d.email ? `&authuser=${encodeURIComponent(d.email)}` : ''}`;
+const urlPath = (u) => u.replace(/^https?:\/\/[^/]+/, '') || '/';
+const IDX_F = [['all', '全部'], ['yes', '已编入'], ['no', '未编入'], ['bad', '有问题'], ['wait', '待检查'], ['err', '检查失败'], ['bno', 'Bing 未收录'], ['nosm', '不在站点地图']];
+const IDX_F_HINT = {
+  bad: '抓取失败、被 robots.txt 屏蔽或带 noindex 的网址，通常需要改网站本身',
+  nosm: '在搜索结果里出现过、但站点地图里没有的网址',
+  wait: '新加入的网址由定时任务逐步检查（每小时一批），也可以点右上角立即检查',
+  err: '接口返回错误的网址（鼠标停在状态上看原因），一天后会自动重试',
+  bno: 'Bing 还没收录的网址：可以逐个提交，或点左侧“提交到 Bing”按当天配额一起提交',
+};
+// Bing 的收录状态
+const bingSt = (r) => (r.b === 'yes' ? ['yes', '已收录'] : r.b === 'no' ? (r.bSubmittedAt ? ['no', `已提交 ${ago(r.bSubmittedAt)}`] : ['no', '未收录'])
+  : r.b === 'err' ? ['bad', '检查失败'] : r.bSubmittedAt ? ['wait', `已提交 ${ago(r.bSubmittedAt)}`] : ['wait', '待检查']);
+function idxFilter(d, f, reason) {
+  const u = d.urls;
+  const g = d.google;
+  const by = { all: u, yes: u.filter((r) => r.indexed), no: u.filter((r) => r.indexed === false), bad: u.filter((r) => r.problem),
+    wait: u.filter((r) => (g ? !r.checkedAt : !r.b)), err: u.filter((r) => r.checkedAt && r.indexed == null), bno: u.filter((r) => r.b === 'no'), nosm: u.filter((r) => !(r.src & 1)) };
+  // 有问题的排前面，然后是未编入、待检查、已编入；只有 Bing 时按 Bing 的状态排
+  const rank = g ? (r) => (r.problem ? 0 : r.indexed === false ? 1 : r.indexed == null ? 2 : 3) : (r) => ({ err: 0, no: 1, '': 2, yes: 3 })[r.b] ?? 2;
+  const rows = (reason ? by.no.filter((r) => idxState(r) === reason) : by[f] || u).slice().sort((a, b) => rank(a) - rank(b) || a.url.localeCompare(b.url));
+  return { by, rows };
+}
+function idxUrlsView(d, f, reason) {
+  const g = d.google, bg = d.bing;
+  if (!g && ['yes', 'no', 'bad', 'err'].includes(f)) f = 'all';
+  if (!bg && f === 'bno') f = 'all';
+  const { by, rows } = idxFilter(d, f, reason);
+  const yes = by.yes.length, no = by.no.length, wait = by.wait.length + by.err.length, tot = d.urls.length || 1;
+  const last = Math.max(0, ...d.urls.map((r) => Math.max(r.checkedAt || 0, r.bCheckedAt || 0)));
+  // 未编入的原因：按网页数排序
+  const rs = new Map();
+  for (const r of by.no) { const k = idxState(r); rs.set(k, (rs.get(k) || 0) + 1); }
+  const reasons = [...rs].sort((a, b) => b[1] - a[1]);
+  const bad = new Set(by.bad.map((r) => idxState(r)));
+  // Bing：已收录 / 未收录 / 待检查，和“提交到 Bing”
+  const bYes = d.urls.filter((r) => r.b === 'yes').length, bNo = by.bno.length, bWait = d.urls.filter((r) => !r.b || r.b === 'err').length;
+  const bCand = d.urls.filter((r) => r.b !== 'yes' && (!r.bSubmittedAt || r.bSubmittedAt < Date.now() - 30 * 86400000)).length;
+  const bingBox = bg ? `<div class="ix-bing">
+      <div class="ix-bh">${BRAND.bing(14)}<b>Bing</b><span class="sp"></span>${bg.auto ? '<span class="pill on" data-tipf-always data-tipf="每天刷新站点地图后，自动把未收录的网址提交给 Bing（在 设置 → Bing Webmaster 里可以关掉）">自动提交</span>' : ''}</div>
+      <div class="ix-n"><div class="ix-k yes"><span>${ic('check', 13)}已收录</span><b>${num(bYes)}</b></div>
+        <div class="ix-k no"><span>${ic('info', 13)}未收录</span><b>${num(bNo)}</b></div>
+        ${bWait ? `<div class="ix-k wait"><span>${ic('history', 13)}待检查</span><b>${num(bWait)}</b></div>` : ''}</div>
+      <button type="button" class="btn sm" id="ix-bsub" ${bCand && bg.quota !== 0 ? '' : 'disabled'} data-tipf-always data-tipf="${esc(bg.quota === 0 ? '今天的 Bing 提交配额已用完' : `提交 ${bCand} 个网址给 Bing（未收录或未检查，且 30 天内没提交过）${bg.quota != null ? `\n今天剩余配额 ${bg.quota}` : ''}`)}">${ic('send', 13)}提交到 Bing${bCand ? `<small>${num(bg.quota != null ? Math.min(bCand, bg.quota) : bCand)}</small>` : ''}</button>
+      ${bg.issues ? `<div class="hint ix-err" data-tipf-always data-tipf="${esc(bg.issues)}">${ic('alert', 13)}<span class="ell">${esc(bg.issues)}</span></div>` : ''}
+    </div>` : '';
+  const sum = `<div class="ix-sum">
+    ${g ? `<div class="ix-n"><div class="ix-k yes"><span>${ic('check', 13)}已编入</span><b>${num(yes)}</b></div>
+      <div class="ix-k no"><span>${ic('info', 13)}未编入</span><b>${num(no)}</b>${reasons.length ? `<small>${reasons.length} 个原因</small>` : ''}</div>
+      ${wait ? `<div class="ix-k wait"><span>${ic('history', 13)}待检查</span><b>${num(wait)}</b>${by.err.length ? `<small class="bad">${by.err.length} 个检查失败</small>` : ''}</div>` : ''}</div>
+    <div class="ix-bar"><i class="yes" style="width:${(yes / tot) * 100}%"></i><i class="no" style="width:${(no / tot) * 100}%"></i></div>
+    ${d.issues ? `<div class="hint ix-err" data-tipf-always data-tipf="${esc(d.issues)}">${ic('alert', 13)}<span class="ell">${esc(d.issues)}</span></div>` : ''}` : ''}
+    <div class="hint">共 ${num(d.urls.length)} 个网址${d.urls.length >= d.maxUrls ? `（最多检查 ${num(d.maxUrls)} 个）` : ''}${last ? ` · 最近检查 ${ago(last)}` : ''}${g ? ` · 今天已用配额 ${num(d.quota)} / ${num(d.quotaMax)}` : ''}</div>
+    ${bingBox}
+    ${reasons.length ? `<div class="ix-rs"><div class="ix-rh"><span>未编入的原因</span><span>网页</span></div>${reasons.map(([k, c]) => `<button type="button" class="ix-r${reason === k ? ' on' : ''}${bad.has(k) ? ' bad' : ''}" data-ixr="${esc(k)}"><span class="ell">${esc(k)}</span><b>${num(c)}</b></button>`).join('')}</div>` : ''}
+  </div>`;
+  const shown = IDX_F.filter(([k]) => (k !== 'err' || by.err.length || f === 'err') && (g || !['yes', 'no', 'bad', 'err'].includes(k)) && (bg || k !== 'bno'));
+  const chips = `<div class="qf">${shown.map(([k, l]) => `<button type="button" class="${!reason && k === f ? 'on' : ''}" data-ixf="${k}">${l}${k !== 'all' ? `<small>${by[k].length}</small>` : ''}</button>`).join('')}
+    ${reason ? `<button type="button" class="on" data-ixf="no">${esc(reason)} ${ic('x', 12)}</button>` : ''}</div>${!reason && IDX_F_HINT[f] ? `<div class="hint qf-h">${IDX_F_HINT[f]}</div>` : ''}`;
+  const row = (r) => {
+    const [bc, bl] = bingSt(r);
+    const btip = [r.bCrawledAt && `Bing 上次抓取 ${fmtTime(r.bCrawledAt)}`, r.bSubmittedAt && `提交于 ${fmtTime(r.bSubmittedAt)}`, r.bCheckedAt && `检查于 ${fmtTime(r.bCheckedAt)}`, r.bError].filter(Boolean).join('\n');
+    return `<tr>
+    <td><div class="ix-u"><a class="ell" href="${esc(r.url)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(r.url)}">${esc(urlPath(r.url))}</a>${!(r.src & 1) ? '<i class="ix-tag" data-tipf-always data-tipf="站点地图里没有这个网址">不在站点地图</i>' : ''}</div></td>
+    ${g ? `<td><span class="ix-st ${r.indexed ? 'yes' : r.problem || (r.checkedAt && r.indexed == null) ? 'bad' : r.checkedAt ? 'no' : 'wait'}"${r.error || r.canon ? ` data-tipf-always data-tipf="${esc(r.error || `Google 选择的规范网址：${r.canon}`)}"` : ''}><i></i><span class="ell">${esc(idxState(r))}</span></span></td>` : ''}
+    ${bg ? `<td><span class="ix-st ${bc}"${btip ? ` data-tipf-always data-tipf="${esc(btip)}"` : ''}><i></i><span class="ell">${esc(bl)}</span></span></td>` : ''}
+    ${g ? `<td class="num"><span class="sm"${r.crawledAt ? ` data-tipf-always data-tipf="${esc(`上次抓取 ${fmtTime(r.crawledAt)}${r.checkedAt ? `\n检查于 ${fmtTime(r.checkedAt)}` : ''}`)}"` : ''}>${r.crawledAt ? ago(r.crawledAt) : '—'}</span></td>` : ''}
+    <td class="ix-a"><button type="button" class="btn sm ghost icon" data-ixi="${esc(r.url)}" aria-label="重新检查" data-tipf-always data-tipf="重新检查这个网址${g && bg ? '（Google 和 Bing）' : ''}">${ic('refresh', 13)}</button>${bg ? `<button type="button" class="btn sm ghost icon" data-ixb="${esc(r.url)}" aria-label="提交到 Bing" data-tipf-always data-tipf="${r.b === 'yes' ? '已被 Bing 收录；内容有更新时可以再提交一次' : '提交到 Bing'}">${ic('send', 13)}</button>` : ''}${g ? `<a class="btn sm ghost icon" href="${esc(gscInspectUrl(d, r.url))}" target="_blank" rel="noopener" aria-label="在 Search Console 中打开" data-tipf-always data-tipf="在 Search Console 中检查，可以在那里请求编入索引">${ic('ext', 13)}</a>` : ''}</td></tr>`;
+  };
+  const cls = `ix-t${g ? '' : ' nog'}${bg ? ' hasb' : ''}`;
+  const table = rows.length ? `<div class="g-scr ix-scr"><table class="tbl gt ${cls}"><thead><tr><th>网址</th>${g ? `<th>${bg ? 'Google' : '状态'}</th>` : ''}${bg ? `<th>Bing</th>` : ''}${g ? '<th class="r">上次抓取</th>' : ''}<th></th></tr></thead>
+    <tbody>${rows.slice(0, 300).map(row).join('')}</tbody></table></div>${rows.length > 300 ? `<div class="hint">只显示前 300 个，共 ${num(rows.length)} 个</div>` : ''}`
+    : `<div class="empty">${ic('inbox')}${d.urls.length ? '没有符合条件的网址' : '没有找到网址：站点地图为空，最近 28 天也没有出现在搜索结果里的页面'}</div>`;
+  return `<div class="ix-g">${sum}<div class="ix-main">${chips}${table}</div></div>`;
+}
+function idxSitemapsView(d) {
+  const st = (x) => (x.local ? ['wait', '未提交'] : x.pending ? ['wait', '等待处理'] : x.errors ? ['bad', `${x.errors} 个错误`] : x.downloaded ? ['yes', '成功'] : ['wait', '尚未读取']);
+  const auth = d.google && !d.canSubmit ? `<div class="bulk-bad ix-auth">${ic('key', 15)}<span>当前 Google 账号${d.email ? `（${esc(maskEmail(d.email))}）` : ''}只授予了只读权限，重新授权后才能在这里提交站点地图</span><span class="sp"></span><button type="button" class="btn sm" id="ix-re">重新授权</button></div>` : '';
+  const rows = d.sitemaps.map((x) => {
+    const [c, l] = st(x);
+    return `<tr><td><a class="ell" href="${esc(x.path)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(x.path)}">${esc(urlPath(x.path))}</a>${x.index ? '<i class="ix-tag">索引文件</i>' : ''}</td>
+      <td><span class="ix-st ${c}"${x.warnings ? ` data-tipf-always data-tipf="${esc(`${x.warnings} 个警告`)}"` : ''}><i></i>${l}${x.warnings ? ` · ${x.warnings} 个警告` : ''}</span></td>
+      <td class="num">${x.urls ? num(x.urls) : '—'}</td>
+      <td class="num"><span class="sm"${x.downloaded ? ` data-tipf-always data-tipf="${esc(fmtTime(x.downloaded))}"` : ''}>${x.downloaded ? ago(x.downloaded) : '—'}</span></td>
+      <td class="num"><span class="sm"${x.submitted ? ` data-tipf-always data-tipf="${esc(fmtTime(x.submitted))}"` : ''}>${x.submitted ? ago(x.submitted) : '—'}</span></td>
+      <td class="ix-a"><button type="button" class="btn sm" data-ixs="${esc(x.path)}" ${d.canSubmit ? '' : 'disabled data-tipf-always data-tipf="需要先重新授权"'}>${x.local ? '提交' : '重新提交'}</button></td></tr>`;
+  }).join('');
+  const google = d.google ? `${auth}${d.issues ? `<div class="hint ix-err" style="margin-bottom:10px">${ic('alert', 13)}<span>${esc(d.issues)}</span></div>` : ''}
+    ${d.sitemaps.length ? `<div class="g-scr"><table class="tbl gt ix-sm"><thead><tr><th>站点地图</th><th>状态</th><th class="r">网址</th><th class="r">上次读取</th><th class="r">上次提交</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : `<div class="empty">${ic('inbox')}还没有提交站点地图，网站根目录下也没找到 /sitemap.xml</div>`}
+    <div class="hint" style="margin-top:10px">站点地图状态每天刷新一次${d.refreshedAt ? `（上次刷新 ${ago(d.refreshedAt)}）` : ''} · <a href="${esc(gscSitemapsUrl(d))}" target="_blank" rel="noopener">在 Search Console 中查看</a></div>` : '';
+  if (!d.bing) return google;
+  // Bing：已提交的站点地图；Google 那边有、Bing 还没有的也列出来，可以一键提交
+  const bf = d.bing.feeds, have = new Set(bf.map((x) => x.path));
+  const missing = d.sitemaps.filter((x) => !have.has(x.path)).map((x) => ({ path: x.path, missing: true }));
+  const bst = (x) => (x.missing ? ['wait', '未提交到 Bing'] : /success|成功/i.test(x.status) ? ['yes', '成功'] : /pend|process/i.test(x.status) ? ['wait', '处理中'] : x.status ? ['bad', x.status] : ['wait', '尚未读取']);
+  const brows = [...bf, ...missing].map((x) => {
+    const [c, l] = bst(x);
+    return `<tr><td><a class="ell" href="${esc(x.path)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(x.path)}">${esc(urlPath(x.path))}</a></td>
+      <td><span class="ix-st ${c}"><i></i>${esc(l)}</span></td>
+      <td class="num">${x.urls ? num(x.urls) : '—'}</td>
+      <td class="num"><span class="sm"${x.crawled ? ` data-tipf-always data-tipf="${esc(fmtTime(x.crawled))}"` : ''}>${x.crawled ? ago(x.crawled) : '—'}</span></td>
+      <td class="num"><span class="sm"${x.submitted ? ` data-tipf-always data-tipf="${esc(fmtTime(x.submitted))}"` : ''}>${x.submitted ? ago(x.submitted) : '—'}</span></td>
+      <td class="ix-a"><button type="button" class="btn sm" data-ixbs="${esc(x.path)}">${x.missing ? '提交' : '重新提交'}</button></td></tr>`;
+  }).join('');
+  return `${google}<h4 class="ix-bt">${BRAND.bing(14)}Bing</h4>
+    ${d.bing.issues ? `<div class="hint ix-err" style="margin-bottom:10px">${ic('alert', 13)}<span>${esc(d.bing.issues)}</span></div>` : ''}
+    ${brows ? `<div class="g-scr"><table class="tbl gt ix-sm"><thead><tr><th>站点地图</th><th>状态</th><th class="r">网址</th><th class="r">上次抓取</th><th class="r">提交时间</th><th></th></tr></thead><tbody>${brows}</tbody></table></div>`
+      : `<div class="empty">${ic('inbox')}Bing 里还没有站点地图</div>`}
+    <div class="hint" style="margin-top:10px"><a href="https://www.bing.com/webmasters/sitemaps?siteUrl=${encodeURIComponent(d.bing.site)}" target="_blank" rel="noopener">在 Bing Webmaster 中查看</a></div>`;
+}
+// 站点列表的“已编入”列：已编入数 / 网址数；还在检查时显示进度
+function idxCell(x) {
+  const i = x.index;
+  if (gState.se === 'bing') return bingIdxCell(x);
+  if (gState.se === 'all' && x.bing) return `${x.gsc ? googleIdxCell(x) : '<span class="sm">—</span>'}<div class="gd ix-pg">${bingIdxShort(x)}</div>`;
+  return googleIdxCell(x);
+}
+// Bing：网址检查的结果（已收录 / 网址数）；还没检查时用 Bing 抓取统计里的“索引中的网页数”
+const bingIdxShort = (x) => {
+  const i = x.index;
+  return `<span data-tipf-always data-tipf="${esc(`Bing 已收录 ${num(i?.byes || 0)} / 已检查 ${num(i?.bdone || 0)}${x.bingInIndex ? `\nBing 抓取统计：索引中 ${num(x.bingInIndex)} 个网页` : ''}`)}">Bing ${i?.bdone ? num(i.byes) : x.bingInIndex ? num(x.bingInIndex) : '—'}</span>`;
+};
+function bingIdxCell(x) {
+  const i = x.index;
+  if (!x.bing) return '—';
+  if (!i?.bdone) return x.bingInIndex ? `<span data-tipf-always data-tipf="Bing 抓取统计里“索引中”的网页数；网址逐个检查完成后改为显示已收录 / 网址数">${num(x.bingInIndex)}</span>` : '<span class="sm" data-tipf-always data-tipf="定时任务还没检查到这个站点">待检查</span>';
+  const tip = `Bing 已收录 ${num(i.byes)} / 已检查 ${num(i.bdone)}\n共 ${num(i.urls)} 个网址${i.bdone < i.urls ? `，还有 ${num(i.urls - i.bdone)} 个待检查` : ''}${x.bingInIndex ? `\nBing 抓取统计：索引中 ${num(x.bingInIndex)} 个网页` : ''}`;
+  return `<span data-tipf-always data-tipf="${esc(tip)}">${num(i.byes)}<span class="ix-of">/${num(i.urls)}</span></span>${i.bdone < i.urls ? `<div class="gd ix-pg">检查中 ${Math.floor((i.bdone / i.urls) * 100)}%</div>` : ''}`;
+}
+function googleIdxCell(x) {
+  const i = x.index;
+  if (!x.gsc) return '—';
+  if (!i) return '<span class="sm" data-tipf-always data-tipf="定时任务还没检查到这个站点">待检查</span>';
+  if (!i.urls) return '<span class="sm" data-tipf-always data-tipf="站点地图为空，最近 28 天也没有出现在搜索结果里的页面">—</span>';
+  const tip = `已编入 ${num(i.yes)} / 已检查 ${num(i.done)}\n共 ${num(i.urls)} 个网址${i.done < i.urls ? `，还有 ${num(i.urls - i.done)} 个待检查` : ''}`;
+  return `<span data-tipf-always data-tipf="${esc(tip)}">${i.done ? num(i.yes) : '—'}<span class="ix-of">/${num(i.urls)}</span></span>${i.done < i.urls ? `<div class="gd ix-pg">检查中 ${Math.floor((i.done / i.urls) * 100)}%</div>` : ''}`;
+}
+async function mountSiteIndex(host) {
+  const el = document.getElementById('g-idx');
+  if (!el) return;
+  const body = el.querySelector('.card-b');
+  let d, f = store.get('ix:f', 'all'), reason = '', tab = store.get('ix:tab', 0);
+  const draw = () => {
+    el.querySelectorAll('.tabs button').forEach((b, i) => b.classList.toggle('on', i === tab));
+    body.innerHTML = tab ? idxSitemapsView(d) : idxUrlsView(d, f, reason);
+  };
+  try { d = await api(`/google/index?host=${encodeURIComponent(host)}`); }
+  catch (err) { body.innerHTML = `<div class="empty">${ic('alert')}${esc(err.message)}</div>`; return; }
+  if (!document.body.contains(el)) return;
+  draw();
+  el.querySelectorAll('.tabs button').forEach((b, i) => (b.onclick = () => { tab = i; store.set('ix:tab', i); draw(); }));
+  const run = async (btn, path, payload, ok) => {
+    btn.disabled = true; btn.classList.add('busy');
+    try { const r = await api(`/google/index/${path}`, { method: 'POST', body: { host, ...payload } }); d = r.index; draw(); toast(ok(r)); }
+    catch (err) { toast(err.message, 'bad'); btn.disabled = false; btn.classList.remove('busy'); }
+  };
+  el.querySelector('#ix-chk').onclick = (e) => run(e.currentTarget, 'check', {}, (r) => [r.done || !r.failed ? `已检查 ${r.done} 个网址` : '', r.failed ? `${r.failed} 个检查失败` : '', r.left ? `还有 ${r.left} 个待检查` : ''].filter(Boolean).join('，'));
+  body.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ixf],[data-ixr],[data-ixi],[data-ixs],[data-ixb],[data-ixbs],#ix-re,#ix-bsub');
+    if (!b || b.disabled) return;
+    if (b.id === 'ix-re') return googleConnect(b);
+    if (b.dataset.ixf) { f = b.dataset.ixf; reason = ''; store.set('ix:f', f); return draw(); }
+    if (b.dataset.ixr) { reason = reason === b.dataset.ixr ? '' : b.dataset.ixr; return draw(); }
+    if (b.dataset.ixi) {
+      // Google 和 Bing 都关联时两边都重新检查
+      if (d.google && d.bing) return run(b, 'inspect', { url: b.dataset.ixi }, () => '已重新检查').then(() => api('/google/index/inspect', { method: 'POST', body: { host, url: b.dataset.ixi, which: 'bing' } }).then((r) => { d = r.index; draw(); }).catch(() => {}));
+      return run(b, 'inspect', { url: b.dataset.ixi, which: d.google ? 'google' : 'bing' }, () => '已重新检查');
+    }
+    if (b.dataset.ixb) return run(b, 'bing-submit', { url: b.dataset.ixb }, (r) => `已提交到 Bing${r.quota != null ? `，今天还能提交 ${r.quota} 个` : ''}`);
+    if (b.id === 'ix-bsub') return run(b, 'bing-submit', {}, (r) => `已提交 ${r.submitted} 个网址到 Bing${r.quota != null ? `，今天还能提交 ${r.quota} 个` : ''}`);
+    if (b.dataset.ixbs) return run(b, 'bing-feed', { path: b.dataset.ixbs }, () => '已把站点地图提交到 Bing');
+    if (b.dataset.ixs) return run(b, 'submit', { path: b.dataset.ixs }, () => '已提交站点地图，Google 会在之后几天内重新读取');
+  });
+}
+
+// ---------------------------------------------------------------- Bing（站点详情页）
+const BQF = [['all', '全部'], ['opp', '排名 4–20'], ['down', '下滑']];
+function bingQueryView(b, f) {
+  if (!b) return `<div class="empty">${ic('inbox')}暂时无法读取 Bing 数据</div>`;
+  if (!b.hasPrev && f === 'down') f = 'all';
+  const lists = {
+    all: b.queries,
+    opp: b.queries.filter((x) => x.position >= 4 && x.position <= 20 && x.impressions >= 5).sort((a, c) => c.impressions - a.impressions),
+    down: b.queries.filter((x) => x.prevClicks != null && x.clicks - x.prevClicks <= -3).sort((a, c) => (a.clicks - a.prevClicks) - (c.clicks - c.prevClicks)),
+  };
+  const chips = `<div class="qf">${BQF.map(([k, l]) => `<button type="button" class="${k === f ? 'on' : ''}" data-bqf="${k}" ${k === 'down' && !b.hasPrev ? 'disabled data-tipf-always data-tipf="时间范围太长，没有上一周期可比"' : ''}>${l}${k !== 'all' ? `<small>${lists[k].length}</small>` : ''}</button>`).join('')}</div>
+    <div class="hint qf-h">Bing 的搜索词数据按周汇总，区间首尾的周可能不完整</div>`;
+  const rows = lists[f];
+  if (!rows.length) return `${chips}<div class="empty">${ic('inbox')}${f === 'all' ? '该时间段内暂无数据' : '没有符合条件的搜索词'}</div>`;
+  const kc = (k) => `<div class="ell" data-tipf="${esc(k)}">${esc(k)}</div>`;
+  return `${chips}<div class="g-scr"><table class="tbl gt qt"><thead><tr><th>搜索词</th><th class="r">点击</th><th class="r">展示</th><th class="r">点击率</th><th class="r">排名</th></tr></thead>
+    <tbody>${rows.map((x) => `<tr><td>${kc(x.k)}</td><td class="num">${num(x.clicks)}${x.prevClicks != null && f === 'down' ? ` <span class="gd down">${num(x.clicks - x.prevClicks)}</span>` : ''}</td><td class="num">${num(x.impressions)}</td><td class="num">${pct1(x.ctr)}</td>
+      <td class="num">${x.position ? x.position.toFixed(1) : '—'}${x.prevPosition && x.position ? rankChange({ position: x.position, prevPosition: x.prevPosition }, true) : ''}</td></tr>`).join('')}</tbody></table></div>`;
+}
+const BING_ISSUES = [[1, '301 重定向'], [2, '302 重定向'], [4, '4xx 错误'], [8, '5xx 错误'], [16, '被 robots.txt 屏蔽'], [32, '含恶意软件'], [64, '重要网址被 robots.txt 屏蔽'], [128, 'DNS 错误'], [256, '超时']];
+function bingCardsHtml(d) {
+  const b = d.bing;
+  const pg = (u) => u.replace(/^https?:\/\/[^/]+/, '') || '/';
+  const pages = b?.pages?.length ? `<div class="g-scr"><table class="tbl gt"><thead><tr><th>页面</th><th class="r">点击</th><th class="r">展示</th><th class="r">点击率</th><th class="r">排名</th></tr></thead>
+    <tbody>${b.pages.map((x) => `<tr><td><div class="ell" data-tipf="${esc(x.k)}">${esc(pg(x.k))}</div></td><td class="num">${num(x.clicks)}</td><td class="num">${num(x.impressions)}</td><td class="num">${pct1(x.ctr)}</td><td class="num">${x.position ? x.position.toFixed(1) : '—'}</td></tr>`).join('')}</tbody></table></div>`
+    : `<div class="empty">${ic('inbox')}该时间段内暂无数据</div>`;
+  const cr = b?.crawl || [], last = cr[cr.length - 1];
+  const S = (k) => cr.reduce((a, r) => a + r[k], 0);
+  const issues = b?.issues || [];
+  const bits = (n) => BING_ISSUES.filter(([v]) => n & v).map(([, l]) => l).join('、') || '其他';
+  const crawl = cr.length ? `<div class="bk-n">
+      <div class="ix-k"><span>索引中</span><b>${num(last.inIndex)}</b><small>最近一天</small></div>
+      <div class="ix-k"><span>抓取网页</span><b>${num(S('crawled'))}</b><small>区间合计</small></div>
+      <div class="ix-k${S('errors') ? ' bad' : ''}"><span>抓取错误</span><b>${num(S('errors'))}</b><small>${[S('c4xx') && `4xx ${num(S('c4xx'))}`, S('c5xx') && `5xx ${num(S('c5xx'))}`, S('robots') && `robots ${num(S('robots'))}`].filter(Boolean).join(' · ') || '区间合计'}</small></div></div>
+    <div class="chart xs" id="ch-bcr"></div>
+    ${issues.length ? `<h4 class="bk-h">抓取问题 <small>${issues.length}</small></h4><div class="g-scr bk-iss"><table class="tbl gt"><thead><tr><th>网址</th><th>问题</th><th class="r">HTTP</th></tr></thead>
+      <tbody>${issues.map((x) => `<tr><td><div class="ell" data-tipf="${esc(x.url)}">${esc(pg(x.url))}</div></td><td><div class="ell">${esc(bits(x.issues))}</div></td><td class="num">${x.code || '—'}</td></tr>`).join('')}</tbody></table></div>` : ''}`
+    : `<div class="empty">${ic('inbox')}${b ? '该时间段内暂无抓取数据' : '暂时无法读取 Bing 数据'}</div>`;
+  return `<div class="grid2">
+    ${tabCard('b-sc', `${BRAND.bing(15)}Bing 搜索`, [
+      { label: '搜索词', get html() { return bingQueryView(b, store.get('b:qf', 'all')); } },
+      { label: '页面', html: pages },
+    ], 'rv')}
+    <section class="card rv" id="b-cr"><div class="card-h"><h3>${BRAND.bing(15)}Bing 抓取</h3><span class="sp"></span><div class="legend" id="lg-bcr"></div></div><div class="card-b">${crawl}</div></section>
+  </div>`;
+}
+function mountBingCrawl(d) {
+  const el = document.getElementById('ch-bcr');
+  if (!el || !d.bing?.crawl?.length) return;
+  const s = d.bing.crawl.map((r) => { const dt = new Date(r.date + 'T00:00:00'); return { k: r.date, t: `${dt.getMonth() + 1} 月 ${dt.getDate()} 日 ${WEEK[dt.getDay()]}`, label: `${dt.getMonth() + 1}/${dt.getDate()}`, cr: r.crawled, er: r.errors }; });
+  mountChart(el, s, [
+    { id: 'cr', key: 'cr', label: '抓取网页', color: 'var(--accent)', type: 'area' },
+    { id: 'er', key: 'er', label: '抓取错误', color: 'var(--bad)', type: 'line' },
+  ], document.getElementById('lg-bcr'));
+}
+
 async function renderSite(token, host) {
   shell('sites', `<a class="back" href="#/sites">${ic('back', 14)}全部站点</a><div class="stack">${skel(120)}${skel(320)}</div>`);
   const d = await api(`/google/site?host=${encodeURIComponent(host)}&days=${gState.days}`);
@@ -5203,14 +5649,21 @@ async function renderSite(token, host) {
     const dt = new Date(k + 'T00:00:00');
     return { k, t: `${dt.getMonth() + 1} 月 ${dt.getDate()} 日 ${WEEK[dt.getDay()]}`, label: `${dt.getMonth() + 1}/${dt.getDate()}`,
       s: r.sessions || 0, u: r.users || 0, c: r.clicks || 0, i: r.impressions || 0, ps: p.sessions || 0, pc: p.clicks || 0,
+      bc: r.b_clicks || 0, bi: r.b_impressions || 0, pbc: p.b_clicks || 0, pbi: p.b_impressions || 0,
       v: r.views || 0, e: r.key_events || 0, pu: p.users || 0, pv: p.views || 0, pe: p.key_events || 0, pi: p.impressions || 0 };
   });
   // 数据卡：标签前是数据来源图标，数值旁是每日趋势（虚线为上一周期）
   const col = (k) => series.map((x) => x[k]);
   const hasPrevS = prev.length > 0;
   const sk = (k, pk, color) => (series.length > 1 ? `<span class="kc-sp">${kpiSpark(col(k), color, hasPrevS ? col(pk) : null)}</span>` : '');
-  const kc2 = (src, label, v, delta, extra, sub, tip = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${src === 'ga' ? BRAND.ga(13) : BRAND.gsc(13)}${label}</span>${delta || ''}</div>
+  const kc2 = (src, label, v, delta, extra, sub, tip = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${(BRAND[src] || BRAND.gsc)(13)}${label}</span>${delta || ''}</div>
     <div class="kc-v"><b>${v}</b>${extra || ''}</div>${sub ? `<div class="kc-d">${sub}</div>` : ''}</div>`;
+  const bc = d.cur.bing, bp = d.prev.bing, bs = d.bing;
+  const bingCards = d.bingSite ? `
+        ${kc2('bing', '搜索点击', bc ? num(bc.clicks) : '—', bc && bp ? gDelta(bc.clicks, bp.clicks) : '', bc ? sk('bc', 'pbc', 'var(--accent)') : '', bc ? (bp ? `上一周期 ${num(bp.clicks)}` : '') : '还没同步到数据')}
+        ${kc2('bing', '曝光量', bc ? num(bc.impressions) : '—', bc && bp ? gDelta(bc.impressions, bp.impressions) : '', bc ? sk('bi', 'pbi', 'var(--violet)') : '', bc ? (bp ? `上一周期 ${num(bp.impressions)}` : '') : '', '在 Bing 搜索结果中出现的次数')}
+        ${kc2('bing', '点击率', bc?.impressions ? pct1(bc.ctr) : '—', bc?.impressions && bp?.impressions ? gDelta(bc.ctr, bp.ctr) : '', '', bc?.impressions ? `Google ${sc?.impressions ? pct1(sc.ctr) : '—'}` : '')}
+        ${kc2('bing', '平均排名', bs?.position ? bs.position.toFixed(1) : '—', bs?.position && bs?.prevPosition ? gDelta(bs.position, bs.prevPosition, true) : '', '', d.bingInIndex ? `索引中 ${num(d.bingInIndex)} 个网页` : '', 'Bing 没有整体平均排名，这里按搜索词的展示加权估算（Bing 的搜索词数据按周汇总）')}` : '';
   const GA_TIP = d.ga?.totals ? LIVE : '', NO_GA = d.ga4 ? '暂时无法读取' : '未关联 GA4', NO_SC = '未关联 Search Console';
   // 点击率：和该排名的常见点击率比；排名：1–50 的刻度上标出本期和上期的位置
   const expCtr = gExpCtr;
@@ -5238,6 +5691,7 @@ async function renderSite(token, host) {
         <div class="meta g-src">
           <span class="gico${d.ga4 ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.ga4 ? `Google Analytics 4：${d.ga4.account} / ${d.ga4.name}（${d.ga4.property}）${d.ga4.email ? ` · ${d.ga4.email}` : ''}` : '未关联 Google Analytics 4')}">${BRAND.ga(15)}</span>
           <span class="gico${d.gsc ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.gsc ? `Search Console：${d.gsc}${d.gscEmail ? ` · ${d.gscEmail}` : ''}` : '未关联 Search Console')}">${BRAND.gsc(15)}</span>
+          ${d.bingSite ? `<span class="gico" data-tipf-always data-tipf="${esc(`Bing Webmaster：${d.bingSite}${d.bingSyncedAt ? `\n同步于 ${fmtTime(d.bingSyncedAt)}` : ''}${d.bingError ? `\n同步出错：${d.bingError}` : ''}`)}">${BRAND.bing(15)}</span>` : ''}
           ${d.syncedAt ? `<span class="g-si" data-tipf-always data-tipf="${esc(fmtTime(d.syncedAt))}">${ic('refresh', 13)}同步于 ${ago(d.syncedAt)}</span>` : ''}
           ${siteTagsBar(host, d.tags || [])}${siteLinksHint(d)}</div>
       </div><div class="acts"><button class="btn ghost g-ai" id="g-ai1">${ic('ai', 15)}AI 分析</button>${gRangeBar()}</div></section>
@@ -5251,13 +5705,14 @@ async function renderSite(token, host) {
         ${kc2('gsc', '曝光量', sc ? num(sc.impressions) : '—', sc && sp ? gDelta(sc.impressions, sp.impressions) : '', sc ? sk('i', 'pi', 'var(--violet)') : '', sc ? (sp ? `上一周期 ${num(sp.impressions)}` : '') : NO_SC, '在 Google 搜索结果中出现的次数')}
         ${kc2('gsc', '点击率', sc?.impressions ? pct1(sc.ctr) : '—', sc && sp?.impressions ? gDelta(sc.ctr, sp.ctr) : '', '', sc?.impressions ? `${ctrBar()}<span>该排名常见约 ${pct1(expCtr(sc.position))}</span>` : sc ? '' : NO_SC)}
         ${kc2('gsc', '平均排名', sc?.impressions ? sc.position.toFixed(1) : '—', sc && sp?.impressions ? gDelta(sc.position, sp.position, true) : '', '', sc?.impressions ? rankScale() : sc ? '' : NO_SC, '按展示加权的平均排名，越小越靠前')}
+        ${bingCards}
       </section>
       ${siteLinksCard(d)}
       <div class="grid2">
         <section class="card rv"><div class="card-h"><h3>访问趋势 · GA4</h3><span class="sp"></span><div class="legend" id="lg-ga"></div></div>
           <div class="card-b">${d.ga4 ? '<div class="chart sm" id="ch-ga"></div>' : `<div class="empty">${ic('inbox')}未关联 GA4</div>`}</div></section>
-        <section class="card rv"><div class="card-h"><h3>搜索趋势 · Search Console</h3><span class="sp"></span><div class="legend" id="lg-sc"></div></div>
-          <div class="card-b">${d.gsc ? '<div class="chart sm" id="ch-sc"></div>' : `<div class="empty">${ic('inbox')}未关联 Search Console</div>`}</div></section>
+        <section class="card rv"><div class="card-h"><h3>${d.bingSite ? '搜索趋势' : '搜索趋势 · Search Console'}</h3><span class="sp"></span><div class="legend" id="lg-sc"></div></div>
+          <div class="card-b">${d.gsc || d.bingSite ? '<div class="chart sm" id="ch-sc"></div>' : `<div class="empty">${ic('inbox')}未关联 Search Console</div>`}</div></section>
       </div>
       <div class="grid2">
         ${d.gsc ? tabCard('g-sc', 'Google 搜索', [
@@ -5277,9 +5732,22 @@ async function renderSite(token, host) {
           { label: '设备', html: gt(d.ga?.devices, [{ h: '设备', f: (r) => kcell(r.k) }, { h: '用户', r: 1, f: (r) => num(r.v[0]) }, { h: '会话', r: 1, f: (r) => num(r.v[1]) }]) },
         ], 'rv') : ''}
       </div>
+      ${d.bingSite ? bingCardsHtml(d) : ''}
+      ${d.gsc || d.bingSite ? `<section class="card rv" id="g-idx"><div class="card-h"><h3>${d.gsc && d.bingSite ? '网页索引' : d.gsc ? '网页索引 · Search Console' : '网页索引 · Bing'}</h3><span class="sp"></span>
+        <div class="tabs"><button>网址</button><button>站点地图</button></div>
+        <button type="button" class="btn sm icon" id="ix-chk" aria-label="立即检查" data-tipf-always data-tipf="立即检查：刷新站点地图，再检查待检查的网址（每次最多 60 个）">${ic('refresh', 14)}</button></div>
+        <div class="card-b">${skel(220)}</div></section>` : ''}
     </div>`;
   const page = document.getElementById('page');
   reveal(page);
+  if (d.gsc || d.bingSite) mountSiteIndex(host);
+  const bsc = document.getElementById('b-sc');
+  if (bsc) bsc.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-bqf]');
+    if (!b || b.disabled) return;
+    store.set('b:qf', b.dataset.bqf);
+    bsc.querySelector('.card-b').innerHTML = bingQueryView(d.bing, b.dataset.bqf);
+  });
   bindGRange(() => renderSite(routeToken, host));
   bindSiteTags(host, () => renderSite(routeToken, host));
   bindSiteLinksHint(d);
@@ -5302,19 +5770,21 @@ async function renderSite(token, host) {
     { id: 'u', key: 'u', label: '用户（按天）', color: 'var(--violet)', type: 'line' },
     ...(d.prevDaily.length ? [{ id: 'ps', key: 'ps', label: '上一周期会话', type: 'dash' }] : []),
   ], document.getElementById('lg-ga'));
-  if (d.gsc) mountChart(document.getElementById('ch-sc'), series, [
-    { id: 'c', key: 'c', label: '点击', color: 'var(--teal)', type: 'area' },
-    ...(d.prevDaily.length ? [{ id: 'pc', key: 'pc', label: '上一周期点击', type: 'dash' }] : []),
+  if (d.gsc || d.bingSite) mountChart(document.getElementById('ch-sc'), series, [
+    ...(d.gsc ? [{ id: 'c', key: 'c', label: d.bingSite ? 'Google 点击' : '点击', color: 'var(--teal)', type: 'area' }] : []),
+    ...(d.bingSite ? [{ id: 'bc', key: 'bc', label: 'Bing 点击', color: 'var(--violet)', type: d.gsc ? 'line' : 'area' }] : []),
+    ...(d.prevDaily.length && d.gsc ? [{ id: 'pc', key: 'pc', label: d.bingSite ? '上一周期 Google 点击' : '上一周期点击', type: 'dash' }] : []),
   ], document.getElementById('lg-sc'));
+  mountBingCrawl(d);
 }
 
 // ---------------------------------------------------------------- 设置（修改密码 / 两步验证）
 async function renderSettings(token) {
   const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证、来源追踪和第三方集成</div></div></header>`;
   shell('settings', `${head}<div class="acc">${skel(76, 3)}</div>`);
-  const [mfa, trk, ret, use, goo, shr, sys, ses] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'),
+  const [mfa, trk, ret, use, goo, shr, sys, ses, bst] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'),
     api('/usage').catch((e) => ({ configured: true, errors: [e.message], days: [] })), api('/google/status').catch(() => ({ configured: false })), api('/shares').catch(() => ({ items: [] })), api('/status').catch(() => null),
-    api('/sessions').catch(() => ({ items: [] }))]);
+    api('/sessions').catch(() => ({ items: [] })), api('/bing/status').catch(() => ({ configured: false }))]);
   if (token !== routeToken) return;
   const item = (id, icon, cls, title, sub, status, body) => `
     <section class="card rv fold acc-i" data-acc="${id}">
@@ -5346,6 +5816,7 @@ async function renderSettings(token) {
       ${item('dev', 'desk', 'dev', '登录设备', sessionsSummary(ses), sessionsPill(ses), '')}
       ${item('trk', 'search', 'trk', '来源追踪', '识别访客从哪个搜索引擎进入推广页', pill(trk.enabled), '')}
       ${item('goo', 'google', 'goo brand', 'Google 集成', googleSummary(goo), googlePill(goo), '')}
+      ${item('bing', 'bing', 'bing brand', 'Bing Webmaster', bingSummary(bst), bingPill(bst), '')}
       ${goo.connected || shr.items.length ? item('ai', 'ai', 'ai', 'AI 分析链接', sharesSummary(shr), sharesPill(shr), '') : ''}
       ${item('use', 'cloudflare', 'use brand', 'Cloudflare 用量', usageSummary(use), usagePill(use), '')}
       ${sys ? item('sys', 'pulse', 'sys', '系统状态', sysSummary(sys), sysPill(sys), sysBody(sys)) : ''}
@@ -5382,6 +5853,10 @@ async function renderSettings(token) {
   renderGoogleSettings(document.getElementById('acc-goo'), goo, (g) => {
     page.querySelector('[data-st="goo"]').innerHTML = googlePill(g);
     page.querySelector('[data-sub="goo"]').innerHTML = googleSummary(g);
+  });
+  renderBingSettings(document.getElementById('acc-bing'), bst, (b) => {
+    page.querySelector('[data-st="bing"]').innerHTML = bingPill(b);
+    page.querySelector('[data-sub="bing"]').innerHTML = bingSummary(b);
   });
   const shBox = document.getElementById('acc-ai');
   if (shBox) renderShares(shBox, shr, (l) => {
@@ -5689,6 +6164,66 @@ function renderRetention(box, r, onState) {
 }
 
 // 来源追踪：推广页上放一段代码，把访客来自的搜索引擎带到短链的 utm_source 上
+// ---------------------------------------------------------------- Bing Webmaster 设置
+const bingSummary = (b) => (!b.configured ? '接入 Bing 搜索的点击、展示、搜索词，以及收录检查和网址提交'
+  : `API Key ••••${esc(b.keyTail)} · ${b.sites} 个站点${b.lastSync ? ` · 同步于 ${ago(b.lastSync)}` : ''}${b.error ? ' · 读取出错' : ''}`);
+const bingPill = (b) => (!b.configured ? '<span class="pill off">未配置</span>' : b.error ? '<span class="pill off">出错</span>' : '<span class="pill on">已连接</span>');
+const bingForm = (b) => `<form class="set-form cfg-f" id="bing-f">
+  <div class="field"><label for="bing-key">API Key</label><input class="input mono" id="bing-key" type="password" autocomplete="off" spellcheck="false" maxlength="64"
+    ${b.configured ? `placeholder="已保存 ••••${esc(b.keyTail)}，粘贴新的 Key 替换"` : 'required placeholder="32 位字符"'}></div>
+  <div class="err" style="margin:4px 0 12px" role="alert"></div>
+  <div class="row-l"><button class="btn primary">验证并保存</button>${b.configured ? '<button type="button" class="btn ghost" id="bing-cancel">取消</button>' : ''}</div>
+</form>`;
+function renderBingSettings(box, b, onState) {
+  const done = (d) => { onState(d); renderBingSettings(box, d, onState); };
+  box.innerHTML = !b.configured ? `
+    <p class="set-p">接入后，站点页会多出 Bing 的点击、展示、搜索词和页面排行；网页索引里会检查每个网址是否被 Bing 收录，并能把没收录的网址提交给 Bing。ChatGPT 搜索、Copilot、DuckDuckGo 都用 Bing 的索引。</p>
+    <ol class="use-steps" style="margin-bottom:18px">
+      <li>打开 <a href="https://www.bing.com/webmasters" target="_blank" rel="noopener">Bing Webmaster Tools</a>，添加站点；已在 Google Search Console 验证的站点可以一键导入。</li>
+      <li>右上角 <b>设置（齿轮）→ API 访问 → API Key</b>，生成一个 Key。</li>
+      <li>粘贴到下面。一个 Key 可以访问这个账号下所有已验证的站点。</li>
+    </ol>${bingForm(b)}`
+    : `<div class="cfg-v">
+      <div class="g-acc-l"><div class="g-acc-r${b.error ? ' bad' : ''}"><span class="g-acc-i">${ic(b.error ? 'alert' : 'check', 14)}</span>
+        <div class="g-acc-t"><b>API Key ••••${esc(b.keyTail)}</b>
+          <span>${b.error ? esc(b.error) : [`${b.sites} 个站点（${b.verified} 个已验证）`, `已和 ${b.linked} 个站点合并显示`, b.lastSync ? `同步于 ${ago(b.lastSync)}` : '等待首次同步'].join(' · ')}</span></div>
+        <button type="button" class="btn sm icon" id="bing-sync" aria-label="立即同步" data-tipf-always data-tipf="立即同步：重新列出站点，并同步一批站点的数据">${ic('refresh', 14)}</button>
+        <button type="button" class="btn sm" id="bing-edit">更换 Key</button>
+        <button type="button" class="btn sm ghost danger-t" id="bing-del">删除</button></div></div>
+      ${b.siteErrors ? `<p class="hint" style="margin-top:8px">${ic('alert', 13)} ${b.siteErrors} 个站点同步出错，到站点详情页查看原因</p>` : ''}
+      <label class="opt trk-sw" style="margin-top:16px"><div class="tx"><b>自动提交未收录的网址</b>
+        <span class="hint">每天刷新站点地图后，把 Bing 还没收录、30 天内没提交过的网址提交给 Bing，不超过 Bing 给每个站点的每日配额。</span></div>
+        <span class="switch"><input type="checkbox" id="bing-auto" ${b.auto ? 'checked' : ''}><span class="t"></span></span></label>
+      <div id="bing-fw" hidden style="margin-top:16px">${bingForm(b)}</div></div>`;
+  const f = box.querySelector('#bing-f');
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = f.querySelector('.primary'), err = f.querySelector('.err');
+    btn.disabled = true; err.textContent = ''; btn.textContent = '正在验证…';
+    try { const d = await api('/bing/config', { method: 'PUT', body: { key: f.querySelector('#bing-key').value.trim() } }); toast('Bing API Key 已保存'); done(d); }
+    catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = '验证并保存'; }
+  };
+  if (!b.configured) return;
+  const fw = box.querySelector('#bing-fw');
+  box.querySelector('#bing-edit').onclick = () => { fw.hidden = !fw.hidden; if (!fw.hidden) fw.querySelector('#bing-key').focus(); };
+  box.querySelector('#bing-cancel').onclick = () => { fw.hidden = true; };
+  box.querySelector('#bing-del').onclick = async () => {
+    const ok = await confirmDialog({ title: '删除 Bing API Key？', text: '会删除已同步的 Bing 点击 / 展示数据，站点页不再显示 Bing。之后可以随时重新填写。', ok: '删除', danger: true });
+    if (!ok) return;
+    try { done(await api('/bing/config', { method: 'DELETE' })); toast('已删除 Bing API Key'); } catch (ex) { toast(ex.message, 'bad'); }
+  };
+  box.querySelector('#bing-sync').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true; btn.classList.add('busy');
+    try { const d = await api('/bing/sync', { method: 'POST' }); done(d); toast(d.left ? `已同步 ${d.done} 个站点，还有 ${d.left} 个稍后自动同步` : `已同步 ${d.done} 个站点`); }
+    catch (ex) { toast(ex.message, 'bad'); btn.disabled = false; btn.classList.remove('busy'); }
+  };
+  box.querySelector('#bing-auto').onchange = async (e) => {
+    try { done(await api('/bing/auto', { method: 'PUT', body: { on: e.target.checked } })); toast(e.target.checked ? '已开启自动提交' : '已关闭自动提交'); }
+    catch (ex) { e.target.checked = !e.target.checked; toast(ex.message, 'bad'); }
+  };
+}
+
 function renderTracking(box, t, onState) {
   const tab = store.get('trk:tab', 0);
   const snippet = [t.script, t.code];

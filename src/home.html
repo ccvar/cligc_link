@@ -14,7 +14,7 @@
   if (l === 'en') document.write('<script src="/i18n/home.en.js"><\/script>');
 })();
 </script>
-<meta name="description" content="cligc link 是免费开源、可自托管的短链接服务，运行在 Cloudflare Workers + D1 上：按国家 / 地区分流、来源追踪、实时访问分析，接入 GA4 与 Search Console 看清每个站点的 SEO，还能一键生成给 AI 分析的报告链接。">
+<meta name="description" content="cligc link 是免费开源、可自托管的短链接服务，运行在 Cloudflare Workers + D1 上：按国家 / 地区分流、来源追踪、实时访问分析，接入 GA4、Search Console 和 Bing Webmaster 看清每个站点的 SEO 和收录，还能一键生成给 AI 分析的报告链接。">
 <meta property="og:title" content="cligc link · 每一次点击，都去对的地方">
 <meta property="og:description" content="免费开源、可自托管的短链接服务。按地区分流、来源追踪、实时分析，几分钟部署到 Cloudflare。">
 <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
@@ -545,6 +545,37 @@ footer a:hover { color: var(--text); }
 .ufb.bad s, .ufb.bad i { background: #e5484d; }
 .ufb.bad + em { color: #e5484d; }
 
+
+/* 网页索引 */
+.t-idx { grid-column: span 6; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 40px; align-items: center; }
+.sti.bi { background: #00809D; border-radius: 2px; clip-path: polygon(14% 4%, 42% 14%, 42% 74%, 68% 58%, 55% 51%, 46% 30%, 90% 46%, 90% 70%, 42% 97%, 14% 83%); }
+.tgx { color: var(--muted); font-size: .92em; }
+.ixd { padding: 18px; border-radius: 16px; background: var(--bg); border: 1px solid var(--line); display: grid; gap: 10px; font-size: 13px; }
+.ixh { display: flex; align-items: center; gap: 14px; color: var(--text-2); }
+.ixh i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.ixh i.g { background: var(--good); } .ixh i.n { background: var(--faint); }
+.ixh b { color: var(--text); font-weight: 650; margin-left: 2px; }
+.ixh .sp { flex: 1; } .ixh em { font-style: normal; font-size: 12px; color: var(--muted); }
+.ixb { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--faint) 45%, transparent); overflow: hidden; }
+.ixb s { display: block; height: 100%; width: 0; background: var(--good); border-radius: 4px; transition: width 1.2s var(--ease); transition-delay: .2s; }
+.reveal.in .ixb s { width: var(--w); }
+.ixr { display: flex; justify-content: space-between; gap: 10px; padding: 6px 2px; border-bottom: 1px solid var(--line); color: var(--text-2); font-size: 12.5px; }
+.ixr i.x { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #e5484d; margin-right: 7px; vertical-align: 1px; }
+.ixr b { color: var(--text); font-weight: 600; }
+.ixt { display: grid; gap: 4px; margin-top: 4px; }
+.ixu { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 9px; background: var(--panel); border: 1px solid var(--line);
+  opacity: 0; transform: translateY(6px); transition: opacity .6s var(--ease), transform .6s var(--ease); transition-delay: calc(var(--n) * 110ms + 300ms); }
+.reveal.in .ixu { opacity: 1; transform: none; }
+.ixu code { font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ixu span { font-size: 11.5px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); }
+.ixu span::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+.ixu span.ok::before { background: var(--good); } .ixu span.no::before { background: var(--faint); } .ixu span.wt::before { background: transparent; border: 1.5px dashed var(--faint); width: 4px; height: 4px; }
+.ixs { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.bi-b { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12.5px; }
+.ixs button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; font-size: 12.5px; cursor: default; }
+.ixs button .i { width: 14px; height: 14px; }
+.ixs button small { color: var(--muted); }
+
 /* ==================================================================== 分流、检查、运维 */
 .rules .rr .f.dv { display: grid; place-items: center; color: var(--violet); }
 .rules .rr .f.dv svg { width: 18px; height: 18px; }
@@ -665,7 +696,7 @@ footer a:hover { color: var(--text); }
   .t-bot { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .t-bot > div:first-child { order: 2; }
   .t-seo, .t-cv, .t-out, .t-ai2 { grid-column: span 6; }
-  .t-uf { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .t-uf, .t-idx { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .t-ab, .t-hc, .t-log, .t-dv, .t-sys { grid-column: span 6; grid-row: auto; }
   .t-kb { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .app { grid-template-columns: 1fr; } .app-side { display: none; }
@@ -690,7 +721,7 @@ footer a:hover { color: var(--text); }
   .route-b { padding: 16px; }
   .kp { grid-template-columns: repeat(2, 1fr); }
   .bento { grid-template-columns: 1fr; }
-  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt, .t-trk, .t-bot, .t-st, .t-out, .t-ai2, .t-seo, .t-cv, .t-uf, .t-ab, .t-hc, .t-log, .t-dv, .t-sys, .t-kb { grid-column: auto; }
+  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt, .t-trk, .t-bot, .t-st, .t-out, .t-ai2, .t-idx, .t-seo, .t-cv, .t-uf, .t-ab, .t-hc, .t-log, .t-dv, .t-sys, .t-kb { grid-column: auto; }
   .lgc { white-space: normal; }
   .nav .lang span { display: none; }
   .sth, .str { grid-template-columns: minmax(0, 1.6fr) 1fr 70px; }
@@ -988,23 +1019,23 @@ footer a:hover { color: var(--text); }
     <div class="wrap">
       <div class="sec-h">
         <div class="reveal"><div class="label"><b>03</b> 站点与 SEO</div><h2><span class="nb">短链之外，</span><span class="mute nb">看清每一个站点。</span></h2></div>
-        <p class="reveal" style="--d:1">连接 Google 账号，GA4 和 Search Console 的数据和短链放在一起看：哪个站点在涨、哪些词快进前三、每个站点带来了多少推广点击。</p>
+        <p class="reveal" style="--d:1">连接 Google 和 Bing，GA4、Search Console、Bing Webmaster 的数据和短链放在一起看：哪个站点在涨、哪些词快进前三、哪些页面还没被收录、每个站点带来了多少推广点击。</p>
       </div>
       <div class="bento">
         <article class="tile t-st reveal">
           <span class="tag">// google analytics · search console</span>
           <h3>所有站点，一页看全</h3>
-          <p>授权一次，账号下所有 GA4 媒体资源和 Search Console 站点按域名自动配对。支持多个 Google 账号、分组筛选、7 天到 12 个月的区间对比，还能导出 CSV。</p>
+          <p>授权一次，账号下所有 GA4 媒体资源和 Search Console 站点按域名自动配对；再填一个 Bing API Key，Bing 的点击和展示也并进来。支持多个 Google 账号、分组筛选、7 天到 12 个月的区间对比，还能导出 CSV。</p>
           <div class="stb" aria-hidden="true">
             <div class="sth"><span>站点</span><span>会话</span><span>占比</span><span>搜索点击</span><span>趋势</span></div>
-            <div class="str" style="--n:0"><span><b>blog.example.com</b><i class="sti ga"></i><i class="sti sc"></i></span><span>3,633<em class="up">↑119%</em></span><span><u style="--w:42%"></u></span><span>1,284</span><svg viewBox="0 0 60 18"><path d="M0 14 8 12 16 13 24 9 32 10 40 6 48 7 60 2"/></svg></div>
-            <div class="str" style="--n:1"><span><b>shop.example.com</b><i class="sti ga"></i><i class="sti sc"></i></span><span>1,819<em class="up">↑86%</em></span><span><u style="--w:21%"></u></span><span>642</span><svg viewBox="0 0 60 18"><path d="M0 12 8 13 16 10 24 11 32 8 40 9 48 6 60 5"/></svg></div>
-            <div class="str" style="--n:2"><span><b>docs.example.com</b><i class="sti ga"></i><i class="sti sc"></i></span><span>669</span><span><u style="--w:8%"></u></span><span>89<em class="dn">↓12%</em></span><svg viewBox="0 0 60 18"><path d="M0 6 8 4 16 8 24 7 32 11 40 10 48 13 60 12"/></svg></div>
-            <div class="str" style="--n:3"><span><b>app.example.com</b><i class="sti ga"></i><i class="sti sc off"></i></span><span>464</span><span><u style="--w:5%"></u></span><span>—</span><svg viewBox="0 0 60 18"><path d="M0 10 8 11 16 9 24 12 32 10 40 8 48 9 60 7"/></svg></div>
-            <div class="str" style="--n:4"><span><b>news.example.com</b><i class="sti ga off"></i><i class="sti sc"></i></span><span>—</span><span></span><span>56<em class="up">↑22%</em></span><svg viewBox="0 0 60 18"><path d="M0 13 8 13 16 12 24 13 32 9 40 11 48 10 60 8"/></svg></div>
-            <div class="str" style="--n:5"><span><b>forum.example.com</b><i class="sti ga"></i><i class="sti sc"></i></span><span>251<em class="up">↑206%</em></span><span><u style="--w:3%"></u></span><span>11</span><svg viewBox="0 0 60 18"><path d="M0 15 8 14 16 15 24 12 32 13 40 9 48 6 60 4"/></svg></div>
+            <div class="str" style="--n:0"><span><b>blog.example.com</b><i class="sti ga"></i><i class="sti sc"></i><i class="sti bi"></i></span><span>3,633<em class="up">↑119%</em></span><span><u style="--w:42%"></u></span><span>1,284</span><svg viewBox="0 0 60 18"><path d="M0 14 8 12 16 13 24 9 32 10 40 6 48 7 60 2"/></svg></div>
+            <div class="str" style="--n:1"><span><b>shop.example.com</b><i class="sti ga"></i><i class="sti sc"></i><i class="sti bi"></i></span><span>1,819<em class="up">↑86%</em></span><span><u style="--w:21%"></u></span><span>642</span><svg viewBox="0 0 60 18"><path d="M0 12 8 13 16 10 24 11 32 8 40 9 48 6 60 5"/></svg></div>
+            <div class="str" style="--n:2"><span><b>docs.example.com</b><i class="sti ga"></i><i class="sti sc"></i><i class="sti bi off"></i></span><span>669</span><span><u style="--w:8%"></u></span><span>89<em class="dn">↓12%</em></span><svg viewBox="0 0 60 18"><path d="M0 6 8 4 16 8 24 7 32 11 40 10 48 13 60 12"/></svg></div>
+            <div class="str" style="--n:3"><span><b>app.example.com</b><i class="sti ga"></i><i class="sti sc off"></i><i class="sti bi off"></i></span><span>464</span><span><u style="--w:5%"></u></span><span>—</span><svg viewBox="0 0 60 18"><path d="M0 10 8 11 16 9 24 12 32 10 40 8 48 9 60 7"/></svg></div>
+            <div class="str" style="--n:4"><span><b>news.example.com</b><i class="sti ga off"></i><i class="sti sc"></i><i class="sti bi"></i></span><span>—</span><span></span><span>56<em class="up">↑22%</em></span><svg viewBox="0 0 60 18"><path d="M0 13 8 13 16 12 24 13 32 9 40 11 48 10 60 8"/></svg></div>
+            <div class="str" style="--n:5"><span><b>forum.example.com</b><i class="sti ga"></i><i class="sti sc"></i><i class="sti bi"></i></span><span>251<em class="up">↑206%</em></span><span><u style="--w:3%"></u></span><span>11</span><svg viewBox="0 0 60 18"><path d="M0 15 8 14 16 15 24 12 32 13 40 9 48 6 60 4"/></svg></div>
           </div>
-          <div class="chips"><span>多个 Google 账号</span><span>按域名合并</span><span>分组</span><span>按增长排序</span><span>导出 CSV</span></div>
+          <div class="chips"><span>多个 Google 账号</span><span>Bing Webmaster</span><span>Google / Bing / 合计</span><span>按域名合并</span><span>分组</span><span>按增长排序</span><span>导出 CSV</span></div>
         </article>
         <article class="tile t-out reveal" style="--d:1">
           <span class="tag">// click-out rate</span>
@@ -1019,20 +1050,40 @@ footer a:hover { color: var(--text); }
         <article class="tile t-ai2 reveal" style="--d:2">
           <span class="tag">// ai analysis</span>
           <h3>一个链接，交给 AI 分析</h3>
-          <p>选好站点生成只读链接，连同提示词一起发给 ChatGPT 或 Claude，它就能读到整理好的数据和预先算好的 SEO 机会。</p>
+          <p>选好站点生成只读链接，连同提示词一起发给 ChatGPT 或 Claude，它就能读到整理好的数据（含 Bing 和收录情况）和预先算好的 SEO 机会。</p>
           <div class="aib" aria-hidden="true">
             <div class="aim">请打开这份报告，分析这些站点的 SEO：<span>go.example.com/r/k7Qx…</span></div>
             <div class="aio"><i>排名 4–20 的高展示词</i><i>点击率偏低的词</i><i>下滑的页面</i></div>
           </div>
         </article>
+        <article class="tile t-idx reveal">
+          <div>
+            <span class="tag">// indexing · google + bing</span>
+            <h3>收录了没有，一眼看清</h3>
+            <p>站点地图和搜索结果里的网址逐个检查：Google 编入了多少、没编入的原因是什么，Bing 收录了没有。没被 Bing 收录的网址可以一键提交，也能每天自动提交；ChatGPT 搜索、Copilot 用的都是 Bing 的索引。站点地图也能直接在后台提交给 Google 和 Bing。</p>
+            <div class="chips"><span>URL Inspection</span><span>未编入原因</span><span>自动提交到 Bing</span><span>提交站点地图</span></div>
+          </div>
+          <div class="ixd" aria-hidden="true">
+            <div class="ixh"><span><i class="g"></i>已编入 <b>86</b></span><span><i class="n"></i>未编入 <b>14</b></span><span class="sp"></span><em>共 100 个网址</em></div>
+            <div class="ixb"><s style="--w:86%"></s></div>
+            <div class="ixr"><span>已抓取 - 尚未编入索引</span><b>9</b></div>
+            <div class="ixr"><span><i class="x"></i>服务器错误 (5xx)</span><b>3</b></div>
+            <div class="ixt">
+              <div class="ixu" style="--n:0"><code>/blog/launch</code><span class="ok">已编入</span><span class="ok">已收录</span></div>
+              <div class="ixu" style="--n:1"><code>/pricing</code><span class="ok">已编入</span><span class="wt">已提交 2 天前</span></div>
+              <div class="ixu" style="--n:2"><code>/docs/api</code><span class="no">已抓取 - 尚未编入</span><span class="no">未收录</span></div>
+            </div>
+            <div class="ixs"><span class="bi-b"><i class="sti bi"></i>Bing</span><button type="button" tabindex="-1"><svg class="i" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>提交到 Bing<small>14</small></button></div>
+          </div>
+        </article>
         <article class="tile t-seo reveal">
           <span class="tag">// weekly seo digest</span>
           <h3>每周一，告诉你什么变了</h3>
-          <p>点击涨跌最多的站点、跌出前 10 和接近前 10 的搜索词，推送到 Telegram 或邮箱。可以只看某个分组。</p>
+          <p>搜索点击和 Bing 点击的涨跌、变化最大的站点、跌出前 10 和接近前 10 的搜索词，推送到 Telegram 或邮箱。可以只看某个分组。</p>
           <div class="tgd" aria-hidden="true">
             <div class="tgb">
               <div class="tgh"><span class="tga"><svg class="i" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span><b>cligc link</b><small>周一 09:00</small></div>
-              <div class="tgm">🔎 <b>每周 SEO 变化 · 搜索点击 ↑ 8%</b><br><span class="tgs">📉 点击下滑最多</span>docs.example.com：120 → 86<br><span class="tgs">🎯 接近前 10 的搜索词</span>short link api — 排名 11.4</div>
+              <div class="tgm">🔎 <b>每周 SEO 变化 · 搜索点击 ↑ 8%</b><br><span class="tgx">Bing 点击 214（↑ 15%）</span><br><span class="tgs">📉 点击下滑最多</span>docs.example.com：120 → 86<br><span class="tgs">🎯 接近前 10 的搜索词</span>short link api — 排名 11.4</div>
             </div>
           </div>
         </article>
@@ -1107,7 +1158,7 @@ footer a:hover { color: var(--text); }
           <div>
             <span class="tag">// command palette · i18n</span>
             <h3>⌘K 随时跳转，中英文界面</h3>
-            <p>按 ⌘K（Windows 上是 Ctrl K）搜索短链、站点和设置项，回车直达。后台默认跟随浏览器语言，可以随时切换中文 / English。</p>
+            <p>按 ⌘K（Windows 上是 Ctrl K）搜索短链、站点和设置项，回车直达。后台默认跟随浏览器语言，可以随时切换中文 / English；要截图分享时，点一下眼睛图标，所有域名就显示成 bl•••.com。</p>
           </div>
           <div class="kbd" aria-hidden="true">
             <div class="kbq"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="kbt">spr</span><kbd>⌘K</kbd></div>
@@ -1183,8 +1234,10 @@ footer a:hover { color: var(--text); }
           <div class="a"><div><p>能。每个短链都有修改记录：默认地址、跳转规则、A/B 比例、启用状态等每次修改都会记下修改前后的内容、时间和操作的设备，保留一年。点“撤销”即可改回去；如果之后又被改过，会提示你手动处理，避免把新的修改覆盖掉。</p></div></div></div>
         <div class="q"><button aria-expanded="false">后台支持英文吗？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>支持。后台默认跟随浏览器语言，也可以在“设置 → 界面语言”或登录页切换中文 / English；这个首页右上角也能切换。统计报告、推送消息和 AI 分析报告目前仍是中文。</p></div></div></div>
+        <div class="q"><button aria-expanded="false">必须接入 Bing 吗？<span class="pm" aria-hidden="true"></span></button>
+          <div class="a"><div><p>不是必须的。在 Bing Webmaster Tools 里添加站点（已在 Search Console 验证的可以一键导入），生成一个 API Key 填到后台即可，Bing 的点击、展示、搜索词和收录情况就会和 Google 的数据合并显示。值得接的原因是 ChatGPT 搜索、Copilot、DuckDuckGo 都用 Bing 的索引：没被 Bing 收录的页面，在这些地方也搜不到。没收录的网址可以在后台直接提交给 Bing。</p></div></div></div>
         <div class="q"><button aria-expanded="false">接入 Google Analytics 和 Search Console 要给什么权限？<span class="pm" aria-hidden="true"></span></button>
-          <div class="a"><div><p>只申请只读权限（analytics.readonly、webmasters.readonly），不会改动你的任何设置。用的是你自己在 Google Cloud 创建的 OAuth 客户端，刷新令牌加密后保存在你自己的 D1 数据库里，可以随时断开；可以连接多个 Google 账号，所有站点按域名合并显示。</p></div></div></div>
+          <div class="a"><div><p>GA4 只申请只读权限（analytics.readonly）；Search Console 申请 webmasters 权限，除了读取数据，只用来在你点“提交”时提交站点地图，不会改动其他设置。用的是你自己在 Google Cloud 创建的 OAuth 客户端，刷新令牌加密后保存在你自己的 D1 数据库里，可以随时断开；可以连接多个 Google 账号，所有站点按域名合并显示。</p></div></div></div>
         <div class="q"><button aria-expanded="false">发给 AI 的分析链接安全吗？<span class="pm" aria-hidden="true"></span></button>
           <div class="a"><div><p>链接是只读的，只包含你选中的站点，用 128 位随机地址，默认 7 天后失效，默认隐藏账号邮箱和媒体资源 ID；每个链接每小时最多打开 60 次，不会被搜索引擎收录。后台能看到每次打开的时间、来自哪个 AI 工具和 IP，可以随时撤销。有些 AI 不能打开链接，也可以下载 Markdown 文件上传给它。</p></div></div></div>
         <div class="q"><button aria-expanded="false">会不会不知不觉超出 Cloudflare 的额度？<span class="pm" aria-hidden="true"></span></button>

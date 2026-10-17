@@ -1,5 +1,6 @@
 // ---------------------------------------------------------------- Google：GA4 + Search Console
-// 授权：OAuth 2.0（Web 应用），只读权限 analytics.readonly、webmasters.readonly。
+// 授权：OAuth 2.0（Web 应用），权限 analytics.readonly、webmasters（Search Console 读取 + 提交站点地图）。
+// 早先授权的账号只有 webmasters.readonly，读取不受影响；要提交站点地图需重新连接一次。
 // OAuth 客户端：在后台填写，加密保存在 settings.int_google（旧版本的环境变量会自动导入一次）。
 // 回调地址为 <域名>/api/google/callback。
 // 可以连接多个 Google 账号：每个账号一行 g_accounts，刷新令牌用会话密钥派生的 AES-GCM 密钥加密保存。
@@ -7,12 +8,20 @@
 // 每日数据存在 g_daily，由定时任务和“立即同步”分批更新；详情页的排行、实时数据现查并缓存一小时。
 
 import { sourceUv, hllNew, hllMerge, hllCount } from './agg.js';
+import { bingRaw, bingSummary } from './bing.js';
 
 const SCOPES = [
   'openid', 'email',
   'https://www.googleapis.com/auth/analytics.readonly',
-  'https://www.googleapis.com/auth/webmasters.readonly',
+  'https://www.googleapis.com/auth/webmasters',
 ];
+const SC_WRITE = 'https://www.googleapis.com/auth/webmasters';
+// 账号是否授予了 Search Console 写权限（提交站点地图要用）
+export async function canSubmit(env, secret, acct) {
+  const row = acct && await env.DB.prepare('SELECT auth FROM g_accounts WHERE id = ?').bind(acct).first();
+  if (!row) return false;
+  try { return String((await unseal(secret, row.auth)).scope || '').split(/\s+/).includes(SC_WRITE); } catch { return false; }
+}
 const DAY = 86400000;
 // 首次回填 486 天（Search Console 最多保留 16 个月），够“最近 6 个月”做环比；回填天数变了会重新回填一次
 const BACKFILL_DAYS = 486, GA_REFRESH = 4, SC_REFRESH = 5;
@@ -229,7 +238,8 @@ export async function disconnect(env, secret, id) {
     tokenCache.delete(a.id);
   }));
   if (!id) {
-    await env.DB.batch(['g_accounts', 'g_sites', 'g_daily', 'g_cache'].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+    await env.DB.batch(['g_accounts', 'g_sites', 'g_daily', 'g_cache', 'g_urls', 'g_sitemaps'].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+    await rebuildSites(env);   // Bing 的站点还在
     return;
   }
   await env.DB.prepare('DELETE FROM g_accounts WHERE id = ?').bind(id).run();
@@ -237,16 +247,17 @@ export async function disconnect(env, secret, id) {
 }
 
 // 带令牌请求 Google 接口
-async function gfetch(env, secret, acct, url, body) {
+export async function gfetch(env, secret, acct, url, body, method) {
   const token = await accessToken(env, secret, acct);
   const res = await fetch(url, {
-    method: body ? 'POST' : 'GET',
+    method: method || (body ? 'POST' : 'GET'),
     headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const d = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = d.error?.message || `HTTP ${res.status}`;
+    if (res.status === 429) throw Object.assign(new Error(`配额已用完：${msg}`), { quota: true });
     throw new Error(/has not been used|is disabled/i.test(msg) ? `接口未启用：${msg}` : msg);
   }
   return d;
@@ -306,14 +317,14 @@ export async function discover(env, secret, only) {
 
 // 把所有账号的发现结果按主域名合并进 g_sites。
 // 同一个媒体资源 / 站点多个账号都能看到时，用最早连接的账号；同一域名有“网域”和“网址前缀”两种 GSC 资源时优先网域资源
-async function rebuildSites(env) {
+export async function rebuildSites(env) {
   const accts = (await env.DB.prepare('SELECT id, found FROM g_accounts ORDER BY connected_at').all()).results
     .map((a) => ({ id: a.id, found: a.found ? JSON.parse(a.found) : null }));
   // 已有的对应关系优先保留：同一域名对应多个媒体资源 / 站点时，Google 返回的顺序变了也不换（否则会清空数据重新回填）
-  const old = new Map((await env.DB.prepare('SELECT host, ga4_property, gsc_site FROM g_sites').all()).results.map((r) => [r.host, r]));
+  const old = new Map((await env.DB.prepare('SELECT host, ga4_property, gsc_site, bing_site FROM g_sites').all()).results.map((r) => [r.host, r]));
   const sites = new Map();
   const get = (host) => {
-    if (!sites.has(host)) sites.set(host, { host, ga4_property: '', ga4_name: '', ga4_account: '', ga4_acct: '', gsc_site: '', gsc_acct: '' });
+    if (!sites.has(host)) sites.set(host, { host, ga4_property: '', ga4_name: '', ga4_account: '', ga4_acct: '', gsc_site: '', gsc_acct: '', bing_site: '' });
     return sites.get(host);
   };
   for (const a of accts) {
@@ -332,28 +343,44 @@ async function rebuildSites(env) {
     if (!s.gsc_site || (g.url === keep && s.gsc_site !== keep)) Object.assign(s, { gsc_site: g.url, gsc_acct: g.acct });
   }
 
+  // Bing Webmaster 的站点（bing.js 每天列一次，存在 settings.bing_found）；同一域名有多个时优先已验证的、https 的
+  let bing = null;
+  try { bing = JSON.parse((await env.DB.prepare("SELECT value FROM settings WHERE key = 'bing_found'").first('value')) || 'null'); } catch {}
+  const bscore = (b) => (b.verified ? 2 : 0) + (b.url.startsWith('https:') ? 1 : 0);
+  for (const b of (bing?.sites || []).slice().sort((a, b2) => bscore(b2) - bscore(a))) {
+    const s = get(b.host);
+    if (!s.bing_site) s.bing_site = b.url;
+  }
+
   const now = Date.now();
   const stmts = [gVerStmt(env)];
   for (const s of sites.values()) {
     const o = old.get(s.host);
     stmts.push(env.DB.prepare(
-      `INSERT INTO g_sites (host, ga4_property, ga4_name, ga4_account, ga4_acct, gsc_site, gsc_acct, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO g_sites (host, ga4_property, ga4_name, ga4_account, ga4_acct, gsc_site, gsc_acct, bing_site, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(host) DO UPDATE SET ga4_property = excluded.ga4_property, ga4_name = excluded.ga4_name, ga4_account = excluded.ga4_account,
-         ga4_acct = excluded.ga4_acct, gsc_site = excluded.gsc_site, gsc_acct = excluded.gsc_acct, updated_at = excluded.updated_at`
-    ).bind(s.host, s.ga4_property, s.ga4_name, s.ga4_account, s.ga4_acct, s.gsc_site, s.gsc_acct, now));
+         ga4_acct = excluded.ga4_acct, gsc_site = excluded.gsc_site, gsc_acct = excluded.gsc_acct, bing_site = excluded.bing_site, updated_at = excluded.updated_at`
+    ).bind(s.host, s.ga4_property, s.ga4_name, s.ga4_account, s.ga4_acct, s.gsc_site, s.gsc_acct, s.bing_site, now));
     if (!o) continue;
     // 数据来源变了：清掉旧来源的每日数据，重新回填
     const gaChanged = o.ga4_property !== s.ga4_property, scChanged = o.gsc_site !== s.gsc_site;
     if (gaChanged) stmts.push(env.DB.prepare('UPDATE g_daily SET users = NULL, sessions = NULL, views = NULL, key_events = NULL, engagement = NULL WHERE host = ?').bind(s.host));
-    if (scChanged) stmts.push(env.DB.prepare('UPDATE g_daily SET clicks = NULL, impressions = NULL, ctr = NULL, position = NULL WHERE host = ?').bind(s.host));
+    if (scChanged) stmts.push(env.DB.prepare('UPDATE g_daily SET clicks = NULL, impressions = NULL, ctr = NULL, position = NULL WHERE host = ?').bind(s.host),
+      env.DB.prepare('DELETE FROM g_urls WHERE host = ?').bind(s.host), env.DB.prepare('DELETE FROM g_sitemaps WHERE host = ?').bind(s.host));
+    if (o.bing_site !== s.bing_site) {
+      stmts.push(env.DB.prepare('UPDATE g_daily SET b_clicks = NULL, b_impressions = NULL WHERE host = ?').bind(s.host),
+        env.DB.prepare("UPDATE g_sites SET b_synced_at = 0, b_in_index = 0, b_error = '' WHERE host = ?").bind(s.host),
+        env.DB.prepare("UPDATE g_urls SET b_state = '', b_due_at = 0, b_submitted_at = 0 WHERE host = ?").bind(s.host));
+    }
     if (gaChanged || scChanged) stmts.push(env.DB.prepare("UPDATE g_sites SET synced_at = 0, users = CASE WHEN ? THEN '' ELSE users END WHERE host = ?").bind(gaChanged ? 1 : 0, s.host));
   }
   // 不再出现在任何账号里的站点删掉（有账号这次查询出错时先保留，免得误删）
-  const complete = accts.every((a) => a.found && !a.found.errors?.length && !a.found.failed);
+  const complete = accts.every((a) => a.found && !a.found.errors?.length && !a.found.failed) && !bing?.error;
   if (complete) {
     for (const host of old.keys()) {
       if (sites.has(host)) continue;
-      stmts.push(env.DB.prepare('DELETE FROM g_sites WHERE host = ?').bind(host), env.DB.prepare('DELETE FROM g_daily WHERE host = ?').bind(host));
+      stmts.push(env.DB.prepare('DELETE FROM g_sites WHERE host = ?').bind(host), env.DB.prepare('DELETE FROM g_daily WHERE host = ?').bind(host),
+        env.DB.prepare('DELETE FROM g_urls WHERE host = ?').bind(host), env.DB.prepare('DELETE FROM g_sitemaps WHERE host = ?').bind(host));
     }
   }
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
@@ -471,7 +498,7 @@ async function syncSite(env, secret, s) {
 }
 
 // Google 数据版本号：每日数据、站点对应关系、区间用户数变了就更新
-const gVerStmt = (env) => env.DB.prepare(
+export const gVerStmt = (env) => env.DB.prepare(
   "INSERT INTO settings (key, value, updated_at) VALUES ('g_ver', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
 ).bind(String(Date.now()), Date.now());
 
@@ -508,9 +535,10 @@ export async function status(env, secret) {
     env.DB.prepare('SELECT COUNT(*) AS n FROM g_sites').first('n'),
     env.DB.prepare('SELECT MAX(synced_at) AS t, SUM(synced_at = 0) AS pending FROM g_sites').first(),
   ]);
+  await Promise.all(accts.map(async (a) => { try { a._w = String((await unseal(secret, a.auth)).scope || '').split(/\s+/).includes(SC_WRITE); } catch { a._w = false; } }));
   const list = accts.map((a) => {
     const f = a.found ? JSON.parse(a.found) : null;
-    return { id: a.id, email: a.email, connectedAt: a.connected_at, error: a.error || '',
+    return { id: a.id, email: a.email, connectedAt: a.connected_at, error: a.error || '', canSubmit: !!a._w,
       ga4: f ? f.props.length : null, gsc: f ? f.gsc.length : null, errors: f?.errors || [], discoveredAt: a.found_at || null };
   });
   const many = list.length > 1;
@@ -524,7 +552,7 @@ export async function status(env, secret) {
 }
 
 const sumRange = (rows, from, to) => {
-  const t = { users: 0, sessions: 0, views: 0, key_events: 0, clicks: 0, impressions: 0, posw: 0, engw: 0, hasGa: false, hasGsc: false, ch: null };
+  const t = { users: 0, sessions: 0, views: 0, key_events: 0, clicks: 0, impressions: 0, posw: 0, engw: 0, hasGa: false, hasGsc: false, ch: null, bc: 0, bi: 0, hasBing: false };
   for (const r of rows) {
     if (r.date < from || r.date > to) continue;
     if (r.channels) {
@@ -536,10 +564,12 @@ const sumRange = (rows, from, to) => {
       t.engw += (r.engagement || 0) * r.sessions;
     }
     if (r.clicks != null) { t.hasGsc = true; t.clicks += r.clicks; t.impressions += r.impressions; t.posw += (r.position || 0) * r.impressions; }
+    if (r.b_clicks != null) { t.hasBing = true; t.bc += r.b_clicks; t.bi += r.b_impressions || 0; }
   }
   return {
     ga: t.hasGa ? { sessions: t.sessions, views: t.views, keyEvents: t.key_events, engagement: t.sessions ? t.engw / t.sessions : 0, ...(t.ch ? { channels: t.ch } : {}) } : null,
     gsc: t.hasGsc ? { clicks: t.clicks, impressions: t.impressions, ctr: t.impressions ? t.clicks / t.impressions : 0, position: t.impressions ? t.posw / t.impressions : 0 } : null,
+    bing: t.hasBing ? { clicks: t.bc, impressions: t.bi, ctr: t.bi ? t.bc / t.bi : 0 } : null,
   };
 };
 
@@ -588,7 +618,7 @@ async function sitesDaily(env, days, ver) {
       cur: sumRange(rs, from, to), prev: hasPrev(days) ? sumRange(rs, pfrom, pto) : { ga: null, gsc: null },
       // 每日：n 会话、c 搜索点击、u 用户（按天）、i 搜索展示；prevSpark 是上一周期每天的会话
       spark: rs.filter((r) => r.date >= from).sort((a, b) => (a.date < b.date ? -1 : 1))
-        .map((r) => ({ k: r.date, n: r.sessions ?? 0, c: r.clicks ?? 0, u: r.users ?? 0, i: r.impressions ?? 0 })),
+        .map((r) => ({ k: r.date, n: r.sessions ?? 0, c: r.clicks ?? 0, u: r.users ?? 0, i: r.impressions ?? 0, bc: r.b_clicks ?? 0, bi: r.b_impressions ?? 0 })),
       prevSpark: hasPrev(days) ? rs.filter((r) => r.date >= pfrom && r.date <= pto).map((r) => ({ k: r.date, n: r.sessions ?? 0 })) : [],
     };
   }
@@ -602,8 +632,8 @@ async function sitesDaily(env, days, ver) {
 
 async function sitesListRaw(env, days, ver) {
   const [sites, daily] = await Promise.all([
-    env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email FROM g_sites s
-      LEFT JOIN g_accounts a ON a.id = s.ga4_acct LEFT JOIN g_accounts b ON b.id = s.gsc_acct ORDER BY s.host`).all().then((r) => r.results),
+    env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email, m.n_urls, m.n_yes, m.n_done, m.nb_yes, m.nb_done FROM g_sites s
+      LEFT JOIN g_accounts a ON a.id = s.ga4_acct LEFT JOIN g_accounts b ON b.id = s.gsc_acct LEFT JOIN g_sitemaps m ON m.host = s.host ORDER BY s.host`).all().then((r) => r.results),
     sitesDaily(env, days, ver),
   ]);
   const hostSet = new Set(sites.map((s) => s.host));
@@ -611,7 +641,7 @@ async function sitesListRaw(env, days, ver) {
   const tagsOf = new Map();
   for (const t of tagRows) { if (!tagsOf.has(t.host)) tagsOf.set(t.host, []); tagsOf.get(t.host).push(t.tag); }
   const [sl, sf] = await Promise.all([siteLinks(env, hostSet, days).catch(() => new Map()), siteSources(env, hostSet, days).catch(() => new Map())]);
-  const EMPTY = { cur: { ga: null, gsc: null }, prev: { ga: null, gsc: null }, spark: [], prevSpark: [] };
+  const EMPTY = { cur: { ga: null, gsc: null, bing: null }, prev: { ga: null, gsc: null, bing: null }, spark: [], prevSpark: [] };
   return sites.map((s) => {
     const g = daily[s.host] || EMPTY;
     const users = s.users ? JSON.parse(s.users) : {};
@@ -620,6 +650,9 @@ async function sitesListRaw(env, days, ver) {
       gsc: s.gsc_site || null, gscAcct: s.gsc_acct || '', gscEmail: s.gsc_email || '', syncedAt: s.synced_at || null, error: s.error || '',
       users: users[days] ?? null, prevUsers: hasPrev(days) ? users[`p${days}`] ?? null : null,
       tags: tagsOf.get(s.host) || [],
+      // 网页索引：网址数、已编入、已检查出结果的数量（还没刷新过站点地图时为 null）
+      index: (s.gsc_site || s.bing_site) && s.n_urls != null ? { urls: s.n_urls, yes: s.n_yes, done: s.n_done, byes: s.nb_yes, bdone: s.nb_done } : null,
+      bing: s.bing_site || null, bingInIndex: s.bing_site ? s.b_in_index || 0 : null, bingError: s.b_error || '', bingSyncedAt: s.b_synced_at || null,
       links: sl.get(s.host) || [],          // 跳转到这个站点的短链
       linksFrom: sf.get(s.host) || [],      // 从这个站点点出的短链
       linksFromVisitors: sf.visitors?.get(s.host) ?? null,   // 这些点击来自多少位访客（去重）
@@ -844,6 +877,7 @@ export async function siteDetail(env, secret, host, days) {
   const out = {
     host, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '' } : null,
     gsc: s.gsc_site || null, gscAcct: s.gsc_acct || '', gscEmail: s.gsc_email || '',
+    bingSite: s.bing_site || null, bingInIndex: s.bing_site ? s.b_in_index || 0 : null, bingSyncedAt: s.b_synced_at || null, bingError: s.b_error || '',
     syncedAt: s.synced_at || null, error: s.error || '', days,
     daily: rows.filter((r) => r.date >= from), prevDaily: hasPrev(days) ? rows.filter((r) => r.date < from) : [],
     cur: sumRange(rows, from, to), prev: hasPrev(days) ? sumRange(rows, pfrom, pto) : { ga: null, gsc: null }, errors: [],
@@ -919,6 +953,11 @@ export async function siteDetail(env, secret, host, days) {
       };
     }).then((v) => { out.sc = v; }).catch((e) => { out.errors.push(`GSC：${e.message}`); }));
   }
+  // Bing：搜索词 / 页面按周汇总，抓取统计按天；按区间汇总后缓存 1 小时
+  if (s.bing_site) {
+    tasks.push(cached(env, `bing|${s.bing_site}|${days}|${to}`, 3600000, async () => bingSummary(await bingRaw(env, secret, s.bing_site), from, to, pfrom, pto, hasPrev(days)))
+      .then((v) => { out.bing = v; }).catch((e) => { out.errors.push(`Bing：${e.message}`); }));
+  }
   await Promise.all(tasks);
   return out;
 }
@@ -952,6 +991,7 @@ export async function aiReport(env, secret, hosts, days, sections, hide) {
       host,
       ga4: s.ga4_property ? { name: s.ga4_name, ...(hide ? {} : { property: s.ga4_property, account: s.ga4_account }) } : null,
       searchConsole: s.gsc_site ? (hide ? true : s.gsc_site) : null,
+      bingWebmaster: s.bing_site ? (hide ? true : s.bing_site) : null,
       syncedAt: s.synced_at ? new Date(s.synced_at).toISOString() : null,
       cur: sumRange(daily, from, to), prev: hasPrev(days) ? sumRange(daily, pfrom, pto) : { ga: null, gsc: null },
       users: users[days] ?? null, prevUsers: hasPrev(days) ? users[`p${days}`] ?? null : null,
@@ -961,6 +1001,26 @@ export async function aiReport(env, secret, hosts, days, sections, hide) {
     if (want('search') && s.gsc_site) {
       try { site.search = await searchSection(env, secret, s, days, from, to, pfrom, pto, lim); } catch (e) { site.errors.push(`Search Console：${e.message}`); }
     }
+    if (want('search') && s.bing_site) {
+      try {
+        const v = await cached(env, `bing|${s.bing_site}|${days}|${to}`, 3600000, async () => bingSummary(await bingRaw(env, secret, s.bing_site), from, to, pfrom, pto, hasPrev(days)));
+        const r1 = (x) => ({ k: x.k, clicks: x.clicks, impressions: x.impressions, ctr: +(x.ctr * 100).toFixed(2), position: +x.position.toFixed(1) });
+        const page = (u) => u.replace(/^https?:\/\/[^/]+/, '') || '/';
+        const last = v.crawl[v.crawl.length - 1];
+        site.bing = {
+          position: v.position != null ? +v.position.toFixed(1) : null, prevPosition: v.prevPosition != null ? +v.prevPosition.toFixed(1) : null,
+          strikingDistance: v.queries.filter((x) => x.position >= 4 && x.position <= 20 && x.impressions >= 5).sort((a, b) => b.impressions - a.impressions).slice(0, lim.opp).map(r1),
+          topQueries: v.queries.slice(0, lim.top).map(r1),
+          topPages: v.pages.slice(0, lim.top).map((x) => r1({ ...x, k: page(x.k) })),
+          crawl: last ? { inIndex: last.inIndex, crawled: v.crawl.reduce((a, r) => a + r.crawled, 0), errors: v.crawl.reduce((a, r) => a + r.errors, 0) } : null,
+          crawlIssues: v.issues.length,
+        };
+      } catch (e) { site.errors.push(`Bing：${e.message}`); }
+    }
+    // 收录：网址逐个检查的结果（Google 网址检查 / Bing GetUrlInfo）
+    const ix = await env.DB.prepare('SELECT n_urls, n_yes, n_done, nb_yes, nb_done FROM g_sitemaps WHERE host = ?').bind(host).first();
+    site.index = ix?.n_urls ? { urls: ix.n_urls, googleIndexed: s.gsc_site ? ix.n_yes : null, googleChecked: s.gsc_site ? ix.n_done : null,
+      bingIndexed: s.bing_site ? ix.nb_yes : null, bingChecked: s.bing_site ? ix.nb_done : null } : null;
     if (want('traffic') && s.ga4_property && !compact) {
       try { site.traffic = await trafficSection(env, secret, s, days, from, to, pfrom, pto, lim); } catch (e) { site.errors.push(`GA4：${e.message}`); }
     }
@@ -1096,23 +1156,25 @@ export function reportMarkdown(r) {
   L.push(`- 统计区间：${r.range.from} 至 ${r.range.to}（共 ${r.days} 天，截至昨天）`);
   L.push(`- 对比区间：${r.prevRange ? `${r.prevRange.from} 至 ${r.prevRange.to}（上一个同长度周期）` : '无（区间过长，不做环比）'}`);
   L.push(`- 站点数：${r.sites.length}`);
-  L.push(`- 数据来源：Google Search Console（搜索表现）、Google Analytics 4（访问与转化）、cligc 短链（推广短链的点击）`);
+  L.push(`- 数据来源：Google Search Console（搜索表现）、${r.sites.some((s) => s.bingWebmaster) ? 'Bing Webmaster Tools（Bing 搜索表现、收录）、' : ''}Google Analytics 4（访问与转化）、cligc 短链（推广短链的点击）`);
   L.push(`- 说明：Search Console 数据通常延迟 2–3 天，最近两天偏低；CTR 和排名按展示加权；“机会”部分由程序按规则预先筛选。`);
   if (r.compact) L.push(`- 格式：站点较多（${r.sites.length} 个），使用精简格式——每个站点只列核心指标和搜索机会（每类前 5 条），不含趋势、搜索词 / 页面全表和 GA4 渠道、着陆页明细。需要深入分析某个站点时，可单独为它生成报告。`);
   L.push('');
 
   if (r.sites.length > 1) {
     L.push(`## 站点对比`, '');
-    L.push(table(['站点', '用户', '会话', '会话环比', '关键事件', '搜索点击', '点击环比', '展示', 'CTR', '平均排名'],
+    const hasB = r.sites.some((s) => s.bingWebmaster);
+    L.push(table(['站点', '用户', '会话', '会话环比', '关键事件', '搜索点击', '点击环比', '展示', 'CTR', '平均排名', ...(hasB ? ['Bing 点击', 'Bing 点击环比'] : [])],
       r.sites.map((s) => [s.host, n(s.users), n(s.cur.ga?.sessions), chg(s.cur.ga?.sessions, s.prev.ga?.sessions), n(s.cur.ga?.keyEvents),
         n(s.cur.gsc?.clicks), chg(s.cur.gsc?.clicks, s.prev.gsc?.clicks), n(s.cur.gsc?.impressions), pc(s.cur.gsc?.ctr, 2),
-        s.cur.gsc?.impressions ? s.cur.gsc.position.toFixed(1) : '—'])));
+        s.cur.gsc?.impressions ? s.cur.gsc.position.toFixed(1) : '—', ...(hasB ? [n(s.cur.bing?.clicks), chg(s.cur.bing?.clicks, s.prev.bing?.clicks)] : [])])));
   }
 
   for (const s of r.sites) {
     L.push(`## ${s.host}`, '');
     L.push(`- GA4：${s.ga4 ? `已关联（${s.ga4.name}${s.ga4.property ? `，媒体资源 ${s.ga4.property}` : ''}）` : '未关联'}`);
     L.push(`- Search Console：${s.searchConsole ? `已关联${typeof s.searchConsole === 'string' ? `（${s.searchConsole}）` : ''}` : '未关联'}`);
+    L.push(`- Bing Webmaster：${s.bingWebmaster ? `已关联${typeof s.bingWebmaster === 'string' ? `（${s.bingWebmaster}）` : ''}` : '未关联'}`);
     if (s.errors.length) L.push(`- 读取出错：${s.errors.join('；')}`);
     L.push('');
     L.push(`### 核心指标`, '');
@@ -1146,6 +1208,28 @@ export function reportMarkdown(r) {
       ['搜索 CTR', pc(s.cur.gsc?.ctr, 2), pc(s.prev.gsc?.ctr, 2), '—'],
       ['平均排名', s.cur.gsc?.impressions ? s.cur.gsc.position.toFixed(1) : '—', s.prev.gsc?.impressions ? s.prev.gsc.position.toFixed(1) : '—', '—'],
     ]));
+    if (s.cur.bing || s.bing) {
+      const b = s.bing;
+      L.push(`### Bing 搜索`, '');
+      L.push(table(['指标', '本期', '上期', '变化'], [
+        ['Bing 点击', n(s.cur.bing?.clicks), n(s.prev.bing?.clicks), chg(s.cur.bing?.clicks, s.prev.bing?.clicks)],
+        ['Bing 展示', n(s.cur.bing?.impressions), n(s.prev.bing?.impressions), chg(s.cur.bing?.impressions, s.prev.bing?.impressions)],
+        ['Bing CTR', pc(s.cur.bing?.ctr, 2), pc(s.prev.bing?.ctr, 2), '—'],
+        ['Bing 平均排名（按搜索词估算）', b?.position ?? '—', b?.prevPosition ?? '—', '—'],
+        ...(b?.crawl ? [['Bing 索引中网页 / 区间抓取 / 抓取错误', `${n(b.crawl.inIndex)} / ${n(b.crawl.crawled)} / ${n(b.crawl.errors)}`, '—', '—']] : []),
+      ]));
+      if (b?.strikingDistance?.length) L.push('**Bing 排名 4–20、展示较多的搜索词**', '', table(['搜索词', '点击', '展示', 'CTR', '排名'], b.strikingDistance.map((x) => [x.k, n(x.clicks), n(x.impressions), `${x.ctr}%`, x.position])));
+      if (!r.compact && b?.topQueries?.length) L.push(`**Bing 搜索词（前 ${b.topQueries.length}，按点击；Bing 按周汇总）**`, '', table(['搜索词', '点击', '展示', 'CTR', '排名'], b.topQueries.map((x) => [x.k, n(x.clicks), n(x.impressions), `${x.ctr}%`, x.position])));
+      if (!r.compact && b?.topPages?.length) L.push(`**Bing 页面（前 ${b.topPages.length}，按点击）**`, '', table(['页面', '点击', '展示', 'CTR', '排名'], b.topPages.map((x) => [x.k, n(x.clicks), n(x.impressions), `${x.ctr}%`, x.position])));
+    }
+    if (s.index) {
+      const i = s.index;
+      L.push(`### 收录（站点地图和搜索结果里的 ${n(i.urls)} 个网址逐个检查）`, '');
+      L.push(table(['搜索引擎', '已收录', '已检查', '收录率'], [
+        ...(i.googleIndexed != null ? [['Google', n(i.googleIndexed), n(i.googleChecked), i.googleChecked ? pc(i.googleIndexed / i.googleChecked) : '—']] : []),
+        ...(i.bingIndexed != null ? [['Bing', n(i.bingIndexed), n(i.bingChecked), i.bingChecked ? pc(i.bingIndexed / i.bingChecked) : '—']] : []),
+      ]));
+    }
     if (s.trend.length) {
       L.push(`### 趋势（${r.days <= 28 && r.sites.length <= 5 ? '按天' : '按周，日期为周一'}）`, '');
       L.push(table(['日期', '会话', '用户（按天相加）', '搜索点击', '展示', '平均排名'], s.trend.map((t) => [t.period, n(t.sessions), n(t.users), n(t.clicks), n(t.impressions), t.position ?? '—'])));
@@ -1226,7 +1310,8 @@ export async function seoDigest(env, secret, tag) {
     const rs = by.get(s.host) || [];
     const sc = sumRange(rs, S.from, S.to).gsc, ps = sumRange(rs, S.pfrom, S.pto).gsc;
     const ga = sumRange(rs, G.from, G.to).ga, pg = sumRange(rs, G.pfrom, G.pto).ga;
-    return { s, host: s.host, clicks: sc?.clicks ?? null, prevClicks: ps?.clicks ?? null, impressions: sc?.impressions ?? null, prevImpressions: ps?.impressions ?? null,
+    const bc = sumRange(rs, S.from, S.to).bing, bp = sumRange(rs, S.pfrom, S.pto).bing;
+    return { s, host: s.host, bingClicks: bc?.clicks ?? null, prevBingClicks: bp?.clicks ?? null, clicks: sc?.clicks ?? null, prevClicks: ps?.clicks ?? null, impressions: sc?.impressions ?? null, prevImpressions: ps?.impressions ?? null,
       position: sc?.impressions ? sc.position : null, prevPosition: ps?.impressions ? ps.position : null, sessions: ga?.sessions ?? null, prevSessions: pg?.sessions ?? null };
   });
   const sum = (k) => list.reduce((a, x) => a + (x[k] || 0), 0);
@@ -1253,7 +1338,8 @@ export async function seoDigest(env, secret, tag) {
   }
   return {
     range: S, gaRange: G, sites: list.length, tag: tag || '',
-    totals: { clicks: sum('clicks'), prevClicks: sum('prevClicks'), impressions: sum('impressions'), prevImpressions: sum('prevImpressions'), sessions: sum('sessions'), prevSessions: sum('prevSessions') },
+    bing: list.some((x) => x.s.bing_site),
+    totals: { bingClicks: sum('bingClicks'), prevBingClicks: sum('prevBingClicks'), clicks: sum('clicks'), prevClicks: sum('prevClicks'), impressions: sum('impressions'), prevImpressions: sum('prevImpressions'), sessions: sum('sessions'), prevSessions: sum('prevSessions') },
     drops, gains,
     fellOut: fellOut.sort((a, b) => b.impressions - a.impressions).slice(0, 8),
     near: near.sort((a, b) => b.impressions - a.impressions).slice(0, 8),
