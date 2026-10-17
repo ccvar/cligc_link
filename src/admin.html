@@ -1648,6 +1648,7 @@ button.gtg { cursor: pointer; }
 #b-sc .card-h h3, #b-cr .card-h h3 { display: flex; align-items: center; gap: 7px; }
 /* 网页索引 */
 .ix-of { color: var(--muted); font-size: 12px; margin-left: 1px; }
+.ix-bl { display: inline-flex; align-items: center; gap: 3px; }
 .gd.ix-pg { color: var(--muted); }
 #g-idx .card-h { gap: 10px; flex-wrap: wrap; }
 .ix-g { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 22px; align-items: start; }
@@ -5521,7 +5522,7 @@ function idxCell(x) {
 // Bing：网址检查的结果（已收录 / 网址数）；还没检查时用 Bing 抓取统计里的“索引中的网页数”
 const bingIdxShort = (x) => {
   const i = x.index;
-  return `<span data-tipf-always data-tipf="${esc(`Bing 已收录 ${num(i?.byes || 0)} / 已检查 ${num(i?.bdone || 0)}${x.bingInIndex ? `\nBing 抓取统计：索引中 ${num(x.bingInIndex)} 个网页` : ''}`)}">Bing ${i?.bdone ? num(i.byes) : x.bingInIndex ? num(x.bingInIndex) : '—'}</span>`;
+  return `<span data-tipf-always data-tipf="${esc(`Bing 已收录 ${num(i?.byes || 0)} / 已检查 ${num(i?.bdone || 0)}${x.bingInIndex ? `\nBing 抓取统计：索引中 ${num(x.bingInIndex)} 个网页` : ''}`)}" class="ix-bl">${BRAND.bing(11)}${i?.bdone ? num(i.byes) : x.bingInIndex ? num(x.bingInIndex) : '—'}</span>`;
 };
 function bingIdxCell(x) {
   const i = x.index;
