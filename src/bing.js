@@ -33,7 +33,16 @@ export const bingDate = (v) => { const t = bingTime(v, true); return t ? ymd(t) 
 
 const ERR = { 3: 'API Key 无效', 4: '请求太频繁（用户限流）', 5: '请求太频繁（站点限流）', 6: '账号已被限制', 7: '网址无效', 8: '参数无效',
   11: '没有找到', 13: '不允许的操作', 14: '没有权限：站点不在这个 Bing 账号下或还没验证' };
+// 限流（ThrottleUser / ThrottleHost / ThrottleIP，以及 HTTP 429）时自动等一会儿重试两次
 async function call(key, method, params, body) {
+  for (let i = 0; ; i++) {
+    try { return await call1(key, method, params, body); } catch (e) {
+      if (!e.throttle || i >= 2) throw e;
+      await new Promise((r) => setTimeout(r, i ? 5000 : 2000));
+    }
+  }
+}
+async function call1(key, method, params, body) {
   const q = new URLSearchParams({ ...(params || {}), apikey: key });
   const res = await fetch(`${API}${method}?${q}`, body
     ? { method: 'POST', headers: { 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify(body), signal: AbortSignal.timeout(20000) }
@@ -42,9 +51,11 @@ async function call(key, method, params, body) {
   let d = null;
   try { d = text ? JSON.parse(text) : null; } catch {}
   if (!res.ok || d?.ErrorCode) {
-    const code = d?.ErrorCode ?? 0;
-    const msg = ERR[code] || d?.Message || `HTTP ${res.status}`;
-    throw Object.assign(new Error(msg), { code, throttle: code === 4 || code === 5 || res.status === 429 });
+    const code = d?.ErrorCode ?? 0, raw = String(d?.Message || '');
+    // ThrottleIP：Bing 按来源 IP 限流（Cloudflare 的出口 IP 是共用的，偶尔会碰上），文档里没有对应的错误码
+    const throttle = code === 4 || code === 5 || res.status === 429 || /throttle/i.test(raw);
+    const msg = ERR[code] || (/throttleip/i.test(raw) ? 'Bing 暂时按 IP 限流' : throttle ? '请求太频繁，Bing 暂时限流' : raw.replace(/^ERROR!+\s*/, '')) || `HTTP ${res.status}`;
+    throw Object.assign(new Error(msg), { code, throttle });
   }
   return d?.d ?? null;
 }
@@ -65,7 +76,13 @@ export async function saveBingConfig(env, secret, body) {
   const key = String(body.key || '').trim() || old?.key || '';
   if (!/^[0-9a-f]{32}$/i.test(key)) return { error: 'API Key 应为 32 位十六进制字符，在 Bing Webmaster Tools → 设置 → API 访问 里生成' };
   let sites;
-  try { sites = await bget(key, 'GetUserSites'); } catch (e) { return { error: `验证失败：${e.message}` }; }
+  try { sites = await bget(key, 'GetUserSites'); } catch (e) {
+    if (!e.throttle) return { error: `验证失败：${e.message}` };
+    // 被限流没法验证：先保存，定时任务稍后会重新列出站点；Key 不对的话会在状态里显示错误
+    await setSetting(env, 'int_bing', await seal(secret, { key }));
+    await setSetting(env, 'bing_found', JSON.stringify({ sites: [], at: 0, error: '' }));
+    return { ok: true, pending: true };
+  }
   await setSetting(env, 'int_bing', await seal(secret, { key }));
   await saveFound(env, sites || []);
   await rebuildSites(env);

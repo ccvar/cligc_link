@@ -2160,8 +2160,8 @@ async function bingApi(request, env, url) {
     if (path === '/api/bing/config' && method === 'PUT') {
       const r = await bing.saveBingConfig(env, secret, await request.json().catch(() => ({})));
       if (r.error) return json(r, 400);
-      await bing.syncBatch(env, secret, { limit: 10, cutoff: Date.now(), deadline: Date.now() + 15000 }).catch(() => {});
-      return json(await bing.status(env, secret));
+      if (!r.pending) await bing.syncBatch(env, secret, { limit: 10, cutoff: Date.now(), deadline: Date.now() + 15000 }).catch(() => {});
+      return json({ ...(await bing.status(env, secret)), pending: !!r.pending });
     }
     if (path === '/api/bing/config' && method === 'DELETE') { await bing.deleteBingConfig(env); return json(await bing.status(env, secret)); }
     if (path === '/api/bing/auto' && method === 'PUT') {

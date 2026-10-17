@@ -6205,7 +6205,10 @@ function renderBingSettings(box, b, onState) {
     e.preventDefault();
     const btn = f.querySelector('.primary'), err = f.querySelector('.err');
     btn.disabled = true; err.textContent = ''; btn.textContent = '正在验证…';
-    try { const d = await api('/bing/config', { method: 'PUT', body: { key: f.querySelector('#bing-key').value.trim() } }); toast('Bing API Key 已保存'); done(d); }
+    try {
+      const d = await api('/bing/config', { method: 'PUT', body: { key: f.querySelector('#bing-key').value.trim() } });
+      toast(d.pending ? 'Bing 暂时限流，Key 已先保存，稍后会自动列出站点并同步' : 'Bing API Key 已保存', d.pending ? 'warn' : 'ok'); done(d);
+    }
     catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = '验证并保存'; }
   };
   if (!b.configured) return;
