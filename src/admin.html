@@ -6208,30 +6208,42 @@ const bingPill = (b) => (!b.configured ? '<span class="pill off">未配置</span
   : b.error ? `<span class="pill ${bingThrottled(b) ? 'exp' : 'bad-p'}" data-tipf-always data-tipf="${esc(`${b.error}${bingThrottled(b) ? '\n定时任务每小时会自动重试' : ''}`)}">${bingErrShort(b)}</span>`
   : '<span class="pill on">已连接</span>');
 // 代理转发配置：把 <代理地址><方法> 转到 https://ssl.bing.com/webmaster/api.svc/json/<方法>
-const BING_NGINX = `location /bing-换成一串随机字符/ {
+// 路径里的随机字符：已经设过代理就沿用它的路径，否则生成一串（记在本地，下次打开不变）
+function bingProxyPath(b) {
+  const m = /^https:\/\/[^/]+(\/.+\/)$/.exec(b?.proxy || '');
+  if (m) return m[1];
+  let t = store.get('bing:tok', '');
+  if (!/^[a-z0-9]{20}$/.test(t)) {
+    const a = crypto.getRandomValues(new Uint8Array(20));
+    t = [...a].map((x) => 'abcdefghijklmnopqrstuvwxyz0123456789'[x % 36]).join('');
+    store.set('bing:tok', t);
+  }
+  return `/bing-${t}/`;
+}
+const BING_NGINX = (path) => `location ${path} {
     proxy_pass https://ssl.bing.com/webmaster/api.svc/json/;
     proxy_set_header Host ssl.bing.com;
     proxy_ssl_server_name on;
     proxy_ssl_name ssl.bing.com;
 }`;
-const BING_CADDY = `handle_path /bing-换成一串随机字符/* {
+const BING_CADDY = (path) => `handle_path ${path}* {
     rewrite * /webmaster/api.svc/json{uri}
     reverse_proxy https://ssl.bing.com {
         header_up Host ssl.bing.com
     }
 }`;
-const bingProxyHelp = () => `<details class="wz-more"><summary>怎么搭代理</summary>
+const bingProxyHelp = (b) => { const path = bingProxyPath(b); return `<details class="wz-more"><summary>怎么搭代理</summary>
   <p class="set-p" style="margin-top:8px">Bing 会按来源 IP 限流，Cloudflare 的出口 IP 是很多网站共用的，常被拦下（提示“按 IP 限流”）。在你自己的服务器上加一条转发，让 Bing 请求从那台机器发出：</p>
-  <div class="trk-h"><b>nginx</b><span class="sp"></span>${copyBtn(BING_NGINX, 'btn sm', '复制')}</div><pre class="code">${esc(BING_NGINX)}</pre>
-  <div class="trk-h" style="margin-top:10px"><b>Caddy</b><span class="sp"></span>${copyBtn(BING_CADDY, 'btn sm', '复制')}</div><pre class="code">${esc(BING_CADDY)}</pre>
-  <p class="hint" style="margin-top:8px">站点要启用 https（API Key 在请求参数里）。路径里放一串别人猜不到的随机字符，免得被别人借用。配好后代理地址填 <code>https://你的域名/bing-那串字符/</code>。</p>
-</details>`;
+  <div class="trk-h"><b>nginx</b><span class="sp"></span>${copyBtn(BING_NGINX(path), 'btn sm', '复制')}</div><pre class="code">${esc(BING_NGINX(path))}</pre>
+  <div class="trk-h" style="margin-top:10px"><b>Caddy</b><span class="sp"></span>${copyBtn(BING_CADDY(path), 'btn sm', '复制')}</div><pre class="code">${esc(BING_CADDY(path))}</pre>
+  <p class="hint" style="margin-top:8px">路径里的随机字符已经生成好了，直接复制即可，别人猜不到，不会被借用。站点要启用 https（API Key 在请求参数里）。配好后代理地址填 <code>https://你的域名${esc(path)}</code>。</p>
+</details>`; };
 const bingForm = (b) => `<form class="set-form cfg-f" id="bing-f">
   <div class="field"><label for="bing-key">API Key</label><input class="input mono" id="bing-key" type="password" autocomplete="off" spellcheck="false" maxlength="64"
     ${b.configured ? `placeholder="已保存 ••••${esc(b.keyTail)}，粘贴新的 Key 替换"` : 'required placeholder="32 位字符"'}></div>
   <div class="field"><label for="bing-proxy">代理地址 <span class="hint">可选</span></label><input class="input mono" id="bing-proxy" autocomplete="off" spellcheck="false"
-    placeholder="https://你的域名/bing-随机字符/" value="${esc(b.proxy || '')}"></div>
-  ${bingProxyHelp()}
+    placeholder="https://你的域名${esc(bingProxyPath(b))}" value="${esc(b.proxy || '')}"></div>
+  ${bingProxyHelp(b)}
   <div class="err" style="margin:4px 0 12px" role="alert"></div>
   <div class="row-l"><button class="btn primary">验证并保存</button>${b.configured ? '<button type="button" class="btn ghost" id="bing-cancel">取消</button>' : ''}</div>
 </form>`;
