@@ -239,6 +239,7 @@ async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}
     await env.DB.prepare('DELETE FROM g_cache WHERE at < ?').bind(Date.now() - 2 * DAY).run();
     // 过期的登录设备、一年前的修改记录
     await env.DB.prepare('DELETE FROM sessions WHERE exp < ?').bind(Date.now()).run();
+    await env.DB.prepare('DELETE FROM fb_seen WHERE exp < ?').bind(Date.now()).run();
     await env.DB.prepare('DELETE FROM link_log WHERE at < ?').bind(Date.now() - 365 * DAY).run();
   });
   await step('google', async () => {
@@ -450,9 +451,10 @@ async function handleRedirect(request, env, ctx, url) {
   // 爬虫 / 链接预览不执行脚本，直接跳转；http 地址在 https 页面里无法探测，也直接跳转。
   if (rule && rule.fallback && link.target_url && request.method === 'GET'
     && target.startsWith('https:') && !parseUA(request.headers.get('user-agent') || '').bot) {
-    const exp = Date.now() + 10 * 60 * 1000;
-    const sig = await hmac(await sessionSecret(env), `fb|${rule.id}|${exp}`);
-    return probePage(target, withQuery(link.target_url), { r: rule.id, e: exp, s: sig });
+    // 签名里带一个随机数：每次跳转的签名都不同，上报时同一个签名只算一次
+    const exp = Date.now() + 10 * 60 * 1000, n = toHex(crypto.getRandomValues(new Uint8Array(8)));
+    const sig = await hmac(await sessionSecret(env), `fb|${rule.id}|${exp}|${n}`);
+    return probePage(target, withQuery(link.target_url), { r: rule.id, e: exp, n, s: sig });
   }
 
   return new Response(null, {
@@ -500,15 +502,39 @@ body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f7f
 async function recordFallback(request, env) {
   const body = await request.text().then((t) => JSON.parse(t)).catch(() => ({}));
   const r = Number(body.r), e = Number(body.e);
-  if (!r || !e || e < Date.now() || typeof body.s !== 'string') return new Response(null, { status: 204 });
+  if (!r || !e || e < Date.now() || typeof body.s !== 'string' || typeof body.n !== 'string' || body.n.length > 32) return new Response(null, { status: 204 });
   const secret = await sessionSecret(env);
-  if (await safeEqual(body.s, await hmac(secret, `fb|${r}|${e}`), secret)) {
-    await env.DB.prepare('UPDATE link_targets SET fallbacks = fallbacks + 1 WHERE id = ?').bind(r).run();
+  if (await safeEqual(body.s, await hmac(secret, `fb|${r}|${e}|${body.n}`), secret)) {
+    // 同一个签名只算一次（防止拿到签名后反复提交刷高回退次数）
+    const first = await env.DB.prepare('INSERT OR IGNORE INTO fb_seen (sig, exp) VALUES (?, ?)').bind(body.s, e).run();
+    if (first.meta.changes) await env.DB.prepare('UPDATE link_targets SET fallbacks = fallbacks + 1 WHERE id = ?').bind(r).run();
   }
   return new Response(null, { status: 204 });
 }
 
 const FLOOD_PER_MIN = 10;
+// 防刷的第一道：同一个 Worker 实例里按“IP + 短链”记最近 1 分钟的访问时间。刷到上限后直接跳转，不查也不写数据库，
+// 只把“高频未记录”的次数攒起来，每 FLOOD_FLUSH 次或 30 秒写一次（实例被回收时最多丢掉这几十次计数）
+const FLOOD_FLUSH = 50, FLOOD_KEYS = 5000;
+const recentHits = new Map(), floodPending = new Map();
+function memHits(key, now) {
+  const list = (recentHits.get(key) || []).filter((t) => now - t < 60000);
+  list.push(now);
+  if (!recentHits.has(key) && recentHits.size >= FLOOD_KEYS) {
+    // 表太大时清掉 1 分钟前的
+    for (const [k, v] of recentHits) if (!v.length || now - v[v.length - 1] >= 60000) recentHits.delete(k);
+    if (recentHits.size >= FLOOD_KEYS) recentHits.clear();
+  }
+  recentHits.set(key, list.slice(-(FLOOD_PER_MIN + 1)));
+  return list.length;
+}
+async function flushFlood(env, linkId, now, force) {
+  const p = floodPending.get(linkId);
+  if (!p || (!force && p.n < FLOOD_FLUSH && now - p.at < 30000)) return;
+  floodPending.delete(linkId);
+  await env.DB.prepare('UPDATE links SET clicks = clicks + ?, flood = flood + ?, last_click = MAX(COALESCE(last_click, 0), ?) WHERE id = ?').bind(p.n, p.n, p.last, linkId).run();
+}
+
 async function logClick(request, env, linkId, url, ruleId) {
   const h = request.headers;
   const cf = request.cf || {};
@@ -523,6 +549,14 @@ async function logClick(request, env, linkId, url, ruleId) {
   const parsed = parseUA(ua);
   const now = Date.now();
   const ip = h.get('cf-connecting-ip') || '';
+  if (ip && memHits(`${ip}|${linkId}`, now) > FLOOD_PER_MIN) {
+    const p = floodPending.get(linkId) || { n: 0, at: now, last: now };
+    p.n++; p.last = now;
+    floodPending.set(linkId, p);
+    return flushFlood(env, linkId, now);
+  }
+  // 有攒着没写的高频计数时顺便写掉
+  if (floodPending.has(linkId)) await flushFlood(env, linkId, now, true);
   const recent = 1 + (await env.DB.prepare('SELECT COUNT(*) AS n FROM clicks WHERE link_id = ? AND ts > ? AND ip = ?')
     .bind(linkId, now - 60000, ip).first('n'));
   // 防刷：同一 IP 对同一短链 1 分钟内超过 FLOOD_PER_MIN 次，照常跳转，但不再记明细，只计数（免得被刷爆数据库写入）
@@ -605,6 +639,7 @@ async function authedApi(request, env, url, cred) {
   if (path === '/api/tracking' && method === 'PUT') {
     const body = await request.json().catch(() => ({}));
     await setSetting(env, 'tracking', body.enabled ? '1' : '0');
+    trackCache = { on: !!body.enabled, at: Date.now() };
     return json(await trackingInfo(env, url));
   }
   if (path === '/api/2fa' && method === 'GET') return json({ enabled: !!cred.totp, since: cred.totp?.at || null });
@@ -1095,8 +1130,13 @@ function trackerCode(host) {
 })();`;
 }
 
+// /t.js 每个新访客都会加载一次：开关缓存 1 分钟，不用每次查数据库（在后台改开关时同一实例立即更新，其他实例最多 1 分钟）
+let trackCache = null;
 async function trackingEnabled(env) {
-  return (await getSetting(env, 'tracking'))?.value === '1';
+  if (trackCache && Date.now() - trackCache.at < 60000) return trackCache.on;
+  const on = (await getSetting(env, 'tracking'))?.value === '1';
+  trackCache = { on, at: Date.now() };
+  return on;
 }
 
 async function trackingInfo(env, url) {

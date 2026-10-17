@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS clicks (
 
 CREATE INDEX IF NOT EXISTS idx_clicks_link_ts ON clicks(link_id, ts);
 CREATE INDEX IF NOT EXISTS idx_clicks_ts ON clicks(ts);
+-- 防刷：数“同一 IP 1 分钟内访问同一短链几次”时只读这个 IP 的记录（只按短链 + 时间查，被很多 IP 刷时会读出整分钟的全部访问）
+CREATE INDEX IF NOT EXISTS idx_clicks_link_ip_ts ON clicks(link_id, ip, ts);
 
 -- 按国家 / 地区跳转到不同目标地址
 CREATE TABLE IF NOT EXISTS link_targets (
@@ -109,6 +111,11 @@ CREATE TABLE IF NOT EXISTS agg_uv (
 );
 
 -- 登录防暴力破解：按 IP 记录连续失败次数和锁定时间
+-- 回退上报（/_fb）已用过的签名：同一次跳转只算一次，过期后由定时任务清掉
+CREATE TABLE IF NOT EXISTS fb_seen (
+  sig  TEXT PRIMARY KEY,
+  exp  INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS login_guard (
   ip     TEXT PRIMARY KEY,
   n      INTEGER NOT NULL DEFAULT 0,    -- 当前连续失败次数
