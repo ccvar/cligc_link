@@ -2,6 +2,18 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.4.1 · 2026-10-17
+
+Site data now shows where it comes from, and tables sort by clicking a column header.
+
+### Improved
+
+- In the site table, the search clicks, impressions, CTR, position and indexed columns show source icons (Google Search Console / Bing / both) that follow the Google / Bing / Combined switch; in Combined mode, hovering a number shows the Google and Bing values separately
+- Every column of the site table sorts by clicking its header (click again to reverse, and the choice is remembered); the "By sessions / clicks / growth / domain" buttons are gone ("growth" is on the "Session trend" header)
+- Data tables on the site page (queries, pages, GA4, Bing…) also sort by clicking a header
+- The summary cards on the Sites page and the Sites card on the overview show source icons (GA4 / Search Console / Bing) with explanations on hover; the overview card's search clicks and impressions follow the Sites page's Google / Bing / Combined choice
+- The site table no longer scrolls horizontally at 1280 px
+
 ## v1.4.0 · 2026-10-17
 
 Short-link QR codes, opening apps, and a large batch of fixes from a full review. **Fixes fresh deployments since v1.1.1 failing to create tables, which made the admin and every link return errors** — please upgrade if you deployed with the button or the CLI.
