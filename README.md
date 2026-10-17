@@ -379,6 +379,19 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 - 网页索引卡片用 `GetUrlInfo` 检查每个网址是否在 Bing 索引里（Bing 限流较严，每小时约检查 36 个，已收录的 30 天复查一次、未收录的 7 天），可以逐个或批量提交；“自动提交”默认开启，每天把未收录、30 天内没提交过的网址按配额提交。
 - AI 分析报告和每周 SEO 变化里也会带上 Bing 的数据。
 
+**Bing 提示“按 IP 限流”怎么办**：Bing 会按来源 IP 限流，Cloudflare Workers 的出口 IP 是很多网站共用的，常被拦下。在自己的服务器上加一条转发，然后在“设置 → Bing Webmaster”里填上代理地址（`https://你的域名/bing-随机字符/`），Bing 请求就会从那台机器发出。nginx 示例（Caddy 的写法在后台的“怎么搭代理”里）：
+
+```nginx
+location /bing-换成一串随机字符/ {
+    proxy_pass https://ssl.bing.com/webmaster/api.svc/json/;
+    proxy_set_header Host ssl.bing.com;
+    proxy_ssl_server_name on;
+    proxy_ssl_name ssl.bing.com;
+}
+```
+
+代理地址必须是 https（API Key 在请求参数里），路径里放一串别人猜不到的随机字符。
+
 ### AI 分析链接
 
 在“站点”页（或站点详情页）右上角点“AI 分析”，选择站点（一个或多个，最多 100 个；超过 30 个时报告自动使用精简格式，每个站点只保留核心指标和搜索机会）、时间范围（28 天 / 3 个月 / 6 个月）和包含的内容，生成一个只读链接，发给 ChatGPT、Claude 等 AI，让它分析这些站点的 SEO。

@@ -381,6 +381,19 @@ Add your sites in [Bing Webmaster Tools](https://www.bing.com/webmasters) (sites
 - The Page indexing card uses `GetUrlInfo` to check whether each URL is in Bing's index (Bing rate-limits this tightly, so about 36 URLs an hour; indexed URLs are re-checked every 30 days, others weekly) and can submit URLs one by one or in bulk; "Auto-submit" is on by default and submits URLs not in the index (and not submitted in the last 30 days) daily within the quota.
 - AI analysis reports and the weekly SEO changes include Bing data too.
 
+**If Bing says it's "throttling this IP"**: Bing rate-limits by source IP, and Cloudflare Workers' outgoing IPs are shared by many sites, so they often get blocked. Add a forwarding rule on your own server and enter the proxy address (`https://your-domain/bing-random-string/`) under "Settings → Bing Webmaster"; Bing requests then go out from that machine. nginx example (the Caddy version is under "How to set up a proxy" in the admin):
+
+```nginx
+location /bing-replace-with-a-random-string/ {
+    proxy_pass https://ssl.bing.com/webmaster/api.svc/json/;
+    proxy_set_header Host ssl.bing.com;
+    proxy_ssl_server_name on;
+    proxy_ssl_name ssl.bing.com;
+}
+```
+
+The proxy address must use https (the API key is in the query string); put a random string in the path that others can't guess.
+
 ### AI analysis links
 
 On the "Sites" page (or a site page), click "AI analysis" at the top right, choose sites (one or more, up to 100; above 30 the report uses a compact format with only core metrics and search opportunities per site), a range (28 days / 3 months / 6 months) and sections, and generate a read-only link to send to ChatGPT, Claude or another AI to analyze the sites' SEO.

@@ -896,6 +896,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .cfg-ro[hidden], [data-cfg-form][hidden] { display: none; }
 .use-cfg { margin-top: 16px; }
 .cfg-f { max-width: 460px; }
+/* Bing 表单：输入框保持窄，代理说明和配置代码可以更宽 */
+#bing-f { max-width: 640px; }
+#bing-f .field { max-width: 460px; }
 .row-l { display: flex; align-items: center; gap: 8px; }
 .btn.danger-t { color: var(--bad); }
 .wz-more { margin-top: 4px; font-size: 13px; color: var(--text-2); }
@@ -6204,9 +6207,31 @@ const bingSummary = (b) => (!b.configured ? '接入 Bing 搜索的点击、展�
 const bingPill = (b) => (!b.configured ? '<span class="pill off">未配置</span>'
   : b.error ? `<span class="pill ${bingThrottled(b) ? 'exp' : 'bad-p'}" data-tipf-always data-tipf="${esc(`${b.error}${bingThrottled(b) ? '\n定时任务每小时会自动重试' : ''}`)}">${bingErrShort(b)}</span>`
   : '<span class="pill on">已连接</span>');
+// 代理转发配置：把 <代理地址><方法> 转到 https://ssl.bing.com/webmaster/api.svc/json/<方法>
+const BING_NGINX = `location /bing-换成一串随机字符/ {
+    proxy_pass https://ssl.bing.com/webmaster/api.svc/json/;
+    proxy_set_header Host ssl.bing.com;
+    proxy_ssl_server_name on;
+    proxy_ssl_name ssl.bing.com;
+}`;
+const BING_CADDY = `handle_path /bing-换成一串随机字符/* {
+    rewrite * /webmaster/api.svc/json{uri}
+    reverse_proxy https://ssl.bing.com {
+        header_up Host ssl.bing.com
+    }
+}`;
+const bingProxyHelp = () => `<details class="wz-more"><summary>怎么搭代理</summary>
+  <p class="set-p" style="margin-top:8px">Bing 会按来源 IP 限流，Cloudflare 的出口 IP 是很多网站共用的，常被拦下（提示“按 IP 限流”）。在你自己的服务器上加一条转发，让 Bing 请求从那台机器发出：</p>
+  <div class="trk-h"><b>nginx</b><span class="sp"></span>${copyBtn(BING_NGINX, 'btn sm', '复制')}</div><pre class="code">${esc(BING_NGINX)}</pre>
+  <div class="trk-h" style="margin-top:10px"><b>Caddy</b><span class="sp"></span>${copyBtn(BING_CADDY, 'btn sm', '复制')}</div><pre class="code">${esc(BING_CADDY)}</pre>
+  <p class="hint" style="margin-top:8px">站点要启用 https（API Key 在请求参数里）。路径里放一串别人猜不到的随机字符，免得被别人借用。配好后代理地址填 <code>https://你的域名/bing-那串字符/</code>。</p>
+</details>`;
 const bingForm = (b) => `<form class="set-form cfg-f" id="bing-f">
   <div class="field"><label for="bing-key">API Key</label><input class="input mono" id="bing-key" type="password" autocomplete="off" spellcheck="false" maxlength="64"
     ${b.configured ? `placeholder="已保存 ••••${esc(b.keyTail)}，粘贴新的 Key 替换"` : 'required placeholder="32 位字符"'}></div>
+  <div class="field"><label for="bing-proxy">代理地址 <span class="hint">可选</span></label><input class="input mono" id="bing-proxy" autocomplete="off" spellcheck="false"
+    placeholder="https://你的域名/bing-随机字符/" value="${esc(b.proxy || '')}"></div>
+  ${bingProxyHelp()}
   <div class="err" style="margin:4px 0 12px" role="alert"></div>
   <div class="row-l"><button class="btn primary">验证并保存</button>${b.configured ? '<button type="button" class="btn ghost" id="bing-cancel">取消</button>' : ''}</div>
 </form>`;
@@ -6222,10 +6247,11 @@ function renderBingSettings(box, b, onState) {
     : `<div class="cfg-v">
       <div class="g-acc-l"><div class="g-acc-r${b.error ? bingThrottled(b) ? ' warn' : ' bad' : ''}"><span class="g-acc-i">${ic(b.error ? 'alert' : 'check', 14)}</span>
         <div class="g-acc-t"><b>API Key ••••${esc(b.keyTail)}</b>
-          <span>${b.error ? esc(bingThrottled(b) ? `${b.error}，定时任务每小时会自动重试` : b.error) : [`${b.sites} 个站点（${b.verified} 个已验证）`, `已和 ${b.linked} 个站点合并显示`, b.lastSync ? `同步于 ${ago(b.lastSync)}` : '等待首次同步'].join(' · ')}</span></div>
+          <span>${b.error ? esc(bingThrottled(b) ? `${b.error}，定时任务每小时会自动重试${b.proxy ? '' : '；一直这样的话请设置代理地址'}` : b.error) : [`${b.sites} 个站点（${b.verified} 个已验证）`, `已和 ${b.linked} 个站点合并显示`, b.lastSync ? `同步于 ${ago(b.lastSync)}` : '等待首次同步'].join(' · ')}</span></div>
         <button type="button" class="btn sm icon" id="bing-sync" aria-label="立即同步" data-tipf-always data-tipf="立即同步：重新列出站点，并同步一批站点的数据">${ic('refresh', 14)}</button>
-        <button type="button" class="btn sm" id="bing-edit">更换 Key</button>
+        <button type="button" class="btn sm" id="bing-edit">${bingThrottled(b) && !b.proxy ? '设置代理' : '修改'}</button>
         <button type="button" class="btn sm ghost danger-t" id="bing-del">删除</button></div></div>
+      ${b.proxy ? `<p class="hint" style="margin-top:8px">${ic('globe', 13)} Bing 请求经代理发出：<code>${esc(new URL(b.proxy).host)}</code></p>` : ''}
       ${b.siteErrors ? `<p class="hint" style="margin-top:8px">${ic('alert', 13)} ${b.siteErrors} 个站点同步出错，到站点详情页查看原因</p>` : ''}
       <label class="opt trk-sw" style="margin-top:16px"><div class="tx"><b>自动提交未收录的网址</b>
         <span class="hint">每天刷新站点地图后，把 Bing 还没收录、30 天内没提交过的网址提交给 Bing，不超过 Bing 给每个站点的每日配额。</span></div>
@@ -6237,7 +6263,7 @@ function renderBingSettings(box, b, onState) {
     const btn = f.querySelector('.primary'), err = f.querySelector('.err');
     btn.disabled = true; err.textContent = ''; btn.textContent = '正在验证…';
     try {
-      const d = await api('/bing/config', { method: 'PUT', body: { key: f.querySelector('#bing-key').value.trim() } });
+      const d = await api('/bing/config', { method: 'PUT', body: { key: f.querySelector('#bing-key').value.trim(), proxy: f.querySelector('#bing-proxy').value.trim() } });
       toast(d.pending ? 'Bing 暂时限流，Key 已先保存，稍后会自动列出站点并同步' : 'Bing API Key 已保存', d.pending ? 'warn' : 'ok'); done(d);
     }
     catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = '验证并保存'; }

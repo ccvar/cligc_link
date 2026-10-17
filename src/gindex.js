@@ -286,7 +286,8 @@ export async function bingSubmit(env, key, s, { urls, limit = 500 } = {}) {
 const idxSites = async (env, host) => new Map((await env.DB.prepare(
   `SELECT host, gsc_site, gsc_acct, bing_site FROM g_sites WHERE ((gsc_site != '' AND gsc_acct != '') OR bing_site != '')${host ? ' AND host = ?' : ''}`
 ).bind(...(host ? [host] : [])).all()).results.map((s) => [s.host, s]));
-const bingKey = async (env, secret) => (await bing.bingCreds(env, secret))?.key || '';
+// Bing 的凭据 { key, proxy }；没配置时为 null
+const bingKey = async (env, secret) => (await bing.bingCreds(env, secret)) || null;
 
 // 刷新几个站点的站点地图，再检查一批到期的网址（Google 和 Bing 各一批）
 export async function cronBatch(env, secret, { budgetMs = 100000, bingBudget = B_BUDGET, autoSubmit = true } = {}) {

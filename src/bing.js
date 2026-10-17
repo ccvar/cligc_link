@@ -1,5 +1,8 @@
 // ---------------------------------------------------------------- Bing Webmaster Tools
 // 授权：API Key（Bing Webmaster → 设置 → API 访问），加密保存在 settings.int_bing；一个 Key 能访问该账号下所有已验证的站点。
+// 代理：Bing 会按来源 IP 限流（ThrottleIP），Cloudflare 的出口 IP 是共用的，常被拦下；可以填一个代理地址（自己服务器上的 nginx / Caddy 转发），
+// 请求改为 <代理地址><方法>?…，由代理转到 https://ssl.bing.com/webmaster/api.svc/json/<方法>?…。
+// 下面的 cred 是 { key, proxy }（也兼容只传 Key 字符串）。
 // 站点按主域名并入 g_sites.bing_site（和 GA4 / GSC 合并显示）；每日点击 / 展示存在 g_daily.b_clicks / b_impressions。
 // 接口：https://ssl.bing.com/webmaster/api.svc/json/<方法>?apikey=…；读取用 GET + 查询参数，写入用 POST + JSON；
 // 返回 {"d": …}，日期是 .NET 格式 /Date(1399014000000-0700)/，出错时返回 {"ErrorCode", "Message"}。
@@ -34,22 +37,28 @@ export const bingDate = (v) => { const t = bingTime(v, true); return t ? ymd(t) 
 const ERR = { 3: 'API Key 无效', 4: '请求太频繁（用户限流）', 5: '请求太频繁（站点限流）', 6: '账号已被限制', 7: '网址无效', 8: '参数无效',
   11: '没有找到', 13: '不允许的操作', 14: '没有权限：站点不在这个 Bing 账号下或还没验证' };
 // 限流（ThrottleUser / ThrottleHost / ThrottleIP，以及 HTTP 429）时自动等一会儿重试两次
-async function call(key, method, params, body) {
+async function call(cred, method, params, body) {
   for (let i = 0; ; i++) {
-    try { return await call1(key, method, params, body); } catch (e) {
+    try { return await call1(cred, method, params, body); } catch (e) {
       if (!e.throttle || i >= 2) throw e;
       await new Promise((r) => setTimeout(r, i ? 5000 : 2000));
     }
   }
 }
-async function call1(key, method, params, body) {
+async function call1(cred, method, params, body) {
+  const key = typeof cred === 'string' ? cred : cred.key, proxy = typeof cred === 'string' ? '' : cred.proxy || '';
   const q = new URLSearchParams({ ...(params || {}), apikey: key });
-  const res = await fetch(`${API}${method}?${q}`, body
+  let res;
+  try {
+    res = await fetch(`${proxy || API}${method}?${q}`, body
     ? { method: 'POST', headers: { 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify(body), signal: AbortSignal.timeout(20000) }
     : { signal: AbortSignal.timeout(20000) });
+  } catch (e) { throw new Error(proxy ? `连不上代理地址：${e.message}` : e.message); }
   const text = await res.text();
   let d = null;
   try { d = text ? JSON.parse(text) : null; } catch {}
+  // 代理配置不对时（404、502 之类）返回的不是 Bing 的 JSON
+  if (proxy && !res.ok && !d) throw new Error(`代理返回 HTTP ${res.status}，请检查代理配置`);
   if (!res.ok || d?.ErrorCode) {
     const code = d?.ErrorCode ?? 0, raw = String(d?.Message || '');
     // ThrottleIP：Bing 按来源 IP 限流（Cloudflare 的出口 IP 是共用的，偶尔会碰上），文档里没有对应的错误码
@@ -59,8 +68,8 @@ async function call1(key, method, params, body) {
   }
   return d?.d ?? null;
 }
-export const bget = (key, method, params) => call(key, method, params);
-export const bpost = (key, method, body) => call(key, method, null, body);
+export const bget = (cred, method, params) => call(cred, method, params);
+export const bpost = (cred, method, body) => call(cred, method, null, body);
 
 // ---------------------------------------------------------------- 凭据
 
@@ -70,24 +79,39 @@ export async function bingCreds(env, secret) {
   try { return await unseal(secret, s); } catch { return null; }
 }
 
-// 保存前先列一次站点，确认 Key 有效
+// 代理地址：必须是 https（Key 在查询参数里），统一以 / 结尾
+export function normProxy(v) {
+  const t = String(v || '').trim();
+  if (!t) return { proxy: '' };
+  let u;
+  try { u = new URL(t); } catch { return { error: '代理地址格式不对，应类似 https://你的域名/bing-一串随机字符/' }; }
+  if (u.protocol !== 'https:') return { error: '代理地址必须是 https（API Key 会放在请求参数里）' };
+  if (u.search || u.hash) return { error: '代理地址不要带 ? 或 # 后面的部分' };
+  return { proxy: u.href.endsWith('/') ? u.href : `${u.href}/` };
+}
+
+// 保存前先列一次站点，确认 Key（和代理）有效。body.proxy 不传时沿用原来的代理，传空字符串表示不用代理
 export async function saveBingConfig(env, secret, body) {
   const old = await bingCreds(env, secret);
   const key = String(body.key || '').trim() || old?.key || '';
   if (!/^[0-9a-f]{32}$/i.test(key)) return { error: 'API Key 应为 32 位十六进制字符，在 Bing Webmaster Tools → 设置 → API 访问 里生成' };
+  const np = body.proxy === undefined ? { proxy: old?.proxy || '' } : normProxy(body.proxy);
+  if (np.error) return { error: np.error };
+  const cred = { key, ...(np.proxy ? { proxy: np.proxy } : {}) };
+  const keyChanged = key !== old?.key;
   let sites;
-  try { sites = await bget(key, 'GetUserSites'); } catch (e) {
+  try { sites = await bget(cred, 'GetUserSites'); } catch (e) {
     if (!e.throttle) return { error: `验证失败：${e.message}` };
     // 被限流没法验证：先保存，定时任务稍后会重新列出站点；Key 不对的话会在状态里显示错误
-    await setSetting(env, 'int_bing', await seal(secret, { key }));
+    await setSetting(env, 'int_bing', await seal(secret, cred));
     await setSetting(env, 'bing_found', JSON.stringify({ sites: [], at: 0, error: '' }));
     return { ok: true, pending: true };
   }
-  await setSetting(env, 'int_bing', await seal(secret, { key }));
+  await setSetting(env, 'int_bing', await seal(secret, cred));
   await saveFound(env, sites || []);
   await rebuildSites(env);
   // 新 Key：所有站点重新同步
-  await env.DB.prepare('UPDATE g_sites SET b_synced_at = 0').run();
+  if (keyChanged) await env.DB.prepare('UPDATE g_sites SET b_synced_at = 0').run();
   return { ok: true };
 }
 
@@ -117,7 +141,7 @@ export async function bingFound(env) {
 export async function discover(env, secret) {
   const c = await bingCreds(env, secret);
   if (!c) return;
-  try { await saveFound(env, (await bget(c.key, 'GetUserSites')) || []); }
+  try { await saveFound(env, (await bget(c, 'GetUserSites')) || []); }
   catch (e) {
     // 出错时保留上次的站点和读取时间，只记下错误（定时任务每小时会再试）
     const old = await bingFound(env);
@@ -133,7 +157,7 @@ export async function status(env, secret) {
   const f = await bingFound(env);
   const r = await env.DB.prepare("SELECT COUNT(*) AS n, MAX(b_synced_at) AS t, SUM(b_error != '') AS bad FROM g_sites WHERE bing_site != ''").first();
   return {
-    configured: true, keyTail: c.key.slice(-4), auto: await bingAuto(env),
+    configured: true, keyTail: c.key.slice(-4), proxy: c.proxy || '', auto: await bingAuto(env),
     sites: f?.sites?.length || 0, verified: f?.sites?.filter((s) => s.verified).length || 0,
     linked: r?.n || 0, lastSync: r?.t || null, siteErrors: r?.bad || 0, error: f?.error || '', discoveredAt: f?.at || null,
   };
@@ -189,7 +213,7 @@ export async function syncBatch(env, secret, { limit = 25, cutoff = Date.now() -
   let done = 0;
   for (const s of due) {
     if (Date.now() > deadline) break;
-    try { await syncSite(env, c.key, s); done++; } catch (e) { if (e.throttle) break; }
+    try { await syncSite(env, c, s); done++; } catch (e) { if (e.throttle) break; }
   }
   const left = await env.DB.prepare("SELECT COUNT(*) AS n FROM g_sites WHERE bing_site != '' AND b_synced_at < ?").bind(cutoff).first('n');
   return { done, left };
@@ -218,10 +242,10 @@ export async function bingRaw(env, secret, site) {
   const c = await bingCreds(env, secret);
   if (!c) throw new Error('未配置 Bing API Key');
   const [queries, pages, crawl, issues] = await Promise.all([
-    bget(c.key, 'GetQueryStats', { siteUrl: site }),
-    bget(c.key, 'GetPageStats', { siteUrl: site }),
-    bget(c.key, 'GetCrawlStats', { siteUrl: site }).catch(() => []),
-    bget(c.key, 'GetCrawlIssues', { siteUrl: site }).catch(() => []),
+    bget(c, 'GetQueryStats', { siteUrl: site }),
+    bget(c, 'GetPageStats', { siteUrl: site }),
+    bget(c, 'GetCrawlStats', { siteUrl: site }).catch(() => []),
+    bget(c, 'GetCrawlIssues', { siteUrl: site }).catch(() => []),
   ]);
   const slim = (rows) => (rows || []).map((r) => ({ Query: r.Query, Date: r.Date, Clicks: r.Clicks, Impressions: r.Impressions, AvgImpressionPosition: r.AvgImpressionPosition }));
   return {

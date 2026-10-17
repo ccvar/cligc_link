@@ -12,3 +12,12 @@ test('bingTime / bingDate 解析 .NET 日期', () => {
   assert.equal(bingTime(null), 0);
   assert.equal(bingDate(''), '');
 });
+
+test('normProxy 校验代理地址', async () => {
+  const { normProxy } = await import('../src/bing.js');
+  assert.deepEqual(normProxy(''), { proxy: '' });
+  assert.deepEqual(normProxy('https://a.com/bing-x'), { proxy: 'https://a.com/bing-x/' });
+  assert.ok(normProxy('http://a.com/x/').error);
+  assert.ok(normProxy('https://a.com/x/?a=1').error);
+  assert.ok(normProxy('not a url').error);
+});
