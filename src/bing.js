@@ -9,6 +9,7 @@
 // 搜索词 / 页面统计是按周汇总的，没有日期参数，一次返回全部（约 6 个月）。
 
 import { seal, unseal, siteHost, rebuildSites, gVerStmt } from './google.js';
+import { spend } from './budget.js';
 
 const DAY = 86400000;
 const API = 'https://ssl.bing.com/webmaster/api.svc/json/';
@@ -40,7 +41,7 @@ const ERR = { 3: 'API Key 无效', 4: '请求太频繁（用户限流）', 5: '�
 async function call(cred, method, params, body) {
   for (let i = 0; ; i++) {
     try { return await call1(cred, method, params, body); } catch (e) {
-      if (!e.throttle || i >= 2) throw e;
+      if (!e.throttle || e.budget || i >= 2) throw e;
       await new Promise((r) => setTimeout(r, i ? 5000 : 2000));
     }
   }
@@ -48,6 +49,7 @@ async function call(cred, method, params, body) {
 async function call1(cred, method, params, body) {
   const key = typeof cred === 'string' ? cred : cred.key, proxy = typeof cred === 'string' ? '' : cred.proxy || '';
   const q = new URLSearchParams({ ...(params || {}), apikey: key });
+  spend();
   let res;
   try {
     res = await fetch(`${proxy || API}${method}?${q}`, body
@@ -102,9 +104,12 @@ export async function saveBingConfig(env, secret, body) {
   let sites;
   try { sites = await bget(cred, 'GetUserSites'); } catch (e) {
     if (!e.throttle) return { error: `验证失败：${e.message}` };
-    // 被限流没法验证：先保存，定时任务稍后会重新列出站点；Key 不对的话会在状态里显示错误
+    // 被限流没法验证：先保存，定时任务稍后会重新列出站点；Key 不对的话会在状态里显示错误。
+    // 已知的站点保留，并带上错误标记——这样在重新列出之前，合并站点时不会把 Bing 的站点当成已经没了而删掉
     await setSetting(env, 'int_bing', await seal(secret, cred));
-    await setSetting(env, 'bing_found', JSON.stringify({ sites: [], at: 0, error: '' }));
+    const prev = await bingFound(env);
+    await setSetting(env, 'bing_found', JSON.stringify({ sites: prev?.sites || [], at: 0, error: e.message, errorAt: Date.now() }));
+    if (keyChanged) await env.DB.prepare('UPDATE g_sites SET b_synced_at = 0').run();
     return { ok: true, pending: true };
   }
   await setSetting(env, 'int_bing', await seal(secret, cred));
@@ -179,6 +184,8 @@ async function syncSite(env, key, s) {
       o.c += Number(r.Clicks) || 0; o.i += Number(r.Impressions) || 0;
       days.set(d, o);
     }
+    // 首次同步写入全部（约 6 个月）；之后只比对最近 21 天（更早的数据 Bing 不会再改），省得每次读 180 行
+    if (s.b_synced_at) { const cut = ymd(Date.now() - 21 * DAY); for (const d of [...days.keys()]) if (d < cut) days.delete(d); }
     const from = [...days.keys()].sort()[0];
     const old = from ? new Map((await env.DB.prepare('SELECT date, b_clicks, b_impressions FROM g_daily WHERE host = ? AND date >= ?').bind(s.host, from).all())
       .results.map((r) => [r.date, r])) : new Map();
@@ -190,12 +197,12 @@ async function syncSite(env, key, s) {
          ON CONFLICT(host, date) DO UPDATE SET b_clicks = excluded.b_clicks, b_impressions = excluded.b_impressions`
       ).bind(s.host, date, v.c, v.i));
     }
-  } catch (e) { errors.push(e.message); if (e.throttle) throw e; }
+  } catch (e) { if (e.throttle || e.budget) throw e; errors.push(e.message); }
   try {
     const cs = (await bget(key, 'GetCrawlStats', { siteUrl: s.bing_site })) || [];
     const last = cs.map((r) => ({ t: bingTime(r.Date), n: Number(r.InIndex) || 0 })).filter((r) => r.t).sort((a, b) => b.t - a.t)[0];
     if (last) inIndex = last.n;
-  } catch (e) { if (e.throttle) throw e; }
+  } catch (e) { if (e.throttle || e.budget) throw e; }
   const err = errors.join('；');
   if (stmts.length || err !== (s.b_error || '') || inIndex !== (s.b_in_index || 0)) stmts.push(gVerStmt(env));
   stmts.push(env.DB.prepare('UPDATE g_sites SET b_synced_at = ?, b_error = ?, b_in_index = ? WHERE host = ?').bind(Date.now(), err, inIndex, s.host));
@@ -208,12 +215,12 @@ export async function syncBatch(env, secret, { limit = 25, cutoff = Date.now() -
   if (!c) return { skipped: true };
   const f = await bingFound(env);
   if (!f || f.error || f.at < Date.now() - DAY) await discover(env, secret);
-  const due = (await env.DB.prepare("SELECT host, bing_site, b_error, b_in_index FROM g_sites WHERE bing_site != '' AND b_synced_at < ? ORDER BY b_synced_at LIMIT ?")
+  const due = (await env.DB.prepare("SELECT host, bing_site, b_error, b_in_index, b_synced_at FROM g_sites WHERE bing_site != '' AND b_synced_at < ? ORDER BY b_synced_at LIMIT ?")
     .bind(cutoff, limit).all()).results;
   let done = 0;
   for (const s of due) {
     if (Date.now() > deadline) break;
-    try { await syncSite(env, c, s); done++; } catch (e) { if (e.throttle) break; }
+    try { await syncSite(env, c, s); done++; } catch (e) { if (e.throttle || e.budget) break; }
   }
   const left = await env.DB.prepare("SELECT COUNT(*) AS n FROM g_sites WHERE bing_site != '' AND b_synced_at < ?").bind(cutoff).first('n');
   return { done, left };
@@ -233,7 +240,8 @@ function weekly(rows, from, to) {
     o.clicks += Number(r.Clicks) || 0; o.impressions += imp; o.posw += (Number(r.AvgImpressionPosition) || 0) * imp;
     m.set(k, o);
   }
-  return [...m.values()].map(({ posw, ...x }) => ({ ...x, ctr: x.impressions ? x.clicks / x.impressions : 0, position: x.impressions ? posw / x.impressions : 0 }))
+  // Bing 的按周数据偶尔点击比展示还多（统计口径不同），点击率封顶 100%
+  return [...m.values()].map(({ posw, ...x }) => ({ ...x, ctr: x.impressions ? Math.min(1, x.clicks / x.impressions) : 0, position: x.impressions ? posw / x.impressions : 0 }))
     .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions);
 }
 

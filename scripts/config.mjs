@@ -35,16 +35,16 @@ export function extractConfig(text) {
 
 export function applyConfig(template, c) {
   let t = template;
-  if (c.name) t = t.replace(/^name\s*=\s*"[^"]*"/m, `name = "${c.name}"`);
+  if (c.name) t = t.replace(/^name\s*=\s*"[^"]*"/m, () => `name = "${c.name}"`);
   if (c.routes && !/^routes\s*=/m.test(top(t))) {
     // 放在模板里注释掉的 routes 示例后面；没有示例就放在 compatibility_date 后面
     const ex = /^# routes = \[[\s\S]*?^# \]\s*$/m.exec(t);
     if (ex) t = t.slice(0, ex.index + ex[0].length) + '\n' + c.routes + t.slice(ex.index + ex[0].length);
-    else t = t.replace(/^(compatibility_date\s*=.*)$/m, `$1\n\n${c.routes}`);
+    else t = t.replace(/^(compatibility_date\s*=.*)$/m, (m0) => `${m0}\n\n${c.routes}`);
   }
   if (c.sendEmail && !/^\[\[send_email\]\]/m.test(t)) {
     t = /^# \[\[send_email\]\]\s*\n# name = "[^"]*"/m.test(t)
-      ? t.replace(/^# \[\[send_email\]\]\s*\n# name = "[^"]*"/m, `[[send_email]]\nname = "${c.sendEmail}"`)
+      ? t.replace(/^# \[\[send_email\]\]\s*\n# name = "[^"]*"/m, () => `[[send_email]]\nname = "${c.sendEmail}"`)
       : `${t.trimEnd()}\n\n[[send_email]]\nname = "${c.sendEmail}"\n`;
   }
   for (const [k, v] of Object.entries(c.vars || {})) {
@@ -52,12 +52,12 @@ export function applyConfig(template, c) {
     if (re.test(section(t, 'vars'))) {
       // 只替换 [vars] 里的那一行
       const vs = section(t, 'vars'), i = t.indexOf(vs);
-      t = t.slice(0, i) + vs.replace(re, `${k} = ${v}`) + t.slice(i + vs.length);
+      t = t.slice(0, i) + vs.replace(re, () => `${k} = ${v}`) + t.slice(i + vs.length);
     } else if (/^\[vars\]\s*$/m.test(t)) {
-      t = t.replace(/^\[vars\]\s*$/m, `[vars]\n${k} = ${v}`);
+      t = t.replace(/^\[vars\]\s*$/m, () => `[vars]\n${k} = ${v}`);
     }
   }
-  if (c.databaseName) t = t.replace(/^database_name\s*=\s*"[^"]*"/m, `database_name = "${c.databaseName}"`);
-  if (c.databaseId) t = t.replace(/^database_id\s*=\s*"[^"]*"/m, `database_id = "${c.databaseId}"`);
+  if (c.databaseName) t = t.replace(/^database_name\s*=\s*"[^"]*"/m, () => `database_name = "${c.databaseName}"`);
+  if (c.databaseId) t = t.replace(/^database_id\s*=\s*"[^"]*"/m, () => `database_id = "${c.databaseId}"`);
   return t;
 }

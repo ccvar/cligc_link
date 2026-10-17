@@ -9,6 +9,7 @@
 
 import { sourceUv, hllNew, hllMerge, hllCount } from './agg.js';
 import { bingRaw, bingSummary } from './bing.js';
+import { spend } from './budget.js';
 
 const SCOPES = [
   'openid', 'email',
@@ -207,6 +208,7 @@ async function accessToken(env, secret, acct) {
   }
   const c = await googleCreds(env, secret);
   if (!c) throw new Error('未配置 Google OAuth 客户端');
+  spend();
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -249,6 +251,7 @@ export async function disconnect(env, secret, id) {
 // 带令牌请求 Google 接口
 export async function gfetch(env, secret, acct, url, body, method) {
   const token = await accessToken(env, secret, acct);
+  spend();
   const res = await fetch(url, {
     method: method || (body ? 'POST' : 'GET'),
     headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
@@ -266,7 +269,8 @@ export async function gfetch(env, secret, acct, url, body, method) {
 // ---------------------------------------------------------------- 站点发现
 
 // 列出一个账号的 GA4 媒体资源和 GSC 站点；某一项失败时返回 null，沿用上次的结果
-async function discoverAccount(env, secret, acct) {
+// oldProps：上次发现的媒体资源（读取数据流失败时沿用上次的域名，避免站点对应关系来回变、数据被反复清空重填）
+async function discoverAccount(env, secret, acct, oldProps = []) {
   // 令牌有问题时账号本身会标记错误（显示“重新连接”），这里不再重复报
   try { await accessToken(env, secret, acct); } catch (e) {
     const marked = await env.DB.prepare("SELECT error != '' AS bad FROM g_accounts WHERE id = ?").bind(acct).first('bad');
@@ -285,14 +289,24 @@ async function discoverAccount(env, secret, acct) {
     } while (page);
   } catch (e) { errors.push(`GA4：${e.message}`); props = null; }
 
-  // 每个媒体资源的网站数据流地址，用来确定域名
-  if (props) await Promise.all(props.map(async (p) => {
-    try {
-      const d = await gfetch(env, secret, acct, `https://analyticsadmin.googleapis.com/v1beta/properties/${p.id}/dataStreams`);
-      const web = (d.dataStreams || []).find((s) => s.webStreamData?.defaultUri);
-      p.host = siteHost(web?.webStreamData?.defaultUri || '');
-    } catch { p.host = ''; }
-  }));
+  // 每个媒体资源的网站数据流地址，用来确定域名。一次最多并发 5 个（一下子发几十个容易被限流）；
+  // 某个读取失败时沿用上次的域名，而不是当成“没有域名”
+  if (props) {
+    const prevHost = new Map(oldProps.map((p) => [p.id, p.host]));
+    let i = 0, failed = 0;
+    const worker = async () => {
+      while (i < props.length) {
+        const p = props[i++];
+        try {
+          const d = await gfetch(env, secret, acct, `https://analyticsadmin.googleapis.com/v1beta/properties/${p.id}/dataStreams`);
+          const web = (d.dataStreams || []).find((s) => s.webStreamData?.defaultUri);
+          p.host = siteHost(web?.webStreamData?.defaultUri || '');
+        } catch { p.host = prevHost.get(p.id) ?? ''; failed++; }
+      }
+    };
+    await Promise.all(Array.from({ length: 5 }, worker));
+    if (failed) console.warn(`GA4 数据流：${failed} 个读取失败，沿用上次的域名`);
+  }
 
   let gsc = null;
   try {
@@ -308,7 +322,7 @@ export async function discover(env, secret, only) {
   for (const a of await accounts(env, secret)) {
     if (only && a.id !== only) continue;
     const old = a.found ? JSON.parse(a.found) : {};
-    const r = await discoverAccount(env, secret, a.id);
+    const r = await discoverAccount(env, secret, a.id, old.props || []);
     const found = { props: r.props ?? old.props ?? [], gsc: r.gsc ?? old.gsc ?? [], errors: r.errors, failed: !!r.failed, at: now };
     await env.DB.prepare('UPDATE g_accounts SET found = ?, found_at = ? WHERE id = ?').bind(JSON.stringify(found), now, a.id).run();
   }
@@ -321,7 +335,7 @@ export async function rebuildSites(env) {
   const accts = (await env.DB.prepare('SELECT id, found FROM g_accounts ORDER BY connected_at').all()).results
     .map((a) => ({ id: a.id, found: a.found ? JSON.parse(a.found) : null }));
   // 已有的对应关系优先保留：同一域名对应多个媒体资源 / 站点时，Google 返回的顺序变了也不换（否则会清空数据重新回填）
-  const old = new Map((await env.DB.prepare('SELECT host, ga4_property, gsc_site, bing_site FROM g_sites').all()).results.map((r) => [r.host, r]));
+  const old = new Map((await env.DB.prepare('SELECT host, ga4_property, ga4_name, ga4_account, ga4_acct, gsc_site, gsc_acct, bing_site FROM g_sites').all()).results.map((r) => [r.host, r]));
   const sites = new Map();
   const get = (host) => {
     if (!sites.has(host)) sites.set(host, { host, ga4_property: '', ga4_name: '', ga4_account: '', ga4_acct: '', gsc_site: '', gsc_acct: '', bing_site: '' });
@@ -353,9 +367,12 @@ export async function rebuildSites(env) {
   }
 
   const now = Date.now();
-  const stmts = [gVerStmt(env)];
+  const stmts = [];
+  const COLS = ['ga4_property', 'ga4_name', 'ga4_account', 'ga4_acct', 'gsc_site', 'gsc_acct', 'bing_site'];
   for (const s of sites.values()) {
     const o = old.get(s.host);
+    // 没变化的行不写（每天会重新合并好几次，158 个站点每次都写一遍很浪费）
+    if (o && COLS.every((k) => (o[k] || '') === s[k])) continue;
     stmts.push(env.DB.prepare(
       `INSERT INTO g_sites (host, ga4_property, ga4_name, ga4_account, ga4_acct, gsc_site, gsc_acct, bing_site, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(host) DO UPDATE SET ga4_property = excluded.ga4_property, ga4_name = excluded.ga4_name, ga4_account = excluded.ga4_account,
@@ -370,7 +387,12 @@ export async function rebuildSites(env) {
     if (o.bing_site !== s.bing_site) {
       stmts.push(env.DB.prepare('UPDATE g_daily SET b_clicks = NULL, b_impressions = NULL WHERE host = ?').bind(s.host),
         env.DB.prepare("UPDATE g_sites SET b_synced_at = 0, b_in_index = 0, b_error = '' WHERE host = ?").bind(s.host),
-        env.DB.prepare("UPDATE g_urls SET b_state = '', b_due_at = 0, b_submitted_at = 0 WHERE host = ?").bind(s.host));
+        // 换了 Bing 站点：网址重新排队检查；解除了关联：不再排队（免得占着队列）
+        env.DB.prepare("UPDATE g_urls SET b_state = '', b_due_at = ?, b_submitted_at = 0 WHERE host = ?").bind(s.bing_site ? 0 : 9e15, s.host));
+    }
+    // GSC 和 Bing 都没关联了：网址清单和站点地图也删掉
+    if (!s.gsc_site && !s.bing_site && (o.gsc_site || o.bing_site)) {
+      stmts.push(env.DB.prepare('DELETE FROM g_urls WHERE host = ?').bind(s.host), env.DB.prepare('DELETE FROM g_sitemaps WHERE host = ?').bind(s.host));
     }
     if (gaChanged || scChanged) stmts.push(env.DB.prepare("UPDATE g_sites SET synced_at = 0, users = CASE WHEN ? THEN '' ELSE users END WHERE host = ?").bind(gaChanged ? 1 : 0, s.host));
   }
@@ -383,8 +405,10 @@ export async function rebuildSites(env) {
         env.DB.prepare('DELETE FROM g_urls WHERE host = ?').bind(host), env.DB.prepare('DELETE FROM g_sitemaps WHERE host = ?').bind(host));
     }
   }
+  // 有变化才更新数据版本（站点列表的缓存据此失效）
+  if (stmts.length) stmts.push(gVerStmt(env));
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
-  return { sites: sites.size };
+  return { sites: sites.size, changed: stmts.length };
 }
 
 // ---------------------------------------------------------------- 同步每日数据
@@ -421,7 +445,7 @@ async function syncSite(env, secret, s) {
              key_events = excluded.key_events, engagement = excluded.engagement`
         ).bind(s.host, date, ...m));
       }
-    } catch (e) { errors.push(`GA4：${e.message}`); }
+    } catch (e) { if (e.budget) throw e; errors.push(`GA4：${e.message}`); }
     // 每天的渠道分组会话数（存成 JSON），首次补一年
     try {
       const d = await gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${s.ga4_property}:runReport`, {
@@ -445,7 +469,7 @@ async function syncSite(env, secret, s) {
           .bind(s.host, date, val));
       }
       if (!s.ch_at) stmts.push(env.DB.prepare('UPDATE g_sites SET ch_at = ? WHERE host = ?').bind(Date.now(), s.host));
-    } catch (e) { errors.push(`GA4 渠道：${e.message}`); }
+    } catch (e) { if (e.budget) throw e; errors.push(`GA4 渠道：${e.message}`); }
   }
   if (s.gsc_site) {
     try {
@@ -462,7 +486,7 @@ async function syncSite(env, secret, s) {
              ctr = excluded.ctr, position = excluded.position`
         ).bind(s.host, r.keys[0], ...m));
       }
-    } catch (e) { errors.push(`GSC：${e.message}`); }
+    } catch (e) { if (e.budget) throw e; errors.push(`GSC：${e.message}`); }
   }
   // 区间去重用户数（GA4 按天的用户数不能直接相加）
   if (s.ga4_property) {
@@ -487,7 +511,7 @@ async function syncSite(env, secret, s) {
       let prevVal = '';
       try { prevVal = s.users ? JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(s.users)).sort(([a], [b]) => (a < b ? -1 : 1)))) : ''; } catch {}
       if (val !== prevVal) stmts.push(env.DB.prepare('UPDATE g_sites SET users = ? WHERE host = ?').bind(val, s.host));
-    } catch (e) { errors.push(`GA4 用户：${e.message}`); }
+    } catch (e) { if (e.budget) throw e; errors.push(`GA4 用户：${e.message}`); }
   }
   // 有数据变化时更新版本号，站点列表的缓存据此失效（没变化就继续用缓存）
   const err = errors.join('；');
@@ -512,14 +536,16 @@ export async function syncBatch(env, secret, { limit = 12, cutoff = Date.now() -
     await env.DB.prepare('UPDATE g_sites SET synced_at = 0').run();
     await setSetting(env, 'g_backfill', String(BACKFILL_DAYS));
   }
-  // 每个账号每天重新发现一次站点
-  if (accts.some((a) => a.found_at < Date.now() - DAY)) await discover(env, secret);
+  // 每个账号每天重新发现一次站点（只查到期的那个账号）
+  for (const a of accts.filter((x) => x.found_at < Date.now() - DAY)) await discover(env, secret, a.id);
   // 还没补过渠道数据的 GA4 站点也算待同步（升级后一次性补）
   const DUE = `synced_at < ? OR (ga4_property IS NOT NULL AND ga4_property != '' AND ch_at = 0)`;
   const due = (await env.DB.prepare(`SELECT * FROM g_sites WHERE ${DUE} ORDER BY ch_at > 0, synced_at LIMIT ?`)
     .bind(cutoff, limit).all()).results;
   let done = 0;
-  for (const s of due) { await syncSite(env, secret, s); done++; }
+  for (const s of due) {
+    try { await syncSite(env, secret, s); done++; } catch (e) { if (e.budget) break; throw e; }
+  }
   const left = await env.DB.prepare(`SELECT COUNT(*) AS n FROM g_sites WHERE ${DUE}`).bind(cutoff).first('n');
   return { done, left };
 }
@@ -569,7 +595,7 @@ const sumRange = (rows, from, to) => {
   return {
     ga: t.hasGa ? { sessions: t.sessions, views: t.views, keyEvents: t.key_events, engagement: t.sessions ? t.engw / t.sessions : 0, ...(t.ch ? { channels: t.ch } : {}) } : null,
     gsc: t.hasGsc ? { clicks: t.clicks, impressions: t.impressions, ctr: t.impressions ? t.clicks / t.impressions : 0, position: t.impressions ? t.posw / t.impressions : 0 } : null,
-    bing: t.hasBing ? { clicks: t.bc, impressions: t.bi, ctr: t.bi ? t.bc / t.bi : 0 } : null,
+    bing: t.hasBing ? { clicks: t.bc, impressions: t.bi, ctr: t.bi ? Math.min(1, t.bc / t.bi) : 0 } : null,
   };
 };
 
@@ -590,25 +616,35 @@ export async function sitesList(env, days) {
       (SELECT COALESCE(MAX(updated_at), 0) || ':' || COUNT(*) FROM link_targets) AS t,
       (SELECT COUNT(*) FROM g_accounts) AS n,
       (SELECT value FROM settings WHERE key = 'tags_ver') AS tv`).first();
-  const key = `sites|${days}|${ranges(days).to}|${v.g}|${v.a}|${v.l}|${v.t}|${v.n}|${v.tv || 0}`;
-  const hit = await env.DB.prepare('SELECT v, at FROM g_cache WHERE k = ?').bind(key).first();
-  if (hit && hit.at > Date.now() - 300000) return JSON.parse(hit.v);
+  // 固定的缓存键（每个时间范围一行，覆盖写，不会越积越多）；版本存在值里。
+  // 短链、分组、访问汇总变了立即重算；Google / Bing 数据每小时都会小幅更新，变了以后最多沿用一小时
+  const rest = `${ranges(days).to}|${v.a}|${v.l}|${v.t}|${v.n}|${v.tv || 0}`;
+  const hit = await cacheGet(env, `sites|${days}`);
+  if (hit && hit.rest === rest && (hit.g === v.g || hit.at > Date.now() - 3600000)) return hit.data;
   const out = await sitesListRaw(env, days, v.g);
-  const body = JSON.stringify(out);
-  // D1 单个值最大 2 MB；站点多、区间长时结果可能很大，超过 1.5 MB 就不缓存
-  if (body.length < 1.5e6) {
-    await env.DB.prepare('INSERT INTO g_cache (k, v, at) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v, at = excluded.at')
-      .bind(key, body, Date.now()).run().catch(() => {});
-  }
+  await cachePut(env, `sites|${days}`, { rest, g: v.g, at: Date.now(), data: out });
   return out;
 }
 
-// 每个站点区间内的 Google 数据汇总和每日序列；按 Google 数据版本缓存（最长一天）
+// g_cache 的读写：值是 JSON；D1 单个值最大 2 MB，超过 1.5 MB 就不缓存
+async function cacheGet(env, k) {
+  const row = await env.DB.prepare('SELECT v FROM g_cache WHERE k = ?').bind(k).first().catch(() => null);
+  if (!row) return null;
+  try { return JSON.parse(row.v); } catch { return null; }
+}
+async function cachePut(env, k, val) {
+  const body = JSON.stringify(val);
+  if (body.length >= 1.5e6) return;
+  await env.DB.prepare('INSERT INTO g_cache (k, v, at) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v, at = excluded.at')
+    .bind(k, body, Date.now()).run().catch(() => {});
+}
+
+// 每个站点区间内的 Google / Bing 数据汇总和每日序列。按日期范围读 g_daily（有日期索引），是站点列表最耗读取的部分：
+// 数据版本没变就一直用缓存；变了（每小时同步都会小幅更新）最多沿用一小时再重算
 async function sitesDaily(env, days, ver) {
   const { from, to, pfrom, pto } = ranges(days);
-  const key = `sitesd|${days}|${to}|${ver}`;
-  const hit = await env.DB.prepare('SELECT v FROM g_cache WHERE k = ? AND at > ?').bind(key, Date.now() - DAY).first();
-  if (hit) return JSON.parse(hit.v);
+  const hit = await cacheGet(env, `sitesd|${days}`);
+  if (hit && hit.to === to && (hit.ver === ver || hit.at > Date.now() - 3600000)) return hit.data;
   const rows = (await env.DB.prepare('SELECT * FROM g_daily WHERE date >= ? AND date <= ?').bind(pfrom, to).all()).results;
   const byHost = new Map();
   for (const r of rows) { if (!byHost.has(r.host)) byHost.set(r.host, []); byHost.get(r.host).push(r); }
@@ -622,11 +658,7 @@ async function sitesDaily(env, days, ver) {
       prevSpark: hasPrev(days) ? rs.filter((r) => r.date >= pfrom && r.date <= pto).map((r) => ({ k: r.date, n: r.sessions ?? 0 })) : [],
     };
   }
-  const body = JSON.stringify(out);
-  if (body.length < 1.5e6) {
-    await env.DB.prepare('INSERT INTO g_cache (k, v, at) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v, at = excluded.at')
-      .bind(key, body, Date.now()).run().catch(() => {});
-  }
+  await cachePut(env, `sitesd|${days}`, { to, ver, at: Date.now(), data: out });
   return out;
 }
 
@@ -973,7 +1005,12 @@ export const expectedCtr = (pos) => (pos < 1 ? 0.28 : pos <= 10 ? CTR_CURVE[Math
 export async function aiReport(env, secret, hosts, days, sections, hide) {
   const { from, to, pfrom, pto } = ranges(days);
   const want = (k) => !sections || sections.includes(k);
-  const rows = (await env.DB.prepare(`SELECT * FROM g_sites WHERE host IN (${hosts.map(() => '?').join(',')})`).bind(...hosts).all()).results;
+  // D1 一条查询最多绑定 100 个参数，分批查
+  const rows = [];
+  for (let i = 0; i < hosts.length; i += 90) {
+    const part = hosts.slice(i, i + 90);
+    rows.push(...(await env.DB.prepare(`SELECT * FROM g_sites WHERE host IN (${part.map(() => '?').join(',')})`).bind(...part).all()).results);
+  }
   const byHost = new Map(rows.map((r) => [r.host, r]));
   const links = want('links') ? await siteLinks(env, new Set(hosts), days).catch(() => new Map()) : new Map();
   const allHosts = new Set((await env.DB.prepare('SELECT host FROM g_sites').all()).results.map((r) => r.host));

@@ -2,6 +2,33 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.1.1 · 2026-10-17
+
+A batch of reliability, performance and UI fixes. Upgrading is recommended.
+
+### Fixed
+
+- When reading a GA4 property's website address occasionally failed, site mappings flipped back and forth and data was repeatedly cleared and refilled
+- Page indexing: sites without permission, out of quota or unlinked kept occupying the check queue and stalled other sites
+- Reading a huge sitemap (or archive) could crash the whole scheduled job; child sitemaps in an index must now belong to the site
+- With more than 100 sites, URL inspection and AI report queries failed
+- A throttled Bing key save could delete Bing sites and data; a transient sitemap failure could drop the URL list of Bing-only sites
+- "Run now" and the hourly job could run at the same time; manual runs took too long; each scheduled run now has an outgoing-request cap
+- Upgrade script: no longer commits `wrangler.toml` with your database ID; deploy-button upgrades no longer fail when upstream adds a workflow; `$` in settings is kept; your own same-name tags are not overwritten
+- Bing query CTR could exceed 100%
+- The page indexing "Check now" button kept spinning after finishing; there was no retry when loading failed
+- Masking also hid file names and could mask twice; domains in input fields are now blurred
+- In Bing / combined mode the site summary's growth, active and share figures still used Google data
+- Some settings help text was cut off on phones
+
+### Improved
+
+- Far fewer database reads for the site list, indexing counters, sitemap refreshes, schema checks and redirects
+- The deploy-button "sync upstream" workflow now only upgrades when you run it (weekly automatic upgrades are opt-in)
+- System status: Chinese step names, a Bing check row, and "Check for updates" / "Run now" next to their rows
+- Warning toasts use an amber icon and stay longer for long messages; amber text uses a higher-contrast colour
+- Tooltips also appear for keyboard users; toggles and tabs expose the selected item; Bing Webmaster added to ⌘K
+
 ## v1.1.0 · 2026-10-17
 
 The first formal release (earlier deployments count as 1.0.0).

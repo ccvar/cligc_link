@@ -100,7 +100,7 @@ npm run upgrade
 
 它会拉取最新发布的版本、保留你在 `wrangler.toml` 里的 Worker 名称、域名、D1 数据库和 `[vars]`、安装依赖，确认后部署。只想先更新代码、检查后再部署：`npm run upgrade -- --no-deploy`；升级到指定版本：`npm run upgrade -- --to v1.2.0`。
 
-**用“Deploy to Cloudflare”按钮部署的**：按钮会在你的 GitHub 下生成一个仓库，并让 Cloudflare 在仓库有新提交时自动部署。打开这个仓库的 **Actions → 同步上游新版本 → Run workflow**，它会把最新版本合并进你的仓库（同样保留 `wrangler.toml` 里的配置），Cloudflare 随后自动重新部署。这个任务每周一也会自动检查一次，不想自动升级就删掉 `.github/workflows/sync-upstream.yml` 里 `schedule` 那两行。
+**用“Deploy to Cloudflare”按钮部署的**：按钮会在你的 GitHub 下生成一个仓库，并让 Cloudflare 在仓库有新提交时自动部署。打开这个仓库的 **Actions → 同步上游新版本 → Run workflow**，它会把最新版本合并进你的仓库（同样保留 `wrangler.toml` 里的配置），Cloudflare 随后自动重新部署。默认只在你手动运行时升级；想每周一自动升级，把 `.github/workflows/sync-upstream.yml` 里 `schedule` 那两行前面的 `#` 去掉（自动部署的新代码能访问你保存的 Google / Bing 凭据，所以默认不开）。
 
 > 在 v1.1.0 之前部署的，仓库里还没有升级脚本：命令行部署的先 `git pull` 一次（`wrangler.toml` 有冲突时保留自己的数据库 ID 和域名），之后就可以用 `npm run upgrade`；一键部署的把本仓库的 `scripts/` 和 `.github/workflows/sync-upstream.yml` 复制到自己的仓库，再运行上面的 Action。
 

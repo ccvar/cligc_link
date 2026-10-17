@@ -10,6 +10,7 @@ import { EmailMessage } from 'cloudflare:email';
 import * as google from './google.js';
 import * as gindex from './gindex.js';
 import * as bing from './bing.js';
+import { subreq } from './budget.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAgg, pruneClicks, backfillSourceUv, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
@@ -72,8 +73,10 @@ export default {
         if (path === '/api/google/callback') return await googleCallback(env, url);
         if (path.startsWith('/api/')) return await handleApi(request, env, url);
         // 后台页面按内容生成 ETag：浏览器每次都来确认，没变就返回 304，不用重新下载整个页面
-        const html = ADMIN_HTML.replace('__TURNSTILE_SITEKEY__', env.TURNSTILE_SITEKEY || '').replace('__VERSION__', VERSION);
-        const etag = adminEtag(html);
+        // 替换后的页面和 ETag 只算一次（页面有 500 多 KB，每次请求都替换很浪费）
+        const sk = env.TURNSTILE_SITEKEY || '';
+        if (adminPage?.sk !== sk) { const html = ADMIN_HTML.replace('__TURNSTILE_SITEKEY__', sk).replace('__VERSION__', VERSION); adminPage = { sk, html, etag: adminEtag(html) }; }
+        const { html, etag } = adminPage;
         if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { etag, 'cache-control': 'no-cache' } });
         return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', etag } });
       }
@@ -99,7 +102,7 @@ export default {
 
   // 定时任务（wrangler.toml 中每小时整点触发）：到了设定时间发送日报 / 周报 / 月报
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runCron(env, event.scheduledTime));
+    ctx.waitUntil(runScheduled(env, event.scheduledTime));
   },
 };
 
@@ -109,7 +112,7 @@ export default {
 // 定时任务每天查一次上游仓库的最新 Release（只读取版本号和更新说明，不上报任何数据），有新版本时在“系统状态”里提示，并推送一次
 const VERSION = PKG.version;
 const UPSTREAM = 'ccvar/cligc_link';
-async function checkUpdate(env, force = false) {
+async function checkUpdate(env, force = false, { notify = true } = {}) {
   const parse = (v) => { try { return v ? JSON.parse(v) : null; } catch { return null; } };
   const old = parse((await getSetting(env, 'update_check'))?.value);
   if (!force && old?.at > Date.now() - 20 * 3600000 && old.current === VERSION) return { skipped: true };
@@ -135,7 +138,7 @@ async function checkUpdate(env, force = false) {
   const out = { at: Date.now(), current: VERSION, latest: v, url, notes, published, error, newer: !!v && semverGt(v, VERSION) };
   await setSetting(env, 'update_check', JSON.stringify(out));
   // 每个新版本只推送一次
-  if (out.newer && (await getSetting(env, 'notify_update'))?.value !== v) {
+  if (notify && out.newer && (await getSetting(env, 'notify_update'))?.value !== v) {
     const cfg = await getNotify(env);
     if (cfg.tg.enabled || cfg.email.enabled) {
       const report = buildUpdateNotice(cfg, out);
@@ -185,7 +188,7 @@ async function systemStatus(env) {
        UNION SELECT t.url FROM link_targets t JOIN links l ON l.id = t.link_id WHERE l.enabled = 1)`
   ).first().catch(() => null);
   return {
-    now: Date.now(), version: VERSION, update: update?.current === VERSION ? update : update ? { ...update, newer: !!update.latest && semverGt(update.latest, VERSION) } : null,
+    now: Date.now(), version: VERSION, bing: await bing.status(env, await sessionSecret(env)).catch(() => null), update: update?.current === VERSION ? update : update ? { ...update, newer: !!update.latest && semverGt(update.latest, VERSION) } : null,
     cron, cronManual, aggMark: Number(mark) || null, backfillDone: suv === 'done',
     google: { accounts: accts.length, accountErrors: accts.filter((a) => a.error).map((a) => ({ email: a.email, error: a.error })), sites: sites?.n || 0, lastSync: sites?.last || null, pending: sites?.pending || 0, siteErrors: sites?.errors || 0 },
     notify: { channels: [n.tg.enabled && 'Telegram', n.email.enabled && '邮件'].filter(Boolean), last: nstat },
@@ -197,9 +200,29 @@ async function systemStatus(env) {
 // ---------------------------------------------------------------- 定时任务
 // 每一步单独计时、单独捕获错误（一步失败不影响后面的步骤），结果记在 settings.cron_status，后台“系统状态”里显示
 // manual：后台“立即运行一次”——不发推送通知，Google / 网页索引每步少做一点，结果另存在 settings.cron_manual（不影响“定时任务是否正常”的判断）
-async function runCron(env, at = Date.now(), { manual = false } = {}) {
+// 定时任务互斥锁：同一时间只跑一个（整点任务和后台“立即运行一次”）。超过 15 分钟没释放的锁视为已中断
+async function acquireCronLock(env, token) {
+  const r = await env.DB.prepare(
+    `INSERT INTO settings (key, value, updated_at) VALUES ('cron_running', ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at WHERE settings.updated_at < ?`
+  ).bind(token, Date.now(), Date.now() - 15 * 60000).run();
+  return (r.meta?.changes || 0) > 0;
+}
+const releaseCronLock = (env, token) => env.DB.prepare("DELETE FROM settings WHERE key = 'cron_running' AND value = ?").bind(token).run().catch(() => {});
+
+// 整点任务：手动运行还没结束时，最多等 3 分钟再跑
+async function runScheduled(env, at) {
+  const token = `cron:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+  for (let i = 0; i < 18 && !(await acquireCronLock(env, token).catch(() => true)); i++) await new Promise((r) => setTimeout(r, 10000));
+  return runCron(env, at, { token });
+}
+
+// manual：后台“立即运行一次”——在请求里同步跑，所以每步都少做一些（总共一分钟左右），不发推送、不自动提交 Bing，
+// 结果另存在 settings.cron_manual（不影响“定时任务是否正常”的判断）
+async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}) {
   const t0 = Date.now(), steps = {};
-  await setSetting(env, 'cron_running', String(t0)).catch(() => {});
+  // 外部请求预算：Workers 每次调用最多约 1000 个子请求，留点余量
+  subreq.left = 900;
   const step = async (name, fn) => {
     const s0 = Date.now();
     try { const info = await fn(); steps[name] = { ok: true, ms: Date.now() - s0, ...(info && typeof info === 'object' ? { info } : {}) }; }
@@ -221,35 +244,46 @@ async function runCron(env, at = Date.now(), { manual = false } = {}) {
   await step('google', async () => {
     const gsec = await sessionSecret(env);
     if (!(await google.googleConfigured(env, gsec))) return { skipped: true };
-    return await google.syncBatch(env, gsec, { limit: manual ? 5 : 10 });
+    return await google.syncBatch(env, gsec, { limit: manual ? 3 : 10 });
   });
   // Bing Webmaster：每日点击 / 展示、索引网页数
-  await step('bing', async () => bing.syncBatch(env, await sessionSecret(env)));
+  await step('bing', async () => bing.syncBatch(env, await sessionSecret(env), manual ? { limit: 5, deadline: Date.now() + 15000 } : {}));
   // 站点地图 + 网页索引检查（Google 和 Bing，每次最多约 100 秒）
   await step('gindex', async () => {
     const gsec = await sessionSecret(env);
     if (!(await google.googleConfigured(env, gsec)) && !(await bing.bingCreds(env, gsec))) return { skipped: true };
-    return await gindex.cronBatch(env, gsec, manual ? { budgetMs: 40000, bingBudget: 20000, autoSubmit: false } : {});
+    return await gindex.cronBatch(env, gsec, manual ? { budgetMs: 25000, bingBudget: 10000, autoSubmit: false } : {});
   });
   await step('health', () => runHealthChecks(env));
-  await step('update', () => checkUpdate(env));
+  await step('update', () => checkUpdate(env, false, { notify: !manual }));
   if (!manual) {
     await step('notify', () => runNotifications(env, at));
     await step('usage', () => runUsageAlert(env));
   }
+  subreq.left = Infinity;
   const result = { at: t0, ms: Date.now() - t0, steps, ...(manual ? { manual: true } : {}) };
   await setSetting(env, manual ? 'cron_manual' : 'cron_status', JSON.stringify(result)).catch(() => {});
-  await env.DB.prepare("DELETE FROM settings WHERE key = 'cron_running'").run().catch(() => {});
+  if (token) await releaseCronLock(env, token);
   return result;
 }
 
 // ---------------------------------------------------------------- 首次运行自动建表
 
 // 每个 Worker 实例只执行一次；表已存在时 CREATE ... IF NOT EXISTS 不会有影响
+// 数据库版本：表结构（schema.sql 的内容）或下面 migrate() 里的补列有变化时才真正执行，平时每个实例只读一行设置。
+// 改了 migrate() 里的补列逻辑时把 MIGRATE_REV 加一
+const MIGRATE_REV = 2;
+const hashStr = (t) => { let h = 2166136261; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619); return (h >>> 0).toString(36); };
+const SCHEMA_VER = `${hashStr(SCHEMA_SQL)}-${MIGRATE_REV}`;
 let schemaReady = null;
 function ensureSchema(env) {
   if (!schemaReady) {
-    schemaReady = migrate(env).catch((err) => { schemaReady = null; throw err; });
+    schemaReady = (async () => {
+      const v = await env.DB.prepare("SELECT value FROM settings WHERE key = 'schema_ver'").first('value').catch(() => null);
+      if (v === SCHEMA_VER) return;
+      await migrate(env);
+      await setSetting(env, 'schema_ver', SCHEMA_VER);
+    })().catch((err) => { schemaReady = null; throw err; });
   }
   return schemaReady;
 }
@@ -292,6 +326,8 @@ async function migrate(env) {
   const dcols = (await env.DB.prepare('PRAGMA table_info(g_daily)').all()).results.map((c) => c.name);
   if (!dcols.includes('channels')) await env.DB.prepare('ALTER TABLE g_daily ADD COLUMN channels TEXT').run();
   for (const c of ['b_clicks', 'b_impressions']) if (!dcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_daily ADD COLUMN ${c} INTEGER`).run();
+  const scols = (await env.DB.prepare('PRAGMA table_info(g_sitemaps)').all()).results.map((c) => c.name);
+  for (const c of ['g_on', 'b_on']) if (!scols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sitemaps ADD COLUMN ${c} INTEGER NOT NULL DEFAULT -1`).run();
   for (const [c, def] of [['kind', "TEXT NOT NULL DEFAULT ''"], ['reason', "TEXT NOT NULL DEFAULT ''"],
     ['asn', 'INTEGER NOT NULL DEFAULT 0'], ['tls', "TEXT NOT NULL DEFAULT ''"], ['http', "TEXT NOT NULL DEFAULT ''"],
     ['proxy', 'INTEGER NOT NULL DEFAULT 0']]) {
@@ -340,20 +376,25 @@ async function backfillKinds(env) {
 
 // ---------------------------------------------------------------- 跳转
 
+let adminPage = null;
+
 async function handleRedirect(request, env, ctx, url) {
   const slug = decodeURIComponent(url.pathname.slice(1)).replace(/\/$/, '');
   if (!SLUG_RE.test(slug)) return notFound();
 
-  const link = await env.DB.prepare(
-    'SELECT id, slug, target_url, enabled, pass_query, utm, expires_at, ab_weight FROM links WHERE slug = ?'
-  ).bind(slug).first();
+  // 短链和它的跳转规则一次取回（同一个批次，只走一次数据库往返）
+  const [lr, tr] = await env.DB.batch([
+    env.DB.prepare('SELECT id, slug, target_url, enabled, pass_query, utm, expires_at, ab_weight FROM links WHERE slug = ?').bind(slug),
+    env.DB.prepare('SELECT id, url, fallback, countries, devices, ab_of, weight FROM link_targets WHERE link_id = (SELECT id FROM links WHERE slug = ?)').bind(slug),
+  ]);
+  const link = lr.results[0];
   if (!link || !link.enabled) return notFound();
   if (link.expires_at && link.expires_at < Date.now()) return new Response('Link expired', { status: 410 });
 
   // 按访问者所在国家 / 地区和设备匹配跳转规则（两者都指定的优先），未命中则用默认地址
   const country = request.cf?.country || '';
   const device = deviceKey(parseUA(request.headers.get('user-agent') || ''));
-  const all = (await env.DB.prepare('SELECT id, url, fallback, countries, devices, ab_of, weight FROM link_targets WHERE link_id = ?').bind(link.id).all()).results
+  const all = tr.results
     .map((r) => ({ ...r, countries: r.countries.split(',').filter(Boolean), devices: (r.devices || '').split(',').filter(Boolean) }));
   const rules = all.filter((r) => r.ab_of < 0);
   const rule = rules.length ? pickRule(rules, country, device) : null;
@@ -565,9 +606,12 @@ async function authedApi(request, env, url, cred) {
   if (path === '/api/update/check' && method === 'POST') { await checkUpdate(env, true); return json(await systemStatus(env)); }
   // 立即运行一次定时任务（同一时间只跑一个；正在跑的超过 15 分钟视为已中断）
   if (path === '/api/cron/run' && method === 'POST') {
-    const running = Number((await getSetting(env, 'cron_running'))?.value) || 0;
-    if (running > Date.now() - 15 * 60000) return json({ error: `定时任务正在运行（${Math.round((Date.now() - running) / 1000)} 秒前开始），稍后再试` }, 409);
-    const result = await runCron(env, Date.now(), { manual: true });
+    const token = `manual:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    if (!(await acquireCronLock(env, token))) {
+      const since = (await getSetting(env, 'cron_running'))?.updated_at || Date.now();
+      return json({ error: `定时任务正在运行（${Math.max(1, Math.round((Date.now() - since) / 1000))} 秒前开始），稍后再试` }, 409);
+    }
+    const result = await runCron(env, Date.now(), { manual: true, token });
     return json({ result, status: await systemStatus(env) });
   }
   // 概览页的“开始使用”清单：各项是否已完成（只读设置，不请求外部接口）

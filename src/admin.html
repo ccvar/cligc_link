@@ -25,7 +25,7 @@
   --text: #0d1321; --text-2: #4a5263; --muted: #8a92a3; --faint: #b8bec9;
   --line: #e9ebf0; --line-2: #f1f2f5;
   --accent: #2f6bff; --accent-2: #edf2ff; --accent-3: #d9e4ff; --accent-ink: #1d4fd8;
-  --violet: #7c5cff; --teal: #12b5a5; --amber: #f2a93b;
+  --violet: #7c5cff; --teal: #12b5a5; --amber: #f2a93b; --rose: #e26d9c; --sky: #0ea5e9;
   --good: #0f9f5a; --good-bg: #e8f7ef; --bad: #e5484d; --bad-bg: #fdeeee; --warn: #a76b00; --warn-bg: #fff5df;
   --shadow-1: 0 1px 2px rgba(13,19,33,.04);
   --shadow-2: 0 1px 2px rgba(13,19,33,.04), 0 6px 20px -6px rgba(13,19,33,.08);
@@ -207,8 +207,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .ph .kicker { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
 .ph h1 { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 680; letter-spacing: -.025em; }
 .ph .sub { color: var(--muted); margin-top: 6px; }
-.ph h1.h1-meta { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; }
-.ph h1.h1-meta span { font-size: 14px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
 .ph .sp { flex: 1; }
 .back { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; margin-bottom: 14px; transition: color .15s, transform .2s var(--ease); }
 .back:hover { color: var(--text); transform: translateX(-2px); }
@@ -286,27 +284,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .kpis { display: grid; gap: 20px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .kpis { gap: 12px; } }
-.kpi { position: relative; padding: 18px 20px 16px; overflow: hidden; display: flex; flex-direction: column; }
-.kpi .kh { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 22px; }
-.kpi .l { color: var(--text-2); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
-.kpi .l .dot { width: 8px; height: 8px; border-radius: 3px; }
-.kpi .v { font-size: 32px; line-height: 1.15; font-weight: 680; letter-spacing: -.03em; margin-top: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.kpi .v small { font-size: 15px; color: var(--muted); font-weight: 500; letter-spacing: 0; margin-left: 4px; }
-.kpi .v.sm { font-size: 20px; margin-top: 14px; }
-.kpi .d { font-size: 12px; margin-top: 6px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.kpi .ks { margin: auto -20px -16px; padding-top: 12px; height: 56px; }
-.kpi .ks svg { display: block; width: 100%; height: 100%; }
-.kpi .sep { border-top: 1px dashed var(--line); margin: 14px 0 12px; }
-.kpi .meter { height: 6px; border-radius: 3px; background: var(--sunken); margin-top: auto; overflow: hidden; }
-.kpi .meter i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--violet)); transform-origin: left; animation: grow 1s var(--ease-out) both .2s; }
-@media (max-width: 480px) { .kpi { padding: 14px 14px 12px; } .kpi .v { font-size: 26px; } .kpi .ks { margin: auto -14px -12px; } }
 /* 概览：紧凑数据条 */
 #home { gap: 16px; }
 #home .g-main, #home .g3 { gap: 16px; }
 .kstrip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.kc-kw { display: block; }
-.kc-kw[data-tip]::after { left: 0; transform: translate(0, 4px); }
-.kc-kw[data-tip]:hover::after { transform: none; }
 .kc { padding: 14px 18px 13px; min-width: 0; }
 .kc + .kc { border-left: 1px solid var(--line-2); }
 .kc-h { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 22px; }
@@ -448,13 +429,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .kmix-l .x b { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 650; }
 .kmix-l .x em { font-style: normal; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .kmix-r { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); }
-.kc-k { display: flex; gap: 10px; margin-top: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; }
-.kc-k span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.kc-k span:last-child { flex: 0 1 auto; }
 .kc-px { display: inline-flex; align-items: center; height: 18px; margin-left: 8px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 600;
   color: var(--accent-ink); background: var(--accent-2); white-space: nowrap; vertical-align: 2px; }
-.kc-k span::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; background: var(--amber); }
-.kc-k span + span::before { background: var(--faint); }
 .bmix { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
 .bmix-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 .bmix-h span:first-child { color: var(--text-2); font-weight: 600; }
@@ -470,11 +446,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 /* 实时访问流 */
 .live { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--good); font-weight: 600; }
 .live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--good); animation: pulse 1.8s infinite; }
-.feed-card { display: flex; flex-direction: column; }
 .feed { display: flex; flex-direction: column; padding: 8px 10px 24px; flex: 1; min-height: 0; max-height: 440px; overflow: auto; scrollbar-width: none;
   -webkit-mask-image: linear-gradient(#000 calc(100% - 40px), transparent); mask-image: linear-gradient(#000 calc(100% - 40px), transparent); }
 .feed::-webkit-scrollbar { display: none; }
-@media (min-width: 1181px) { .feed-card { height: 0; min-height: 100%; } .feed { max-height: none; } }
 .fi { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 10px; border-radius: 10px; transition: background .15s; }
 .fi:hover { background: var(--panel-2); }
 .fi.new { animation: flash 2.4s var(--ease) both; }
@@ -777,7 +751,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .set-form .field + .field { margin-top: 14px; }
 .set-p { margin: 0 0 14px; color: var(--text-2); font-size: 14px; line-height: 1.7; }
 .set-list { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 8px; font-size: 13px; color: var(--text-2); }
-.set-list li { display: flex; gap: 8px; align-items: center; }
+.set-list li { position: relative; padding-left: 22px; line-height: 1.6; }
+.set-list li > svg:first-child { position: absolute; left: 0; top: 3px; }
 .set-list svg { color: var(--good); }
 .chi.pw { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .chi.mfa { background: var(--good-bg); color: var(--good); }
@@ -810,7 +785,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .sys-a .btn { height: 28px; white-space: nowrap; }
 @media (max-width: 600px) { .sys-r.has-act { grid-template-columns: 22px 110px minmax(0, 1fr); } .sys-r.has-act .sys-a { grid-column: 3; } }
 .sys-i { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--good); margin-top: -1px; }
-.sys-r.warn .sys-i { background: var(--amber); } .sys-r.bad .sys-i { background: var(--bad); }
+.sys-r.warn .sys-i { background: var(--warn-bg); color: var(--warn); }
+/* 全局的 .warn 文字颜色不要染到整行 */
+.sys-r.warn, .g-acc-r.warn { color: var(--text); } .sys-r.bad .sys-i { background: var(--bad); }
 .sys-r.bad { background: var(--bad-bg); }
 @media (max-width: 640px) { .sys-r { grid-template-columns: 22px minmax(0, 1fr); } .sys-r > span:last-child { grid-column: 2; } }
 .sys-steps { display: flex; flex-wrap: wrap; gap: 6px; font-family: var(--mono); font-size: 11.5px; }
@@ -836,7 +813,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .ai-site { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; cursor: pointer; font-size: 13px; }
 .ai-site:hover { background: var(--sunken); }
 .ai-site .mono { font-family: var(--mono); font-size: 12.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ai-cmp { display: none; align-items: flex-start; gap: 6px; margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--amber); }
+.ai-cmp { display: none; align-items: flex-start; gap: 6px; margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--warn); }
 .ai-cmp.on { display: flex; }
 .ai-cmp svg { flex: none; margin-top: 2px; }
 .ai-chk { display: flex; align-items: flex-start; gap: 9px; padding: 4px 0; cursor: pointer; width: 100%; }
@@ -878,6 +855,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .chi.use { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .use-steps { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 13px; color: var(--text-2); line-height: 1.7; }
 .use-steps code { font-family: var(--mono); font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--sunken); }
+.use-steps code, .set-list code { overflow-wrap: anywhere; }
 .use-cmd { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 6px 6px 12px; border-radius: 9px; background: var(--sunken); max-width: 420px; }
 .use-cmd code { background: none; padding: 0; flex: 1; }
 /* 用量预测 */
@@ -887,10 +865,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .use-bar i { position: relative; }
 .use-fc { font-size: 12px; color: var(--text-2); margin-top: 6px; }
 .use-fc b { font-weight: 600; color: var(--text); }
-.use-fc.bad { color: var(--bad); } .use-fc.warn { color: var(--amber); }
+.use-fc.bad { color: var(--bad); } .use-fc.warn { color: var(--warn); }
 .use-v-b { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 13px; }
 .use-v-b.ok { background: var(--good-bg); color: var(--good); }
-.use-v-b.warn { background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber); }
+.use-v-b.warn { background: var(--warn-bg); color: var(--warn); }
 .use-v-b.bad { background: var(--bad-bg); color: var(--bad); }
 .use-v-b .hint { margin-left: auto; color: inherit; opacity: .75; }
 /* 凭据配置：只读摘要 / 表单 / 向导 */
@@ -1018,7 +996,6 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .chi.mail { background: color-mix(in srgb, var(--violet) 15%, transparent); color: var(--violet); }
 .chan .card-b { transition: opacity .2s; }
 .chan:not(.on) .card-b { opacity: .55; }
-.grid2.tight { gap: 14px; }
 .kc-v b.sm { font-size: 20px; padding-bottom: 3px; }
 /* 概览“来源”：跟左侧热门短链等高，多出的在卡片内滚动 */
 #c-src { display: flex; flex-direction: column; }
@@ -1090,12 +1067,7 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 }
 @media (max-width: 960px) { #t-src .card-b { max-height: 460px; } }
 .input.mono { font-family: var(--mono); font-size: 13px; }
-.howto { margin-top: 14px; font-size: 13px; color: var(--text-2); }
-.howto summary { cursor: pointer; color: var(--accent-ink); font-weight: 550; width: fit-content; }
-.howto ol { margin: 10px 0 0; padding-left: 20px; line-height: 1.8; }
-.ctest { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
 .hint.ok { color: var(--good); } .hint.bad { color: var(--bad); }
-.prov-hint { margin: 12px 0 14px; }
 #prov { margin-top: 2px; }
 .savebar { position: sticky; bottom: 16px; z-index: 4; display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 18px; border-radius: 14px;
   background: color-mix(in srgb, var(--panel) 85%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow-2); backdrop-filter: blur(10px); flex-wrap: wrap; }
@@ -1167,15 +1139,12 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 /* 可折叠卡片 */
 .fold-h { width: 100%; border: 0; background: none; cursor: pointer; text-align: left; padding-bottom: 16px; border-radius: var(--r-lg); font: inherit; color: inherit; }
 .fold-h:hover h3 { color: var(--accent-ink); }
-.fold-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--sunken); color: var(--text-2); }
 .fold-h > svg:last-child { color: var(--muted); transition: transform .3s var(--ease-out); }
 .fold.open .fold-h > svg:last-child { transform: rotate(180deg); }
 .fold-b { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .35s var(--ease-out); }
 .fold-b > * { overflow: hidden; min-height: 0; min-width: 0; }
 .fold.open .fold-b { grid-template-rows: 1fr; }
 .fold.settled .fold-b > * { overflow: visible; }
-#rules .rsum { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-family: var(--mono); font-size: 12px; }
-#rules.open .rsum { visibility: hidden; }
 .rules-bar { display: flex; align-items: center; gap: 12px; padding: 12px var(--cp) 14px; }
 .rules-bar .sub { margin: 0; }
 .drawer.panel { width: min(760px, calc(100vw - 16px)); }
@@ -1596,6 +1565,7 @@ button.gtg { cursor: pointer; }
 .toast.out { opacity: 0; transform: translateY(6px) scale(.98); }
 .toast svg.i { color: var(--good); }
 .toast.bad svg.i { color: var(--bad); }
+.toast.warn svg.i { color: var(--warn); }
 
 /* ================================================================ login */
 .login { min-height: 100vh; display: grid; place-items: center; padding: 16px; position: relative; overflow: hidden; background: var(--side); }
@@ -1667,6 +1637,9 @@ button.gtg { cursor: pointer; }
 .b-warn { color: var(--warn); } .b-bad { color: var(--bad); }
 /* 系统状态：立即运行一次 */
 /* 脱敏开关 */
+/* 输入框里的内容改不了显示，脱敏时模糊处理（截图里看不清域名） */
+html.masked input:not(:placeholder-shown):not([type=checkbox]):not([type=radio]):not([type=password]) { filter: blur(4px); }
+html.masked input:focus { filter: none; }
 .mask-btn.on { color: var(--accent); background: var(--accent-2); }
 /* Bing 抓取 */
 .bk-n { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -1733,10 +1706,9 @@ button.gtg { cursor: pointer; }
 .ix-bt { display: flex; align-items: center; gap: 6px; margin: 22px 0 10px; font-size: 13.5px; }
 .ix-sm { table-layout: fixed; }
 .ix-sm th:nth-child(2) { width: 150px; } .ix-sm th:nth-child(3), .ix-sm th:nth-child(4), .ix-sm th:nth-child(5) { width: 84px; } .ix-sm th:nth-child(6) { width: 96px; }
-.ix-sm td:first-child { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.ix-sm td:first-child a { color: inherit; text-decoration: none; min-width: 0; }
+.ix-sm .ix-u a { color: inherit; text-decoration: none; min-width: 0; }
 .ix-auth { margin-bottom: 12px; align-items: center; }
-.ix-err { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--amber); margin: 0; }
+.ix-err { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--warn); margin: 0; }
 .ix-err svg { flex: none; }
 .ix-err .ell { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ix-sm + .hint, .ix-auth + .ix-err { margin-top: 10px; }
@@ -1770,7 +1742,8 @@ let liveTimer = null;
 // 开启后，页面上所有域名（文字、图表、提示）显示为 bl•••.com；只改显示，不改数据。刷新后保持。
 const MASK = { on: store.get('mask', false) };
 // 最后一段是 TLD；文件名（sitemap.xml、robots.txt 之类）不算域名
-const MASK_RE = /\b((?:[a-z0-9-]+\.)*)([a-z0-9][a-z0-9-]*)\.((?!(?:xml|txt|html?|js|css|json|png|jpe?g|gif|svg|webp|ico|gz|php|md|csv|pdf|zip)\b)[a-z]{2,24})\b/gi;
+// 前面不能紧挨着 • . - 或字母数字：已经遮过的（bl•••.co.uk）不会被再遮一次
+const MASK_RE = /(?<![•\w.-])((?:[a-z0-9-]+\.)*)([a-z0-9][a-z0-9-]*)\.((?!(?:xml|txt|html?|js|mjs|ts|css|json|toml|ya?ml|lock|log|sql|sh|rss|aspx?|png|jpe?g|gif|svg|webp|ico|gz|php|md|csv|pdf|zip)\b)[a-z]{2,24})(?![•\w-])/gi;
 const SLD = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac']);   // example.co.uk：遮 example 而不是 co
 function maskText(t) {
   return t.replace(MASK_RE, (m, sub, name, tld) => {
@@ -1810,12 +1783,13 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   MASK.on = !MASK.on;
   store.set('mask', MASK.on);
+  document.documentElement.classList.toggle('masked', MASK.on);
   toast(MASK.on ? '已开启脱敏显示' : '已恢复显示域名');
   // 开启：直接改当前页面；关闭：重新渲染当前页，恢复原文
   if (MASK.on) { document.querySelectorAll('[data-mask]').forEach((x) => { x.outerHTML = maskBtn(); }); maskNode(document.body); }
   else route();
 });
-if (MASK.on) document.addEventListener('DOMContentLoaded', () => maskNode(document.body));
+if (MASK.on) { document.documentElement.classList.add('masked'); document.addEventListener('DOMContentLoaded', () => maskNode(document.body)); }
 
 // ---------------------------------------------------------------- icons
 const I = {
@@ -2028,12 +2002,15 @@ async function api(path, opts = {}) {
   return data;
 }
 
+// kind：ok / warn / bad。停留时间按文字长度加长，出错和警告至少 5 秒，免得长的错误信息还没看完就消失
 function toast(msg, kind = 'ok') {
   const el = document.createElement('div');
-  el.className = 'toast' + (kind === 'bad' ? ' bad' : '');
-  el.innerHTML = `${ic(kind === 'bad' ? 'alert' : 'check', 15)}<span>${esc(msg)}</span>`;
+  el.className = 'toast' + (kind === 'bad' ? ' bad' : kind === 'warn' ? ' warn' : '');
+  el.setAttribute('role', kind === 'ok' ? 'status' : 'alert');
+  el.innerHTML = `${ic(kind === 'ok' ? 'check' : 'alert', 15)}<span>${esc(msg)}</span>`;
   document.getElementById('toasts').appendChild(el);
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 250); }, 2200);
+  const ms = Math.min(9000, Math.max(kind === 'ok' ? 2200 : 5000, String(msg).length * 70));
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 250); }, ms);
 }
 
 async function copy(text, label = '已复制', btn) {
@@ -2151,6 +2128,13 @@ function duplicateDialog(src, onDone) {
     if (!el.hasAttribute('data-tipf-always') && el.scrollWidth <= el.clientWidth + 1) return;
     show(el, el.dataset.tipf);
   });
+  // 键盘：Tab 到带说明的按钮、链接时也显示提示（只在用键盘时，鼠标点击产生的焦点不显示）
+  document.addEventListener('focusin', (e) => {
+    const el = e.target.closest && e.target.closest('[data-tipf]');
+    if (!el || !el.dataset.tipf || !el.matches(':focus-visible')) return;
+    show(el, el.dataset.tipf);
+  });
+  document.addEventListener('focusout', (e) => { if (e.target === cur || cur?.contains(e.target)) hide(); });
   function show(el, text, force) {
     hide();
     if (!text || (!force && !el.isConnected)) return;
@@ -2228,6 +2212,8 @@ function fitNums(root = document) {
 // 分段控件：滑块跟随选中项
 function segThumb(seg) {
   if (!seg) return;
+  // 读屏软件：告诉它当前选中的是哪个
+  seg.querySelectorAll('button').forEach((b) => { if (!b.hasAttribute('type')) b.type = 'button'; if (b.getAttribute('role') !== 'tab') b.setAttribute('aria-pressed', b.classList.contains('on')); else b.setAttribute('aria-selected', b.classList.contains('on')); });
   let th = seg.querySelector('.thumb');
   if (!th) { th = document.createElement('span'); th.className = 'thumb'; seg.prepend(th); }
   const on = seg.querySelector('button.on');
@@ -2503,14 +2489,14 @@ function tabCard(id, title, tabs, cls = '') {
     if (!el) return;
     el.querySelectorAll('.tabs button').forEach((b, i) => (b.onclick = () => {
       store.set(key, i);
-      el.querySelectorAll('.tabs button').forEach((x, j) => x.classList.toggle('on', i === j));
+      el.querySelectorAll('.tabs button').forEach((x, j) => { x.classList.toggle('on', i === j); x.setAttribute('aria-selected', i === j); });
       el.querySelector('.card-b').innerHTML = tabs[i].html;
       setTimeout(() => el.querySelectorAll('.donut circle[data-len]').forEach((c) => c.setAttribute('stroke-dasharray', `${c.dataset.len} ${c.dataset.c}`)), 30);
       countUp(el);
     }));
   });
   return `<section class="card ${cls}" id="${id}"><div class="card-h"><h3>${title}</h3><span class="sp"></span>
-    ${tabs.length > 1 ? `<div class="tabs">${tabs.map((t, i) => `<button class="${i === cur ? 'on' : ''}">${t.label}</button>`).join('')}</div>` : ''}
+    ${tabs.length > 1 ? `<div class="tabs" role="tablist">${tabs.map((t, i) => `<button type="button" role="tab" aria-selected="${i === cur}" class="${i === cur ? 'on' : ''}">${t.label}</button>`).join('')}</div>` : ''}
     </div><div class="card-b">${tabs[cur].html}</div></section>`;
 }
 
@@ -2743,22 +2729,6 @@ async function openMfaDialog(onDone = () => {}) {
   };
 }
 
-function openPasswordDialog() {
-  const ov = document.createElement('div'); ov.className = 'ov';
-  const d = document.createElement('form'); d.className = 'dialog pw-dialog'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
-  d.innerHTML = `<h3>修改密码</h3><p>修改后，其他设备上的登录会自动退出。</p>
-    ${passwordFields('')}
-    <div class="err" style="margin:4px 0 12px" role="alert"></div>
-    <div class="row"><button type="button" class="btn" data-no>取消</button><button class="btn primary">保存新密码</button></div>`;
-  const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); };
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
-  ov.onclick = close;
-  d.querySelector('[data-no]').onclick = close;
-  document.addEventListener('keydown', onKey);
-  document.body.append(ov, d);
-  d.querySelector('#p-cur').focus();
-  bindPasswordForm(d, '', close);
-}
 
 // Cloudflare Turnstile 站点密钥，由服务端在返回页面时注入；为空则不启用
 const TS_KEY = '__TURNSTILE_SITEKEY__';
@@ -4063,18 +4033,6 @@ function rulesCard(link, s) {
   </div>`;
 }
 
-// 折叠卡片：展开动画结束后取消裁剪，让悬停提示和浮层能超出卡片
-function bindFold(fold, key, onOpen) {
-  const fh = fold.querySelector('.fold-h');
-  fh.onclick = () => {
-    const open = !fold.classList.contains('open');
-    fold.classList.toggle('open', open); fh.setAttribute('aria-expanded', open);
-    store.set(key, open);
-    clearTimeout(fold._t);
-    if (open) { fold._t = setTimeout(() => fold.classList.add('settled'), 380); onOpen && onOpen(); }
-    else fold.classList.remove('settled');
-  };
-}
 
 // 顶部信息卡：地区规则 + 默认地址，一行一条
 function heroRoutes(link) {
@@ -4349,7 +4307,7 @@ function openSplitDrawer(link, parent) {
   document.body.append(ov, dr);
 
   const list = dr.querySelector('#abd'), bar = dr.querySelector('#abd-bar');
-  const COLORS = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--warn)', 'var(--rose, #e11d48)'];
+  const COLORS = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--warn)', 'var(--rose)'];
   const drawBar = () => {
     const ws = [pw, ...arms.map((a) => Number(a.weight) || 0)], sum = ws.reduce((x, y) => x + y, 0) || 1;
     bar.innerHTML = ws.map((w, i) => `<i style="flex:${w || 0.001};background:${COLORS[i]}" data-tipf-always data-tipf="${ARM[i]} · ${Math.round((w / sum) * 100)}%"><b>${ARM[i]} ${Math.round((w / sum) * 100)}%</b></i>`).join('');
@@ -4413,7 +4371,7 @@ function SE(x, k = 'cur') {
   return g;
 }
 // 搜索数据来源切换：放在标题“站点 / 账号”后面
-const seSeg = () => `<div class="seg g-se" id="g-se" data-tipf-always data-tipf="搜索点击、展示、点击率、排名和已编入几列的数据来源">${Object.entries(SE_NAME).map(([k, l]) => `<button data-e="${k}" class="${k === gState.se ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+const seSeg = () => `<div class="seg g-se" id="g-se" data-tipf-always data-tipf="搜索点击、展示、点击率、排名和收录几列的数据来源">${Object.entries(SE_NAME).map(([k, l]) => `<button data-e="${k}" class="${k === gState.se ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 // 汇总卡片标签前的来源图标：只有 Google 时不显示
 const seIcons = () => (gState.se === 'bing' ? `<span class="se-ic" data-tipf-always data-tipf="Bing">${BRAND.bing(12)}</span>`
   : gState.se === 'all' ? `<span class="se-ic" data-tipf-always data-tipf="Google + Bing">${BRAND.gsc(12)}${BRAND.bing(12)}</span>` : '');
@@ -5047,15 +5005,16 @@ function exportSitesCsv(rows, d) {
 
 // ---------------------------------------------------------------- 系统状态
 // 每一项：ok / warn / bad + 说明；定时任务超过 3 小时没跑算异常
+// 定时任务各步骤的中文名
+const CRON_NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', bing: 'Bing 同步', gindex: '网页索引检查', health: '目标页检查', update: '检查更新', notify: '推送通知', usage: '用量预警' };
 function sysChecks(st) {
   const H = 3600000, now = st.now, c = st.cron;
   const out = [];
   const steps = c?.steps || {};
   const failed = Object.entries(steps).filter(([, v]) => !v.ok);
-  const NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', bing: 'Bing 同步', gindex: '网页索引检查', notify: '推送通知', usage: '用量预警', health: '目标页检查' };
   out.push(!c ? { lv: 'warn', t: '定时任务', d: '还没有运行记录（部署后每小时整点运行一次）' }
     : now - c.at > 3 * H ? { lv: 'bad', t: '定时任务', d: `上次运行在 ${ago(c.at)}，超过 3 小时没有运行，请检查 wrangler.toml 里的 [triggers] crons` }
-    : failed.length ? { lv: 'bad', t: '定时任务', d: `${ago(c.at)}运行，${failed.map(([k, v]) => `${NAME[k] || k}失败：${v.error}`).join('；')}` }
+    : failed.length ? { lv: 'bad', t: '定时任务', d: `${ago(c.at)}运行，${failed.map(([k, v]) => `${CRON_NAME[k] || k}失败：${v.error}`).join('；')}` }
     : { lv: 'ok', t: '定时任务', d: `${ago(c.at)}运行，耗时 ${(c.ms / 1000).toFixed(1)} 秒，${Object.keys(steps).length} 个步骤都正常` });
   out[out.length - 1].act = `<button type="button" class="btn sm ghost" id="sys-run" data-tipf-always data-tipf="按定时任务的步骤立即跑一遍：访问汇总、Google / Bing 同步、网页索引检查、目标页检查。不发推送通知、不自动提交网址给 Bing，每步比整点那次少做一些。请求从你当前访问的 Cloudflare 节点发出">${ic('refresh', 13)}立即运行一次</button>`;
   out.push(!st.aggMark ? { lv: 'warn', t: '访问汇总', d: '还没有汇总过（有访问后自动开始）' }
@@ -5079,6 +5038,10 @@ function sysChecks(st) {
   out.push(st.usage.configured ? { lv: 'ok', t: 'Cloudflare 用量', d: st.usage.alert ? '已配置，用量预警已开启' : '已配置（用量预警未开启，可以在“通知”页开启）' }
     : { lv: 'warn', t: 'Cloudflare 用量', d: '没有填写凭据，看不到账户用量' });
   if (!st.backfillDone && st.aggMark) out.push({ lv: 'warn', t: '访客回填', d: '按来源的独立访客正在回填旧数据，几个小时内完成' });
+  // Bing Webmaster（配置了才显示）：限流是临时的（黄色），Key 无效等需要处理（红色）
+  const bg = st.bing;
+  if (bg?.configured) out.push(!bg.error ? { lv: 'ok', t: 'Bing', d: `${bg.sites} 个站点${bg.lastSync ? `，最近同步于 ${ago(bg.lastSync)}` : '，等待首次同步'}${bg.proxy ? '，经代理' : ''}` }
+    : { lv: bingThrottled(bg) ? 'warn' : 'bad', t: 'Bing', d: bingThrottled(bg) ? `${bg.error}，定时任务每小时会自动重试${bg.proxy ? '' : '；一直这样的话请在“Bing Webmaster”里设置代理地址'}` : bg.error });
   // 版本：每天查一次上游的最新 Release
   const u = st.update, v = st.version || APP_VERSION;
   out.push(!u ? { lv: 'ok', t: '版本', d: `v${v}（还没检查过更新，定时任务每天检查一次）` }
@@ -5101,7 +5064,7 @@ const sysBody = (st) => `<div class="sys-l">${sysChecks(st).map((x) => `<div cla
   ${st.cronManual ? `<details class="wz-more" style="margin-top:8px"><summary>最近一次手动运行（${ago(st.cronManual.at)}，耗时 ${(st.cronManual.ms / 1000).toFixed(1)} 秒）</summary>${cronSteps(st.cronManual)}</details>` : ''}
 `;
 // 定时任务各步骤的耗时 / 错误
-const cronSteps = (c) => `<div class="sys-steps">${Object.entries(c.steps).map(([k, v]) => `<span class="${v.ok ? '' : 'bad'}">${esc(k)} · ${v.ok ? `${v.ms} ms` : esc(v.error)}</span>`).join('')}</div>`;
+const cronSteps = (c) => `<div class="sys-steps">${Object.entries(c.steps).map(([k, v]) => `<span class="${v.ok ? '' : 'bad'}">${esc(CRON_NAME[k] || k)} · ${v.ok ? `${(v.ms / 1000).toFixed(1)} 秒` : esc(v.error)}</span>`).join('')}</div>`;
 
 // 打开设置页并展开某一项
 function goSettings(id) { store.set('set:open', id); location.hash = '#/settings'; }
@@ -5228,10 +5191,10 @@ async function renderSites(token) {
     // 涨跌：有会话看会话，没有 GA4 看搜索点击
     let up = 0, down = 0;
     if (hasP) for (const x of rows) {
-      const [a, b] = x.cur.ga && x.prev.ga ? [x.cur.ga.sessions, x.prev.ga.sessions] : x.cur.gsc && x.prev.gsc ? [x.cur.gsc.clicks, x.prev.gsc.clicks] : [0, 0];
+      const [a, b] = x.cur.ga && x.prev.ga ? [x.cur.ga.sessions, x.prev.ga.sessions] : SE(x) && SE(x, 'prev') ? [SE(x).clicks, SE(x, 'prev').clicks] : [0, 0];
       if (a > b * 1.05 && a - b >= 3) up++; else if (a < b * 0.95 && b - a >= 3) down++;
     }
-    const active = rows.filter((x) => (x.cur.ga?.sessions || 0) + (x.cur.gsc?.clicks || 0) > 0).length;
+    const active = rows.filter((x) => (x.cur.ga?.sessions || 0) + (SE(x)?.clicks || 0) > 0).length;
     // 每日序列：区间内每天相加；上一周期按“第几天”对齐
     const days = [];
     for (let t = Date.parse(d.ranges.from); ; t += 86400000) { const k = new Date(t).toISOString().slice(0, 10); if (k > d.ranges.to) break; days.push(k); }
@@ -5247,10 +5210,10 @@ async function renderSites(token) {
     const shift = (k, n) => new Date(Date.parse(k) - n * 86400000).toISOString().slice(0, 10);
     const sPrev = hasP && pm.size ? days.map((k) => pm.get(shift(k, gState.days)) || 0) : null;
     // 访问量占比：会话最多的 5 个站点各一段，其余合并；没有 GA4 数据时按搜索点击
-    const byS = ses > 0, val = (x) => (byS ? x.cur.ga?.sessions : x.cur.gsc?.clicks) || 0, tot = byS ? ses : clk;
+    const byS = ses > 0, val = (x) => (byS ? x.cur.ga?.sessions : SE(x)?.clicks) || 0, tot = byS ? ses : clk;
     const top = rows.filter((x) => val(x) > 0).sort((a, b) => val(b) - val(a)).slice(0, 5);
     const rest = tot - top.reduce((a, x) => a + val(x), 0);
-    const COL = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', '#e26d9c'];
+    const COL = ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', 'var(--rose)'];
     const nm = (x) => (x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host);
     const bar = tot ? `<div class="gsb">${top.map((x, i) => `<i style="flex:${val(x)};background:${COL[i]}" data-tipf-always data-tipf="${esc(`${nm(x)} · ${pctText(val(x) / tot)}`)}"></i>`).join('')}${rest > 0 ? `<i style="flex:${rest}" class="o" data-tipf-always data-tipf="其余 ${rows.length - top.length} 个站点 · ${pctText(rest / tot)}"></i>` : ''}</div>
       <div class="gsb-l">${top.slice(0, 3).map((x, i) => `<span><i style="background:${COL[i]}"></i>${esc(nm(x))} ${pctText(val(x) / tot)}</span>`).join('')}</div>` : '';
@@ -5261,7 +5224,7 @@ async function renderSites(token) {
       gKc('会话', num(ses), hasP ? gDelta(ses, pses) : '', `关键事件 ${num(kev)}`, sPrev ? '虚线为上一周期' : '', kpiSpark(sSes, 'var(--accent)', sPrev)),
       gKc('搜索点击', num(clk), hasP ? gDelta(clk, pclk) : '', `${seIcons()}${imp ? `点击率 ${pct1(clk / imp)}` : '暂无搜索数据'}`, '', kpiSpark(sClk, 'var(--teal)')),
       gKc('搜索展示', num(imp), hasP ? gDelta(imp, pimp) : '', `${seIcons()}${pos != null ? `${gState.se === 'all' ? 'Google ' : ''}平均排名 ${pos.toFixed(1)}${hasP && ppos != null ? ` ${gDelta(pos, ppos, true)}` : ''}` : imp ? '' : '暂无搜索数据'}`,
-        gState.se === 'bing' ? 'Bing 的展示次数（Bing 没有按天的平均排名）' : gState.se === 'all' ? 'Google 和 Bing 的展示次数相加；平均排名只算 Google' : 'Search Console 的展示次数；平均排名按展示加权，数字越小越靠前', kpiSpark(sImp, '#0ea5e9')),
+        gState.se === 'bing' ? 'Bing 的展示次数（Bing 没有按天的平均排名）' : gState.se === 'all' ? 'Google 和 Bing 的展示次数相加；平均排名只算 Google' : 'Search Console 的展示次数；平均排名按展示加权，数字越小越靠前', kpiSpark(sImp, 'var(--sky)')),
       chCard(rows),
       gKc('短链点击', num(lh), hasP ? gDelta(lh, lph) : '', lids ? `${lv ? `${num(lv)} 位访客 · ` : ''}${lids} 个短链${ses ? ` · 点出率 ${pct1(lh / ses)}` : ''}` : '这些站点还没有点出的短链',
         '从这些站点点出去的短链真人点击：按短链访问的来源（src 参数或 Referer 域名）匹配站点。访客按 IP 去重（估算，误差约 5%），多个站点的访客直接相加。点出率 = 短链点击 ÷ 会话', sLnk.some(Boolean) ? kpiSpark(sLnk, 'var(--amber)') : ''),
@@ -5547,7 +5510,7 @@ function idxSitemapsView(d) {
   const auth = d.google && !d.canSubmit ? `<div class="bulk-bad ix-auth">${ic('key', 15)}<span>当前 Google 账号${d.email ? `（${esc(maskEmail(d.email))}）` : ''}只授予了只读权限，重新授权后才能在这里提交站点地图</span><span class="sp"></span><button type="button" class="btn sm" id="ix-re">重新授权</button></div>` : '';
   const rows = d.sitemaps.map((x) => {
     const [c, l] = st(x);
-    return `<tr><td><a class="ell" href="${esc(x.path)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(x.path)}">${esc(urlPath(x.path))}</a>${x.index ? '<i class="ix-tag">索引文件</i>' : ''}</td>
+    return `<tr><td><div class="ix-u"><a class="ell" href="${esc(x.path)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(x.path)}">${esc(urlPath(x.path))}</a>${x.index ? '<i class="ix-tag">索引文件</i>' : ''}</div></td>
       <td><span class="ix-st ${c}"${x.warnings ? ` data-tipf-always data-tipf="${esc(`${x.warnings} 个警告`)}"` : ''}><i></i>${l}${x.warnings ? ` · ${x.warnings} 个警告` : ''}</span></td>
       <td class="num">${x.urls ? num(x.urls) : '—'}</td>
       <td class="num"><span class="sm"${x.downloaded ? ` data-tipf-always data-tipf="${esc(fmtTime(x.downloaded))}"` : ''}>${x.downloaded ? ago(x.downloaded) : '—'}</span></td>
@@ -5565,7 +5528,7 @@ function idxSitemapsView(d) {
   const bst = (x) => (x.missing ? ['wait', '未提交到 Bing'] : /success|成功/i.test(x.status) ? ['yes', '成功'] : /pend|process/i.test(x.status) ? ['wait', '处理中'] : x.status ? ['bad', x.status] : ['wait', '尚未读取']);
   const brows = [...bf, ...missing].map((x) => {
     const [c, l] = bst(x);
-    return `<tr><td><a class="ell" href="${esc(x.path)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(x.path)}">${esc(urlPath(x.path))}</a></td>
+    return `<tr><td><div class="ix-u"><a class="ell" href="${esc(x.path)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(x.path)}">${esc(urlPath(x.path))}</a></div></td>
       <td><span class="ix-st ${c}"><i></i>${esc(l)}</span></td>
       <td class="num">${x.urls ? num(x.urls) : '—'}</td>
       <td class="num"><span class="sm"${x.crawled ? ` data-tipf-always data-tipf="${esc(fmtTime(x.crawled))}"` : ''}>${x.crawled ? ago(x.crawled) : '—'}</span></td>
@@ -5574,7 +5537,7 @@ function idxSitemapsView(d) {
   }).join('');
   return `${google}<h4 class="ix-bt">${BRAND.bing(14)}Bing</h4>
     ${d.bing.issues ? `<div class="hint ix-err" style="margin-bottom:10px">${ic('alert', 13)}<span>${esc(d.bing.issues)}</span></div>` : ''}
-    ${brows ? `<div class="g-scr"><table class="tbl gt ix-sm"><thead><tr><th>站点地图</th><th>状态</th><th class="r">网址</th><th class="r">上次抓取</th><th class="r">提交时间</th><th></th></tr></thead><tbody>${brows}</tbody></table></div>`
+    ${brows ? `<div class="g-scr"><table class="tbl gt ix-sm"><thead><tr><th>站点地图</th><th>状态</th><th class="r">网址</th><th class="r">上次读取</th><th class="r">上次提交</th><th></th></tr></thead><tbody>${brows}</tbody></table></div>`
       : `<div class="empty">${ic('inbox')}Bing 里还没有站点地图</div>`}
     <div class="hint" style="margin-top:10px"><a href="https://www.bing.com/webmasters/sitemaps?siteUrl=${encodeURIComponent(d.bing.site)}" target="_blank" rel="noopener">在 Bing Webmaster 中查看</a></div>`;
 }
@@ -5611,18 +5574,27 @@ async function mountSiteIndex(host) {
   const body = el.querySelector('.card-b');
   let d, f = store.get('ix:f', 'all'), reason = '', tab = store.get('ix:tab', 0);
   const draw = () => {
-    el.querySelectorAll('.tabs button').forEach((b, i) => b.classList.toggle('on', i === tab));
+    el.querySelectorAll('.tabs button').forEach((b, i) => { b.classList.toggle('on', i === tab); b.setAttribute('aria-selected', i === tab); });
     body.innerHTML = tab ? idxSitemapsView(d) : idxUrlsView(d, f, reason);
   };
+  el.querySelectorAll('.tabs button').forEach((b, i) => b.classList.toggle('on', i === tab));
+  const chk = el.querySelector('#ix-chk');
   try { d = await api(`/google/index?host=${encodeURIComponent(host)}`); }
-  catch (err) { body.innerHTML = `<div class="empty">${ic('alert')}${esc(err.message)}</div>`; return; }
+  catch (err) {
+    // 加载失败：给一个重试按钮，标题栏的按钮先禁用
+    chk.disabled = true;
+    body.innerHTML = `<div class="empty">${ic('alert')}${esc(err.message)}<button type="button" class="btn sm" id="ix-retry" style="margin-top:10px">重试</button></div>`;
+    body.querySelector('#ix-retry').onclick = () => { body.innerHTML = skel(220); chk.disabled = false; mountSiteIndex(host); };
+    return;
+  }
   if (!document.body.contains(el)) return;
   draw();
   el.querySelectorAll('.tabs button').forEach((b, i) => (b.onclick = () => { tab = i; store.set('ix:tab', i); draw(); }));
   const run = async (btn, path, payload, ok) => {
     btn.disabled = true; btn.classList.add('busy');
-    try { const r = await api(`/google/index/${path}`, { method: 'POST', body: { host, ...payload } }); d = r.index; draw(); toast(ok(r)); }
-    catch (err) { toast(err.message, 'bad'); btn.disabled = false; btn.classList.remove('busy'); }
+    try { const r = await api(`/google/index/${path}`, { method: 'POST', body: { host, ...payload } }); d = r.index; draw(); toast(ok(r)); return r; }
+    catch (err) { toast(err.message, 'bad'); }
+    finally { btn.disabled = false; btn.classList.remove('busy'); }   // 卡片内容重绘时按钮会换新的；标题栏的“立即检查”不会，要在这里恢复
   };
   el.querySelector('#ix-chk').onclick = (e) => run(e.currentTarget, 'check', {}, (r) => [r.done || !r.failed ? `已检查 ${r.done} 个网址` : '', r.failed ? `${r.failed} 个检查失败` : '', r.left ? `还有 ${r.left} 个待检查` : ''].filter(Boolean).join('，'));
   body.addEventListener('click', (e) => {
@@ -5633,7 +5605,19 @@ async function mountSiteIndex(host) {
     if (b.dataset.ixr) { reason = reason === b.dataset.ixr ? '' : b.dataset.ixr; return draw(); }
     if (b.dataset.ixi) {
       // Google 和 Bing 都关联时两边都重新检查
-      if (d.google && d.bing) return run(b, 'inspect', { url: b.dataset.ixi }, () => '已重新检查').then(() => api('/google/index/inspect', { method: 'POST', body: { host, url: b.dataset.ixi, which: 'bing' } }).then((r) => { d = r.index; draw(); }).catch(() => {}));
+      if (d.google && d.bing) {
+        // 两边都关联时先查 Google 再查 Bing，结果合在一个提示里（任何一边出错都会说出来）
+        return (async () => {
+          b.disabled = true; b.classList.add('busy');
+          const errs = [];
+          for (const which of ['google', 'bing']) {
+            try { d = (await api('/google/index/inspect', { method: 'POST', body: { host, url: b.dataset.ixi, which } })).index; }
+            catch (err) { errs.push(`${which === 'google' ? 'Google' : 'Bing'}：${err.message}`); }
+          }
+          draw();
+          toast(errs.length ? (errs.length === 2 ? `重新检查失败：${errs.join('；')}` : `已重新检查，但 ${errs[0]}`) : '已重新检查（Google 和 Bing）', errs.length === 2 ? 'bad' : errs.length ? 'warn' : 'ok');
+        })();
+      }
       return run(b, 'inspect', { url: b.dataset.ixi, which: d.google ? 'google' : 'bing' }, () => '已重新检查');
     }
     if (b.dataset.ixb) return run(b, 'bing-submit', { url: b.dataset.ixb }, (r) => `已提交到 Bing${r.quota != null ? `，今天还能提交 ${r.quota} 个` : ''}`);
@@ -5927,13 +5911,16 @@ async function renderSettings(token) {
   });
   renderTracking(document.getElementById('acc-trk'), trk, (on) => { page.querySelector('[data-st="trk"]').innerHTML = pill(on); });
   const sysBox = document.getElementById('acc-sys');
+  let sysRunning = false;
   if (sysBox) sysBox.addEventListener('click', async (e) => {
     const ub = e.target.closest('#sys-upd');
     if (ub && !ub.disabled) {
       ub.disabled = true; ub.classList.add('busy');
       try {
         const d = await api('/update/check', { method: 'POST', body: {} });
-        sysBox.innerHTML = sysBody(d);
+        // 正在“立即运行一次”时不重绘（会把运行中的按钮换成可点的，导致重复运行）
+        if (!sysRunning) sysBox.innerHTML = sysBody(d);
+        else { ub.disabled = false; ub.classList.remove('busy'); }
         page.querySelector('[data-st="sys"]').innerHTML = sysPill(d);
         page.querySelector('[data-sub="sys"]').innerHTML = sysSummary(d);
         toast(d.update?.newer ? `有新版本 v${d.update.latest}` : d.update?.error ? `检查更新失败：${d.update.error}` : '已是最新版本', d.update?.error ? 'bad' : 'ok');
@@ -5942,16 +5929,17 @@ async function renderSettings(token) {
     }
     const btn = e.target.closest('#sys-run');
     if (!btn || btn.disabled) return;
-    btn.disabled = true; btn.classList.add('busy');
-    const label = btn.lastChild; label.textContent = '运行中…（约 1–2 分钟）';
+    btn.disabled = true; btn.classList.add('busy'); sysRunning = true;
+    const label = btn.lastChild; label.textContent = '运行中…（约 1 分钟）';
     try {
       const d = await api('/cron/run', { method: 'POST' });
       const bad = Object.entries(d.result.steps).filter(([, v]) => !v.ok);
       sysBox.innerHTML = sysBody(d.status);
       page.querySelector('[data-st="sys"]').innerHTML = sysPill(d.status);
       page.querySelector('[data-sub="sys"]').innerHTML = sysSummary(d.status);
-      toast(bad.length ? `运行完成，${bad.length} 个步骤出错：${bad.map(([k]) => k).join('、')}` : `运行完成，用时 ${(d.result.ms / 1000).toFixed(1)} 秒`, bad.length ? 'bad' : 'ok');
+      toast(bad.length ? `运行完成，${bad.length} 个步骤出错：${bad.map(([k]) => CRON_NAME[k] || k).join('、')}` : `运行完成，用时 ${(d.result.ms / 1000).toFixed(1)} 秒`, bad.length ? 'bad' : 'ok');
     } catch (err) { toast(err.message, 'bad'); btn.disabled = false; btn.classList.remove('busy'); label.textContent = '立即运行一次'; }
+    finally { sysRunning = false; }
   });
   renderGoogleSettings(document.getElementById('acc-goo'), goo, (g) => {
     page.querySelector('[data-st="goo"]').innerHTML = googlePill(g);
@@ -6019,7 +6007,6 @@ function renderSessions(box, d, onState) {
 }
 
 // ---------------------------------------------------------------- Cloudflare 用量
-const FREE_LIMITS = { rowsRead: 5e6, rowsWritten: 1e5, requests: 1e5, storage: 5e9 };
 const wan = (n) => (EN ? (n >= 1e9 ? `${+(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${+(n / 1e3).toFixed(1)}K` : num(n))
   : n >= 1e8 ? `${+(n / 1e8).toFixed(2)} 亿` : n >= 1e4 ? `${+(n / 1e4).toFixed(1)} 万` : num(n));
 const bytes = (b) => (b >= 1e9 ? `${+(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${+(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
@@ -6158,7 +6145,7 @@ function renderUsage(box, u, onState) {
   const UCOL = ['var(--accent)', 'var(--violet)', 'var(--teal)'];
   const colorOf = new Map((u.top?.week?.rowsRead || []).map(([id], i) => [id, UCOL[i]]));
   // 写入多、读取少的数据库也给个颜色；Worker 按最近 7 天的请求量另配颜色
-  for (const [id] of u.top?.week?.rowsWritten || []) if (!colorOf.has(id) && colorOf.size < 5) colorOf.set(id, ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', '#e26d9c'][colorOf.size]);
+  for (const [id] of u.top?.week?.rowsWritten || []) if (!colorOf.has(id) && colorOf.size < 5) colorOf.set(id, ['var(--accent)', 'var(--violet)', 'var(--teal)', 'var(--amber)', 'var(--rose)'][colorOf.size]);
   const wkColor = new Map((u.top?.week?.requests || []).map(([n], i) => [n, UCOL[i]]));
   // 写入 / 请求格子里：数字下面列出占用最多的两个
   const topCell = (list, total, k, d) => {
@@ -6847,7 +6834,7 @@ addEventListener('resize', () => document.querySelectorAll('.seg').forEach(segTh
 // ---------------------------------------------------------------- ⌘K：搜索短链、站点、设置，快速跳转
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 const KBAR_SETTINGS = [['pw', 'key', '修改密码'], ['mfa', 'shield', '两步验证'], ['dev', 'desk', '登录设备'], ['trk', 'search', '来源追踪'], ['goo', 'globe', 'Google 集成'],
-  ['ai', 'ai', 'AI 分析链接'], ['use', 'chart', 'Cloudflare 用量'], ['sys', 'pulse', '系统状态'], ['ret', 'inbox', '数据保留']];
+  ['bing', 'search', 'Bing Webmaster'], ['ai', 'ai', 'AI 分析链接'], ['use', 'chart', 'Cloudflare 用量'], ['sys', 'pulse', '系统状态'], ['ret', 'inbox', '数据保留']];
 let kbarSites = null;
 function openKbar() {
   if (document.querySelector('.kbar')) return;

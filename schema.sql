@@ -177,6 +177,9 @@ CREATE TABLE IF NOT EXISTS g_urls (
 );
 CREATE INDEX IF NOT EXISTS g_urls_due ON g_urls (due_at);
 CREATE INDEX IF NOT EXISTS g_urls_bdue ON g_urls (b_due_at);
+-- 站点列表按日期范围读每日数据；清理任务按时间删缓存和修改记录
+CREATE INDEX IF NOT EXISTS g_daily_date ON g_daily (date);
+CREATE INDEX IF NOT EXISTS g_cache_at ON g_cache (at);
 -- 站点地图：Sitemaps API 的结果，每天刷新一次；同时记下当天网址检查用掉的配额（每个资源每天 2000 次）
 CREATE TABLE IF NOT EXISTS g_sitemaps (
   host     TEXT PRIMARY KEY,
@@ -194,7 +197,9 @@ CREATE TABLE IF NOT EXISTS g_sitemaps (
   b_feeds  TEXT NOT NULL DEFAULT '[]',      -- Bing 的站点地图（GetFeeds）
   b_error  TEXT NOT NULL DEFAULT '',
   b_quota  INTEGER NOT NULL DEFAULT -1,     -- Bing 今天剩余的提交配额（-1 = 未知）
-  b_quota_at INTEGER NOT NULL DEFAULT 0
+  b_quota_at INTEGER NOT NULL DEFAULT 0,
+  g_on     INTEGER NOT NULL DEFAULT -1,     -- 上次刷新时是否关联了 GSC / Bing（变了才调整网址的检查排期）
+  b_on     INTEGER NOT NULL DEFAULT -1
 );
 CREATE TABLE IF NOT EXISTS g_cache (
   k   TEXT PRIMARY KEY,
@@ -278,3 +283,4 @@ CREATE TABLE IF NOT EXISTS link_log (
   reverted    INTEGER NOT NULL DEFAULT 0  -- 已撤销时为撤销记录的 id
 );
 CREATE INDEX IF NOT EXISTS idx_link_log_link ON link_log(link_id, at);
+CREATE INDEX IF NOT EXISTS idx_link_log_at ON link_log(at);

@@ -1,13 +1,14 @@
 # 同步上游新版本：把 ccvar/cligc_link 最新发布的版本合并进你自己的仓库，Cloudflare 会自动重新部署。
 # 适用于用“Deploy to Cloudflare”按钮部署的仓库（或自己 fork 的仓库）。
-# 在仓库的 Actions 页面选“同步上游新版本”→ Run workflow 手动运行；也会每周一自动检查一次（不想自动升级就删掉 schedule 那两行）。
+# 在仓库的 Actions 页面选“同步上游新版本”→ Run workflow 手动运行。
+# 想每周自动升级，把下面 schedule 那两行前面的 # 去掉（自动部署的新代码能访问你保存的 Google / Bing 凭据，默认不开）。
 # 你在 wrangler.toml 里的 Worker 名称、域名、D1 数据库、[vars] 会保留。
 name: 同步上游新版本
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 3 * * 1'
+  # schedule:
+  #   - cron: '0 3 * * 1'
 
 permissions:
   contents: write

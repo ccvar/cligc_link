@@ -36,7 +36,8 @@ const remotes = sh('git remote -v').split('\n').map((l) => l.split(/\s+/)).filte
 let remote = remotes.find(([, url]) => url === UPSTREAM || (!process.env.CLIGC_UPSTREAM && /ccvar\/cligc_link(\.git)?$/i.test(url)))?.[0];
 if (!remote) { sh(`git remote add upstream ${UPSTREAM}`); remote = 'upstream'; }
 log(`→ 从 ${remote} 获取新版本…`);
-sh(`git fetch ${remote} --tags --force`, { show: true });
+// 不加 --force：不覆盖你自己打的同名标签（有冲突时只给提示）
+if (!ok(`git fetch ${remote} --tags`)) log('  （部分标签和本地的同名标签冲突，已跳过；不影响升级）');
 
 const tags = sh("git tag -l 'v*'").split('\n').filter((t) => /^v\d+\.\d+\.\d+$/.test(t));
 const latest = TO || tags.sort((a, b) => (gt(a, b) ? -1 : gt(b, a) ? 1 : 0))[0];
@@ -67,8 +68,12 @@ if (ok(`git merge-base --is-ancestor HEAD ${latest}`)) {
       if (f !== 'wrangler.toml' && !f.startsWith('.github/')) ok(`git rm -q --ignore-unmatch -- "${f}"`);
     }
   }
-  // GitHub Actions 的令牌不能修改工作流文件，.github 保持原样
-  if (CI && ok('git cat-file -e HEAD:.github')) sh('git checkout HEAD -- .github');
+  // GitHub Actions 的令牌不能修改工作流文件：.github 保持原样（包括上游新增的工作流文件也不带进来）
+  if (CI) {
+    ok('git reset -q HEAD -- .github');
+    if (ok('git cat-file -e HEAD:.github')) ok('git checkout HEAD -- .github');
+    ok('git clean -fdq -- .github');
+  }
 }
 
 // 把自己的配置填回新版本的 wrangler.toml
@@ -88,7 +93,8 @@ if (CI) {
 }
 
 // 命令行：不是快进的（覆盖了文件）也提交一次，方便以后再升级
-if (!ok('git diff --quiet HEAD -- . ":(exclude)wrangler.toml"')) { sh('git add -A'); ok(`git commit -q -m "升级到 ${latest}"`); }
+// wrangler.toml 里有你的数据库 ID 和域名，不提交（仓库公开时会泄露）
+if (!ok('git diff --quiet HEAD -- . ":(exclude)wrangler.toml"')) { sh('git add -A -- . ":(exclude)wrangler.toml"'); ok(`git commit -q -m "升级到 ${latest}"`); }
 log('→ 安装依赖…');
 if (NO_DEPLOY) { sh('npm install --no-audit --no-fund', { show: true }); log(`\n✓ 代码已更新到 ${latest}，还没部署；检查后执行 npx wrangler deploy`); process.exit(0); }
 sh('npm install --no-audit --no-fund', { show: true });
