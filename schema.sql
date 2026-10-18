@@ -310,3 +310,11 @@ CREATE TABLE IF NOT EXISTS link_log (
 );
 CREATE INDEX IF NOT EXISTS idx_link_log_link ON link_log(link_id, at);
 CREATE INDEX IF NOT EXISTS idx_link_log_at ON link_log(at);
+
+-- 站点优化建议的忽略记录（src/advice.js）：until 之前不再显示这一类建议，永久忽略记为 9e15
+CREATE TABLE IF NOT EXISTS site_ignores (
+  host   TEXT NOT NULL,
+  rule   TEXT NOT NULL,
+  until  INTEGER NOT NULL,
+  PRIMARY KEY (host, rule)
+);

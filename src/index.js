@@ -11,6 +11,7 @@ import * as google from './google.js';
 import * as gindex from './gindex.js';
 import * as bing from './bing.js';
 import * as backlinks from './backlinks.js';
+import * as advice from './advice.js';
 import { subreq } from './budget.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT, normalizeTarget, isAppUrl, isWebUrl, inAppBrowser, intentWithFallback, guardKey, isDbError } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAggStmts, pruneClicks, backfillSourceUv, prunePerRun, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
@@ -244,6 +245,7 @@ async function runCron(env, at = Date.now(), { manual = false, token = '', start
     // 过期的登录设备、一年前的修改记录
     await env.DB.prepare('DELETE FROM sessions WHERE exp < ?').bind(Date.now()).run();
     await env.DB.prepare('DELETE FROM fb_seen WHERE exp < ?').bind(Date.now()).run();
+    await env.DB.prepare('DELETE FROM site_ignores WHERE until < ?').bind(Date.now()).run();
     await env.DB.prepare('DELETE FROM link_log WHERE at < ?').bind(Date.now() - 365 * DAY).run();
   });
   await step('google', async () => {
@@ -2504,6 +2506,16 @@ async function googleApi(request, env, url) {
     if (path === '/api/google/tags' && method === 'GET') return json({ tags: await google.tagsList(env) });
     if (path === '/api/google/tags' && method === 'PUT') {
       const r = await google.tagsUpdate(env, await request.json().catch(() => ({})));
+      return r.error ? json(r, 400) : json(r);
+    }
+    // 站点优化建议：不带 host 时是全部站点（站点列表），带 host 时是一个站点（含已忽略的规则）
+    if (path === '/api/google/advice' && method === 'GET') {
+      const host = String(url.searchParams.get('host') || '');
+      return json(host ? (await advice.advice(env, host))[host] || { items: [], ignored: [] } : { items: await advice.adviceAll(env) });
+    }
+    if (path === '/api/google/advice/ignore' && method === 'POST') {
+      const b = await request.json().catch(() => ({}));
+      const r = await advice.setIgnore(env, String(b.host || ''), String(b.rule || ''), Number(b.days));
       return r.error ? json(r, 400) : json(r);
     }
     if (path === '/api/google/hosts') {

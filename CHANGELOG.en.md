@@ -2,6 +2,24 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.6.0 · 2026-10-18
+
+New site suggestions: the data already synced is used to point out which sites have problems and what to do.
+
+### New
+
+- **Site suggestions**: based only on data already synced (no extra API calls); sites with very little traffic aren't flagged
+  - Whole site: GA4 suddenly reporting nothing for 3 days (the tracking code may be gone), search clicks down 30% or more, many impressions but a CTR well below typical for the position (with the clicks you could gain), a low indexing rate (with the main reasons and what to do), URLs that fail to load or are blocked, sitemaps that can't be read or haven't been submitted, far fewer pages in Bing than in Google, and traffic without any key events
+  - The site page also lists pages with many impressions but few clicks, and queries at positions 4–20 that are close to the top 3
+  - The "Suggestions" card at the top of the site page is sorted by importance; each item shows the numbers, what to do, and a button that jumps to the matching filter
+  - Sites with suggestions get a small badge in the site list, and "Has suggestions" on the right of the filter bar shows only those
+  - Suggestions you don't need can be ignored for 30 days or permanently, and restored from the same card
+
+### Improved
+
+- When the site table doesn't fit, lower-priority columns (session share, CTR, session trend) are hidden one by one instead of showing a horizontal scrollbar; it's based on the actual width and adjusts when the window or sidebar changes
+- "Key events" is merged into the Sessions column and shown under the session count when there are any
+
 ## v1.5.2 · 2026-10-18
 
 Switch sites right from the site page, and the site list picks up changes sooner.

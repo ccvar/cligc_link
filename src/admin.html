@@ -644,6 +644,40 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .qr-big { display: block; width: 220px; height: 220px; margin: 0 auto 10px; padding: 8px; border-radius: 14px; border: 1px solid var(--line); background: #fff; image-rendering: pixelated; }
 .qr-d .row { text-align: left; }
 .hero .ttl { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; color: var(--text-2); font-weight: 550; }
+/* 站点优化建议 */
+.adv .card-h .hint { margin-left: 4px; }
+.adv-l { display: grid; gap: 10px; }
+.adv-i { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--sunken); }
+.adv-ic { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--panel); color: var(--muted); }
+.adv-i.lv-high .adv-ic { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--panel)); }
+.adv-i.lv-mid .adv-ic { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
+.adv-t { flex: 1; min-width: 0; }
+.adv-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adv-h b { font-size: 13.5px; font-weight: 600; }
+.adv-lv { font-size: 11px; padding: 0 6px; line-height: 18px; border-radius: 5px; background: var(--panel); color: var(--muted); }
+.lv-high .adv-lv { color: var(--bad); } .lv-mid .adv-lv { color: var(--warn); }
+.adv-t p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--text-2); overflow-wrap: anywhere; }
+.adv-a { flex: none; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; max-width: 300px; }
+.adv-ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12.5px; }
+.adv-ul li { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+.adv-ul li::before { content: ''; flex: none; width: 4px; height: 4px; border-radius: 50%; background: var(--faint); transform: translateY(-2px); }
+.adv-k { min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.adv-ul .hint { min-width: 0; }
+.adv-ul li:has(.hint:empty) .adv-k { max-width: none; white-space: normal; overflow-wrap: anywhere; }
+.adv-ig { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 12px; }
+.adv-ig small { margin-left: 2px; }
+.lnk { border: 0; background: none; padding: 0 0 0 6px; color: var(--accent); font: inherit; cursor: pointer; }
+@media (max-width: 640px) { .adv-i { flex-wrap: wrap; } .adv-a { width: 100%; max-width: none; justify-content: flex-start; padding-left: 40px; } }
+/* 站点列表：有优化建议的站点 */
+.gadv { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: default;
+  color: var(--muted); background: var(--sunken); }
+.gadv.lv-high { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.gadv.lv-mid { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.g-advf { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; font-size: 12.5px; font-weight: 500; border-color: transparent; background: none; box-shadow: none; color: var(--muted); }
+.g-advf > svg { width: 13px; height: 13px; }
+.g-advf:hover { border-color: transparent; background: var(--sunken); color: var(--text); }
+.g-advf small { font-size: 11px; opacity: .8; }
+.g-advf.on, .g-advf.on:hover { border-color: transparent; color: var(--accent); background: var(--accent-2); }
 /* 站点详情：域名后面的站点切换，只显示一个下拉箭头 */
 .site-sw { display: inline-flex; font-family: var(--sans); letter-spacing: 0; }
 .site-sw .combo-btn { width: 30px; min-width: 0; height: 30px; padding: 0; justify-content: center; border-color: transparent; background: none; border-radius: 8px; }
@@ -1540,6 +1574,8 @@ button.gtg { cursor: pointer; }
 .g-prog b { color: var(--accent-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .g-prog[hidden] { display: none; }
 .gl-wrap { overflow-x: auto; }
+/* 放不下时按重要程度依次收起几列，不出现横向滚动（fitSiteCols 按实际宽度量） */
+.tbl.gl.h-share .c-share, .tbl.gl.h-ctr .c-ctr, .tbl.gl.h-spark .c-spark { display: none; }
 /* 可以横向滚动时在边缘显示阴影，滚到头就消失（纯 CSS：遮罩随内容滚动，阴影固定在容器边缘） */
 .gl-wrap, .scroll {
   background:
@@ -5031,7 +5067,7 @@ function openSplitDrawer(link, parent) {
 // ---------------------------------------------------------------- 站点（GA4 + Search Console）
 // 站点列表最近一次显示的站点（按当时的筛选和排序），详情页的站点切换按这个顺序列出
 let siteNav = null;
-const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), dir: store.get('g:dir', ''), acct: '', link: '', tag: '', se: store.get('g:se', 'google') };
+const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), dir: store.get('g:dir', ''), acct: '', link: '', tag: '', adv: false, se: store.get('g:se', 'google') };
 // 站点表格默认从小到大排的列（域名按字母、排名越小越好），其余默认从大到小
 const SORT_ASC = new Set(['host', 'pos']);
 // 站点列表搜索列的数据来源：google / bing / all（合计）；Bing 没有按天的平均排名，合计时排名只看 Google
@@ -5867,6 +5903,15 @@ function renderGoogleSettings(box, st, onState) {
 
 // 站点列表 / 站点详情：切换时间范围等会用同一个 routeToken 重新加载，按请求序号丢掉较慢的旧结果
 let sitesSeq = 0, siteSeq = 0;
+// 站点表格放不下时按重要程度依次收起几列（会话占比 → 点击率 → 会话趋势），直到不用横向滚动；
+// 按渲染后的实际宽度量（字体、缩放、侧栏都考虑在内），窗口或侧栏宽度变了重新量。手机上全收起还放不下时才横向滚动
+const GL_HIDE = ['h-share', 'h-ctr', 'h-spark'];
+function fitSiteCols(list) {
+  const wrap = list?.querySelector('.gl-wrap'), t = wrap?.querySelector('.tbl.gl');
+  if (!t) return;
+  t.classList.remove(...GL_HIDE);
+  for (const c of GL_HIDE) { if (t.offsetWidth <= wrap.clientWidth + 1) break; t.classList.add(c); }
+}
 let gFresh = false;   // 下一次加载站点列表时跳过缓存（手动同步完成后）
 async function renderSites(token) {
   const my = ++sitesSeq;
@@ -5905,8 +5950,12 @@ async function renderSites(token) {
   }
 
   // 刚手动同步完：让服务端用最新数据重算列表，不沿用缓存
+  const advP = api('/google/advice').catch(() => null);   // 优化建议（和列表并行加载）
   const d = await api('/google/sites?days=' + gState.days + (gFresh ? '&fresh=1' : ''));
   gFresh = false;
+  const ADV = (await advP)?.items || {};
+  const advOf = (h) => ADV[h]?.items || [];
+  if (!Object.values(ADV).some((a) => a.items.length)) gState.adv = false;
   const BL = d.bl || {};   // 外链与权重开了哪几项
   if (token !== routeToken || my !== sitesSeq) return;
   const hasBing = d.items.some((x) => x.bing);
@@ -5919,7 +5968,7 @@ async function renderSites(token) {
     ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
     <section class="card kstrip gs rv" id="g-sum"></section>
     <section class="card rv">
-      <div class="lh"><div class="search">${ic('search')}<input class="input" id="g-q" placeholder="搜索域名或 GA4 名称" value="${esc(gState.q)}" aria-label="搜索站点"><button type="button" class="s-clear" id="g-qx" aria-label="清除搜索" ${gState.q ? '' : 'hidden'}>${ic('x', 14)}</button></div>${gRangeBar()}<div class="combo g-lf" id="g-lf"></div><div class="combo g-lf" id="g-tf"></div><span class="sp"></span>
+      <div class="lh"><div class="search">${ic('search')}<input class="input" id="g-q" placeholder="搜索域名或 GA4 名称" value="${esc(gState.q)}" aria-label="搜索站点"><button type="button" class="s-clear" id="g-qx" aria-label="清除搜索" ${gState.q ? '' : 'hidden'}>${ic('x', 14)}</button></div>${gRangeBar()}<div class="combo g-lf" id="g-lf"></div><div class="combo g-lf" id="g-tf"></div><span class="sp"></span>${Object.values(ADV).some((a) => a.items.length) ? `<button type="button" class="btn g-advf${gState.adv ? ' on' : ''}" id="g-advf" aria-pressed="${!!gState.adv}" data-tipf-always data-tipf="只看有优化建议的站点">${ic('alert', 13)}有优化建议<small>${Object.values(ADV).filter((a) => a.items.length).length}</small></button>` : ''}
         </div>
       <div id="g-list"></div>
       <div class="pager"><span><span id="g-cnt">${d.items.length} 个站点</span> · 统计到 ${d.ranges.to}（截至昨天；Search Console 数据通常延迟 2–3 天<span data-tipf-always data-tipf="Google 数据按 UTC 自然日统计，短链点击按后台时区（${tzLabelOf(TZ)}）的自然日统计，日期边界可能相差几个小时">；短链按本地日期</span>）${st.lastSync ? ` · 同步于 ${ago(st.lastSync)}` : ''}</span></div>
@@ -6003,6 +6052,7 @@ async function renderSites(token) {
     const rows = d.items.filter((x) => (!q || x.host.includes(q) || (x.ga4?.name || '').toLowerCase().includes(q))
       && (!gState.acct || x.ga4?.acct === gState.acct || x.gscAcct === gState.acct)
       && (!gState.tag || (gState.tag === '+none' ? !x.tags.length : x.tags.includes(gState.tag)))
+      && (!gState.adv || advOf(x.host).length > 0)
       && (!gState.link || (gState.link === 'any' ? x.linksFrom.length + x.links.length > 0
         : x.linksFrom.some((l) => String(l.id) === gState.link) || x.links.some((l) => String(l.id) === gState.link))));
     // 增长（“会话趋势”列）：用户比上一周期增加的人数（绝对值，避免小站点百分比虚高）；没有上一周期时按用户数
@@ -6013,7 +6063,7 @@ async function renderSites(token) {
     const byClicks = ['clicks', 'impr', 'ctr', 'pos'].includes(gState.sort);
     const shareOf = (x) => (byClicks ? SE(x)?.clicks : x.cur.ga?.sessions) || 0;
     const VAL = {
-      users: (x) => x.users, sessions: (x) => x.cur.ga?.sessions, share: shareOf, events: (x) => x.cur.ga?.keyEvents,
+      users: (x) => x.users, sessions: (x) => x.cur.ga?.sessions, share: shareOf,
       clicks: (x) => SE(x)?.clicks, impr: (x) => SE(x)?.impressions, ctr: (x) => (SE(x)?.impressions ? SE(x).ctr : null), pos: (x) => SE(x)?.position, idx: idxVal, growth,
       // 权重 / 外链：开了 Open PageRank 按分数排，只开 Bing 外链时按外链数排
       ...(BL.opr || BL.bing ? { bl: (x) => (BL.opr ? x.opr?.s ?? null : x.bl?.n ?? null) } : {}),
@@ -6034,8 +6084,8 @@ async function renderSites(token) {
     const sth = (k, inner, cls = 'r') => `<th class="${cls} sortable" data-sk="${k}" tabindex="0"${sk === k ? ` aria-sort="${asc ? 'ascending' : 'descending'}"` : ''}>${inner}</th>`;
     const lab = (t) => `<span class="sl">${t}${SORT_IC}</span>`;
     list.innerHTML = rows.length ? `<div class="gl-wrap"><table class="tbl gl${BL.opr || BL.bing ? ' has-bl' : ''}">
-      <thead><tr>${sth('host', lab('站点'), '')}${sth('users', lab('用户'))}${sth('sessions', lab('会话'))}${sth('share', lab(byClicks ? '点击占比' : '会话占比'), '')}${sth('events', lab('关键事件'))}${sth('clicks', seTh('搜索点击'))}${sth('impr', seTh('展示'))}${sth('ctr', seTh('点击率'))}${sth('pos', seTh('排名', true))}${gState.se === 'bing' ? sth('idx', `<span class="se-th" data-tipf-always data-tipf="站点地图和搜索结果里的网址中，已被 Bing 收录的数量；还没逐个检查时显示 Bing 抓取统计里的索引网页数"><i class="se-i">${BRAND.bing(12)}</i>${lab('已收录')}</span>`)
-        : sth('idx', `<span class="se-th" data-tipf-always data-tipf="${gState.se === 'all' ? '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量；下面一行是 Bing 已收录的数量' : '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量'}"><i class="se-i">${BRAND.gsc(12)}${gState.se === 'all' ? BRAND.bing(12) : ''}</i>${lab('已编入')}</span>`)}${blTh(BL, sth, lab)}${sth('growth', `<span class="sl" data-tipf-always data-tipf="按用户比上一周期增加的人数排序">会话趋势${SORT_IC}</span>`, '')}</tr></thead>
+      <thead><tr>${sth('host', lab('站点'), '')}${sth('users', lab('用户'))}${sth('sessions', lab('会话'))}${sth('share', lab(byClicks ? '点击占比' : '会话占比'), 'c-share')}${sth('clicks', seTh('搜索点击'))}${sth('impr', seTh('展示'))}${sth('ctr', seTh('点击率'), 'r c-ctr')}${sth('pos', seTh('排名', true))}${gState.se === 'bing' ? sth('idx', `<span class="se-th" data-tipf-always data-tipf="站点地图和搜索结果里的网址中，已被 Bing 收录的数量；还没逐个检查时显示 Bing 抓取统计里的索引网页数"><i class="se-i">${BRAND.bing(12)}</i>${lab('已收录')}</span>`)
+        : sth('idx', `<span class="se-th" data-tipf-always data-tipf="${gState.se === 'all' ? '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量；下面一行是 Bing 已收录的数量' : '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量'}"><i class="se-i">${BRAND.gsc(12)}${gState.se === 'all' ? BRAND.bing(12) : ''}</i>${lab('已编入')}</span>`)}${blTh(BL, sth, lab)}${sth('growth', `<span class="sl" data-tipf-always data-tipf="按用户比上一周期增加的人数排序">会话趋势${SORT_IC}</span>`, 'c-spark')}</tr></thead>
       <tbody>${rows.map((x) => {
         const ga = x.cur.ga, pg = x.prev.ga, sc = SE(x), ps = SE(x, 'prev');
         return `<tr data-host="${esc(x.host)}" tabindex="0">
@@ -6050,19 +6100,19 @@ async function renderSites(token) {
               const h = x.linksFrom.reduce((a, l) => a + l.human, 0), ses = x.cur.ga?.sessions;
               const tip = `${G_LABEL()}从这个站点点出 ${x.linksFrom.length} 个短链，真人点击 ${num(h)}${x.linksFromVisitors ? `（${num(x.linksFromVisitors)} 位访客）` : ''}${ses ? `，点出率 ${pct1(h / ses)}` : ''}：${x.linksFrom.slice(0, 3).map((l) => `/${l.slug} ${num(l.human)}`).join('、')}${x.linksFrom.length > 3 ? ' …' : ''}`;
               return `<span class="gsl" data-tipf-always data-tipf="${esc(tip)}">${ic('link', 12)}${num(h)}</span>`;
-            })() : ''}${x.ga4?.created ? `<span class="gage" data-tipf-always data-tipf="${esc(`GA4 接入于 ${ymd(new Date(x.ga4.created))}，大致是网站上线时间`)}">${ic('history', 11)}${siteAge(x.ga4.created)}</span>` : ''}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div></td>
+            })() : ''}${x.ga4?.created ? `<span class="gage" data-tipf-always data-tipf="${esc(`GA4 接入于 ${ymd(new Date(x.ga4.created))}，大致是网站上线时间`)}">${ic('history', 11)}${siteAge(x.ga4.created)}</span>` : ''}${advOf(x.host).length ? `<span class="gadv lv-${advOf(x.host)[0].level}" data-tipf-always data-tipf="${esc(`${advOf(x.host).length} 条优化建议\n${advTip(advOf(x.host))}`)}">${ic(ADV_LV_IC[advOf(x.host)[0].level], 11)}${advOf(x.host).length}</span>` : ''}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div></td>
           <td class="num">${x.users != null ? num(x.users) : '—'}${x.prevUsers != null ? gDelta(x.users, x.prevUsers) : ''}</td>
-          <td class="num">${ga ? num(ga.sessions) : '—'}${ga && pg ? gDelta(ga.sessions, pg.sessions) : ''}</td>
-          <td class="gsh-c">${shareSum && shareOf(x) ? `<div class="gsh"><i style="width:${(shareOf(x) / shareSum) * 100}%"></i></div><span>${pctText(shareOf(x) / shareSum)}</span>` : '<span class="sm">—</span>'}</td>
-          <td class="num">${ga ? num(ga.keyEvents) : '—'}</td>
+          <td class="num">${ga ? num(ga.sessions) : '—'}${ga && pg ? gDelta(ga.sessions, pg.sessions) : ''}${ga?.keyEvents ? `<div class="gd ix-pg" data-tipf-always data-tipf="GA4 关键事件（标记为转化的事件）">关键事件 ${num(ga.keyEvents)}</div>` : ''}</td>
+          <td class="gsh-c c-share">${shareSum && shareOf(x) ? `<div class="gsh"><i style="width:${(shareOf(x) / shareSum) * 100}%"></i></div><span>${pctText(shareOf(x) / shareSum)}</span>` : '<span class="sm">—</span>'}</td>
           <td class="num"${seSplit(x, 'clicks')}>${sc ? num(sc.clicks) : '—'}${sc && ps ? gDelta(sc.clicks, ps.clicks) : ''}</td>
           <td class="num"${seSplit(x, 'impressions')}>${sc ? num(sc.impressions) : '—'}</td>
-          <td class="num"${seSplit(x, 'ctr')}>${sc ? pct1(sc.ctr) : '—'}</td>
+          <td class="num c-ctr"${seSplit(x, 'ctr')}>${sc ? pct1(sc.ctr) : '—'}</td>
           <td class="num"${seSplit(x, 'position')}>${sc?.position != null ? sc.position.toFixed(1) : '—'}${sc?.position != null && ps?.position != null ? gDelta(sc.position, ps.position, true) : ''}</td>
           <td class="num">${idxCell(x)}</td>${BL.opr || BL.bing ? `<td class="num">${blCell(x, BL)}</td>` : ''}
-          <td class="gsp">${x.spark.length ? sparkOf(x) : ''}</td></tr>`;
+          <td class="gsp c-spark">${x.spark.length ? sparkOf(x) : ''}</td></tr>`;
       }).join('')}</tbody></table></div>`
       : `<div class="empty" style="padding:48px">${ic('inbox')}${d.items.length ? '没有匹配的站点' : '账号下还没有找到 GA4 媒体资源或 Search Console 站点'}</div>`;
+    fitSiteCols(list);
     sumStrip(rows);
     lastRows = rows;
     const navItem = (x) => ({ host: x.host, name: x.ga4?.name || '', s: x.cur.ga?.sessions ?? null });
@@ -6076,6 +6126,11 @@ async function renderSites(token) {
     });
   };
   draw();
+  // 宽度变了（窗口、侧栏收起 / 展开）重新量
+  let fitW = list.clientWidth;
+  new ResizeObserver(() => { if (list.clientWidth !== fitW) { fitW = list.clientWidth; fitSiteCols(list); } }).observe(list);
+  const advf = document.getElementById('g-advf');
+  if (advf) advf.onclick = () => { gState.adv = !gState.adv; advf.classList.toggle('on', gState.adv); advf.setAttribute('aria-pressed', gState.adv); draw(); };
   const qi = document.getElementById('g-q');
   const qx = document.getElementById('g-qx');
   let t; qi.oninput = () => { qx.hidden = !qi.value; clearTimeout(t); t = setTimeout(() => { gState.q = qi.value.trim(); draw(); }, 150); };
@@ -6572,6 +6627,126 @@ function mountBingCrawl(d) {
   ], document.getElementById('lg-bcr'));
 }
 
+// ---------------------------------------------------------------- 站点优化建议（规则在 src/advice.js；高曝光低点击的页面、差一点上首页的词在这里用详情页的数据算）
+const ADV_LV = { high: '重要', mid: '建议', low: '提示' };
+const ADV_NAME = { ga_stopped: 'GA4 停止上报', traffic_drop: '搜索点击下滑', site_ctr: '整站点击率偏低', low_index: '收录率低', url_problems: '网址有问题',
+  sitemap_error: '站点地图有问题', bing_low: 'Bing 收录少', no_conversion: '有流量没有转化', page_ctr: '页面点击率偏低', near_top: '差一点进前 3 的词' };
+// 未编入原因对应的做法
+const advReasonTip = (state) => {
+  const k = String(state || '').toLowerCase();
+  if (k.startsWith('discovered')) return 'Google 知道这些网址但还没来抓：多从首页和相关文章加内链，或在 Search Console 里请求编入';
+  if (k.startsWith('crawled')) return 'Google 抓过但没收录，通常是内容太少或和别的页面太像：充实内容、合并相似页面';
+  if (k.startsWith('duplicate') || k.startsWith('alternate')) return '检查这些页面的规范网址（canonical）是否指向了正确的页面';
+  if (k.includes('noindex') || k.includes('robots')) return '这些页面被 noindex 或 robots.txt 挡住了，确认是不是有意的';
+  if (k.includes('unknown')) return 'Google 还不知道这些网址：确认它们在站点地图里，并从其他页面链接过来';
+  return '在“网页索引”里按原因筛选，逐个看看';
+};
+// 一条建议：标题 t、说明 d（一句一段，各自翻译）、列表 li、列表后的说明 d2、“查看”跳转 go / gl
+function advView(a) {
+  const n = a.n || {};
+  switch (a.rule) {
+    case 'ga_stopped': return { t: 'GA4 最近 3 天没有数据', d: [`前两周共 ${num(n.before)} 次会话，最近 3 天一次都没有。`, '可能是网站上的 GA4 统计代码被删掉或改坏了，检查一下页面里的 GA4 代码。'] };
+    case 'traffic_drop': return { t: `搜索点击下滑 ${n.pct}%`, d: [`最近 7 天 ${num(n.cur)} 次，之前 7 天 ${num(n.prev)} 次（Google 和 Bing 相加）。`, '看看哪些词在下滑，检查对应的页面有没有被改动、还能不能正常打开。'], go: 'sc:down', gl: '看下滑的词' };
+    case 'site_ctr': return { t: '曝光多、点击率偏低', d: [`近 28 天曝光 ${num(n.imp)} 次，点击率 ${pct1(n.ctr)}，平均排名 ${n.pos.toFixed(1)} 的常见点击率约 ${pct1(n.exp)}。`, `改写标题和描述，让搜索结果更吸引人；按常见点击率估算可多约 ${num(n.lost)} 次点击。`], go: 'sc:low', gl: '看点击率偏低的词' };
+    case 'low_index': {
+      const r = n.reasons || [];
+      return { t: `收录率低：${num(n.yes)} / ${num(n.done)} 已编入`, d: r.length ? ['没编入的主要原因：'] : [], li: r.map((x) => [idxState({ checkedAt: 1, state: x.state }), num(x.n)]), d2: [`${advReasonTip(r[0]?.state)}。`], go: 'idx:no', gl: '看未编入的网址' };
+    }
+    case 'url_problems': return { t: `${num(n.count)} 个网址有问题`, d: ['打不开（404、服务器错误、重定向错误等），或被 robots.txt、noindex 挡住，这些网页不会被收录。'], go: 'idx:bad', gl: '看有问题的网址' };
+    case 'sitemap_error': return n.none
+      ? { t: '还没有提交站点地图', d: ['Search Console 里没有站点地图。', '提交后 Google 能更快发现新网页，可以在“网页索引 → 站点地图”里一键提交。'], go: 'idx:sm', gl: '去提交' }
+      : { t: '站点地图读取失败', li: [[String(n.error || '').replace(/^读取站点地图失败：/, ''), '']], d2: ['检查站点地图地址能不能打开、格式对不对。'], go: 'idx:sm', gl: '看站点地图' };
+    case 'bing_low': return { t: `Bing 收录少：${num(n.yes)} / ${num(n.done)}`, d: [n.g != null ? `Bing 已检查的网址里收录不到 20%，Google 是 ${pctText(n.g)}。` : 'Bing 已检查的网址里收录不到 20%。', '把没收录的网址提交给 Bing，或在 Bing Webmaster 里提交站点地图。'], go: 'idx:bno', gl: '看 Bing 未收录' };
+    case 'no_conversion': return { t: '有流量但没有转化', d: [`近 28 天 ${num(n.sessions)} 次会话，没有一次关键事件。`, '在 GA4 里把重要的操作（注册、下载、点推广链接）标记为关键事件，才看得出哪些流量有价值。'] };
+    case 'page_ctr': return { t: '这些页面曝光多、点击率低', li: n.items.map((x) => [urlPath(x.k), `曝光 ${num(x.impressions)}，点击率 ${pct1(x.ctr)}，排名 ${x.position.toFixed(1)} 常见约 ${pct1(gExpCtr(x.position))}`]),
+      d2: [`改写这些页面的标题和描述，估算可多约 ${num(n.lost)} 次点击。`], go: 'sc:pages', gl: '看页面数据' };
+    case 'near_top': return { t: '这些词差一点进前 3', li: n.items.map((x) => [x.k, `排名 ${x.position.toFixed(1)}，曝光 ${num(x.impressions)}`]),
+      d2: ['充实对应页面的内容、多加内链，往前推几名点击会明显增加。'], go: 'sc:near', gl: '看排名 4–20 的词' };
+  }
+  return { t: ADV_NAME[a.rule] || a.rule };
+}
+const advSents = (list) => (list || []).filter(Boolean).map((x) => `<span>${esc(x)}</span>`).join('');
+const advBody = (v) => `${v.d?.length ? `<p>${advSents(v.d)}</p>` : ''}${v.li?.length ? `<ul class="adv-ul">${v.li.map(([k, x]) => `<li><span class="adv-k">${esc(k)}</span><span class="hint">${esc(x)}</span></li>`).join('')}</ul>` : ''}${v.d2?.length ? `<p>${advSents(v.d2)}</p>` : ''}`;
+// 详情页现查的搜索词 / 页面数据里算两条（门槛和服务端的规则一样防噪音）
+function advLocal(d) {
+  const out = [], sc = d.sc;
+  if (!sc) return out;
+  const pages = (sc.pages || []).filter((x) => x.impressions >= 100 && x.position <= 20 && x.ctr < gExpCtr(x.position) * 0.5)
+    .map((x) => ({ ...x, lost: Math.round(x.impressions * (gExpCtr(x.position) - x.ctr)) })).filter((x) => x.lost >= 5).sort((a, b) => b.lost - a.lost).slice(0, 3);
+  if (pages.length) out.push({ rule: 'page_ctr', level: 'mid', impact: pages.reduce((a, x) => a + x.lost, 0), n: { items: pages, lost: pages.reduce((a, x) => a + x.lost, 0) } });
+  const near = (sc.queries || []).filter((x) => x.position >= 4 && x.position <= 15 && x.impressions >= 50).sort((a, b) => b.impressions - a.impressions).slice(0, 3);
+  if (near.length) out.push({ rule: 'near_top', level: 'low', impact: near.reduce((a, x) => a + x.impressions, 0) / 100, n: { items: near } });
+  return out;
+}
+const advTip = (items) => items.map((a) => `· ${ADV_NAME[a.rule] || a.rule}`).join('\n');
+// “查看”：滚到对应卡片并切到对应筛选
+function advGo(go) {
+  const [card, k] = go.split(':');
+  if (card === 'sc') {
+    const el = document.getElementById('g-sc');
+    if (!el) return;
+    const tabs = [...el.querySelectorAll('.tabs button')];
+    (k === 'pages' ? tabs[1] : tabs[0])?.click();
+    if (k !== 'pages') setTimeout(() => el.querySelector(`[data-qf="${k}"]`)?.click(), 30);
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else {
+    const el = document.getElementById('g-idx');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const pick = () => {
+      if (k === 'sm') { [...el.querySelectorAll('.card-h .tabs button')][1]?.click(); return true; }
+      const b = el.querySelector(`[data-ixf="${k}"]`);
+      if (b) b.click();
+      return !!b;
+    };
+    // 网页索引卡片是异步加载的，等它出来
+    let tries = 0;
+    const t = setInterval(() => { if (pick() || ++tries > 20) clearInterval(t); }, 250);
+  }
+}
+const ADV_LV_IC = { high: 'alert', mid: 'info', low: 'help' };
+// 站点详情：优化建议卡片（服务端规则 + 页面 / 搜索词两条）；忽略 30 天 / 不再提醒，已忽略的可以恢复
+async function mountAdvice(host, d) {
+  const box = document.getElementById('g-adv');
+  if (!box) return;
+  let r;
+  try { r = await api(`/google/advice?host=${encodeURIComponent(host)}`); } catch { box.remove(); return; }
+  if (!box.isConnected) return;
+  const ignored = new Map((r.ignored || []).map((x) => [x.rule, x.until]));
+  const order = { high: 3, mid: 2, low: 1 };
+  const items = [...r.items, ...advLocal(d).filter((a) => !ignored.has(a.rule))].sort((a, b) => order[b.level] - order[a.level] || b.impact - a.impact);
+  if (!items.length && !ignored.size) { box.remove(); return; }
+  box.hidden = false;
+  box.innerHTML = `<div class="card-h"><h3>优化建议</h3><span class="hint">${items.length ? `${items.length} 条，按重要程度排列` : '暂时没有需要处理的'}</span></div>
+    <div class="card-b">${items.length ? `<div class="adv-l">${items.map((a) => {
+      const v = advView(a);
+      return `<div class="adv-i lv-${a.level}" data-rule="${a.rule}"><span class="adv-ic">${ic(ADV_LV_IC[a.level], 15)}</span>
+        <div class="adv-t"><div class="adv-h"><b>${esc(v.t)}</b><span class="adv-lv">${ADV_LV[a.level]}</span></div>${advBody(v)}</div>
+        <div class="adv-a">${v.go ? `<button type="button" class="btn sm" data-go="${v.go}">${esc(v.gl)}</button>` : ''}<button type="button" class="btn sm ghost" data-ign>忽略</button></div></div>`;
+    }).join('')}</div>` : ''}
+    ${ignored.size ? `<div class="adv-ig hint">已忽略：${[...ignored].map(([rule, until]) => `<span>${esc(ADV_NAME[rule] || rule)}<small>${until > 9e14 ? '（不再提醒）' : `（到 ${ymd(new Date(until))}）`}</small><button type="button" class="lnk" data-restore="${rule}">恢复</button></span>`).join('')}</div>` : ''}</div>`;
+  const set = async (rule, days) => {
+    try { await api('/google/advice/ignore', { method: 'POST', body: { host, rule, days } }); toast(days < 0 ? '已恢复提醒' : days ? '已忽略 30 天' : '以后不再提醒这一条'); mountAdvice(host, d); }
+    catch (ex) { toast(ex.message, 'bad'); }
+  };
+  box.onclick = (e) => {
+    const go = e.target.closest('[data-go]');
+    if (go) return advGo(go.dataset.go);
+    const rs = e.target.closest('[data-restore]');
+    if (rs) return set(rs.dataset.restore, -1);
+    const it = e.target.closest('.adv-i');
+    if (!it) return;
+    if (e.target.closest('[data-ign]')) {
+      it.querySelector('.adv-a').innerHTML = `<button type="button" class="btn sm" data-ig="30">忽略 30 天</button><button type="button" class="btn sm" data-ig="0">不再提醒</button><button type="button" class="btn sm ghost" data-ig="x">取消</button>`;
+      return;
+    }
+    const ig = e.target.closest('[data-ig]');
+    if (!ig) return;
+    if (ig.dataset.ig === 'x') { mountAdvice(host, d); return; }
+    set(it.dataset.rule, Number(ig.dataset.ig));
+  };
+}
+
 // ---------------------------------------------------------------- 站点详情：切换站点
 // 域名后面的下拉箭头：可搜索域名或 GA4 名称。从站点列表进来时按列表当时的筛选和排序（有筛选时其余站点列在后面）；
 // 直接打开详情页时读站点清单（只有域名和名称，按域名排序）
@@ -6758,6 +6933,7 @@ async function renderSite(token, host) {
         ${kc2('gsc', '平均排名', sc?.impressions ? sc.position.toFixed(1) : '—', sc && sp?.impressions ? gDelta(sc.position, sp.position, true) : '', '', sc?.impressions ? rankScale() : sc ? '' : NO_SC, '按展示加权的平均排名，越小越靠前')}
         ${bingCards}
       </section>
+      <section class="card adv" id="g-adv" hidden></section>
       ${siteLinksCard(d)}
       <div class="grid2">
         <section class="card rv"><div class="card-h"><h3>访问趋势 · GA4</h3><span class="sp"></span><div class="legend" id="lg-ga"></div></div>
@@ -6795,6 +6971,7 @@ async function renderSite(token, host) {
   if (d.gsc || d.bingSite) mountSiteIndex(host);
   bindBlCard(host);
   mountSiteSwitch(host);
+  mountAdvice(host, d);
   const bsc = document.getElementById('b-sc');
   if (bsc) bsc.addEventListener('click', (e) => {
     const b = e.target.closest('[data-bqf]');

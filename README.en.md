@@ -437,6 +437,12 @@ bing.example.com {
 
 Then enter `https://bing.example.com/bing-that-string/` as the proxy address. It must use https (the API key is in the query string); put a random string in the path that others can't guess.
 
+### Site suggestions
+
+The Sites pages turn the data already synced into optimization suggestions (no extra API calls): GA4 suddenly reporting nothing, search clicks dropping, many impressions but a low CTR, a low indexing rate (with the main reasons and what to do), URLs that fail to load or are blocked, sitemaps that can't be read or haven't been submitted, far fewer pages in Bing than in Google, and traffic without any key events. The site page also lists pages with many impressions but few clicks, and queries at positions 4–20 that are close to the top 3. Each suggestion shows the numbers behind it and what to do, sorted by importance, with a button that jumps to the relevant data. Sites with very little traffic aren't flagged.
+
+Sites with suggestions get a small badge in the site list, and the "Has suggestions" filter shows only those. A suggestion you don't need can be ignored for 30 days or permanently, and restored from the same card.
+
 ### Backlinks & authority (optional)
 
 Turn it on under “Settings → Backlinks & authority”. The two parts can be switched on separately and are both off by default; while off, nothing is requested and nothing extra is shown.
@@ -499,6 +505,7 @@ src/google.js     Google integration: OAuth, GA4 / Search Console sync, site–l
 src/bing.js       Bing Webmaster: API key / proxy, daily data sync, queries and crawl stats, index checks and submission
 src/gindex.js     Page indexing: sitemaps, Google URL inspection, Bing index checks and auto-submission
 src/backlinks.js  Backlinks & authority (optional): Bing backlinks, Open PageRank domain scores
+src/advice.js     Site suggestions: rules over the synced data, ignore records
 src/admin.html    Admin (single file, no build step)
 src/home.html     Home page served at / (built into public/ as a static file on deploy; Cloudflare serves it directly, without using Workers requests)
 src/i18n/         English UI: the translation script (client.js) and dictionaries for the admin / home page

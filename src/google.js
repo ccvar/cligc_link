@@ -404,6 +404,7 @@ export async function rebuildSites(env) {
     for (const host of old.keys()) {
       if (sites.has(host)) continue;
       stmts.push(env.DB.prepare('DELETE FROM g_sites WHERE host = ?').bind(host), env.DB.prepare('DELETE FROM g_daily WHERE host = ?').bind(host),
+        env.DB.prepare('DELETE FROM site_ignores WHERE host = ?').bind(host),
         env.DB.prepare('DELETE FROM g_urls WHERE host = ?').bind(host), env.DB.prepare('DELETE FROM g_sitemaps WHERE host = ?').bind(host));
     }
   }
