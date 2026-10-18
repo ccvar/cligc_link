@@ -2,6 +2,22 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.5.0 · 2026-10-18
+
+New optional "Backlinks & authority": see the backlinks Bing has found and the Open PageRank domain score on the Sites pages.
+
+### New
+
+- **Backlinks & authority** (Settings → Backlinks & authority; the two parts switch on separately and are both off by default; while off, nothing is requested and nothing extra is shown)
+  - **Bing backlinks**: uses your saved Bing Webmaster key (no extra cost) to check, once a week per site, the links from other websites that Bing has found, counted per page; on the site page, open a page to see which URLs link to it
+  - **Open PageRank**: paste a free API key (from [Keywords Everywhere](https://keywordseverywhere.com/openpagerank); the free plan covers 30,000 domains a month) to get each domain's score (0–10), global rank, referring domains and monthly scores for the past year, refreshed weekly; subdomain sites show the subdomain's own score
+  - When on, the site list gets a sortable "OPR / Backlinks" column and each site page gets a "Backlinks & authority" card (score and change, 13-month trend, pages with the most backlinks); when there's no data the card explains why instead of showing zeros
+  - Done in batches by the hourly scheduled task: Bing checks at most 10 sites per run to stay clear of its throttling; the "Update now" button skips sites checked within the last hour
+
+### Fixed
+
+- In the English UI, the tooltip on the site list's "Indexed" column was half untranslated
+
 ## v1.4.1 · 2026-10-17
 
 Site data now shows where it comes from, and tables sort by clicking a column header.

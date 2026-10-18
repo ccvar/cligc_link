@@ -1040,6 +1040,56 @@ details[open] > summary::before { transform: rotate(90deg); }
 .acc-i:not(.open):hover { border-color: color-mix(in srgb, var(--line) 60%, var(--accent) 25%); }
 .acc .set-form { max-width: 420px; }
 .trk-sw { margin-bottom: 18px; }
+/* 站点详情 → 外链与权重 */
+.bl-k { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.bl-m { padding: 14px 16px; border-radius: 12px; background: var(--sunken); min-width: 0; }
+.bl-l { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.bl-v { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
+.bl-v b { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.bl-v .gd { display: inline; }
+.bl-of { font-size: 13px; color: var(--muted); }
+.bl-sp { margin-left: auto; width: 110px; height: 30px; align-self: center; }
+.bl-sp svg { width: 100%; height: 100%; display: block; }
+.bl-d { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.bl-d .kc-mi { margin: 0; background: var(--line); flex: 0 0 72px; }
+.bl-src .bad-t { color: var(--bad); }
+.bl-e { margin-top: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.bl-t tr[data-blu] { cursor: pointer; }
+.bl-t .bl-a { width: 28px; color: var(--faint); }
+.bl-t .bl-a svg { transition: transform .2s; display: block; margin-left: auto; }
+.bl-t tr[aria-expanded="true"] .bl-a svg { transform: rotate(180deg); }
+.bl-t tr.bl-x td { background: var(--sunken); }
+.bl-src { display: grid; gap: 6px; padding: 4px 0; }
+.bl-si { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 40%); gap: 10px; font-size: 12.5px; }
+.bl-si a { color: var(--accent); font-family: var(--mono); font-size: 12px; }
+.bl-src .bl-more { justify-self: start; }
+.bl-empty { display: flex; align-items: center; gap: 12px; text-align: left; padding: 18px 4px; }
+.bl-empty .hint { display: inline-block; margin-top: 4px; }
+.bl-empty svg.i { margin: 0; flex: none; }
+.bl-d .kc-mi i { background: var(--violet); }
+/* 设置 → 外链与权重 */
+.chi.bl { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
+.bl-set { display: grid; gap: 10px; max-width: 640px; }
+.bl-sw { align-items: flex-start; }
+.bl-sw .chi-sm { margin-top: 1px; }
+.bl-sw .tx .hint { display: block; margin-top: 3px; line-height: 1.6; }
+.bl-sw .switch { margin-top: 4px; }
+.opt.dis { cursor: default; }
+.opt.dis .switch { cursor: default; opacity: .45; }
+.bl-st { display: flex !important; align-items: center; gap: 5px; color: var(--good); }
+.bl-st svg { flex: none; }
+.bl-st.bad { color: var(--warn); }
+.bl-st.mu { color: var(--muted); }
+.bl-i { border: 1px solid var(--line); border-radius: 12px; }
+.bl-i > .opt { border: 0; }
+.bl-key { display: flex; align-items: center; gap: 8px; padding: 0 14px 12px 54px; }
+.bl-key code { font-family: var(--mono); }
+.bl-cfg, #opr-fw { padding: 2px 14px 14px 54px; }
+.bl-cfg .use-steps { margin-bottom: 14px; }
+.bl-run { margin-top: 14px; gap: 10px; align-items: center; }
+.bl-note { display: flex; gap: 6px; align-items: flex-start; margin: 14px 0 0; max-width: 640px; line-height: 1.6; }
+.bl-note svg { flex: none; margin-top: 3px; }
+@media (max-width: 520px) { .bl-key, .bl-cfg, #opr-fw { padding-left: 14px; } }
 @media (max-width: 640px) { .acc-t .sub { display: none; } }
 .trk-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; font-size: 12.5px; color: var(--muted); }
 .trk-flow > span { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 8px; background: var(--sunken); color: var(--text-2); white-space: nowrap; }
@@ -1504,6 +1554,19 @@ button.gtg { cursor: pointer; }
   .tbl.gl th:last-child, .tbl.gl td:last-child { padding-right: var(--cp); }
   .tbl.gl .gsp { width: 84px; } .tbl.gl .gsp svg { width: 76px; }
 }
+/* 开了“外链与权重”多一列：更宽的屏幕上也收紧；笔记本宽度再收紧一点（占比条变短） */
+@media (max-width: 1700px) {
+  .tbl.gl.has-bl th, .tbl.gl.has-bl td { padding-left: 10px; padding-right: 10px; }
+  .tbl.gl.has-bl th:first-child, .tbl.gl.has-bl td:first-child { padding-left: var(--cp); }
+  .tbl.gl.has-bl th:last-child, .tbl.gl.has-bl td:last-child { padding-right: var(--cp); }
+  .tbl.gl.has-bl .gsp { width: 84px; } .tbl.gl.has-bl .gsp svg { width: 76px; }
+}
+@media (max-width: 1440px) {
+  .tbl.gl.has-bl th, .tbl.gl.has-bl td { padding-left: 8px; padding-right: 8px; }
+  .tbl.gl.has-bl .gsh { width: 40px; margin-right: 6px; } .tbl.gl.has-bl .gsh-c { min-width: 80px; }
+}
+.bl-th { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.bl-th2 { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; color: var(--muted); }
 .gtag { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; margin-right: 5px; border-radius: 4px; font-size: 10.5px; font-weight: 650; vertical-align: 1px; }
 .gm { display: flex; align-items: center; gap: 5px; margin-top: 3px; white-space: nowrap; }
 /* 站点名下面那排图标 / 分组 / 状态放不下时换行，不把整张表撑出横向滚动 */
@@ -5678,7 +5741,7 @@ function exportSitesCsv(rows, d) {
 // ---------------------------------------------------------------- 系统状态
 // 每一项：ok / warn / bad + 说明；定时任务超过 3 小时没跑算异常
 // 定时任务各步骤的中文名
-const CRON_NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', bing: 'Bing 同步', gindex: '网页索引检查', health: '目标页检查', update: '检查更新', notify: '推送通知', usage: '用量预警' };
+const CRON_NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', bing: 'Bing 同步', links: '外链与权重', gindex: '网页索引检查', health: '目标页检查', update: '检查更新', notify: '推送通知', usage: '用量预警' };
 function sysChecks(st) {
   const H = 3600000, now = st.now, c = st.cron;
   const out = [];
@@ -5824,6 +5887,7 @@ async function renderSites(token) {
   }
 
   const d = await api('/google/sites?days=' + gState.days);
+  const BL = d.bl || {};   // 外链与权重开了哪几项
   if (token !== routeToken || my !== sitesSeq) return;
   const hasBing = d.items.some((x) => x.bing);
   if (!hasBing) gState.se = 'google';
@@ -5931,8 +5995,12 @@ async function renderSites(token) {
     const VAL = {
       users: (x) => x.users, sessions: (x) => x.cur.ga?.sessions, share: shareOf, events: (x) => x.cur.ga?.keyEvents,
       clicks: (x) => SE(x)?.clicks, impr: (x) => SE(x)?.impressions, ctr: (x) => (SE(x)?.impressions ? SE(x).ctr : null), pos: (x) => SE(x)?.position, idx: idxVal, growth,
+      // 权重 / 外链：开了 Open PageRank 按分数排，只开 Bing 外链时按外链数排
+      ...(BL.opr || BL.bing ? { bl: (x) => (BL.opr ? x.opr?.s ?? null : x.bl?.n ?? null) } : {}),
     };
-    const sk = VAL[gState.sort] || gState.sort === 'host' ? gState.sort : 'sessions';
+    // 排序的那一列不在了（比如关掉了外链与权重）：回到默认排序，免得记着的方向和表头点击对不上
+    if (!VAL[gState.sort] && gState.sort !== 'host') { gState.sort = 'sessions'; gState.dir = ''; store.set('g:sort', 'sessions'); store.set('g:dir', ''); }
+    const sk = gState.sort;
     const asc = (gState.dir || (SORT_ASC.has(sk) ? 'asc' : 'desc')) === 'asc';
     // 没有数据的行（未关联、还没同步）不管正序倒序都排在最后
     rows.sort((a, b) => {
@@ -5945,9 +6013,9 @@ async function renderSites(token) {
     // 表头：可以点着排序，当前排序列带箭头
     const sth = (k, inner, cls = 'r') => `<th class="${cls} sortable" data-sk="${k}" tabindex="0"${sk === k ? ` aria-sort="${asc ? 'ascending' : 'descending'}"` : ''}>${inner}</th>`;
     const lab = (t) => `<span class="sl">${t}${SORT_IC}</span>`;
-    list.innerHTML = rows.length ? `<div class="gl-wrap"><table class="tbl gl">
+    list.innerHTML = rows.length ? `<div class="gl-wrap"><table class="tbl gl${BL.opr || BL.bing ? ' has-bl' : ''}">
       <thead><tr>${sth('host', lab('站点'), '')}${sth('users', lab('用户'))}${sth('sessions', lab('会话'))}${sth('share', lab(byClicks ? '点击占比' : '会话占比'), '')}${sth('events', lab('关键事件'))}${sth('clicks', seTh('搜索点击'))}${sth('impr', seTh('展示'))}${sth('ctr', seTh('点击率'))}${sth('pos', seTh('排名', true))}${gState.se === 'bing' ? sth('idx', `<span class="se-th" data-tipf-always data-tipf="站点地图和搜索结果里的网址中，已被 Bing 收录的数量；还没逐个检查时显示 Bing 抓取统计里的索引网页数"><i class="se-i">${BRAND.bing(12)}</i>${lab('已收录')}</span>`)
-        : sth('idx', `<span class="se-th" data-tipf-always data-tipf="${gState.se === 'all' ? '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量；下面一行是 Bing 已收录的数量' : '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量'}"><i class="se-i">${BRAND.gsc(12)}${gState.se === 'all' ? BRAND.bing(12) : ''}</i>${lab('已编入')}</span>`)}${sth('growth', `<span class="sl" data-tipf-always data-tipf="按用户比上一周期增加的人数排序">会话趋势${SORT_IC}</span>`, '')}</tr></thead>
+        : sth('idx', `<span class="se-th" data-tipf-always data-tipf="${gState.se === 'all' ? '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量；下面一行是 Bing 已收录的数量' : '站点地图和搜索结果里的网址中，已被 Google 编入索引的数量'}"><i class="se-i">${BRAND.gsc(12)}${gState.se === 'all' ? BRAND.bing(12) : ''}</i>${lab('已编入')}</span>`)}${blTh(BL, sth, lab)}${sth('growth', `<span class="sl" data-tipf-always data-tipf="按用户比上一周期增加的人数排序">会话趋势${SORT_IC}</span>`, '')}</tr></thead>
       <tbody>${rows.map((x) => {
         const ga = x.cur.ga, pg = x.prev.ga, sc = SE(x), ps = SE(x, 'prev');
         return `<tr data-host="${esc(x.host)}" tabindex="0">
@@ -5971,7 +6039,7 @@ async function renderSites(token) {
           <td class="num"${seSplit(x, 'impressions')}>${sc ? num(sc.impressions) : '—'}</td>
           <td class="num"${seSplit(x, 'ctr')}>${sc ? pct1(sc.ctr) : '—'}</td>
           <td class="num"${seSplit(x, 'position')}>${sc?.position != null ? sc.position.toFixed(1) : '—'}${sc?.position != null && ps?.position != null ? gDelta(sc.position, ps.position, true) : ''}</td>
-          <td class="num">${idxCell(x)}</td>
+          <td class="num">${idxCell(x)}</td>${BL.opr || BL.bing ? `<td class="num">${blCell(x, BL)}</td>` : ''}
           <td class="gsp">${x.spark.length ? sparkOf(x) : ''}</td></tr>`;
       }).join('')}</tbody></table></div>`
       : `<div class="empty" style="padding:48px">${ic('inbox')}${d.items.length ? '没有匹配的站点' : '账号下还没有找到 GA4 媒体资源或 Search Console 站点'}</div>`;
@@ -6311,6 +6379,32 @@ function idxSitemapsView(d) {
       : `<div class="empty">${ic('inbox')}Bing 里还没有站点地图</div>`}
     <div class="hint" style="margin-top:10px"><a href="https://www.bing.com/webmasters/sitemaps?siteUrl=${encodeURIComponent(d.bing.site)}" target="_blank" rel="noopener">在 Bing Webmaster 中查看</a></div>`;
 }
+// 站点列表的“权重 / 外链”列（设置里开启后才有）：上面是 Open PageRank 分数，下面是 Bing 外链数
+function blTh(BL, sth, lab) {
+  if (!BL.opr && !BL.bing) return '';
+  const tip = BL.opr && BL.bing ? 'Open PageRank 权重（0–10，每月更新）；下面一行是 Bing 发现的外链数。按权重排序'
+    : BL.opr ? 'Open PageRank 权重（0–10，每月更新），按 Common Crawl 公开数据计算' : 'Bing 发现的、从其他网站链到这个站点的链接数';
+  // 两项都开：和单元格一样上下两行（上面权重，下面 Bing 外链），列宽不比单项宽
+  if (BL.opr && BL.bing) return sth('bl', `<span class="bl-th" data-tipf-always data-tipf="${tip}">${lab('权重')}<span class="bl-th2">${BRAND.bing(11)}外链</span></span>`);
+  return sth('bl', `<span class="se-th" data-tipf-always data-tipf="${tip}">${lab(BL.opr ? '权重' : '外链')}</span>`);
+}
+const oprTip = (o) => `Open PageRank ${o.s.toFixed(2)}（满分 10）${o.r ? `\n全球排名 #${num(o.r)}` : ''}\n引用域名 ${num(o.d)} 个${o.prev != null ? `\n上个月 ${o.prev.toFixed(2)}` : ''}`;
+function oprCell(x) {
+  if (!x.host.includes('.')) return '<span class="sm" data-tipf-always data-tipf="没有域名，查不了 Open PageRank">—</span>';
+  if (!x.opr) return '<span class="sm" data-tipf-always data-tipf="还没查到，定时任务每小时分批查">—</span>';
+  if (x.opr.s == null) return '<span class="sm" data-tipf-always data-tipf="Open PageRank 里还没有这个域名（新站或外链很少的站点通常查不到）">—</span>';
+  return `<span data-tipf-always data-tipf="${esc(oprTip(x.opr))}">${x.opr.s.toFixed(2)}</span>`;
+}
+function blLinkCell(x, short) {
+  if (!x.bing) return short ? '' : '<span class="sm" data-tipf-always data-tipf="没有关联 Bing Webmaster">—</span>';
+  const ico = short ? BRAND.bing(11) : '';
+  if (!x.bl) return `<span class="sm ix-bl" data-tipf-always data-tipf="${esc(x.blError ? `查询出错：${x.blError}` : '还没查到，定时任务每小时分批查')}">${ico}${x.blError ? '!' : '—'}</span>`;
+  const plus = x.bl.more ? '+' : '', n = num(x.bl.n) + plus, p = num(x.bl.p) + plus;
+  const tip = x.bl.n ? `Bing 发现 ${n} 个外链，分布在 ${p} 个页面${x.bl.prev != null && x.bl.prev !== x.bl.n ? `\n上次 ${num(x.bl.prev)}` : ''}` : 'Bing 还没发现指向这个站点的外链';
+  return `<span class="ix-bl" data-tipf-always data-tipf="${esc(tip)}">${ico}${n}</span>`;
+}
+const blCell = (x, BL) => (BL.opr && BL.bing ? `${oprCell(x)}${x.bing ? `<div class="gd ix-pg">${blLinkCell(x, true)}</div>` : ''}` : BL.opr ? oprCell(x) : blLinkCell(x, false));
+
 // 站点列表的“已编入”列：已编入数 / 网址数；还在检查时显示进度
 function idxCell(x) {
   const i = x.index;
@@ -6453,6 +6547,73 @@ function mountBingCrawl(d) {
   ], document.getElementById('lg-bcr'));
 }
 
+// ---------------------------------------------------------------- 站点详情：外链与权重（设置里开启后才显示）
+function blCardHtml(d) {
+  // 没有域名的站点（只有 GA4 媒体资源，如 ga4-123）查不了 Open PageRank
+  const on = d.blOn || {}, showB = on.bing && d.bingSite, showO = on.opr && d.host.includes('.');
+  if (!showB && !showO) return '';
+  const o = d.opr, b = d.bl;
+  const oprBox = !showO ? '' : `<div class="bl-m">
+      <div class="bl-l">${ic('chart', 13)}Open PageRank</div>
+      ${!o ? `<div class="bl-e">还没查到，定时任务每小时分批查</div>`
+        : o.s == null ? `<div class="bl-v"><b>—</b></div><div class="bl-e">Open PageRank 里还没有这个域名。它按 Common Crawl 的公开抓取数据计算，新站或外链很少的站点通常查不到。</div>`
+        : `<div class="bl-v"><b>${o.s.toFixed(2)}</b><span class="bl-of">/ 10</span>${o.prev != null && o.prev !== o.s ? `<span class="gd ${o.s > o.prev ? 'up' : 'down'}" data-tipf-always data-tipf="上个月 ${o.prev.toFixed(2)}">${o.s > o.prev ? '↑' : '↓'}${Math.abs(o.s - o.prev).toFixed(2)}</span>` : ''}
+            ${o.hist?.length > 2 ? `<span class="bl-sp" data-tipf-always data-tipf="${esc(`近 ${o.hist.length} 个月：${o.hist[0][0]} ${o.hist[0][1]} → ${o.hist[o.hist.length - 1][0]} ${o.hist[o.hist.length - 1][1]}`)}">${kpiSpark(o.hist.map((h) => h[1] * 100), 'var(--violet)')}</span>` : ''}</div>
+          <div class="bl-d"><span class="kc-mi"><i style="width:${Math.min(100, o.s * 10)}%"></i></span><span>${o.r ? `全球排名 #${num(o.r)} · ` : ''}引用域名 ${num(o.d)} 个</span></div>`}
+    </div>`;
+  const bingBox = !on.bing ? '' : `<div class="bl-m">
+      <div class="bl-l">${BRAND.bing(13)}Bing 外链</div>
+      ${!d.bingSite ? '<div class="bl-e">这个站点没有关联 Bing Webmaster</div>'
+        : !b ? `<div class="bl-e">${d.blError ? `查询出错：${esc(d.blError)}，一天后自动重试` : '还没查到，定时任务每小时分批查'}</div>`
+        : `<div class="bl-v"><b>${num(b.n)}${b.more ? '+' : ''}</b>${b.prev != null && b.prev !== b.n ? `<span class="gd ${b.n > b.prev ? 'up' : 'down'}" data-tipf-always data-tipf="上次 ${num(b.prev)}">${b.n > b.prev ? '↑' : '↓'}${num(Math.abs(b.n - b.prev))}</span>` : ''}</div>
+          ${b.n ? `<div class="bl-d">分布在 ${num(b.p)}${b.more ? '+' : ''} 个页面</div>` : ''}`}
+    </div>`;
+  const top = d.blTop || [];
+  const pages = !showB || !b ? '' : top.length ? `<div class="g-scr"><table class="tbl gt bl-t nosort"><thead><tr><th>有外链的页面</th><th class="r">外链</th><th></th></tr></thead><tbody>
+      ${top.map(([u, n]) => `<tr data-blu="${esc(u)}" tabindex="0" aria-expanded="false"><td><div class="ell" data-tipf="${esc(u)}">${esc(urlPath(u))}</div></td><td class="num">${num(n)}</td><td class="bl-a">${ic('chev', 14)}</td></tr>`).join('')}
+    </tbody></table></div>${top.length < b.p ? `<div class="hint" style="margin-top:8px">只列出外链最多的 ${top.length} 个页面</div>` : ''}`
+    : `<div class="empty bl-empty">${ic('link')}<div>Bing 还没发现指向这个站点的外链。<br><span class="hint">新站一般要几周到几个月才会出现；在其他网站、社交媒体、行业目录发布带链接的内容后会慢慢增加。</span></div></div>`;
+  const at = Math.max(b?.at || 0, o?.at || 0);
+  return `<section class="card rv" id="g-bl"><div class="card-h"><h3>外链与权重</h3><span class="sp"></span>${at ? `<span class="hint" data-tipf-always data-tipf="${esc(fmtTime(at))}">每周更新 · ${ago(at)}</span>` : ''}</div>
+    <div class="card-b"><div class="bl-k">${oprBox}${bingBox}</div>${pages}</div></section>`;
+}
+// 点开页面：查 Bing 发现的来源网址（GetUrlLinks，按页翻）
+function bindBlCard(host) {
+  const card = document.getElementById('g-bl');
+  if (!card) return;
+  const load = async (tr, row, page) => {
+    const box = row.querySelector('.bl-src');
+    const more = box.querySelector('.bl-more');
+    if (more) more.remove();
+    box.insertAdjacentHTML('beforeend', '<div class="hint bl-ld">正在查询…</div>');
+    try {
+      const r = await api(`/backlinks/url?host=${encodeURIComponent(host)}&url=${encodeURIComponent(tr.dataset.blu)}&page=${page}`);
+      box.querySelector('.bl-ld')?.remove();
+      if (!r.items.length && !page) { box.innerHTML = '<div class="hint">Bing 暂时没有返回具体来源</div>'; return; }
+      box.insertAdjacentHTML('beforeend', r.items.map((x) => `<div class="bl-si"><a class="ell" href="${esc(x.u)}" target="_blank" rel="noopener noreferrer" data-tipf="${esc(x.u)}">${esc(x.u.replace(/^https?:\/\//, ''))}</a>${x.a ? `<span class="hint ell">“${esc(x.a)}”</span>` : ''}</div>`).join('')
+        + (r.page + 1 < r.pages ? `<button type="button" class="btn sm ghost bl-more" data-p="${r.page + 1}">加载更多</button>` : ''));
+    } catch (ex) { box.querySelector('.bl-ld')?.remove(); box.insertAdjacentHTML('beforeend', `<div class="hint bad-t">${esc(ex.message)}</div>`); }
+  };
+  const toggle = (tr) => {
+    const next = tr.nextElementSibling;
+    if (next?.classList.contains('bl-x')) { next.remove(); tr.setAttribute('aria-expanded', 'false'); return; }
+    tr.setAttribute('aria-expanded', 'true');
+    tr.insertAdjacentHTML('afterend', '<tr class="bl-x"><td colspan="3"><div class="bl-src"></div></td></tr>');
+    load(tr, tr.nextElementSibling, 0);
+  };
+  card.addEventListener('click', (e) => {
+    const m = e.target.closest('.bl-more');
+    if (m) { const row = m.closest('tr.bl-x'); load(row.previousElementSibling, row, Number(m.dataset.p)); return; }
+    if (e.target.closest('a')) return;
+    const tr = e.target.closest('tr[data-blu]');
+    if (tr) toggle(tr);
+  });
+  card.addEventListener('keydown', (e) => {
+    const tr = e.target.closest('tr[data-blu]');
+    if (tr && e.key === 'Enter' && e.target === tr) toggle(tr);
+  });
+}
+
 async function renderSite(token, host) {
   const my = ++siteSeq;
   shell('sites', `<a class="back" href="#/sites">${ic('back', 14)}全部站点</a><div class="stack">${skel(120)}${skel(320)}</div>`);
@@ -6564,6 +6725,7 @@ async function renderSite(token, host) {
         ], 'rv') : ''}
       </div>
       ${d.bingSite ? bingCardsHtml(d) : ''}
+      ${blCardHtml(d)}
       ${d.gsc || d.bingSite ? `<section class="card rv" id="g-idx"><div class="card-h"><h3>${d.gsc && d.bingSite ? '网页索引' : d.gsc ? '网页索引 · Search Console' : '网页索引 · Bing'}</h3><span class="sp"></span>
         <div class="tabs"><button>网址</button><button>站点地图</button></div>
         <button type="button" class="btn sm icon" id="ix-chk" aria-label="立即检查" data-tipf-always data-tipf="立即检查：刷新站点地图，再检查待检查的网址（每次最多 60 个）">${ic('refresh', 14)}</button></div>
@@ -6572,6 +6734,7 @@ async function renderSite(token, host) {
   const page = document.getElementById('page');
   reveal(page);
   if (d.gsc || d.bingSite) mountSiteIndex(host);
+  bindBlCard(host);
   const bsc = document.getElementById('b-sc');
   if (bsc) bsc.addEventListener('click', (e) => {
     const b = e.target.closest('[data-bqf]');
@@ -6613,9 +6776,9 @@ async function renderSite(token, host) {
 async function renderSettings(token) {
   const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证、来源追踪和第三方集成</div></div></header>`;
   shell('settings', `${head}<div class="acc">${skel(76, 3)}</div>`);
-  const [mfa, trk, ret, use, goo, shr, sys, ses, bst] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'),
+  const [mfa, trk, ret, use, goo, shr, sys, ses, bst, bls] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'),
     api('/usage').catch((e) => ({ configured: true, errors: [e.message], days: [] })), api('/google/status').catch(() => ({ configured: false })), api('/shares').catch(() => ({ items: [] })), api('/status').catch(() => null),
-    api('/sessions').catch(() => ({ items: [] })), api('/bing/status').catch(() => ({ configured: false }))]);
+    api('/sessions').catch(() => ({ items: [] })), api('/bing/status').catch(() => ({ configured: false })), api('/backlinks/status').catch(() => null)]);
   if (token !== routeToken) return;
   const item = (id, icon, cls, title, sub, status, body) => `
     <section class="card rv fold acc-i" data-acc="${id}">
@@ -6649,6 +6812,7 @@ async function renderSettings(token) {
       ${item('trk', 'search', 'trk', '来源追踪', '识别访客从哪个搜索引擎进入推广页', pill(trk.enabled), '')}
       ${item('goo', 'google', 'goo brand', 'Google 集成', googleSummary(goo), googlePill(goo), '')}
       ${item('bing', 'bing', 'bing brand', 'Bing Webmaster', bingSummary(bst), bingPill(bst), '')}
+      ${bls ? item('bl', 'link', 'bl', '外链与权重', blSummary(bls), blPill(bls), '') : ''}
       ${goo.connected || shr.items.length ? item('ai', 'ai', 'ai', 'AI 分析链接', sharesSummary(shr), sharesPill(shr), '') : ''}
       ${sys ? item('sys', 'pulse', 'sys', '系统状态', sysSummary(sys), sysPill(sys), sysBody(sys)) : ''}
       ${item('ret', 'inbox', 'ret', '数据保留', '访问明细保存多久；统计数据长期保留', `<span class="pill on">${ret.days ? ret.days + ' 天' : '永久'}</span>`, '')}
@@ -6716,9 +6880,17 @@ async function renderSettings(token) {
     page.querySelector('[data-st="goo"]').innerHTML = googlePill(g);
     page.querySelector('[data-sub="goo"]').innerHTML = googleSummary(g);
   });
+  // 外链与权重里的 Bing 开关要看 Bing 是否已配置：Bing 配置变了顺带刷新
+  const blBox = document.getElementById('acc-bl');
+  const blState = (s) => {
+    page.querySelector('[data-st="bl"]').innerHTML = blPill(s);
+    page.querySelector('[data-sub="bl"]').innerHTML = blSummary(s);
+  };
+  if (blBox) renderBacklinks(blBox, bls, blState);
   renderBingSettings(document.getElementById('acc-bing'), bst, (b) => {
     page.querySelector('[data-st="bing"]').innerHTML = bingPill(b);
     page.querySelector('[data-sub="bing"]').innerHTML = bingSummary(b);
+    if (blBox) api('/backlinks/status').then((s) => { blState(s); renderBacklinks(blBox, s, blState); }).catch(() => {});
   });
   const shBox = document.getElementById('acc-ai');
   if (shBox) renderShares(shBox, shr, (l) => {
@@ -7211,6 +7383,97 @@ function renderBingSettings(box, b, onState) {
   };
 }
 
+// ---------------------------------------------------------------- 设置 → 外链与权重（Bing 外链 / Open PageRank，默认都关闭）
+const blOnCount = (s) => (s ? (s.bing.on ? 1 : 0) + (s.opr.on ? 1 : 0) : 0);
+const blSummary = (s) => {
+  if (!blOnCount(s)) return '每周查一次 Bing 发现的外链和 Open PageRank 权重，显示在站点页';
+  return [s.bing.on && `Bing 外链：${s.bing.withLinks} 个站点有外链`, s.opr.on && `Open PageRank：${s.opr.ranked} 个站点有分数`].filter(Boolean).join(' · ');
+};
+const blPill = (s) => (!s ? '' : s.opr.on && s.opr.error ? `<span class="pill exp" data-tipf-always data-tipf="${esc(`Open PageRank：${s.opr.error.msg}`)}">查询出错</span>`
+  : blOnCount(s) ? `<span class="pill on">已开启 ${blOnCount(s)} 项</span>` : '<span class="pill off">未开启</span>');
+// 状态行：查到多少个站点、上次更新时间
+const blBingLine = (b) => (b.synced < b.sites ? `已查 ${b.synced} / ${b.sites} 个站点，其余每小时分批查` : `${b.sites} 个站点，${b.withLinks} 个有外链`)
+  + (b.errors ? ` · ${b.errors} 个出错` : '') + (b.lastSync ? ` · 更新于 ${ago(b.lastSync)}` : '');
+const blOprLine = (o) => [o.synced < o.sites ? `已查 ${o.synced} / ${o.sites} 个域名` : `${o.sites} 个域名，${o.ranked} 个有分数`,
+  o.usage?.limit ? `本月剩余 ${num(o.usage.remaining)} / ${num(o.usage.limit)}` : '', o.lastSync ? `更新于 ${ago(o.lastSync)}` : ''].filter(Boolean).join(' · ');
+const oprForm = (o) => `<form class="set-form cfg-f" id="opr-f">
+  <div class="field"><label for="opr-key">API Key</label>
+    <input class="input mono" id="opr-key" type="password" autocomplete="off" spellcheck="false" maxlength="128" required placeholder="opr_live_ 开头"></div>
+  <div class="err" style="margin:4px 0 12px" role="alert"></div>
+  <div class="row-l"><button class="btn primary">验证并保存</button>${o.configured ? '<button type="button" class="btn ghost" id="opr-cancel">取消</button>' : ''}</div>
+</form>`;
+function renderBacklinks(box, s, onState) {
+  const done = (d) => { onState(d); renderBacklinks(box, d, onState); };
+  const b = s.bing, o = s.opr;
+  box.innerHTML = `
+    <p class="set-p">开启后，站点列表会多出一列，站点详情页会多出“外链与权重”卡片。每个站点每周更新一次，由每小时的定时任务分批完成；关闭后不再查询，也不再显示。</p>
+    <div class="bl-set">
+      <label class="opt bl-sw${b.available ? '' : ' dis'}"><span class="chi chi-sm bing brand">${BRAND.bing(16)}</span>
+        <div class="tx"><b>Bing 外链</b>
+          <span class="hint">Bing 发现的、从其他网站链到你站点的链接数，按页面统计，点开页面能看到具体来源。用已保存的 Bing API Key，不另外收费。</span>
+          ${b.on ? `<span class="hint bl-st">${ic('check', 12)}${esc(blBingLine(b))}</span>` : !b.available ? `<span class="hint bl-st mu">${ic('info', 12)}需要先在上面的“Bing Webmaster”里填写 API Key</span>` : ''}</div>
+        <span class="switch"><input type="checkbox" id="bl-bing" ${b.on ? 'checked' : ''} ${b.available ? '' : 'disabled'} aria-label="Bing 外链"><span class="t"></span></span></label>
+      <div class="bl-i">
+        <label class="opt bl-sw${o.configured ? '' : ' dis'}"><span class="chi chi-sm bl">${ic('chart', 16)}</span>
+          <div class="tx"><b>Open PageRank 权重</b>
+            <span class="hint">按 Common Crawl 公开数据计算的域名权重（0–10），以及全球排名和引用域名数，每月更新一次。免费版每月可查 3 万个域名。</span>
+            ${o.on ? `<span class="hint bl-st${o.error ? ' bad' : ''}">${ic(o.error ? 'alert' : 'check', 12)}${esc(o.error ? `${o.error.msg}（${ago(o.error.at)}），定时任务会自动重试` : blOprLine(o))}</span>` : ''}</div>
+          <span class="switch"><input type="checkbox" id="bl-opr" ${o.on ? 'checked' : ''} ${o.configured ? '' : 'disabled'} aria-label="Open PageRank 权重"><span class="t"></span></span></label>
+        ${o.configured ? `<div class="bl-key"><span class="hint">API Key <code>••••${esc(o.keyTail)}</code></span><span class="sp"></span>
+            <button type="button" class="btn sm" id="opr-edit">更换</button><button type="button" class="btn sm ghost danger-t" id="opr-del">删除</button></div>
+          <div id="opr-fw" hidden>${oprForm(o)}</div>`
+        : `<div class="bl-cfg"><ol class="use-steps">
+            <li>打开 <a href="https://keywordseverywhere.com/openpagerank" target="_blank" rel="noopener">Keywords Everywhere 的 Open PageRank 页面</a>，免费注册。</li>
+            <li>生成一个 API Key（以 <code>opr_live_</code> 开头）。</li>
+            <li>粘贴到下面，验证通过后自动开启。</li></ol>${oprForm(o)}</div>`}
+      </div>
+    </div>
+    ${blOnCount(s) ? `<div class="row-l bl-run"><button type="button" class="btn sm" id="bl-sync">${ic('refresh', 14)}立即更新</button><span class="hint">一小时内更新过的站点会跳过；Bing 每次最多查 10 个站点</span></div>` : ''}
+    <p class="hint bl-note">${ic('info', 13)}<span>Open PageRank 不是 Google PR（已停用多年），也不是 Ahrefs 的 DR 或 Moz 的 DA，几种指标的算法和数值都不一样，不能直接比较。新站通常查不到分数，外链也要几周到几个月才会被发现。</span></p>`;
+  const toggle = (id, key, label) => {
+    const el = box.querySelector(id);
+    el.onchange = async () => {
+      el.disabled = true;
+      if (el.checked) toast(`正在开启${label}，先查一批站点…`);
+      try { done(await api('/backlinks/config', { method: 'PUT', body: { [key]: el.checked } })); toast(el.checked ? `已开启${label}` : `已关闭${label}`); }
+      catch (ex) { el.checked = !el.checked; el.disabled = false; toast(ex.message, 'bad'); }
+    };
+  };
+  if (b.available) toggle('#bl-bing', 'bing', ' Bing 外链');
+  if (o.configured) toggle('#bl-opr', 'opr', ' Open PageRank');
+  const f = box.querySelector('#opr-f');
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = f.querySelector('.primary'), err = f.querySelector('.err');
+    btn.disabled = true; err.textContent = ''; btn.textContent = '正在验证…';
+    try { done(await api('/backlinks/opr', { method: 'PUT', body: { key: f.querySelector('#opr-key').value.trim() } })); toast('Open PageRank 已开启'); }
+    catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = '验证并保存'; }
+  };
+  if (o.configured) {
+    const fw = box.querySelector('#opr-fw');
+    box.querySelector('#opr-edit').onclick = () => { fw.hidden = !fw.hidden; if (!fw.hidden) fw.querySelector('#opr-key').focus(); };
+    box.querySelector('#opr-cancel').onclick = () => { fw.hidden = true; };
+    box.querySelector('#opr-del').onclick = async () => {
+      const ok = await confirmDialog({ title: '删除 Open PageRank 的 API Key？', text: '会关闭 Open PageRank，并删除已查到的分数。之后可以随时重新填写。', ok: '删除', danger: true });
+      if (!ok) return;
+      try { done(await api('/backlinks/opr', { method: 'DELETE' })); toast('已删除 Open PageRank 的 API Key'); } catch (ex) { toast(ex.message, 'bad'); }
+    };
+  }
+  const sy = box.querySelector('#bl-sync');
+  if (sy) sy.onclick = async () => {
+    sy.disabled = true; sy.classList.add('busy');
+    try {
+      const d = await api('/backlinks/sync', { method: 'POST' });
+      const r = d.result || {};
+      done(d);
+      // 两项分开提示（各自一条，翻译时也不会拼错）
+      if (r.bing?.error) toast(`Bing 外链出错：${r.bing.error}`, 'warn');
+      else if (r.bing && !r.bing.skipped) toast(r.bing.throttled ? `Bing 暂时限流，已查 ${r.bing.done} 个站点` : `Bing 外链更新了 ${r.bing.done} 个站点${r.bing.left ? `，还有 ${r.bing.left} 个稍后自动更新` : ''}`, r.bing.throttled ? 'warn' : 'ok');
+      if (r.opr && !r.opr.skipped) toast(r.opr.error ? `Open PageRank 出错：${r.opr.error}` : `Open PageRank 更新了 ${r.opr.done} 个域名`, r.opr.error ? 'warn' : 'ok');
+    } catch (ex) { toast(ex.message, 'bad'); sy.disabled = false; sy.classList.remove('busy'); }
+  };
+}
+
 // 安装方式：默认推荐完整代码。Script 链接（/t.js）由 Worker 返回，推广页每个新访客都会用掉一次 Worker 请求额度
 // （和短链跳转共用，免费版每天 10 万次），流量大时可能挤掉短链跳转；完整代码在访客浏览器里运行，不占额度
 function renderTracking(box, t, onState) {
@@ -7614,7 +7877,7 @@ addEventListener('resize', () => document.querySelectorAll('.seg').forEach(segTh
 // ---------------------------------------------------------------- ⌘K：搜索短链、站点、设置，快速跳转
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 const KBAR_SETTINGS = [['pw', 'key', '修改密码'], ['mfa', 'shield', '两步验证'], ['dev', 'desk', '登录设备'], ['trk', 'search', '来源追踪'], ['goo', 'globe', 'Google 集成'],
-  ['bing', 'search', 'Bing Webmaster'], ['ai', 'ai', 'AI 分析链接'], ['use', 'chart', 'Cloudflare 用量'], ['sys', 'pulse', '系统状态'], ['ret', 'inbox', '数据保留']];
+  ['bing', 'search', 'Bing Webmaster'], ['bl', 'link', '外链与权重'], ['ai', 'ai', 'AI 分析链接'], ['use', 'chart', 'Cloudflare 用量'], ['sys', 'pulse', '系统状态'], ['ret', 'inbox', '数据保留']];
 let kbarSites = null;
 function openKbar() {
   if (document.querySelector('.kbar')) return;

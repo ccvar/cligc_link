@@ -12,6 +12,8 @@ import { seal, unseal, siteHost, rebuildSites, gVerStmt } from './google.js';
 import { spend } from './budget.js';
 
 const DAY = 86400000;
+// 清空外链数据（见 src/backlinks.js）：换 Key、删除 Key、站点换了 Bing 资源时用
+export const BL_RESET = "bl_total = -1, bl_pages = 0, bl_more = 0, bl_prev = -1, bl_top = '', bl_error = '', bl_at = 0";
 const API = 'https://ssl.bing.com/webmaster/api.svc/json/';
 const ymd = (t) => new Date(t).toISOString().slice(0, 10);
 
@@ -109,14 +111,14 @@ export async function saveBingConfig(env, secret, body) {
     await setSetting(env, 'int_bing', await seal(secret, cred));
     const prev = await bingFound(env);
     await setSetting(env, 'bing_found', JSON.stringify({ sites: prev?.sites || [], at: 0, error: e.message, errorAt: Date.now() }));
-    if (keyChanged) await env.DB.prepare('UPDATE g_sites SET b_synced_at = 0').run();
+    if (keyChanged) await env.DB.prepare(`UPDATE g_sites SET b_synced_at = 0, ${BL_RESET}`).run();
     return { ok: true, pending: true };
   }
   await setSetting(env, 'int_bing', await seal(secret, cred));
   await saveFound(env, sites || []);
   await rebuildSites(env);
   // 新 Key：所有站点重新同步
-  if (keyChanged) await env.DB.prepare('UPDATE g_sites SET b_synced_at = 0').run();
+  if (keyChanged) await env.DB.prepare(`UPDATE g_sites SET b_synced_at = 0, ${BL_RESET}`).run();
   return { ok: true };
 }
 
@@ -124,6 +126,8 @@ export async function deleteBingConfig(env) {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM settings WHERE key IN ('int_bing', 'bing_found')"),
     env.DB.prepare('UPDATE g_daily SET b_clicks = NULL, b_impressions = NULL WHERE b_clicks IS NOT NULL OR b_impressions IS NOT NULL'),
+    // 外链数据（src/backlinks.js）也清掉，免得之后换个账号重新填写时还显示旧的数字
+    env.DB.prepare(`UPDATE g_sites SET ${BL_RESET} WHERE bl_at > 0`),
   ]);
   await rebuildSites(env);
 }

@@ -10,6 +10,7 @@ import { EmailMessage } from 'cloudflare:email';
 import * as google from './google.js';
 import * as gindex from './gindex.js';
 import * as bing from './bing.js';
+import * as backlinks from './backlinks.js';
 import { subreq } from './budget.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT, normalizeTarget, isAppUrl, isWebUrl, inAppBrowser, intentWithFallback, guardKey, isDbError } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAggStmts, pruneClicks, backfillSourceUv, prunePerRun, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
@@ -250,6 +251,8 @@ async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}
   });
   // Bing Webmaster：每日点击 / 展示、索引网页数
   await step('bing', async () => bing.syncBatch(env, await sessionSecret(env), manual ? { limit: 5, deadline: Date.now() + 15000 } : {}));
+  // 外链与权重（设置里开启后才查）：Bing 外链每次最多 10 个站点，Open PageRank 最多 200 个域名；每个站点每周一次
+  await step('links', async () => backlinks.cronBatch(env, await sessionSecret(env), { manual }));
   // 站点地图 + 网页索引检查（Google 和 Bing，每次最多约 100 秒）
   await step('gindex', async () => {
     const gsec = await sessionSecret(env);
@@ -274,7 +277,7 @@ async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}
 // 每个 Worker 实例只执行一次；表已存在时 CREATE ... IF NOT EXISTS 不会有影响
 // 数据库版本：表结构（schema.sql 的内容）或下面 migrate() 里的补列有变化时才真正执行，平时每个实例只读一行设置。
 // 改了 migrate() 里的补列逻辑时把 MIGRATE_REV 加一
-const MIGRATE_REV = 4;
+const MIGRATE_REV = 5;
 const hashStr = (t) => { let h = 2166136261; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619); return (h >>> 0).toString(36); };
 const SCHEMA_VER = `${hashStr(SCHEMA_SQL)}-${MIGRATE_REV}`;
 let schemaReady = null;
@@ -324,7 +327,10 @@ async function migrate(env) {
     if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`).run();
   }
   if (!gcols.includes('ch_at')) await env.DB.prepare('ALTER TABLE g_sites ADD COLUMN ch_at INTEGER NOT NULL DEFAULT 0').run();
-  for (const [c, def] of [['bing_site', "TEXT NOT NULL DEFAULT ''"], ['b_synced_at', 'INTEGER NOT NULL DEFAULT 0'], ['b_error', "TEXT NOT NULL DEFAULT ''"], ['b_in_index', 'INTEGER NOT NULL DEFAULT 0']]) {
+  for (const [c, def] of [['bing_site', "TEXT NOT NULL DEFAULT ''"], ['b_synced_at', 'INTEGER NOT NULL DEFAULT 0'], ['b_error', "TEXT NOT NULL DEFAULT ''"], ['b_in_index', 'INTEGER NOT NULL DEFAULT 0'],
+    ['bl_total', 'INTEGER NOT NULL DEFAULT -1'], ['bl_pages', 'INTEGER NOT NULL DEFAULT 0'], ['bl_more', 'INTEGER NOT NULL DEFAULT 0'], ['bl_prev', 'INTEGER NOT NULL DEFAULT -1'],
+    ['bl_top', "TEXT NOT NULL DEFAULT ''"], ['bl_error', "TEXT NOT NULL DEFAULT ''"], ['bl_at', 'INTEGER NOT NULL DEFAULT 0'],
+    ['opr', 'REAL NOT NULL DEFAULT -1'], ['opr_rank', 'INTEGER NOT NULL DEFAULT 0'], ['opr_ref', 'INTEGER NOT NULL DEFAULT 0'], ['opr_hist', "TEXT NOT NULL DEFAULT ''"], ['opr_at', 'INTEGER NOT NULL DEFAULT 0']]) {
     if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} ${def}`).run();
   }
   const dcols = (await env.DB.prepare('PRAGMA table_info(g_daily)').all()).results.map((c) => c.name);
@@ -819,6 +825,7 @@ async function authedApi(request, env, url, cred) {
   if (path === '/api/retention' && method === 'GET') return json(await retentionInfo(env));
   if (path.startsWith('/api/google/')) return googleApi(request, env, url);
   if (path.startsWith('/api/bing/')) return bingApi(request, env, url);
+  if (path.startsWith('/api/backlinks/')) return backlinksApi(request, env, url);
   if (path === '/api/shares' && method === 'GET') return json(await listShares(env, url));
   if (path === '/api/shares' && method === 'POST') return createShare(request, env, url);
   if (path.startsWith('/api/shares/') && path.endsWith('/views') && method === 'GET') {
@@ -2483,7 +2490,8 @@ async function googleApi(request, env, url) {
       return json(await google.status(env, secret));
     }
     const days = google.RANGE_DAYS.includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 28;
-    if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days) });
+    // bl：外链与权重开了哪几项（不进缓存，开关一变立即生效）
+    if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days), bl: await backlinks.blFlags(env) });
     if (path === '/api/google/tags' && method === 'GET') return json({ tags: await google.tagsList(env) });
     if (path === '/api/google/tags' && method === 'PUT') {
       const r = await google.tagsUpdate(env, await request.json().catch(() => ({})));
@@ -2497,7 +2505,7 @@ async function googleApi(request, env, url) {
     if (path === '/api/google/link') return json({ days, ranges: google.ranges(days), ...(await google.linkSites(env, Number(url.searchParams.get('id')) || 0, days, secret)) });
     if (path === '/api/google/site') {
       const d = await google.siteDetail(env, secret, String(url.searchParams.get('host') || ''), days);
-      return d.error ? json(d, 404) : json(d);
+      return d.error ? json(d, 404) : json({ ...d, blOn: await backlinks.blFlags(env) });
     }
   } catch (err) {
     return json({ error: err.message || String(err) }, 500);
@@ -2526,6 +2534,35 @@ async function bingApi(request, env, url) {
       await bing.discover(env, secret);
       const r = await bing.syncBatch(env, secret, { limit: 20, cutoff: Date.now() - 60000, deadline: Date.now() + 20000 });
       return json({ ...r, ...(await bing.status(env, secret)) });
+    }
+  } catch (err) {
+    return json({ error: err.message || String(err) }, 500);
+  }
+  return json({ error: 'not found' }, 404);
+}
+
+// 外链与权重：开关、Open PageRank 的 Key、立即更新、某个页面的外链明细
+async function backlinksApi(request, env, url) {
+  const path = url.pathname, method = request.method;
+  const secret = await sessionSecret(env);
+  try {
+    if (path === '/api/backlinks/status') return json(await backlinks.status(env, secret));
+    if (path === '/api/backlinks/config' && method === 'PUT') {
+      const r = await backlinks.setEnabled(env, secret, await request.json().catch(() => ({})));
+      return r.error ? json(r, 400) : json(await backlinks.status(env, secret));
+    }
+    if (path === '/api/backlinks/opr' && method === 'PUT') {
+      const r = await backlinks.saveOprConfig(env, secret, await request.json().catch(() => ({})));
+      return r.error ? json(r, 400) : json(await backlinks.status(env, secret));
+    }
+    if (path === '/api/backlinks/opr' && method === 'DELETE') { await backlinks.deleteOprConfig(env); return json(await backlinks.status(env, secret)); }
+    if (path === '/api/backlinks/sync' && method === 'POST') {
+      const r = await backlinks.syncNow(env, secret);
+      return json({ result: r, ...(await backlinks.status(env, secret)) });
+    }
+    if (path === '/api/backlinks/url' && method === 'GET') {
+      const r = await backlinks.urlLinks(env, secret, String(url.searchParams.get('host') || ''), String(url.searchParams.get('url') || ''), url.searchParams.get('page'));
+      return r.error ? json(r, 400) : json(r);
     }
   } catch (err) {
     return json({ error: err.message || String(err) }, 500);

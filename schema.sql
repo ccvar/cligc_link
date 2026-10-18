@@ -150,6 +150,19 @@ CREATE TABLE IF NOT EXISTS g_sites (
   b_synced_at   INTEGER NOT NULL DEFAULT 0,
   b_error       TEXT NOT NULL DEFAULT '',
   b_in_index    INTEGER NOT NULL DEFAULT 0,   -- Bing 抓取统计里最新的“索引中的网页数”
+  -- 外链与权重（设置里开启后才查，见 src/backlinks.js）
+  bl_total      INTEGER NOT NULL DEFAULT -1,  -- Bing 发现的外链总数（-1 = 还没查到）
+  bl_pages      INTEGER NOT NULL DEFAULT 0,   -- 有外链的页面数
+  bl_more       INTEGER NOT NULL DEFAULT 0,   -- 页面太多只查了前几页（总数是下限）
+  bl_prev       INTEGER NOT NULL DEFAULT -1,  -- 上一次查到的外链总数
+  bl_top        TEXT NOT NULL DEFAULT '',     -- 外链最多的页面 JSON [[网址, 外链数], …]
+  bl_error      TEXT NOT NULL DEFAULT '',
+  bl_at         INTEGER NOT NULL DEFAULT 0,
+  opr           REAL NOT NULL DEFAULT -1,     -- Open PageRank 0–10（-1 = 没有这个域名的数据）
+  opr_rank      INTEGER NOT NULL DEFAULT 0,   -- 全球排名
+  opr_ref       INTEGER NOT NULL DEFAULT 0,   -- 引用域名数
+  opr_hist      TEXT NOT NULL DEFAULT '',     -- 每月分数 JSON [[YYYY-MM, 分数], …]
+  opr_at        INTEGER NOT NULL DEFAULT 0,
   error         TEXT NOT NULL DEFAULT '',
   updated_at    INTEGER NOT NULL DEFAULT 0
 );

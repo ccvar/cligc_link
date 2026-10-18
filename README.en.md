@@ -35,6 +35,7 @@
 - **Analytics**: visit trends (with previous-period comparison), unique visitors, today's visits, sources, countries / cities, devices / OS / browsers, a weekday × hour heatmap, a live visit feed, rule hits, human / bot / suspicious detection, and CSV export.
 - **Site analytics (GA4 + Search Console)**: connect one or more Google accounts; all sites are merged by domain with users, sessions, key events, search clicks / impressions / CTR / position and their changes, over 7 days to 12 months; summary cards with trends and traffic share; groups, sort by growth, CSV export.
 - **Bing Webmaster**: paste one API key to add Bing clicks, impressions, query / page rankings and crawl stats, merged with Google's data by domain; the site list's search columns switch between Google / Bing / combined. Page indexing checks whether each URL is in Bing's index, and missing ones can be submitted to Bing by hand or automatically every day (within Bing's daily quota). ChatGPT search, Copilot and DuckDuckGo all use Bing's index.
+- **Backlinks & authority (optional)**: once turned on in Settings, checks the backlinks Bing has found (per page, with the linking URLs) and the Open PageRank domain score (0–10, global rank, referring domains) once a week, shown in the site list and on each site page. Off by default; nothing is requested while it's off.
 - **Page indexing**: lists sitemaps (Google / Bing, one-click submit) and checks every URL from the sitemaps and search results for whether it's indexed and why not; the site list shows indexed counts.
 - **Masked screenshots**: the eye icon on the overview and sites pages shows every domain as `bl•••.com`, handy for sharing screenshots.
 - **Connected to short links**: count each site's short link clicks, unique visitors and **click-out rate** by visit source (`?src=` / Referer), and see which sites each link goes to. Optional **conversion tracking** adds utm parameters to redirects so GA4 shows each link's arrival sessions and key events.
@@ -436,6 +437,15 @@ bing.example.com {
 
 Then enter `https://bing.example.com/bing-that-string/` as the proxy address. It must use https (the API key is in the query string); put a random string in the path that others can't guess.
 
+### Backlinks & authority (optional)
+
+Turn it on under “Settings → Backlinks & authority”. The two parts can be switched on separately and are both off by default; while off, nothing is requested and nothing extra is shown.
+
+- **Bing backlinks**: needs Bing Webmaster set up first (no extra cost). Once a week per site, `GetLinkCounts` fetches the links from other websites to that site that Bing has found (counted per page, up to 5 result pages per site, keeping the 50 pages with the most links). Each scheduled run checks at most 10 sites to stay clear of Bing's throttling. Opening a page on the site page looks up the linking URLs with `GetUrlLinks` (cached for a day).
+- **Open PageRank**: provided by Keywords Everywhere — a domain authority score (0–10) computed from public Common Crawl data, with global rank, referring domains and monthly scores for the past year. Sign up for free at [keywordseverywhere.com/openpagerank](https://keywordseverywhere.com/openpagerank), create an API key starting with `opr_live_` and paste it in (stored encrypted). The free plan covers 30,000 domains a month and 100 domains per request; checking weekly, 150 sites use about 650 a month.
+
+When on, the site list gets a sortable “OPR / Backlinks” column and each site page gets a “Backlinks & authority” card. Note: Open PageRank is not Google PR (retired years ago), nor Ahrefs DR or Moz DA, and these metrics can't be compared directly. New sites usually have no score yet, and Bing can take weeks to months to discover backlinks.
+
 ### AI analysis links
 
 On the "Sites" page (or a site page), click "AI analysis" at the top right, choose sites (one or more, up to 100; above 30 the report uses a compact format with only core metrics and search opportunities per site), a range (28 days / 3 months / 6 months) and sections, and generate a read-only link to send to ChatGPT, Claude or another AI to analyze the sites' SEO.
@@ -488,6 +498,7 @@ src/agg.js        Visit aggregation (hourly / daily), HyperLogLog unique visitor
 src/google.js     Google integration: OAuth, GA4 / Search Console sync, site–link matching, AI reports, weekly SEO changes
 src/bing.js       Bing Webmaster: API key / proxy, daily data sync, queries and crawl stats, index checks and submission
 src/gindex.js     Page indexing: sitemaps, Google URL inspection, Bing index checks and auto-submission
+src/backlinks.js  Backlinks & authority (optional): Bing backlinks, Open PageRank domain scores
 src/admin.html    Admin (single file, no build step)
 src/home.html     Home page served at / (built into public/ as a static file on deploy; Cloudflare serves it directly, without using Workers requests)
 src/i18n/         English UI: the translation script (client.js) and dictionaries for the admin / home page

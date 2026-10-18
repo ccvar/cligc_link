@@ -8,7 +8,7 @@
 // 每日数据存在 g_daily，由定时任务和“立即同步”分批更新；详情页的排行、实时数据现查并缓存一小时。
 
 import { sourceUv, hllNew, hllMerge, hllCount } from './agg.js';
-import { bingRaw, bingSummary } from './bing.js';
+import { bingRaw, bingSummary, BL_RESET } from './bing.js';
 import { spend } from './budget.js';
 
 const SCOPES = [
@@ -386,7 +386,7 @@ export async function rebuildSites(env) {
       env.DB.prepare('DELETE FROM g_urls WHERE host = ?').bind(s.host), env.DB.prepare('DELETE FROM g_sitemaps WHERE host = ?').bind(s.host));
     if (o.bing_site !== s.bing_site) {
       stmts.push(env.DB.prepare('UPDATE g_daily SET b_clicks = NULL, b_impressions = NULL WHERE host = ?').bind(s.host),
-        env.DB.prepare("UPDATE g_sites SET b_synced_at = 0, b_in_index = 0, b_error = '' WHERE host = ?").bind(s.host),
+        env.DB.prepare(`UPDATE g_sites SET b_synced_at = 0, b_in_index = 0, b_error = '', ${BL_RESET} WHERE host = ?`).bind(s.host),
         // 换了 Bing 站点：网址重新排队检查；解除了关联：不再排队（免得占着队列）
         env.DB.prepare("UPDATE g_urls SET b_state = '', b_due_at = ?, b_submitted_at = 0 WHERE host = ?").bind(s.bing_site ? 0 : 9e15, s.host));
     }
@@ -615,10 +615,11 @@ export async function sitesList(env, days) {
       (SELECT COALESCE(MAX(updated_at), 0) || ':' || COUNT(*) FROM links) AS l,
       (SELECT COALESCE(MAX(updated_at), 0) || ':' || COUNT(*) FROM link_targets) AS t,
       (SELECT COUNT(*) FROM g_accounts) AS n,
-      (SELECT value FROM settings WHERE key = 'tags_ver') AS tv`).first();
+      (SELECT value FROM settings WHERE key = 'tags_ver') AS tv,
+      (SELECT value FROM settings WHERE key = 'bl_ver') AS bv`).first();
   // 固定的缓存键（每个时间范围一行，覆盖写，不会越积越多）；版本存在值里。
-  // 短链、分组、访问汇总变了立即重算；Google / Bing 数据每小时都会小幅更新，变了以后最多沿用一小时
-  const rest = `${ranges(days).to}|${v.a}|${v.l}|${v.t}|${v.n}|${v.tv || 0}`;
+  // 短链、分组、访问汇总、外链开关变了立即重算；Google / Bing 数据每小时都会小幅更新，变了以后最多沿用一小时
+  const rest = `${ranges(days).to}|${v.a}|${v.l}|${v.t}|${v.n}|${v.tv || 0}|${v.bv || 0}`;
   const hit = await cacheGet(env, `sites|${days}`);
   if (hit && hit.rest === rest && (hit.g === v.g || hit.at > Date.now() - 3600000)) return hit.data;
   const out = await sitesListRaw(env, days, v.g);
@@ -662,6 +663,25 @@ async function sitesDaily(env, days, ver) {
   return out;
 }
 
+// 外链与权重（设置里开启后才查，见 backlinks.js）：没查到时为 null。opr.s 为 null 表示 Open PageRank 里没有这个域名
+const oprHist = (s) => { try { return s.opr_hist ? JSON.parse(s.opr_hist) : []; } catch { return []; } };
+function blFields(s, detail = false) {
+  const hist = oprHist(s);
+  const out = {
+    bl: s.bl_total >= 0 ? { n: s.bl_total, p: s.bl_pages, more: !!s.bl_more, prev: s.bl_prev >= 0 ? s.bl_prev : null, at: s.bl_at } : null,
+    blError: s.bl_error || '',
+    // prev：上个月的分数（Open PageRank 每月更新一次）
+    opr: s.opr_at ? { s: s.opr >= 0 ? s.opr : null, r: s.opr_rank || null, d: s.opr_ref || 0, prev: s.opr >= 0 && hist.length > 1 ? hist[hist.length - 2][1] : null, at: s.opr_at } : null,
+  };
+  if (detail) {
+    let top = [];
+    try { top = s.bl_top ? JSON.parse(s.bl_top) : []; } catch {}
+    out.blTop = top;
+    if (out.opr) out.opr.hist = hist;
+  }
+  return out;
+}
+
 async function sitesListRaw(env, days, ver) {
   const [sites, daily] = await Promise.all([
     env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email, m.n_urls, m.n_yes, m.n_done, m.nb_yes, m.nb_done FROM g_sites s
@@ -689,6 +709,7 @@ async function sitesListRaw(env, days, ver) {
       linksFrom: sf.get(s.host) || [],      // 从这个站点点出的短链
       linksFromVisitors: sf.visitors?.get(s.host) ?? null,   // 这些点击来自多少位访客（去重）
       cur: g.cur, prev: g.prev, spark: g.spark, prevSpark: g.prevSpark,
+      ...blFields(s),
     };
   });
 }
@@ -916,6 +937,7 @@ export async function siteDetail(env, secret, host, days) {
     links: (await siteLinks(env, new Set([host]), days).catch(() => new Map())).get(host) || [],
     linksFrom: [],
     tags: (await env.DB.prepare('SELECT tag FROM site_tags WHERE host = ? ORDER BY tag').bind(host).all()).results.map((r) => r.tag),
+    ...blFields(s, true),
   };
   // 来源匹配要用全部站点（不带点的 src 名称需要确认只对应一个站点）
   const all = new Set((await env.DB.prepare('SELECT host FROM g_sites').all()).results.map((r) => r.host));
