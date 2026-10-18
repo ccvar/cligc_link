@@ -1968,7 +1968,6 @@ html.masked input:focus { filter: none; }
 .ix-sub { font-size: 11px; white-space: nowrap; }
 .ix-all { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .ix-done { display: flex; align-items: center; gap: 4px; margin-top: -4px; cursor: help; }
-.ix-bh .ix-q { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ix-box .ix-k b { font-size: 18px; }
 .ix-bing #ix-bsub { justify-self: start; }
 #ix-bsub small { margin-left: 4px; color: var(--muted); }
@@ -1977,7 +1976,8 @@ html.masked input:focus { filter: none; }
 .ix-sm th:nth-child(2) { width: 150px; } .ix-sm th:nth-child(3), .ix-sm th:nth-child(4), .ix-sm th:nth-child(5) { width: 84px; } .ix-sm th:nth-child(6) { width: 96px; }
 .ix-sm .ix-u a { color: inherit; text-decoration: none; min-width: 0; }
 .ix-auth { margin-bottom: 12px; align-items: center; }
-.ix-sma { margin: 16px 0 0; }
+.ix-sma { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ix-sma a { margin-left: 4px; }
 .ix-err { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--warn); margin: 0; }
 .ix-err svg { flex: none; }
 .ix-err .ell { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -5910,9 +5910,17 @@ function renderGoogleSettings(box, st, onState) {
         ${a.error ? '<button type="button" class="btn sm" data-re>重新连接</button>'
           : !a.canSubmit && a.gsc ? '<button type="button" class="btn sm" data-re data-tipf-always data-tipf="早先只授予了 Search Console 只读权限；重新授权一次后，才能在后台提交站点地图">重新授权</button>' : ''}
         <button type="button" class="btn sm ghost danger-t" data-off="${esc(a.id)}" data-mail="${esc(a.email)}">断开</button></div>`).join('')}</div>
-        <p class="hint" style="margin-top:10px">所有账号的站点按域名合并显示；多个账号都能看到同一个站点时，用最早连接的账号的数据。添加账号请到 <a href="#/sites">站点</a> 页。</p>`
+        <p class="hint" style="margin-top:10px">所有账号的站点按域名合并显示；多个账号都能看到同一个站点时，用最早连接的账号的数据。添加账号请到 <a href="#/sites">站点</a> 页。</p>
+        <label class="opt trk-sw" style="margin-top:18px"><div class="tx"><b>有新网址或网页更新时自动重新提交站点地图</b>
+          <span class="hint">每天刷新站点地图时，如果里面多了新网址、或者有网页的更新时间 lastmod 变新了，自动把已提交的站点地图重新提交给 Google，让 Google 早点来读取。${accts.some((a) => !a.canSubmit && a.gsc) ? '标着“重新授权”的账号要先重新授权才会提交。' : ''}</span></div>
+          <span class="switch"><input type="checkbox" id="g-sma" ${st.smAuto ? 'checked' : ''}><span class="t"></span></span></label>`
       : `<p class="set-p">还没有连接账号，到 <a href="#/sites">站点</a> 页连接 Google 账号。</p>`}` : ''}`;
   bindGoogleConfig(box, st, reload);
+  const sma = box.querySelector('#g-sma');
+  if (sma) sma.onchange = async () => {
+    try { const d = await api('/google/sm-auto', { method: 'PUT', body: { on: sma.checked } }); onState(d); toast(sma.checked ? '已开启：自动重新提交站点地图给 Google' : '已关闭：不再自动重新提交站点地图给 Google'); }
+    catch (err) { sma.checked = !sma.checked; toast(err.message, 'bad'); }
+  };
   box.querySelectorAll('[data-re]').forEach((b) => (b.onclick = () => googleConnect(b)));
   box.querySelectorAll('[data-off]').forEach((b) => (b.onclick = async () => {
     const last = accts.length === 1;
@@ -6405,7 +6413,7 @@ function idxUrlsView(d, f, reason) {
   const bYes = d.urls.filter((r) => r.b === 'yes').length, bNo = by.bno.length, bWait = d.urls.filter((r) => !r.b || r.b === 'err').length;
   const bCand = d.urls.filter((r) => (r.b !== 'yes' && (!r.bSubmittedAt || r.bSubmittedAt < Date.now() - 30 * 86400000)) || r.updAt > (r.bSubmittedAt || 0)).length;
   const bingBox = bg ? `<div class="ix-box ix-bing">
-      <div class="ix-bh">${BRAND.bing(14)}<b>Bing</b><span class="sp"></span>${bg.auto ? '<span class="pill on" data-tipf-always data-tipf="每天刷新站点地图后，自动把未收录的网址、以及站点地图里显示有更新的网址提交给 Bing（在 设置 → Bing Webmaster 里可以关掉）">自动提交</span>' : ''}</div>
+      <div class="ix-bh">${BRAND.bing(14)}<b>Bing</b><span class="sp"></span>${bg.auto || bg.smAuto ? `<span class="pill on" data-tipf-always data-tipf="${esc([bg.auto && '每天刷新站点地图后，自动把未收录的网址、以及站点地图里显示有更新的网址提交给 Bing', bg.smAuto && '站点地图里有新网址或网页更新时，自动把站点地图重新提交给 Bing', '在 设置 → Bing Webmaster 里可以关掉'].filter(Boolean).join('\n'))}">自动提交</span>` : ''}</div>
       <div class="ix-n"><div class="ix-k yes"><span>${ic('check', 13)}已收录</span><b>${num(bYes)}</b></div>
         <div class="ix-k no"><span>${ic('info', 13)}未收录</span><b>${num(bNo)}</b></div>
         ${bWait ? `<div class="ix-k wait"><span>${ic('history', 13)}待检查</span><b>${num(bWait)}</b></div>` : ''}</div>
@@ -6416,12 +6424,13 @@ function idxUrlsView(d, f, reason) {
     </div>` : '';
   const sum = `<div class="ix-sum">
     ${g ? `<div class="ix-box">
-      <div class="ix-bh">${BRAND.google(14)}<b>Google</b><span class="sp"></span><span class="ix-q" data-tipf-always data-tipf="Google 网址检查接口每个站点每天限 2,000 次，这里最多用 ${num(d.quotaMax)} 次，留一些给你在 Search Console 里手动检查">今天已用 ${num(d.quota)} / ${num(d.quotaMax)}</span></div>
+      <div class="ix-bh">${BRAND.google(14)}<b>Google</b><span class="sp"></span>${d.smAuto ? `<span class="pill ${d.canSubmit ? 'on' : 'off'}" data-tipf-always data-tipf="${esc(d.canSubmit ? '站点地图里有新网址或网页更新时，自动把站点地图重新提交给 Google\n在 设置 → Google 集成 里可以关掉' : '已开启自动重新提交站点地图，但当前 Google 账号只有只读权限，到“站点地图”标签里重新授权后才会生效')}">自动提交</span>` : ''}</div>
       <div class="ix-n"><div class="ix-k yes"><span>${ic('check', 13)}已编入</span><b>${num(yes)}</b></div>
       <div class="ix-k no"><span>${ic('info', 13)}未编入</span><b>${num(no)}</b>${reasons.length ? `<small>${reasons.length} 个原因</small>` : ''}</div>
       ${wait ? `<div class="ix-k wait"><span>${ic('history', 13)}待检查</span><b>${num(wait)}</b>${by.err.length ? `<small class="bad">${by.err.length} 个检查失败</small>` : ''}</div>` : ''}</div>
     <div class="ix-bar"><i class="yes" style="width:${(yes / tot) * 100}%"></i><i class="no" style="width:${(no / tot) * 100}%"></i></div>
     ${ixDone(yes, no, d.urls.length, d.maxUrls, 'Google', 'Search Console 的“网页索引”报告')}
+    <div class="hint ix-done" data-tipf-always data-tipf="Google 网址检查接口每个站点每天限 2,000 次，这里最多用 ${num(d.quotaMax)} 次，留一些给你在 Search Console 里手动检查">今天检查配额已用 ${num(d.quota)} / ${num(d.quotaMax)}${ic('help', 12)}</div>
     ${d.scPages != null ? `<div class="hint ix-done" data-tipf-always data-tipf="最近 3 个月在 Google 搜索结果里出现过的网页数（每天更新，有 2～3 天延迟）。出现过就一定被编入过，所以已编入的至少有这么多；编入了但从没出现在搜索结果里的不算在内，所以会比 Search Console 的“已编入”少一些。\n近 28 天有展示的网址直接记为已编入，不再逐个检查">近 3 个月有搜索展示 <b class="ix-all">${num(d.scPages)}${d.scPages >= d.scRows ? '+' : ''}</b> 个网页${ic('help', 12)}</div>` : ''}
     ${d.issues ? `<div class="hint ix-err" data-tipf-always data-tipf="${esc(d.issues)}">${ic('alert', 13)}<span class="ell">${esc(d.issues)}</span></div>` : ''}
     </div>` : ''}
@@ -6466,10 +6475,11 @@ function idxSitemapsView(d) {
     ${d.sitemaps.length ? `<div class="g-scr"><table class="tbl gt ix-sm"><thead><tr><th>站点地图</th><th>状态</th><th class="r">网址</th><th class="r">上次读取</th><th class="r">上次提交</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
       : `<div class="empty">${ic('inbox')}还没有提交站点地图，网站根目录下也没找到 /sitemap.xml</div>`}
     <div class="hint" style="margin-top:10px">站点地图状态每天刷新一次${d.refreshedAt ? `（上次刷新 ${ago(d.refreshedAt)}）` : ''} · <a href="${esc(gscSitemapsUrl(d))}" target="_blank" rel="noopener">在 Search Console 中查看</a></div>` : '';
-  // 全局开关：站点地图里出现新网址时，定时任务自动把已提交的站点地图重新提交一遍
-  const auto = `<label class="opt trk-sw ix-sma"><div class="tx"><b>有新网址或网页更新时自动重新提交</b>
-      <span class="hint">每天刷新站点地图时，如果里面多了新网址、或者有网页的更新时间 lastmod 变新了，自动把已提交的站点地图重新提交给 ${d.google && d.bing ? 'Google 和 Bing' : d.google ? 'Google' : 'Bing'}，让它们早点来读取${d.google && !d.canSubmit ? '（Google 需要先重新授权）' : ''}。对所有站点生效</span></div>
-      <span class="switch"><input type="checkbox" id="ix-sma" ${d.smAuto ? 'checked' : ''}><span class="t"></span></span></label>`;
+  // 有新网址或网页更新时自动重新提交：开关在设置里（Google 集成 / Bing Webmaster），这里只说明现在的状态
+  const sma = [d.google && (d.smAuto ? (d.canSubmit ? ['on', 'Google 已开启'] : ['exp', 'Google 重新授权后生效']) : ['off', 'Google 已关闭']),
+    d.bing && (d.bing.smAuto ? ['on', 'Bing 已开启'] : ['off', 'Bing 已关闭'])].filter(Boolean);
+  const auto = `<div class="hint ix-sma"><span>有新网址或网页更新时自动重新提交站点地图</span>${sma.map(([c, l]) => `<span class="pill ${c}">${l}</span>`).join('')}
+    <a href="#/settings" data-gs="${d.google ? 'goo' : 'bing'}">在设置中修改</a></div>`;
   if (!d.bing) return google + auto;
   // Bing：已提交的站点地图；Google 那边有、Bing 还没有的也列出来，可以一键提交
   const bf = d.bing.feeds, have = new Set(bf.map((x) => x.path));
@@ -6600,11 +6610,9 @@ async function mountSiteIndex(host) {
     if (b.dataset.ixbs) return run(b, 'bing-feed', { path: b.dataset.ixbs }, () => '已把站点地图提交到 Bing');
     if (b.dataset.ixs) return run(b, 'submit', { path: b.dataset.ixs }, () => '已提交站点地图，Google 会在之后几天内重新读取');
   });
-  body.addEventListener('change', async (e) => {
-    if (e.target.id !== 'ix-sma') return;
-    const on = e.target.checked;
-    try { d = (await api('/google/index/sm-auto', { method: 'POST', body: { host, on } })).index; toast(on ? '已开启：有新网址或网页更新时自动重新提交站点地图' : '已关闭自动重新提交站点地图'); }
-    catch (err) { e.target.checked = !on; toast(err.message, 'bad'); }
+  body.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-gs]');
+    if (a) { e.preventDefault(); goSettings(a.dataset.gs); }
   });
 }
 
@@ -7624,6 +7632,9 @@ function renderBingSettings(box, b, onState) {
       <label class="opt trk-sw" style="margin-top:16px"><div class="tx"><b>自动提交未收录的网址</b>
         <span class="hint">每天刷新站点地图后，把 Bing 还没收录、30 天内没提交过的网址，以及站点地图里显示有更新的网址提交给 Bing，不超过 Bing 给每个站点的每日配额。</span></div>
         <span class="switch"><input type="checkbox" id="bing-auto" ${b.auto ? 'checked' : ''}><span class="t"></span></span></label>
+      <label class="opt trk-sw"><div class="tx"><b>有新网址或网页更新时自动重新提交站点地图</b>
+        <span class="hint">每天刷新站点地图时，如果里面多了新网址、或者有网页的更新时间 lastmod 变新了，自动把已提交的站点地图重新提交给 Bing，让 Bing 早点来读取。</span></div>
+        <span class="switch"><input type="checkbox" id="bing-sma" ${b.smAuto ? 'checked' : ''}><span class="t"></span></span></label>
       <div id="bing-fw" hidden style="margin-top:16px">${bingForm(b)}</div></div>`;
   const f = box.querySelector('#bing-f');
   bindBingProxyHelp(f, b);
@@ -7657,6 +7668,10 @@ function renderBingSettings(box, b, onState) {
   };
   box.querySelector('#bing-auto').onchange = async (e) => {
     try { done(await api('/bing/auto', { method: 'PUT', body: { on: e.target.checked } })); toast(e.target.checked ? '已开启自动提交' : '已关闭自动提交'); }
+    catch (ex) { e.target.checked = !e.target.checked; toast(ex.message, 'bad'); }
+  };
+  box.querySelector('#bing-sma').onchange = async (e) => {
+    try { done(await api('/bing/sm-auto', { method: 'PUT', body: { on: e.target.checked } })); toast(e.target.checked ? '已开启：自动重新提交站点地图给 Bing' : '已关闭：不再自动重新提交站点地图给 Bing'); }
     catch (ex) { e.target.checked = !e.target.checked; toast(ex.message, 'bad'); }
   };
 }

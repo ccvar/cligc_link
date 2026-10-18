@@ -8,7 +8,7 @@
 // Bing：同一份网址清单用 GetUrlInfo 检查是否收录（逐个查，每小时约 36 个；已收录的 30 天复查，未收录的 7 天），没收录的按每天的提交配额自动提交（可在设置里关掉）。
 // 只关联了 Bing 的站点也能用：站点地图来自 Bing 的 GetFeeds 或网站根目录的 /sitemap.xml。
 
-import { gfetch, canSubmit } from './google.js';
+import { gfetch, canSubmit, smAutoGoogle } from './google.js';
 import * as bing from './bing.js';
 import { spend } from './budget.js';
 
@@ -147,27 +147,17 @@ const prop = (s) => (hasG(s) ? s.gsc_site : `sc-domain:${s.host}`);
 const origin = (s) => (hasG(s) && !s.gsc_site.startsWith('sc-domain:') ? s.gsc_site.replace(/\/$/, '') : s.bing_site ? s.bing_site.replace(/\/$/, '') : `https://${s.host}`);
 const today = () => ymd(Date.now());
 
-// 设置：站点地图有新网址时自动重新提交（默认开启）
-export const smAuto = async (env) => (await env.DB.prepare("SELECT value FROM settings WHERE key = 'sm_auto'").first('value')) !== '0';
-export async function setSmAuto(env, on) {
-  await env.DB.prepare(
-    `INSERT INTO settings (key, value, updated_at) VALUES ('sm_auto', ?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
-  ).bind(on ? '1' : '0', Date.now()).run();
-  return { ok: true };
-}
-
-// 把已经提交过的站点地图重新提交给 Google 和 Bing（站点地图里出现新网址时，定时任务调用），提交成功的更新“上次提交”时间。
+// 把已经提交过的站点地图重新提交给 Google / Bing（on.g / on.b：两边各自的开关；站点地图里有新网址或网页更新时，定时任务调用），提交成功的更新“上次提交”时间。
 // Google 需要 webmasters 写权限，没有就跳过；只提交已经提交过的，网站根目录下找到、还没提交的（local）不动
-async function resubmitSitemaps(env, secret, s, bkey, list, bf) {
+async function resubmitSitemaps(env, secret, s, bkey, list, bf, on) {
   const now = Date.now(), gErrs = [], bErrs = [];
-  if (hasG(s) && await canSubmit(env, secret, s.gsc_acct)) {
+  if (on.g && await canSubmit(env, secret, s.gsc_acct)) {
     for (const x of list.filter((x) => !x.local).slice(0, SM_AUTO_MAX)) {
       try { await gfetch(env, secret, s.gsc_acct, `${API}${encodeURIComponent(s.gsc_site)}/sitemaps/${encodeURIComponent(x.path)}`, undefined, 'PUT'); x.submitted = now; }
       catch (e) { if (e.budget) return { gErrs, bErrs }; gErrs.push(`${urlTail(x.path)}：${e.message}`); }
     }
   }
-  if (s.bing_site && bkey) {
+  if (on.b && bkey) {
     for (const x of bf.slice(0, SM_AUTO_MAX)) {
       try { await bing.submitFeed(bkey, s.bing_site, x.path); x.submitted = now; }
       catch (e) { if (e.budget) return { gErrs, bErrs }; bErrs.push(`${urlTail(x.path)}：${e.message}`); }
@@ -286,8 +276,10 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
   // 站点地图里出现了新网址（以前没有记录，或以前只是搜索结果里的页面；网址太多存不下时看总数有没有变多），或者有网页的更新时间变新了：
   // 定时任务把已提交的站点地图重新提交一遍，让 Google / Bing 早点重新读取。第一次读取、读取出错时不算
   const smNew = [...want].filter(([u, src]) => src & 1 && !(have.get(u)?.src & 1)).length;
-  if (auto && old && (have.size || old.urls > 0) && !sm.errors.length && (smNew || updated || sm.urls.length > old.urls) && await smAuto(env)) {
-    const r = await resubmitSitemaps(env, secret, s, bkey, list, bf);
+  const smOn = auto && old && (have.size || old.urls > 0) && !sm.errors.length && (smNew || updated || sm.urls.length > old.urls)
+    ? { g: hasG(s) && await smAutoGoogle(env), b: !!s.bing_site && await bing.smAutoBing(env) } : null;
+  if (smOn && (smOn.g || smOn.b)) {
+    const r = await resubmitSitemaps(env, secret, s, bkey, list, bf, smOn);
     if (r.gErrs.length) errs.push(`自动重新提交站点地图失败：${r.gErrs.slice(0, 2).join('；')}`);
     if (r.bErrs.length) berr = [berr, `自动重新提交站点地图失败：${r.bErrs.slice(0, 2).join('；')}`].filter(Boolean).join('；');
   }
@@ -509,9 +501,9 @@ export async function siteIndex(env, secret, host) {
     host, google: hasG(s), site: s.gsc_site || '', email: email || '', canSubmit: hasG(s) ? await canSubmit(env, secret, s.gsc_acct) : false,
     sitemaps: m ? JSON.parse(m.list || '[]') : [], sitemapUrls: m?.urls || 0, refreshedAt: m?.at || 0, issues: m?.error || '',
     quota: m?.q_day === today() ? m.q_n : 0, quotaMax: QUOTA, maxUrls: MAX_URLS,
-    scPages: hasG(s) && m?.sc_pages >= 0 ? m.sc_pages : null, scRows: SC_ROWS, smAuto: await smAuto(env),
+    scPages: hasG(s) && m?.sc_pages >= 0 ? m.sc_pages : null, scRows: SC_ROWS, smAuto: hasG(s) && await smAutoGoogle(env),
     bing: s.bing_site ? {
-      site: s.bing_site, feeds: JSON.parse(m?.b_feeds || '[]'), issues: m?.b_error || '', auto: await bing.bingAuto(env),
+      site: s.bing_site, feeds: JSON.parse(m?.b_feeds || '[]'), issues: m?.b_error || '', auto: await bing.bingAuto(env), smAuto: await bing.smAutoBing(env),
       quota: m && m.b_quota >= 0 && ymd(m.b_quota_at) === today() ? m.b_quota : null,
       // Bing 抓取统计里全站“索引中”的网页数（和 Bing Webmaster 后台一致；逐个检查的只是收集到的网址）
       inIndex: (await env.DB.prepare('SELECT b_in_index FROM g_sites WHERE host = ?').bind(host).first('b_in_index')) || 0,

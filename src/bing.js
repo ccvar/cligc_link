@@ -136,6 +136,11 @@ export async function setBingAuto(env, on) {
   await setSetting(env, 'bing_auto', on ? '1' : '0');
 }
 export const bingAuto = async (env) => (await getSetting(env, 'bing_auto')) !== '0';
+// 站点地图里有新网址或网页更新时，定时任务自动把站点地图重新提交给 Bing（默认开启；sm_auto 是早先 Google / Bing 共用的开关）
+export const smAutoBing = async (env) => ((await getSetting(env, 'sm_auto_b')) ?? (await getSetting(env, 'sm_auto'))) !== '0';
+export async function setSmAutoBing(env, on) {
+  await setSetting(env, 'sm_auto_b', on ? '1' : '0');
+}
 
 // ---------------------------------------------------------------- 站点
 
@@ -166,7 +171,7 @@ export async function status(env, secret) {
   const f = await bingFound(env);
   const r = await env.DB.prepare("SELECT COUNT(*) AS n, MAX(b_synced_at) AS t, SUM(b_error != '') AS bad FROM g_sites WHERE bing_site != ''").first();
   return {
-    configured: true, keyTail: c.key.slice(-4), proxy: c.proxy || '', auto: await bingAuto(env),
+    configured: true, keyTail: c.key.slice(-4), proxy: c.proxy || '', auto: await bingAuto(env), smAuto: await smAutoBing(env),
     sites: f?.sites?.length || 0, verified: f?.sites?.filter((s) => s.verified).length || 0,
     linked: r?.n || 0, lastSync: r?.t || null, siteErrors: r?.bad || 0, error: f?.error || '', discoveredAt: f?.at || null,
   };

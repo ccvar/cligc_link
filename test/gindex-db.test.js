@@ -59,11 +59,11 @@ test('站点地图里出现新网址时，定时任务自动把站点地图重�
     await refreshSite(env, 'x', s, 'KEY');
     assert.equal(submitted.length, 1, '手动刷新（不是定时任务）不自动提交');
     pages = [...pages, 'https://a.com/new3'];
-    setting(db, 'sm_auto', 0);
+    setting(db, 'sm_auto_b', 0);
     await refreshSite(env, 'x', s, 'KEY', { auto: true });
     assert.equal(submitted.length, 1, '关掉开关后不提交');
     pages = pages.slice(0, 2);
-    setting(db, 'sm_auto', 1);
+    setting(db, 'sm_auto_b', 1);
     await refreshSite(env, 'x', s, 'KEY', { auto: true });
     assert.equal(submitted.length, 1, '只删了网址不提交');
   } finally { globalThis.fetch = realFetch; }

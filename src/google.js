@@ -558,6 +558,12 @@ export async function syncBatch(env, secret, { limit = 12, cutoff = Date.now() -
 
 // ---------------------------------------------------------------- 读取
 
+// 站点地图里有新网址或网页更新时，定时任务自动把站点地图重新提交给 Google（默认开启；sm_auto 是早先 Google / Bing 共用的开关）
+export const smAutoGoogle = async (env) => ((await getSetting(env, 'sm_auto_g')) ?? (await getSetting(env, 'sm_auto'))) !== '0';
+export async function setSmAutoGoogle(env, on) {
+  await setSetting(env, 'sm_auto_g', on ? '1' : '0');
+}
+
 export async function status(env, secret) {
   const c = await googleCreds(env, secret);
   if (!c) return { configured: false };
@@ -579,7 +585,7 @@ export async function status(env, secret) {
     // 汇总的错误提示：多个账号时前面带上邮箱
     error: list.filter((a) => a.error).map((a) => `${a.email}：${a.error}`).join('；'),
     errors: list.flatMap((a) => (a.error ? [] : a.errors.map((e) => (many ? `${a.email} · ${e}` : e)))),
-    sites: cnt || 0, lastSync: last?.t || null, pending: last?.pending || 0,
+    sites: cnt || 0, lastSync: last?.t || null, pending: last?.pending || 0, smAuto: await smAutoGoogle(env),
   };
 }
 

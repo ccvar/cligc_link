@@ -2463,6 +2463,10 @@ async function googleApi(request, env, url) {
   const secret = await sessionSecret(env);
   try {
     if (path === '/api/google/status') return json(await google.status(env, secret));
+    if (path === '/api/google/sm-auto' && method === 'PUT') {
+      await google.setSmAutoGoogle(env, !!(await request.json().catch(() => ({}))).on);
+      return json(await google.status(env, secret));
+    }
     // 后台填写 OAuth 客户端（加密保存）
     if (path === '/api/google/config' && method === 'PUT') {
       const r = await google.saveGoogleConfig(env, secret, await request.json().catch(() => ({})));
@@ -2486,7 +2490,6 @@ async function googleApi(request, env, url) {
         : path === '/api/google/index/submit' ? await gindex.submitSitemap(env, secret, host, String(b.path || ''))
         : path === '/api/google/index/bing-feed' ? await gindex.bingFeed(env, secret, host, String(b.path || ''))
         : path === '/api/google/index/bing-submit' ? await gindex.bingSubmitNow(env, secret, host, b.url ? String(b.url) : '')
-        : path === '/api/google/index/sm-auto' ? await gindex.setSmAuto(env, !!b.on)
         : { error: 'not found' };
       return r.error ? json(r, 400) : json({ ...r, index: await gindex.siteIndex(env, secret, host) });
     }
@@ -2552,6 +2555,10 @@ async function bingApi(request, env, url) {
     if (path === '/api/bing/config' && method === 'DELETE') { await bing.deleteBingConfig(env); return json(await bing.status(env, secret)); }
     if (path === '/api/bing/auto' && method === 'PUT') {
       await bing.setBingAuto(env, !!(await request.json().catch(() => ({}))).on);
+      return json(await bing.status(env, secret));
+    }
+    if (path === '/api/bing/sm-auto' && method === 'PUT') {
+      await bing.setSmAutoBing(env, !!(await request.json().catch(() => ({}))).on);
       return json(await bing.status(env, secret));
     }
     if (path === '/api/bing/sync' && method === 'POST') {
