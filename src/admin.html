@@ -1584,6 +1584,14 @@ button.gtg { cursor: pointer; }
 .g-prog[hidden] { display: none; }
 .gl-wrap { overflow-x: auto; }
 /* 放不下时按重要程度依次收起几列，不出现横向滚动（fitSiteCols 按实际宽度量） */
+/* 往下滚动时表头吸在页面顶部（只在不需要横向滚动时，见 fitSiteCols） */
+.gl-wrap.fits { overflow: visible; }
+/* 窄屏时侧栏变成顶部导航条（57px，往下滚时收起、往上滚时出现）：表头跟着它，不被挡住 */
+@media (max-width: 900px) {
+  .shell:has(> .side:not(.hide)) { --sticky-top: 57px; }
+  .gl-wrap.fits .tbl.gl thead th { transition: top .35s var(--ease-out); }
+}
+.gl-wrap.fits .tbl.gl thead th { position: sticky; top: var(--sticky-top, 0px); z-index: 3; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line); border-bottom: 0; }
 .tbl.gl.h-share .c-share, .tbl.gl.h-ctr .c-ctr, .tbl.gl.h-spark .c-spark { display: none; }
 /* 可以横向滚动时在边缘显示阴影，滚到头就消失（纯 CSS：遮罩随内容滚动，阴影固定在容器边缘） */
 .gl-wrap, .scroll {
@@ -5924,8 +5932,11 @@ const GL_HIDE = ['h-share', 'h-ctr', 'h-spark'];
 function fitSiteCols(list) {
   const wrap = list?.querySelector('.gl-wrap'), t = wrap?.querySelector('.tbl.gl');
   if (!t) return;
+  wrap.classList.remove('fits');
   t.classList.remove(...GL_HIDE);
   for (const c of GL_HIDE) { if (t.offsetWidth <= wrap.clientWidth + 1) break; t.classList.add(c); }
+  // 放得下就不需要横向滚动：去掉滚动容器，表头才能吸在页面顶部（滚动容器里的吸顶只在容器内生效）
+  wrap.classList.toggle('fits', t.offsetWidth <= wrap.clientWidth + 1);
 }
 let gFresh = false;   // 下一次加载站点列表时跳过缓存（手动同步完成后）
 async function renderSites(token) {
