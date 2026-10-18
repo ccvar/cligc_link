@@ -2,6 +2,22 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.7.0 · 2026-10-18
+
+Sitemaps are resubmitted automatically when they change, and updated pages are sent to Bing again.
+
+### New
+
+- **Resubmit sitemaps when URLs are added or updated**: when the daily sitemap refresh finds new URLs or a newer last-modified time (lastmod) on a page, your submitted sitemaps are resubmitted to Google and Bing so they're read again sooner. Google needs an account with submit permission
+- **Updated pages are resubmitted to Bing**: the lastmod of every sitemap URL is read; pages with a newer lastmod are submitted to Bing again even if already indexed (once per update, within the daily quota), and Google's indexing status is rechecked within a day. If more than half of the pages change at once (common when a site generator stamps every page with the build date), the dates are treated as unreliable and only the sitemap is resubmitted
+- In the Page indexing list, URLs updated in the last 7 days are marked "Updated"; hover a URL to see its last-modified time from the sitemap
+
+### Improved
+
+- Settings → Google integration and Settings → Bing Webmaster each have a "Resubmit sitemaps automatically when URLs are added or updated" switch, on by default; the Google card in Page indexing now shows an "Auto-submit" badge like Bing's
+- The Google card's daily inspection quota moved to its own line, so the header is no longer crowded
+- Sites list: group tags are on their own third line, and the table header sticks to the top of the page when you scroll
+
 ## v1.6.1 · 2026-10-18
 
 Admin screenshots in the README, new features on the home page, and a few UI fixes.
