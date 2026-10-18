@@ -1623,6 +1623,8 @@ button.gtg { cursor: pointer; }
 /* 站点名下面那排图标 / 分组 / 状态放不下时换行，不把整张表撑出横向滚动 */
 .tbl.gl .gm { flex-wrap: wrap; row-gap: 2px; }
 .gm .gtag { flex: none; }
+/* 站点的分组单独一行，放在来源图标那一行下面 */
+.tbl.gl .gm.gtl { margin-top: 4px; }
 .gico { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; cursor: default; }
 .gico:hover { background: var(--sunken); }
 .gico.off { filter: grayscale(1); opacity: .35; }
@@ -6103,7 +6105,7 @@ async function renderSites(token) {
         const ga = x.cur.ga, pg = x.prev.ga, sc = SE(x), ps = SE(x, 'prev');
         return `<tr data-host="${esc(x.host)}" tabindex="0">
           <td><div class="gh">${esc(x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host)}${x.host.includes('.') ? `<a class="row-ext" href="https://${esc(x.host)}" target="_blank" rel="noopener" data-tip="打开网站" aria-label="打开网站">${ic('ext', 13)}</a>` : ''}</div>
-            <div class="sm gm">${x.tags.length ? `${x.tags.slice(0, 2).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}${x.tags.length > 2 ? `<span class="gtg sm-t" data-tipf-always data-tipf="${esc(x.tags.join('、'))}">+${x.tags.length - 2}</span>` : ''}` : ''}${x.ga4
+            <div class="sm gm">${x.ga4
               ? `<span class="gico" data-tipf-always data-tipf="${esc(`Google Analytics 4：${x.ga4.account} / ${x.ga4.name}（${x.ga4.property}）${many ? ` · 来自 ${x.ga4.email}` : ''}`)}">${BRAND.ga(14)}</span>`
               : `<span class="gico off" data-tipf-always data-tipf="未关联 Google Analytics 4">${BRAND.ga(14)}</span>`}${x.gsc
               ? `<span class="gico" data-tipf-always data-tipf="${esc(`Search Console：${x.gsc}${many ? ` · 来自 ${x.gscEmail}` : ''}`)}">${BRAND.gsc(14)}</span>`
@@ -6113,7 +6115,7 @@ async function renderSites(token) {
               const h = x.linksFrom.reduce((a, l) => a + l.human, 0), ses = x.cur.ga?.sessions;
               const tip = `${G_LABEL()}从这个站点点出 ${x.linksFrom.length} 个短链，真人点击 ${num(h)}${x.linksFromVisitors ? `（${num(x.linksFromVisitors)} 位访客）` : ''}${ses ? `，点出率 ${pct1(h / ses)}` : ''}：${x.linksFrom.slice(0, 3).map((l) => `/${l.slug} ${num(l.human)}`).join('、')}${x.linksFrom.length > 3 ? ' …' : ''}`;
               return `<span class="gsl" data-tipf-always data-tipf="${esc(tip)}">${ic('link', 12)}${num(h)}</span>`;
-            })() : ''}${x.ga4?.created ? `<span class="gage" data-tipf-always data-tipf="${esc(`GA4 接入于 ${ymd(new Date(x.ga4.created))}，大致是网站上线时间`)}">${ic('history', 11)}${siteAge(x.ga4.created)}</span>` : ''}${advOf(x.host).length ? `<span class="gadv lv-${advOf(x.host)[0].level}" data-tipf-always data-tipf="${esc(`${advOf(x.host).length} 条优化建议\n${advTip(advOf(x.host))}`)}">${ic(ADV_LV_IC[advOf(x.host)[0].level], 11)}${advOf(x.host).length}</span>` : ''}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div></td>
+            })() : ''}${x.ga4?.created ? `<span class="gage" data-tipf-always data-tipf="${esc(`GA4 接入于 ${ymd(new Date(x.ga4.created))}，大致是网站上线时间`)}">${ic('history', 11)}${siteAge(x.ga4.created)}</span>` : ''}${advOf(x.host).length ? `<span class="gadv lv-${advOf(x.host)[0].level}" data-tipf-always data-tipf="${esc(`${advOf(x.host).length} 条优化建议\n${advTip(advOf(x.host))}`)}">${ic(ADV_LV_IC[advOf(x.host)[0].level], 11)}${advOf(x.host).length}</span>` : ''}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div>${x.tags.length ? `<div class="sm gm gtl">${x.tags.slice(0, 3).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}${x.tags.length > 3 ? `<span class="gtg sm-t" data-tipf-always data-tipf="${esc(x.tags.join(LIST_SEP))}">+${x.tags.length - 3}</span>` : ''}</div>` : ''}</td>
           <td class="num">${x.users != null ? num(x.users) : '—'}${x.prevUsers != null ? gDelta(x.users, x.prevUsers) : ''}</td>
           <td class="num">${ga ? num(ga.sessions) : '—'}${ga && pg ? gDelta(ga.sessions, pg.sessions) : ''}${ga?.keyEvents ? `<div class="gd ix-pg" data-tipf-always data-tipf="GA4 关键事件（标记为转化的事件）">关键事件 ${num(ga.keyEvents)}</div>` : ''}</td>
           <td class="gsh-c c-share">${shareSum && shareOf(x) ? `<div class="gsh"><i style="width:${(shareOf(x) / shareSum) * 100}%"></i></div><span>${pctText(shareOf(x) / shareSum)}</span>` : '<span class="sm">—</span>'}</td>
