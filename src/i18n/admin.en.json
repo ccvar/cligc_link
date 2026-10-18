@@ -892,6 +892,7 @@
 "同步中…": "Syncing…",
 "同步于": "synced",
 "同步于 {}": "synced {}",
+"同步于 刚刚": "synced just now",
 "同步出错": "Sync error",
 "同步出错：{}": "Sync error: {}",
 "同步完成": "Sync complete",

@@ -21,6 +21,10 @@
   <img src="https://img.shields.io/badge/database-D1-F38020.svg" alt="Cloudflare D1">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/sites-zh.webp" alt="站点列表：所有站点的访问、搜索表现、收录和优化建议" width="100%">
+</p>
+
 ---
 
 ## 功能
@@ -45,6 +49,26 @@
 - **修改记录与撤销**：每个短链的默认地址、跳转规则、A/B 比例、启用状态等修改都有记录（时间、操作设备、修改前后），保留一年，可以一键撤销。
 - **管理后台**：单页应用，中文 / English 界面，支持深色模式和手机访问（触屏上点一下即可查看提示）；⌘K 快速搜索短链、站点和设置；新部署时概览页会给出“开始使用”清单；签名 Cookie 会话、登录设备管理（可退出其他设备）、TOTP 两步验证、登录防暴力破解，可选 Cloudflare Turnstile 人机验证；Google 和 Cloudflare 的凭据可以直接在后台填写（加密保存）。
 - **零运维**：无需服务器，表结构在首次请求时自动创建；统计读按小时 / 按天的汇总表，用量很小。“设置 → 系统状态”一页查看定时任务、Google 同步、推送渠道、目标页检查和用量凭据是否正常。
+
+## 截图
+
+**概览：访问趋势、实时访问、来源和热门短链**
+
+<img src="docs/screenshots/overview-zh.webp" alt="概览：访问趋势、实时访问、来源和热门短链" width="100%">
+
+**短链详情：跳转规则、二维码和访问分析**
+
+<img src="docs/screenshots/link-zh.webp" alt="短链详情：跳转规则、二维码和访问分析" width="100%">
+
+**跳转规则：按国家 / 地区、设备分流，A/B 测试**
+
+<img src="docs/screenshots/rules-zh.webp" alt="跳转规则：按国家 / 地区、设备分流，A/B 测试" width="100%">
+
+**站点详情：GA4、Search Console、Bing 数据和优化建议**
+
+<img src="docs/screenshots/site-zh.webp" alt="站点详情：GA4、Search Console、Bing 数据和优化建议" width="100%">
+
+<sub>演示数据，均为虚构</sub>
 
 ## 快速部署
 
@@ -511,7 +535,8 @@ test/             node --test 测试
 schema.sql        数据库表结构（首次请求时自动执行）
 migrations/       旧版本数据库的升级脚本
 wrangler.toml     Cloudflare 配置模板
-scripts/          升级脚本（npm run upgrade）：拉取新版本并保留 wrangler.toml 里的个人配置；build-assets.mjs 生成静态首页
+scripts/          升级脚本（npm run upgrade）：拉取新版本并保留 wrangler.toml 里的个人配置；build-assets.mjs 生成静态首页；demo-data.mjs 生成虚构的演示数据，screenshots.mjs 用它截 README 里的截图
+docs/screenshots/ README 截图（演示数据）
 .github/workflows/ 一键部署仓库用的“同步上游新版本”任务
 CHANGELOG.md      更新日志
 ```

@@ -2,6 +2,22 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.6.1 · 2026-10-18
+
+Admin screenshots in the README, new features on the home page, and a few UI fixes.
+
+### Improved
+
+- The README now shows admin screenshots at the top and in a "Screenshots" section (one set each in Chinese and English, taken with fictional demo data); new `scripts/demo-data.mjs` (generates the demo data) and `scripts/screenshots.mjs` (takes the screenshots with local Chrome) make it easy to retake them after UI changes
+- The home page adds "Every short link has a QR code", "Tap a short link, open the app" and "What to fix, spelled out" (site suggestions), and the site feature tags now include Bing backlinks and Open PageRank
+- The "Suggestions" card on the site page is collapsed by default, listing each suggestion's name in the header; click to see details
+
+### Fixed
+
+- In the English UI, country / region lists were separated with Chinese commas
+- In the English UI, long titles in the Sites summary cards overlapped the change badge; they're now truncated
+- In the English UI, "synced just now" was shown as "synced Just now"
+
 ## v1.6.0 · 2026-10-18
 
 New site suggestions: the data already synced is used to point out which sites have problems and what to do.

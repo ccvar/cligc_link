@@ -21,6 +21,10 @@
   <img src="https://img.shields.io/badge/database-D1-F38020.svg" alt="Cloudflare D1">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/sites-en.webp" alt="Site list: traffic, search performance, indexing and suggestions for every site" width="100%">
+</p>
+
 ---
 
 ## Features
@@ -45,6 +49,26 @@
 - **Change history & undo**: every change to a link's default URL, redirect rules, A/B weights, status and more is recorded (time, device, before and after), kept for a year, and can be undone with one click.
 - **Admin**: a single-page app with Chinese / English UI, dark mode and mobile support (tap to see tooltips on touch screens); ⌘K to search links, sites and settings; a "Get started" checklist on new deployments; signed cookie sessions, signed-in device management (sign out other devices), TOTP two-step verification, brute-force protection and optional Cloudflare Turnstile; Google and Cloudflare credentials can be entered right in the admin (stored encrypted).
 - **Zero maintenance**: no servers; tables are created on the first request; stats read hourly / daily aggregates, so usage is tiny. "Settings → System status" shows whether the scheduled job, Google sync, push channels, target checks and usage credentials are healthy.
+
+## Screenshots
+
+**Overview: visit trend, live visits, sources and top links**
+
+<img src="docs/screenshots/overview-en.webp" alt="Overview: visit trend, live visits, sources and top links" width="100%">
+
+**Link page: redirect rules, QR code and analytics**
+
+<img src="docs/screenshots/link-en.webp" alt="Link page: redirect rules, QR code and analytics" width="100%">
+
+**Redirect rules: route by country / region and device, A/B tests**
+
+<img src="docs/screenshots/rules-en.webp" alt="Redirect rules: route by country / region and device, A/B tests" width="100%">
+
+**Site page: GA4, Search Console and Bing data with suggestions**
+
+<img src="docs/screenshots/site-en.webp" alt="Site page: GA4, Search Console and Bing data with suggestions" width="100%">
+
+<sub>Demo data, all fictional</sub>
 
 ## Quick deploy
 
@@ -513,7 +537,8 @@ test/             node --test tests
 schema.sql        Database schema (applied automatically on the first request)
 migrations/       Upgrade scripts for older databases
 wrangler.toml     Cloudflare configuration template
-scripts/          Upgrade script (npm run upgrade): fetches a new release and keeps your wrangler.toml settings; build-assets.mjs builds the static home page
+scripts/          Upgrade script (npm run upgrade): fetches a new release and keeps your wrangler.toml settings; build-assets.mjs builds the static home page; demo-data.mjs generates fictional demo data and screenshots.mjs takes the README screenshots with it
+docs/screenshots/ README screenshots (demo data)
 .github/workflows/ "Sync upstream" workflow for repositories created by the deploy button
 CHANGELOG.md      Changelog
 ```

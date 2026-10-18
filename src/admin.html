@@ -1853,6 +1853,8 @@ th.sortable[aria-sort="ascending"] .sk { transform: rotate(180deg); }
 /* 标签放不下时省略，涨跌幅始终完整显示 */
 .kc-h .l { min-width: 0; }
 .kc-h .l .kl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* 标签太长时（英文界面）省略，不压到右边的涨跌上 */
+.kc-h > .gd { flex: none; }
 .kc-h > :not(.l) { flex: none; }
 .seg button:focus:not(:focus-visible) { outline: none; }
 /* 已保存的 Key：只读一行 + 铅笔 */
@@ -2117,6 +2119,8 @@ const copyBtn = (text, cls = 'btn ghost icon', label = '') =>
 // ---------------------------------------------------------------- utils
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const EN = window.LANG === 'en';
+// 国家 / 地区这类列表的分隔符：中文用顿号，英文界面用逗号
+const LIST_SEP = EN ? ', ' : '、';
 const setLang = (l) => { try { localStorage.setItem('sl:lang', JSON.stringify(l)); } catch {} location.reload(); };
 // 不经过页面显示的文字（复制到剪贴板、导出文件、对话框）手动翻译
 const T = (s) => (EN && window.T ? window.T(s) : s);
@@ -2189,7 +2193,7 @@ const cname = (c) => { try { return (regionNames && regionNames.of(c)) || c; } c
 // 规则的国家标签，最多显示 n 个，其余折叠成 +N
 function countryChips(codes, n = 6) {
   const shown = codes.slice(0, n).map((c) => `<span class="chip" title="${esc(c)}">${`${flag(c)} ${esc(cname(c))}`.trim()}</span>`).join('');
-  return shown + (codes.length > n ? `<span class="chip more" title="${esc(codes.slice(n).map(cname).join('、'))}">+${codes.length - n}</span>` : '');
+  return shown + (codes.length > n ? `<span class="chip more" title="${esc(codes.slice(n).map(cname).join(LIST_SEP))}">+${codes.length - n}</span>` : '');
 }
 // 目标页检查结果的小圆点：绿 = 能打开，红 = 打不开，灰 = 无法验证 / 还没检查
 function healthDot(h) {
@@ -2203,7 +2207,7 @@ const DEVN = { ios: 'iOS', android: 'Android', desktop: '电脑' };
 const devText = (ds) => (ds || []).map((d) => DEVN[d] || d).join(' / ');
 const ruleText = (t) => {
   if (!t) return '默认地址';
-  const cs = t.countries.length ? t.countries.slice(0, 3).map((c) => `${flag(c)} ${cname(c)}`.trim()).join('、') + (t.countries.length > 3 ? ` 等 ${t.countries.length} 个` : '') : '';
+  const cs = t.countries.length ? t.countries.slice(0, 3).map((c) => `${flag(c)} ${cname(c)}`.trim()).join(LIST_SEP) + (t.countries.length > 3 ? ` 等 ${t.countries.length} 个` : '') : '';
   const ds = devText(t.devices);
   return ds && cs ? `${ds} · ${cs}` : ds ? `${ds}（所有地区）` : cs;
 };
@@ -4877,7 +4881,7 @@ function openRuleDrawer(link, rule) {
   dr.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => {
     const skipped = GROUPS[b.dataset.g][1].filter((c) => taken.has(c));
     GROUPS[b.dataset.g][1].forEach((c) => { if (!taken.has(c)) selected.add(c); });
-    if (skipped.length) toast(`已跳过其他规则中的：${skipped.map(cname).join('、')}`);
+    if (skipped.length) toast(`已跳过其他规则中的：${skipped.map(cname).join(LIST_SEP)}`);
     renderSel(); renderList();
   }));
   ps.oninput = renderList;
@@ -4935,7 +4939,7 @@ function logEntry(e, link) {
     icon = 'route'; title = `修改跳转规则：${esc(ruleName(d.after))}`;
     const b = d.before, a = d.after, rows = [];
     if (b.url !== a.url) rows.push(logPair('地址', b.url, a.url));
-    if (b.countries && JSON.stringify(b.countries) !== JSON.stringify(a.countries)) rows.push(logPair('国家 / 地区', b.countries.map(cname).join('、') || '所有地区', a.countries.map(cname).join('、') || '所有地区'));
+    if (b.countries && JSON.stringify(b.countries) !== JSON.stringify(a.countries)) rows.push(logPair('国家 / 地区', b.countries.map(cname).join(LIST_SEP) || '所有地区', a.countries.map(cname).join(LIST_SEP) || '所有地区'));
     if (b.devices && JSON.stringify(b.devices) !== JSON.stringify(a.devices)) rows.push(logPair('设备', devText(b.devices) || '所有设备', devText(a.devices) || '所有设备'));
     if (b.note !== undefined && b.note !== a.note) rows.push(logPair('备注', b.note || '（空）', a.note || '（空）'));
     if (b.fallback !== undefined && b.fallback !== a.fallback) rows.push(logPair('打不开时回退', b.fallback ? '开' : '关', a.fallback ? '开' : '关'));
@@ -5263,11 +5267,11 @@ function queryView(sc, f) {
 }
 const tzLabelOf = (m) => `UTC${m >= 0 ? '+' : '−'}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ':' + String(Math.abs(m) % 60).padStart(2, '0') : ''}`;
 // 迷你趋势图放在说明文字下面，铺满卡片宽度、底部对齐；其他附加内容（如占比色条）放在数字下面
-const gKc = (label, v, delta, sub = '', tip = '', extra = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}>${label}</span>${delta || ''}</div><div class="kc-v"><b>${v}</b></div>${extra && !extra.startsWith('<svg') ? extra : ''}${sub ? `<div class="kc-d">${sub}</div>` : ''}${extra.startsWith('<svg') ? `<div class="kc-sb">${extra}</div>` : ''}</div>`;
+const gKc = (label, v, delta, sub = '', tip = '', extra = '') => `<div class="kc"><div class="kc-h"><span class="l"${tip ? ` data-tipf-always data-tipf="${esc(tip)}"` : ''}><span class="kl">${label}</span></span>${delta || ''}</div><div class="kc-v"><b>${v}</b></div>${extra && !extra.startsWith('<svg') ? extra : ''}${sub ? `<div class="kc-d">${sub}</div>` : ''}${extra.startsWith('<svg') ? `<div class="kc-sb">${extra}</div>` : ''}</div>`;
 // 跳转去向的文字：默认地址 / 地区规则的国家
 const routeLabel = (r) => {
   if (!r.rule) return '默认地址';
-  const cs = (r.countries || '').split(',').filter(Boolean).map((c) => country(c)).join('、');
+  const cs = (r.countries || '').split(',').filter(Boolean).map((c) => country(c)).join(LIST_SEP);
   const ds = devText((r.devices || '').split(',').filter(Boolean));
   return [ds, cs].filter(Boolean).join(' · ') || '跳转规则';
 };
