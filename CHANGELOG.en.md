@@ -2,6 +2,20 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.5.2 · 2026-10-18
+
+Switch sites right from the site page, and the site list picks up changes sooner.
+
+### Improved
+
+- **Switch sites**: the site page has a dropdown arrow after the domain; search by domain or GA4 name and pick a site to jump straight to it (arrow keys + Enter work too). Coming from the site list, sites are listed in the list's current order; when the list is filtered, they're grouped into "Current filter" and "Other sites"
+- The site list no longer shows the GA4 property name on each row; it's still in the GA4 icon's tooltip
+
+### Fixed
+
+- After "Sync now" on the Sites page the toast said the list was updated, but the list could still be up to an hour old from the cache; it now always reloads with fresh data after a sync
+- New sites, changed site connections and GA4 added dates could take up to an hour to appear in the site list; they now show immediately
+
 ## v1.5.1 · 2026-10-18
 
 Google index checks are about twice as fast, and sites show when GA4 was added (roughly when the site went live).

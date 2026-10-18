@@ -644,6 +644,11 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .qr-big { display: block; width: 220px; height: 220px; margin: 0 auto 10px; padding: 8px; border-radius: 14px; border: 1px solid var(--line); background: #fff; image-rendering: pixelated; }
 .qr-d .row { text-align: left; }
 .hero .ttl { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; color: var(--text-2); font-weight: 550; }
+/* 站点详情：域名后面的站点切换，只显示一个下拉箭头 */
+.site-sw { display: inline-flex; font-family: var(--sans); letter-spacing: 0; }
+.site-sw .combo-btn { width: 30px; min-width: 0; height: 30px; padding: 0; justify-content: center; border-color: transparent; background: none; border-radius: 8px; }
+.site-sw .combo-btn:hover { background: var(--sunken); border-color: transparent; }
+.site-sw .combo-btn > svg { width: 17px; height: 17px; color: var(--text-2); }
 .hero .short { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--mono); font-size: 22px; font-weight: 650; letter-spacing: -.01em; margin: 8px 0 10px; word-break: break-all; }
 .hero .target { display: flex; align-items: center; gap: 6px; color: var(--text-2); word-break: break-all; }
 .hero .target a { transition: color .15s; }
@@ -1578,7 +1583,6 @@ button.gtg { cursor: pointer; }
 .gico.off { filter: grayscale(1); opacity: .35; }
 .gm .gico + .gico { margin-left: 2px; }
 .gm .gtag { margin-right: 0; vertical-align: 0; }
-.gm .gnm { margin-right: 6px; min-width: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gtag.ga { color: #e8710a; background: color-mix(in srgb, #e8710a 13%, transparent); }
 .gtag.sc { color: var(--accent-ink); background: var(--accent-2); }
 .gtag.off { color: var(--muted); background: var(--sunken); }
@@ -5025,6 +5029,8 @@ function openSplitDrawer(link, parent) {
 }
 
 // ---------------------------------------------------------------- 站点（GA4 + Search Console）
+// 站点列表最近一次显示的站点（按当时的筛选和排序），详情页的站点切换按这个顺序列出
+let siteNav = null;
 const gState = { days: store.get('g:days', 28), q: '', sort: store.get('g:sort', 'sessions'), dir: store.get('g:dir', ''), acct: '', link: '', tag: '', se: store.get('g:se', 'google') };
 // 站点表格默认从小到大排的列（域名按字母、排名越小越好），其余默认从大到小
 const SORT_ASC = new Set(['host', 'pos']);
@@ -6035,7 +6041,7 @@ async function renderSites(token) {
         return `<tr data-host="${esc(x.host)}" tabindex="0">
           <td><div class="gh">${esc(x.host.startsWith('ga4-') ? x.ga4?.name || x.host : x.host)}${x.host.includes('.') ? `<a class="row-ext" href="https://${esc(x.host)}" target="_blank" rel="noopener" data-tip="打开网站" aria-label="打开网站">${ic('ext', 13)}</a>` : ''}</div>
             <div class="sm gm">${x.tags.length ? `${x.tags.slice(0, 2).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}${x.tags.length > 2 ? `<span class="gtg sm-t" data-tipf-always data-tipf="${esc(x.tags.join('、'))}">+${x.tags.length - 2}</span>` : ''}` : ''}${x.ga4
-              ? `<span class="gico" data-tipf-always data-tipf="${esc(`Google Analytics 4：${x.ga4.account} / ${x.ga4.name}（${x.ga4.property}）${many ? ` · 来自 ${x.ga4.email}` : ''}`)}">${BRAND.ga(14)}</span>${sameName(x.ga4.name, x.host) ? '' : `<span class="gnm">${esc(x.ga4.name)}</span>`}`
+              ? `<span class="gico" data-tipf-always data-tipf="${esc(`Google Analytics 4：${x.ga4.account} / ${x.ga4.name}（${x.ga4.property}）${many ? ` · 来自 ${x.ga4.email}` : ''}`)}">${BRAND.ga(14)}</span>`
               : `<span class="gico off" data-tipf-always data-tipf="未关联 Google Analytics 4">${BRAND.ga(14)}</span>`}${x.gsc
               ? `<span class="gico" data-tipf-always data-tipf="${esc(`Search Console：${x.gsc}${many ? ` · 来自 ${x.gscEmail}` : ''}`)}">${BRAND.gsc(14)}</span>`
               : `<span class="gico off" data-tipf-always data-tipf="未关联 Search Console">${BRAND.gsc(14)}</span>`}${hasBing ? (x.bing
@@ -6059,6 +6065,8 @@ async function renderSites(token) {
       : `<div class="empty" style="padding:48px">${ic('inbox')}${d.items.length ? '没有匹配的站点' : '账号下还没有找到 GA4 媒体资源或 Search Console 站点'}</div>`;
     sumStrip(rows);
     lastRows = rows;
+    const navItem = (x) => ({ host: x.host, name: x.ga4?.name || '', s: x.cur.ga?.sessions ?? null });
+    siteNav = { rows: rows.map(navItem), all: d.items.map(navItem) };
     const cnt = document.getElementById('g-cnt');
     if (cnt) cnt.textContent = rows.length === d.items.length ? `${d.items.length} 个站点` : `${rows.length} / ${d.items.length} 个站点`;
     list.querySelectorAll('tr[data-host]').forEach((tr) => {
@@ -6564,6 +6572,39 @@ function mountBingCrawl(d) {
   ], document.getElementById('lg-bcr'));
 }
 
+// ---------------------------------------------------------------- 站点详情：切换站点
+// 域名后面的下拉箭头：可搜索域名或 GA4 名称。从站点列表进来时按列表当时的筛选和排序（有筛选时其余站点列在后面）；
+// 直接打开详情页时读站点清单（只有域名和名称，按域名排序）
+async function mountSiteSwitch(host) {
+  const root = document.getElementById('site-sw');
+  if (!root) return;
+  let nav = siteNav;
+  if (!nav) {
+    try { nav = { rows: (await api('/google/hosts')).items.map((x) => ({ host: x.host, name: x.name || '', s: null })), all: null }; }
+    catch { root.remove(); return; }
+    if (!root.isConnected) return;
+  }
+  const by = new Map([...(nav.all || []), ...nav.rows].map((x) => [x.host, x]));
+  const listed = nav.rows.map((x) => x.host), inList = new Set(listed);
+  const rest = (nav.all || []).filter((x) => !inList.has(x.host)).sort((a, b) => (b.s || 0) - (a.s || 0) || a.host.localeCompare(b.host)).map((x) => x.host);
+  if (listed.length + rest.length < 2) { root.remove(); return; }
+  const label = (x) => (x.host.startsWith('ga4-') ? x.name || x.host : x.host);
+  dropdown(root, {
+    value: host, aria: '切换站点', search: '搜索域名或 GA4 名称', empty: '没有匹配的站点', minWidth: 300, maxWidth: 380,
+    groups: (q) => {
+      if (q) return [['', [...listed, ...rest].filter((h) => h.includes(q) || by.get(h).name.toLowerCase().includes(q))]];
+      return rest.length ? [['当前筛选', listed], ['其他站点', rest]] : [['', listed]];
+    },
+    button: () => '',
+    option: (h, q) => {
+      const x = by.get(h);
+      return `<span class="ot"><span class="mono">${hl(label(x), q)}</span>${x.name && !h.startsWith('ga4-') && !sameName(x.name, h) ? `<small>${hl(x.name, q)}</small>` : ''}</span>${x.s != null ? `<span class="hint">${num(x.s)} 次会话</span>` : ''}`;
+    },
+    onChange: (h) => { location.hash = '#/site/' + encodeURIComponent(h); },
+  });
+  root.querySelector('.combo-btn').dataset.tip = '切换站点';
+}
+
 // ---------------------------------------------------------------- 站点详情：外链与权重（设置里开启后才显示）
 function blCardHtml(d) {
   // 没有域名的站点（只有 GA4 媒体资源，如 ga4-123）查不了 Open PageRank
@@ -6696,7 +6737,7 @@ async function renderSite(token, host) {
     <div class="stack">
       <section class="card hero rv"><div class="info">
         <div class="ttl"><span class="ttl-t">${esc(d.ga4?.name && !sameName(d.ga4.name, title) ? d.ga4.name : '')}</span>${d.realtime != null ? `<span class="live">实时 ${num(d.realtime)} 人在线</span>` : ''}</div>
-        <div class="short">${esc(title)}${host.includes('.') ? `<a class="btn sm ghost icon" href="https://${esc(host)}" target="_blank" rel="noopener" data-tip="打开网站" aria-label="打开网站">${ic('ext', 15)}</a>` : ''}</div>
+        <div class="short">${esc(title)}<span class="combo site-sw" id="site-sw"></span>${host.includes('.') ? `<a class="btn sm ghost icon" href="https://${esc(host)}" target="_blank" rel="noopener" data-tip="打开网站" aria-label="打开网站">${ic('ext', 15)}</a>` : ''}</div>
         <div class="meta g-src">
           <span class="gico${d.ga4 ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.ga4 ? `Google Analytics 4：${d.ga4.account} / ${d.ga4.name}（${d.ga4.property}）${d.ga4.email ? ` · ${d.ga4.email}` : ''}` : '未关联 Google Analytics 4')}">${BRAND.ga(15)}</span>
           <span class="gico${d.gsc ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.gsc ? `Search Console：${d.gsc}${d.gscEmail ? ` · ${d.gscEmail}` : ''}` : '未关联 Search Console')}">${BRAND.gsc(15)}</span>
@@ -6753,6 +6794,7 @@ async function renderSite(token, host) {
   reveal(page);
   if (d.gsc || d.bingSite) mountSiteIndex(host);
   bindBlCard(host);
+  mountSiteSwitch(host);
   const bsc = document.getElementById('b-sc');
   if (bsc) bsc.addEventListener('click', (e) => {
     const b = e.target.closest('[data-bqf]');
