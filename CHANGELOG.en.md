@@ -2,6 +2,15 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.7.1 · 2026-10-18
+
+A more compact admin on phones.
+
+### Improved
+
+- On phones (narrower than 640px), the page margins, gaps between cards and card padding are smaller, so more fits on one screen; desktop is unchanged
+- On phones, the Google account and Bing API Key rows in Settings put their buttons on a second line, so the text is no longer squeezed onto several lines
+
 ## v1.7.0 · 2026-10-18
 
 Sitemaps are resubmitted automatically when they change, and updated pages are sent to Bing again.
