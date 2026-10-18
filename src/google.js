@@ -10,6 +10,7 @@
 import { sourceUv, hllNew, hllMerge, hllCount } from './agg.js';
 import { bingRaw, bingSummary, BL_RESET } from './bing.js';
 import { spend } from './budget.js';
+import { contentOf } from './content.js';
 
 const SCOPES = [
   'openid', 'email',
@@ -699,7 +700,8 @@ function blFields(s, detail = false) {
 
 async function sitesListRaw(env, days, ver, fresh = false) {
   const [sites, daily] = await Promise.all([
-    env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email, m.n_urls, m.n_yes, m.n_done, m.nb_yes, m.nb_done FROM g_sites s
+    env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email, m.n_urls, m.n_yes, m.n_done, m.nb_yes, m.nb_done,
+      m.c_mod, m.c_trust, m.c_seen, m.c_since, m.c_new30, m.c_upd30 FROM g_sites s
       LEFT JOIN g_accounts a ON a.id = s.ga4_acct LEFT JOIN g_accounts b ON b.id = s.gsc_acct LEFT JOIN g_sitemaps m ON m.host = s.host ORDER BY s.host`).all().then((r) => r.results),
     sitesDaily(env, days, ver, fresh),
   ]);
@@ -719,6 +721,7 @@ async function sitesListRaw(env, days, ver, fresh = false) {
       tags: tagsOf.get(s.host) || [],
       // 网页索引：网址数、已编入、已检查出结果的数量（还没刷新过站点地图时为 null）
       index: (s.gsc_site || s.bing_site) && s.n_urls != null ? { urls: s.n_urls, yes: s.n_yes, done: s.n_done, byes: s.nb_yes, bdone: s.nb_done } : null,
+      content: (s.gsc_site || s.bing_site) ? contentOf(s) : null,   // 内容更新时间（按站点地图推测）
       bing: s.bing_site || null, bingInIndex: s.bing_site ? s.b_in_index || 0 : null, bingError: s.b_error || '', bingSyncedAt: s.b_synced_at || null,
       links: sl.get(s.host) || [],          // 跳转到这个站点的短链
       linksFrom: sf.get(s.host) || [],      // 从这个站点点出的短链
@@ -937,8 +940,8 @@ async function cached(env, key, ttl, fn) {
 
 // 站点详情：每日趋势读 g_daily；区间汇总、排行、实时在线现查并缓存
 export async function siteDetail(env, secret, host, days) {
-  const s = await env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email FROM g_sites s
-    LEFT JOIN g_accounts a ON a.id = s.ga4_acct LEFT JOIN g_accounts b ON b.id = s.gsc_acct WHERE s.host = ?`).bind(host).first();
+  const s = await env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email, m.c_mod, m.c_trust, m.c_seen, m.c_since, m.c_new30, m.c_upd30 FROM g_sites s
+    LEFT JOIN g_accounts a ON a.id = s.ga4_acct LEFT JOIN g_accounts b ON b.id = s.gsc_acct LEFT JOIN g_sitemaps m ON m.host = s.host WHERE s.host = ?`).bind(host).first();
   if (!s) return { error: '站点不存在' };
   const { from, to, pfrom, pto } = ranges(days);
   const rows = (await env.DB.prepare('SELECT * FROM g_daily WHERE host = ? AND date >= ? AND date <= ? ORDER BY date').bind(host, pfrom, to).all()).results;
@@ -946,6 +949,7 @@ export async function siteDetail(env, secret, host, days) {
     host, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '', created: s.ga4_created || null } : null,
     gsc: s.gsc_site || null, gscAcct: s.gsc_acct || '', gscEmail: s.gsc_email || '',
     bingSite: s.bing_site || null, bingInIndex: s.bing_site ? s.b_in_index || 0 : null, bingSyncedAt: s.b_synced_at || null, bingError: s.b_error || '',
+    content: (s.gsc_site || s.bing_site) ? contentOf(s) : null,
     syncedAt: s.synced_at || null, error: s.error || '', days,
     daily: rows.filter((r) => r.date >= from), prevDaily: hasPrev(days) ? rows.filter((r) => r.date < from) : [],
     cur: sumRange(rows, from, to), prev: hasPrev(days) ? sumRange(rows, pfrom, pto) : { ga: null, gsc: null }, errors: [],
@@ -1092,9 +1096,13 @@ export async function aiReport(env, secret, hosts, days, sections, hide) {
       } catch (e) { site.errors.push(`Bing：${e.message}`); }
     }
     // 收录：网址逐个检查的结果（Google 网址检查 / Bing GetUrlInfo）
-    const ix = await env.DB.prepare('SELECT n_urls, n_yes, n_done, nb_yes, nb_done FROM g_sitemaps WHERE host = ?').bind(host).first();
+    const ix = await env.DB.prepare('SELECT n_urls, n_yes, n_done, nb_yes, nb_done, c_mod, c_trust, c_seen, c_since, c_new30, c_upd30 FROM g_sitemaps WHERE host = ?').bind(host).first();
     site.index = ix?.n_urls ? { urls: ix.n_urls, googleIndexed: s.gsc_site ? ix.n_yes : null, googleChecked: s.gsc_site ? ix.n_done : null,
       bingIndexed: s.bing_site ? ix.nb_yes : null, bingChecked: s.bing_site ? ix.nb_done : null } : null;
+    // 内容最后更新时间（按站点地图推测）
+    const ct = contentOf(ix);
+    if (ct?.at) site.contentUpdate = { date: ymd(ct.at), basis: { mod: '站点地图里网页的最后更新时间（lastmod）', seen: '每天读取站点地图时发现的变化（新网址或网页更新）', build: '站点地图日期（大部分网页同一天，多半是构建时间，不一定是内容更新）' }[ct.src],
+      newPages30d: ct.new30, updatedPages30d: ct.upd30 };
     if (want('traffic') && s.ga4_property && !compact) {
       try { site.traffic = await trafficSection(env, secret, s, days, from, to, pfrom, pto, lim); } catch (e) { site.errors.push(`GA4：${e.message}`); }
     }
@@ -1303,6 +1311,10 @@ export function reportMarkdown(r) {
         ...(i.googleIndexed != null ? [['Google', n(i.googleIndexed), n(i.googleChecked), i.googleChecked ? pc(i.googleIndexed / i.googleChecked) : '—']] : []),
         ...(i.bingIndexed != null ? [['Bing', n(i.bingIndexed), n(i.bingChecked), i.bingChecked ? pc(i.bingIndexed / i.bingChecked) : '—']] : []),
       ]));
+    }
+    if (s.contentUpdate) {
+      const c = s.contentUpdate;
+      L.push(`**内容最后更新**：${c.date}（依据：${c.basis}）；近 30 天新出现 ${n(c.newPages30d)} 个网址${c.updatedPages30d != null ? `，${n(c.updatedPages30d)} 个网页有更新` : ''}`, '');
     }
     if (s.trend.length) {
       L.push(`### 趋势（${r.days <= 28 && r.sites.length <= 5 ? '按天' : '按周，日期为周一'}）`, '');

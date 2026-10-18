@@ -11,6 +11,7 @@
 import { gfetch, canSubmit, smAutoGoogle } from './google.js';
 import * as bing from './bing.js';
 import { spend } from './budget.js';
+import { modTrusted } from './content.js';
 
 const DAY = 86400000, HOUR = 3600000;
 // 定时任务每次：刷新 SITEMAP_PER_RUN 个站点的站点地图（约 100 秒），再同时做 Google 网址检查（G_BUDGET 内最多 RUN_LIMIT 个）和 Bing 收录检查（B_BUDGET）。
@@ -170,7 +171,9 @@ const urlTail = (u) => { try { return new URL(u).pathname; } catch { return u; }
 // 刷新一个站点的站点地图列表和网址清单（只写有变化的行）；auto = true（只有定时任务这样调用）且 Bing 开着自动提交时顺便提交
 export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
   const now = Date.now(), errs = [];
-  const old = await env.DB.prepare('SELECT list, b_feeds, g_on, b_on, urls FROM g_sitemaps WHERE host = ?').bind(s.host).first();
+  const old = await env.DB.prepare('SELECT list, b_feeds, g_on, b_on, urls, at FROM g_sitemaps WHERE host = ?').bind(s.host).first();
+  // 以前读过这个站点的站点地图：这次多出来的网址才算“新出现”（第一次读到的全部网址不算）
+  const known = !!old?.at;
   // 先记下这次刷新的时间：万一读到一半出事（比如超大的站点地图），这个站点今天不会被反复重试
   await env.DB.prepare('INSERT INTO g_sitemaps (host, at) VALUES (?, ?) ON CONFLICT(host) DO UPDATE SET at = excluded.at').bind(s.host, now).run();
   let list = [], bfeeds = null, berr = '', unsure = false;
@@ -220,7 +223,7 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
     if (want.size >= MAX_URLS) break;
     if (!want.has(u)) want.set(u, (inSm.has(u) ? 1 : 0) | (inSc.has(u) ? 2 : 0));
   }
-  const have = new Map((await env.DB.prepare('SELECT url, src, state, verdict, due_at, lastmod FROM g_urls WHERE host = ?').bind(s.host).all()).results.map((r) => [r.url, r]));
+  const have = new Map((await env.DB.prepare('SELECT url, src, state, verdict, due_at, lastmod, first_at FROM g_urls WHERE host = ?').bind(s.host).all()).results.map((r) => [r.url, r]));
   const stmts = [];
   // 拿不到网址、又有出错或说不准的时候不删旧数据（免得一次接口抖动就丢掉收录状态和提交记录）
   const reliable = want.size > 0 || (!errs.length && !unsure);
@@ -235,8 +238,8 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
     const r = have.get(u), hit = gOn && seen.has(u);
     if (!r) {
       stmts.push(hit
-        ? env.DB.prepare("INSERT INTO g_urls (host, url, src, state, verdict, checked_at, due_at, b_due_at, lastmod) VALUES (?, ?, ?, ?, 'PASS', ?, ?, ?, ?)").bind(s.host, u, src, SEEN_STATE, now, later(), bDue, sm.mods.get(u) || 0)
-        : env.DB.prepare('INSERT INTO g_urls (host, url, src, due_at, b_due_at, lastmod) VALUES (?, ?, ?, ?, ?, ?)').bind(s.host, u, src, gDue, bDue, sm.mods.get(u) || 0));
+        ? env.DB.prepare("INSERT INTO g_urls (host, url, src, state, verdict, checked_at, due_at, b_due_at, lastmod, first_at) VALUES (?, ?, ?, ?, 'PASS', ?, ?, ?, ?, ?)").bind(s.host, u, src, SEEN_STATE, now, later(), bDue, sm.mods.get(u) || 0, known ? now : 0)
+        : env.DB.prepare('INSERT INTO g_urls (host, url, src, due_at, b_due_at, lastmod, first_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(s.host, u, src, gDue, bDue, sm.mods.get(u) || 0, known ? now : 0));
       changed++;
       continue;
     }
@@ -276,6 +279,15 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
   // 站点地图里出现了新网址（以前没有记录，或以前只是搜索结果里的页面；网址太多存不下时看总数有没有变多），或者有网页的更新时间变新了：
   // 定时任务把已提交的站点地图重新提交一遍，让 Google / Bing 早点重新读取。第一次读取、读取出错时不算
   const smNew = [...want].filter(([u, src]) => src & 1 && !(have.get(u)?.src & 1)).length;
+  // 内容更新时间（显示在站点页、站点列表，也用于“内容很久没更新”的建议）。站点地图读取出错或说不准时保留上次的值
+  if (!sm.errors.length && !unsure) {
+    const mv = [...sm.mods.values()], ago30 = now - 30 * DAY, trust = modTrusted(mv, ymd);
+    const changed = known && (smNew > 0 || sm.urls.length > old.urls || (updated > 0 && lmTrusted));
+    const new30 = [...want].filter(([u, src]) => src & 1 && (have.has(u) ? have.get(u).first_at > ago30 : known)).length;
+    stmts.push(env.DB.prepare(`UPDATE g_sitemaps SET c_mod = ?, c_trust = ?, c_seen = CASE WHEN ? THEN ? ELSE c_seen END,
+      c_since = CASE WHEN c_since = 0 THEN ? ELSE c_since END, c_new30 = ?, c_upd30 = ? WHERE host = ?`)
+      .bind(mv.length ? Math.max(...mv) : 0, trust ? 1 : 0, changed ? 1 : 0, now, now, new30, mv.length && trust ? mv.filter((t) => t > ago30).length : -1, s.host));
+  }
   const smOn = auto && old && (have.size || old.urls > 0) && !sm.errors.length && (smNew || updated || sm.urls.length > old.urls)
     ? { g: hasG(s) && await smAutoGoogle(env), b: !!s.bing_site && await bing.smAutoBing(env) } : null;
   if (smOn && (smOn.g || smOn.b)) {

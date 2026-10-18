@@ -199,6 +199,7 @@ CREATE TABLE IF NOT EXISTS g_urls (
   b_error     TEXT NOT NULL DEFAULT '',
   lastmod     INTEGER NOT NULL DEFAULT 0,   -- 站点地图里写的最后更新时间
   upd_at      INTEGER NOT NULL DEFAULT 0,   -- 发现最后更新时间变新的时间；比 b_submitted_at 新时要重新提交给 Bing
+  first_at    INTEGER NOT NULL DEFAULT 0,   -- 第一次在站点地图里看到的时间（站点第一次读取时的网址记 0）
   PRIMARY KEY (host, url)
 );
 CREATE INDEX IF NOT EXISTS g_urls_due ON g_urls (due_at);
@@ -226,7 +227,14 @@ CREATE TABLE IF NOT EXISTS g_sitemaps (
   g_on     INTEGER NOT NULL DEFAULT -1,     -- 上次刷新时是否关联了 GSC / Bing（变了才调整网址的检查排期）
   b_on     INTEGER NOT NULL DEFAULT -1,
   sc_pages INTEGER NOT NULL DEFAULT -1,     -- 近 3 个月在 Google 搜索结果里有展示的网页数（-1 = 还没取到）
-  sc_at    INTEGER NOT NULL DEFAULT 0       -- 上次取这个数的时间
+  sc_at    INTEGER NOT NULL DEFAULT 0,      -- 上次取这个数的时间
+  -- 内容更新时间（每天刷新站点地图时算，见 src/content.js）
+  c_mod    INTEGER NOT NULL DEFAULT 0,      -- 站点地图里最新的 lastmod
+  c_trust  INTEGER NOT NULL DEFAULT 1,      -- 0 = 大部分网页的 lastmod 是同一天（多半是构建时统一改的）
+  c_seen   INTEGER NOT NULL DEFAULT 0,      -- 最近一次发现新网址或网页更新的时间
+  c_since  INTEGER NOT NULL DEFAULT 0,      -- 开始观察的时间
+  c_new30  INTEGER NOT NULL DEFAULT 0,      -- 近 30 天新出现的网址数
+  c_upd30  INTEGER NOT NULL DEFAULT -1      -- 近 30 天 lastmod 有更新的网址数（lastmod 不可信或没写时为 -1）
 );
 CREATE TABLE IF NOT EXISTS g_cache (
   k   TEXT PRIMARY KEY,

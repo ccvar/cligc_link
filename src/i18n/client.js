@@ -11,7 +11,7 @@ export function installI18n(dict) {
     const nk = k.replace(/\s+/g, ' ').trim();
     if (!k.includes('{}')) { exact.set(k, v); if (nk !== k) exact.set(nk, v); continue; }
     const parts = nk.split('{}');
-    pats.push({ re: new RegExp('^' + parts.map(esc).join('([\\s\\S]+?)') + '$'), v, w: parts.join('').length });
+    pats.push({ re: new RegExp('^' + parts.map(esc).join('([\\s\\S]+?)') + '$'), v, w: parts.join('').length, ml: k.includes('\n') });
   }
   pats.sort((a, b) => b.w - a.w);
   // 占位符：{} 按顺序，{0}{1} 按位置
@@ -31,6 +31,19 @@ export function installI18n(dict) {
     const lead = text.match(/^\s*/)[0], tail = text.match(/\s*$/)[0];
     const s = text.replace(/\s+/g, ' ').trim();
     let out = exact.get(text.trim()) ?? exact.get(s);
+    // 多行文字（浮动提示常见）：整段对不上时先逐行翻译（不然“xx {}”这种模式会把后面几行都吞进去），保留换行
+    if (out === undefined && text.trim().includes('\n')) {
+      // 本身就是多行的模板词条先整段匹配
+      for (const p of pats) {
+        if (!p.ml) continue;
+        const m = s.match(p.re);
+        if (m) { out = fill(p.v, m.slice(1)); break; }
+      }
+    }
+    if (out === undefined && text.trim().includes('\n')) {
+      const lines = text.trim().split('\n'), done = lines.map((l) => tr(l));
+      if (done.some((x, i) => x !== lines[i])) out = done.join('\n');
+    }
     if (out === undefined) {
       for (const p of pats) {
         const m = s.match(p.re);

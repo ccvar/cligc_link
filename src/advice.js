@@ -5,9 +5,10 @@
 // 站点详情页另外用现查的搜索词 / 页面数据算“高曝光低点击的页面”“差一点上首页的词”（规则名 page_ctr / near_top，也能忽略）。
 
 import { isIndexed, hasProblem } from './gindex.js';
+import { contentOf, C_COLS } from './content.js';
 
 const DAY = 86400000;
-export const RULES = ['ga_stopped', 'traffic_drop', 'site_ctr', 'low_index', 'url_problems', 'sitemap_error', 'bing_low', 'no_conversion', 'page_ctr', 'near_top'];
+export const RULES = ['ga_stopped', 'traffic_drop', 'site_ctr', 'low_index', 'url_problems', 'sitemap_error', 'bing_low', 'no_conversion', 'stale_content', 'page_ctr', 'near_top'];
 const ymd = (t) => new Date(t).toISOString().slice(0, 10);
 // 各排名的大致点击率（和后台页面、AI 报告用的一致）
 const G_CTR = [0, 0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018];
@@ -69,6 +70,19 @@ export function siteRules(s, rows, m, idx) {
     if (g == null || g >= 0.5) out.push({ rule: 'bing_low', level: 'low', impact: m.nb_done - m.nb_yes, n: { yes: m.nb_yes, done: m.nb_done, g } });
   }
 
+  // 内容很久没更新：按站点地图推测，90 天以上没有新网址、也没有网页更新，同时搜索点击在下滑（最近两周比之前两周少 15% 以上）。
+  // 推测不出更新时间时，看开始观察以来是不是一直没变化（观察满 90 天才算）
+  const ct = contentOf(m);
+  if (ct && (s.gsc_site || s.bing_site)) {
+    const last = ct.at || ct.since, days = Math.floor((Date.now() - last) / DAY);
+    const clk = (r) => (Number(r.clicks) || 0) + (Number(r.b_clicks) || 0);
+    const cur = sum(span(3, 16), clk), prev = sum(span(17, 30), clk);
+    if (days >= 90 && prev >= 30 && cur <= prev * 0.85) {
+      out.push({ rule: 'stale_content', level: cur <= prev * 0.7 ? 'mid' : 'low', impact: prev - cur,
+        n: { days, at: ct.at, src: ct.src, cur, prev, pct: Math.round((1 - cur / prev) * 100) } });
+    }
+  }
+
   // 有流量没转化：近 28 天会话不少，但一次关键事件都没有（多半是 GA4 里没设置转化）
   if (s.ga4_property) {
     const sp = span(2, 29), ses = sum(sp, (r) => r.sessions), ev = sum(sp, (r) => r.key_events);
@@ -95,7 +109,7 @@ export async function advice(env, host = '') {
     env.DB.prepare(`SELECT host, ga4_property, gsc_site, bing_site, error, synced_at FROM g_sites${w}`).bind(...b).all().then((r) => r.results),
     env.DB.prepare(`SELECT host, date, sessions, key_events, clicks, impressions, position, b_clicks FROM g_daily WHERE date >= ?${host ? ' AND host = ?' : ''}`)
       .bind(ymd(Date.now() - 40 * DAY), ...b).all().then((r) => r.results),
-    env.DB.prepare(`SELECT host, list, error, at, n_urls, n_yes, n_done, nb_yes, nb_done FROM g_sitemaps${w}`).bind(...b).all().then((r) => r.results),
+    env.DB.prepare(`SELECT host, list, error, at, n_urls, n_yes, n_done, nb_yes, nb_done, ${C_COLS} FROM g_sitemaps${w}`).bind(...b).all().then((r) => r.results),
     // 网址检查结果按状态汇总（同一组合只读一行，不把每个网址传回来）
     env.DB.prepare(`SELECT host, state, verdict, fetch, robots, indexing, COUNT(*) AS n FROM g_urls WHERE state != ''${host ? ' AND host = ?' : ''}
       GROUP BY host, state, verdict, fetch, robots, indexing`).bind(...b).all().then((r) => r.results),

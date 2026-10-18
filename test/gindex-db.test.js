@@ -116,3 +116,42 @@ test('网页的 lastmod 变新：提交给 Bing、重新提交站点地图；一
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM g_urls WHERE upd_at > b_submitted_at').get().n, 0, '不逐个提交给 Bing');
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('内容更新时间：第一次读取只记下 lastmod；之后有新网址记下发现时间和近 30 天新增数', { skip }, async () => {
+  const { db, env } = fakeEnv();
+  setting(db, 'bing_auto', 0);
+  setting(db, 'sm_auto_b', 0);
+  const SM = 'https://a.com/sitemap.xml';
+  const old = new Date(Date.now() - 200 * 86400000).toISOString().slice(0, 10);
+  let pages = Array.from({ length: 12 }, (_, i) => [`https://a.com/p${i}`, new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10)]);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('/GetFeeds')) return new Response(JSON.stringify({ d: [{ Url: SM }] }));
+    if (u === SM) return new Response(`<urlset>${pages.map(([p, m]) => `<url><loc>${p}</loc>${m ? `<lastmod>${m}</lastmod>` : ''}</url>`).join('')}</urlset>`);
+    return new Response('', { status: 404 });
+  };
+  const s = { host: 'a.com', bing_site: 'https://a.com/', gsc_site: '', gsc_acct: '' };
+  const c = () => db.prepare('SELECT c_mod, c_trust, c_seen, c_since, c_new30, c_upd30 FROM g_sitemaps WHERE host = ?').get('a.com');
+  try {
+    await refreshSite(env, 'x', s, 'KEY', { auto: true });
+    let r = c();
+    assert.equal(r.c_mod, Date.UTC(2026, 0, 12));
+    assert.equal(r.c_trust, 1);
+    assert.equal(r.c_seen, 0, '第一次读取不算变化');
+    assert.equal(r.c_new30, 0, '第一次读到的网址不算新增');
+    assert.ok(r.c_since > 0);
+    const since = r.c_since;
+    pages = [...pages, ['https://a.com/new', '']];
+    await refreshSite(env, 'x', s, 'KEY', { auto: true });
+    r = c();
+    assert.ok(r.c_seen > 0, '发现新网址');
+    assert.equal(r.c_new30, 1);
+    assert.equal(r.c_since, since, '开始观察的时间不变');
+    // 每次构建全部改成同一天：不可信
+    pages = pages.map(([p]) => [p, old]);
+    await refreshSite(env, 'x', s, 'KEY', { auto: true });
+    assert.equal(c().c_trust, 0);
+    assert.equal(c().c_upd30, -1);
+  } finally { globalThis.fetch = realFetch; }
+});

@@ -41,3 +41,19 @@ test('parseSitemap 读取 lastmod（没写、写错、未来时间都不算）',
   assert.deepEqual(a.locs, ['https://a.com/', 'https://a.com/x', 'https://a.com/y', 'https://a.com/z', 'https://a.com/f']);
   assert.deepEqual([...a.mods], [['https://a.com/', Date.UTC(2026, 4, 1)], ['https://a.com/x', Date.UTC(2026, 4, 2, 2)]]);
 });
+
+test('contentOf：lastmod 可信时用它，不可信时用观察到的变化，再不行给出站点地图日期', async () => {
+  const { contentOf, modTrusted } = await import('../src/content.js');
+  const ymd = (t) => new Date(t).toISOString().slice(0, 10);
+  assert.equal(contentOf(null), null);
+  assert.equal(contentOf({ c_since: 0 }), null, '还没开始观察');
+  assert.deepEqual(contentOf({ c_since: 1, c_mod: 100, c_trust: 1, c_seen: 50, c_new30: 2, c_upd30: 3 }), { at: 100, src: 'mod', new30: 2, upd30: 3, since: 1 });
+  assert.equal(contentOf({ c_since: 1, c_mod: 100, c_trust: 1, c_seen: 200 }).src, 'seen', '有没写 lastmod 的新网址');
+  assert.deepEqual(contentOf({ c_since: 1, c_mod: 100, c_trust: 0, c_seen: 50, c_upd30: -1 }), { at: 50, src: 'seen', new30: 0, upd30: null, since: 1 });
+  assert.equal(contentOf({ c_since: 1, c_mod: 100, c_trust: 0, c_seen: 0 }).src, 'build');
+  assert.equal(contentOf({ c_since: 1, c_mod: 0, c_seen: 0 }).at, null);
+  const D = (d) => Date.UTC(2026, 4, d);
+  assert.equal(modTrusted([D(1), D(1), D(2)], ymd), true, '太少不判断');
+  assert.equal(modTrusted(Array.from({ length: 20 }, (_, i) => D(1 + (i % 10))), ymd), true);
+  assert.equal(modTrusted([...Array(12).fill(D(9)), ...Array.from({ length: 8 }, (_, i) => D(1 + i))], ymd), false, '一大半是同一天');
+});

@@ -65,3 +65,19 @@ test('有流量没转化：近 28 天会话够多、关键事件为 0', () => {
   assert.equal(siteRules(s, rows.map((r, i) => ({ ...r, key_events: i ? 0 : 1 })), null, null).some((x) => x.rule === 'no_conversion'), false);
   assert.equal(siteRules(s, rows.slice(0, 10), null, null).some((x) => x.rule === 'no_conversion'), false, '会话不到 300');
 });
+
+test('内容很久没更新：90 天以上没变化、搜索点击两周比两周少 15% 以上才提醒', () => {
+  const s = { gsc_site: 'sc-domain:a.com' };
+  const mk = (cur, prev) => [...Array.from({ length: 14 }, (_, i) => day(3 + i, { clicks: cur / 14 })), ...Array.from({ length: 14 }, (_, i) => day(17 + i, { clicks: prev / 14 }))];
+  const m = (mod, extra = {}) => ({ c_mod: mod, c_trust: 1, c_seen: 0, c_since: Date.now() - 10 * DAY, c_new30: 0, c_upd30: 0, ...extra });
+  const a = siteRules(s, mk(70, 100), m(Date.now() - 120 * DAY), null).find((x) => x.rule === 'stale_content');
+  assert.equal(a.n.days, 120);
+  assert.equal(a.level, 'low');
+  assert.equal(siteRules(s, mk(50, 100), m(Date.now() - 120 * DAY), null).find((x) => x.rule === 'stale_content').level, 'mid', '少一半');
+  assert.equal(siteRules(s, mk(70, 100), m(Date.now() - 30 * DAY), null).some((x) => x.rule === 'stale_content'), false, '最近更新过');
+  assert.equal(siteRules(s, mk(95, 100), m(Date.now() - 120 * DAY), null).some((x) => x.rule === 'stale_content'), false, '点击没怎么掉');
+  assert.equal(siteRules(s, mk(70, 100), m(Date.now() - 120 * DAY, { c_seen: Date.now() - 5 * DAY }), null).some((x) => x.rule === 'stale_content'), false, '观察到新网址');
+  // 推测不出更新时间：开始观察满 90 天才算
+  assert.equal(siteRules(s, mk(70, 100), m(0), null).some((x) => x.rule === 'stale_content'), false, '才观察 10 天');
+  assert.equal(siteRules(s, mk(70, 100), m(0, { c_since: Date.now() - 100 * DAY }), null).find((x) => x.rule === 'stale_content').n.at, null);
+});
