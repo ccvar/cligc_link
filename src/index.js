@@ -214,14 +214,16 @@ const releaseCronLock = (env, token) => env.DB.prepare("DELETE FROM settings WHE
 
 // 整点任务：手动运行还没结束时，最多等 3 分钟再跑
 async function runScheduled(env, at) {
+  // 15 分钟的运行上限从这里算起（下面等锁最多 3 分钟也算在内）
+  const startedAt = Date.now();
   const token = `cron:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
   for (let i = 0; i < 18 && !(await acquireCronLock(env, token).catch(() => true)); i++) await new Promise((r) => setTimeout(r, 10000));
-  return runCron(env, at, { token });
+  return runCron(env, at, { token, startedAt });
 }
 
 // manual：后台“立即运行一次”——在请求里同步跑，所以每步都少做一些（总共一分钟左右），不发推送、不自动提交 Bing，
 // 结果另存在 settings.cron_manual（不影响“定时任务是否正常”的判断）
-async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}) {
+async function runCron(env, at = Date.now(), { manual = false, token = '', startedAt = 0 } = {}) {
   const t0 = Date.now(), steps = {};
   // 外部请求预算：Workers 每次调用最多约 1000 个子请求，留点余量
   subreq.left = 900;
@@ -253,18 +255,20 @@ async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}
   await step('bing', async () => bing.syncBatch(env, await sessionSecret(env), manual ? { limit: 5, deadline: Date.now() + 15000 } : {}));
   // 外链与权重（设置里开启后才查）：Bing 外链每次最多 10 个站点，Open PageRank 最多 200 个域名；每个站点每周一次
   await step('links', async () => backlinks.cronBatch(env, await sessionSecret(env), { manual }));
-  // 站点地图 + 网页索引检查（Google 和 Bing，每次最多约 100 秒）
-  await step('gindex', async () => {
-    const gsec = await sessionSecret(env);
-    if (!(await google.googleConfigured(env, gsec)) && !(await bing.bingCreds(env, gsec))) return { skipped: true };
-    return await gindex.cronBatch(env, gsec, manual ? { budgetMs: 15000, inspectBudget: 15000, bingBudget: 10000, autoSubmit: false } : {});
-  });
   await step('health', () => runHealthChecks(env));
   await step('update', () => checkUpdate(env, false, { notify: !manual }));
   if (!manual) {
     await step('notify', () => runNotifications(env, at));
     await step('usage', () => runUsageAlert(env));
   }
+  // 站点地图 + 网页索引检查放在最后：用剩下的时间和外部请求数（站点地图最多约 100 秒；Google 网址检查约 8 分钟，同时做 Bing 收录检查）。
+  // 放在推送之前的话，检查得多会用光外部请求数，周报里的搜索数据就查不了
+  await step('gindex', async () => {
+    const gsec = await sessionSecret(env);
+    if (!(await google.googleConfigured(env, gsec)) && !(await bing.bingCreds(env, gsec))) return { skipped: true };
+    // 定时任务最多运行 15 分钟（从触发时算，包括等锁的时间）：网址检查最晚在 12 分钟时停下，留时间把结果写进数据库
+    return await gindex.cronBatch(env, gsec, manual ? { budgetMs: 15000, inspectBudget: 15000, bingBudget: 10000, autoSubmit: false } : { until: (startedAt || t0) + 12 * 60000 });
+  });
   subreq.left = Infinity;
   const result = { at: t0, ms: Date.now() - t0, steps, ...(manual ? { manual: true } : {}) };
   await setSetting(env, manual ? 'cron_manual' : 'cron_status', JSON.stringify(result)).catch(() => {});
@@ -277,7 +281,7 @@ async function runCron(env, at = Date.now(), { manual = false, token = '' } = {}
 // 每个 Worker 实例只执行一次；表已存在时 CREATE ... IF NOT EXISTS 不会有影响
 // 数据库版本：表结构（schema.sql 的内容）或下面 migrate() 里的补列有变化时才真正执行，平时每个实例只读一行设置。
 // 改了 migrate() 里的补列逻辑时把 MIGRATE_REV 加一
-const MIGRATE_REV = 5;
+const MIGRATE_REV = 6;
 const hashStr = (t) => { let h = 2166136261; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619); return (h >>> 0).toString(36); };
 const SCHEMA_VER = `${hashStr(SCHEMA_SQL)}-${MIGRATE_REV}`;
 let schemaReady = null;
@@ -327,6 +331,11 @@ async function migrate(env) {
     if (!gcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sites ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`).run();
   }
   if (!gcols.includes('ch_at')) await env.DB.prepare('ALTER TABLE g_sites ADD COLUMN ch_at INTEGER NOT NULL DEFAULT 0').run();
+  if (!gcols.includes('ga4_created')) {
+    await env.DB.prepare('ALTER TABLE g_sites ADD COLUMN ga4_created INTEGER NOT NULL DEFAULT 0').run();
+    // 新加的 GA4 接入时间要重新发现一次站点才有：下次定时任务就重新发现，不用等一天
+    await env.DB.prepare('UPDATE g_accounts SET found_at = 0').run();
+  }
   for (const [c, def] of [['bing_site', "TEXT NOT NULL DEFAULT ''"], ['b_synced_at', 'INTEGER NOT NULL DEFAULT 0'], ['b_error', "TEXT NOT NULL DEFAULT ''"], ['b_in_index', 'INTEGER NOT NULL DEFAULT 0'],
     ['bl_total', 'INTEGER NOT NULL DEFAULT -1'], ['bl_pages', 'INTEGER NOT NULL DEFAULT 0'], ['bl_more', 'INTEGER NOT NULL DEFAULT 0'], ['bl_prev', 'INTEGER NOT NULL DEFAULT -1'],
     ['bl_top', "TEXT NOT NULL DEFAULT ''"], ['bl_error', "TEXT NOT NULL DEFAULT ''"], ['bl_at', 'INTEGER NOT NULL DEFAULT 0'],

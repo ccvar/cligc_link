@@ -13,8 +13,10 @@ import * as bing from './bing.js';
 import { spend } from './budget.js';
 
 const DAY = 86400000, HOUR = 3600000;
-// 定时任务每次：刷新 SITEMAP_PER_RUN 个站点的站点地图（约 100 秒），再用 G_BUDGET 检查最多 RUN_LIMIT 个 Google 网址（两者各算各的时间）
-const MAX_URLS = 500, QUOTA = 1800, RUN_LIMIT = 400, SITEMAP_PER_RUN = 8, CONCURRENCY = 8, G_BUDGET = 240000;
+// 定时任务每次：刷新 SITEMAP_PER_RUN 个站点的站点地图（约 100 秒），再同时做 Google 网址检查（G_BUDGET 内最多 RUN_LIMIT 个）和 Bing 收录检查（B_BUDGET）。
+// Google 的检查接口每个网址要等 7 秒左右，一次运行最多同时发 6 个请求（Workers 的限制），每分钟约 50 个，所以 Google 这边主要靠时间；
+// RUN_LIMIT 只是上限（外部请求数也有预算，见 budget.js）
+const MAX_URLS = 500, QUOTA = 1800, RUN_LIMIT = 500, SITEMAP_PER_RUN = 8, CONCURRENCY = 8, G_BUDGET = 480000;
 // Bing 的 GetUrlInfo 限流很严（实测约每分钟 10 次），只能逐个、间隔 B_GAP 查；定时任务每次给它 B_BUDGET
 // 搜索数据每次最多取 SC_ROWS 行（接口上限）；有展示的网址记成这个状态（以 Indexed 开头，算已编入）
 const SC_ROWS = 25000, SEEN_STATE = 'Indexed, seen in search results';
@@ -391,8 +393,9 @@ const rrSql = (col, linked) => `SELECT ${ROW_COLS} FROM (
     FROM g_urls u JOIN g_sites s ON s.host = u.host WHERE u.${col} <= ? AND ${linked}) u
   ORDER BY rn, due LIMIT ?`;
 
-// 刷新几个站点的站点地图，再检查一批到期的网址（Google 和 Bing 各一批）
-export async function cronBatch(env, secret, { budgetMs = 100000, inspectBudget = G_BUDGET, bingBudget = B_BUDGET, autoSubmit = true } = {}) {
+// 刷新几个站点的站点地图，再同时检查一批到期的网址（Google 和 Bing 各一批）。
+// until：整个定时任务的截止时间，检查的时间预算不会超过它（定时任务最多运行 15 分钟）
+export async function cronBatch(env, secret, { budgetMs = 100000, inspectBudget = G_BUDGET, bingBudget = B_BUDGET, autoSubmit = true, until = Infinity } = {}) {
   const deadline = Date.now() + budgetMs, margin = Math.min(40000, budgetMs / 2);
   const sites = await idxSites(env);
   if (!sites.size) return { skipped: true };
@@ -411,14 +414,18 @@ export async function cronBatch(env, secret, { budgetMs = 100000, inspectBudget 
   // 只取还关联着 GSC / Bing 的站点的网址（解除关联的不占队列）。
   // 按站点轮流取：每个站点先各取最早到期的一个，再各取第二个……这样每个站点每小时都能查到一些，不会一个站点查完才轮到下一个
   const due = (await env.DB.prepare(rrSql('due_at', "s.gsc_site != '' AND s.gsc_acct != ''")).bind(Date.now(), RUN_LIMIT).all()).results;
-  // 网址检查有自己的时间预算，不被前面刷新站点地图用掉（之前共用时每小时只查得到几十个）
-  const g = due.length ? await inspectRows(env, secret, sites, due, Date.now() + inspectBudget) : { done: 0, failed: 0 };
-  let b = { done: 0, failed: 0 };
-  if (bkey) {
-    const bdue = (await env.DB.prepare(rrSql('b_due_at', "s.bing_site != ''")).bind(Date.now(), B_RUN_LIMIT).all()).results;
-    if (bdue.length) b = await bingRows(env, bkey, sites, bdue, Date.now() + bingBudget);
-  }
-  return { refreshed, inspected: g.done, failed: g.failed, bing: b.done, bingFailed: b.failed };
+  const bdue = bkey ? (await env.DB.prepare(rrSql('b_due_at', "s.bing_site != ''")).bind(Date.now(), B_RUN_LIMIT).all()).results : [];
+  // 网址检查有自己的时间预算，不被前面刷新站点地图用掉；Google 和 Bing 是两家的接口，同时查（以前先查完 Google 再查 Bing，Google 只分到一半时间）
+  const left = until - Date.now(), none = { done: 0, failed: 0 };
+  // allSettled：一边出错时也等另一边写完结果再返回（不然它会在定时任务结束后被中断，查过的结果没写进去）
+  const [gr, br] = await Promise.allSettled([
+    due.length && left > 0 ? inspectRows(env, secret, sites, due, Date.now() + Math.min(inspectBudget, left)) : none,
+    bdue.length && left > 0 ? bingRows(env, bkey, sites, bdue, Date.now() + Math.min(bingBudget, left)) : none,
+  ]);
+  if (gr.status === 'rejected' && br.status === 'rejected') throw gr.reason;
+  const g = gr.value || none, b = br.value || none;
+  const errs = [gr.reason && `Google：${gr.reason.message || gr.reason}`, br.reason && `Bing：${br.reason.message || br.reason}`].filter(Boolean);
+  return { refreshed, inspected: g.done, failed: g.failed, bing: b.done, bingFailed: b.failed, ...(errs.length ? { error: errs.join('；') } : {}) };
 }
 
 // ---------------------------------------------------------------- 后台接口

@@ -292,7 +292,7 @@ async function discoverAccount(env, secret, acct, oldProps = []) {
   // 每个媒体资源的网站数据流地址，用来确定域名。一次最多并发 5 个（一下子发几十个容易被限流）；
   // 某个读取失败时沿用上次的域名，而不是当成“没有域名”
   if (props) {
-    const prevHost = new Map(oldProps.map((p) => [p.id, p.host]));
+    const prevHost = new Map(oldProps.map((p) => [p.id, p.host])), prevCreated = new Map(oldProps.map((p) => [p.id, p.created]));
     let i = 0, failed = 0;
     const worker = async () => {
       while (i < props.length) {
@@ -301,7 +301,9 @@ async function discoverAccount(env, secret, acct, oldProps = []) {
           const d = await gfetch(env, secret, acct, `https://analyticsadmin.googleapis.com/v1beta/properties/${p.id}/dataStreams`);
           const web = (d.dataStreams || []).find((s) => s.webStreamData?.defaultUri);
           p.host = siteHost(web?.webStreamData?.defaultUri || '');
-        } catch { p.host = prevHost.get(p.id) ?? ''; failed++; }
+          // 网站数据流的创建时间：开始用 GA4 统计这个网站的时间，可以大致看作网站上线时间
+          p.created = Date.parse(web?.createTime || '') || 0;
+        } catch { p.host = prevHost.get(p.id) ?? ''; p.created = prevCreated.get(p.id) || 0; failed++; }
       }
     };
     await Promise.all(Array.from({ length: 5 }, worker));
@@ -335,17 +337,17 @@ export async function rebuildSites(env) {
   const accts = (await env.DB.prepare('SELECT id, found FROM g_accounts ORDER BY connected_at').all()).results
     .map((a) => ({ id: a.id, found: a.found ? JSON.parse(a.found) : null }));
   // 已有的对应关系优先保留：同一域名对应多个媒体资源 / 站点时，Google 返回的顺序变了也不换（否则会清空数据重新回填）
-  const old = new Map((await env.DB.prepare('SELECT host, ga4_property, ga4_name, ga4_account, ga4_acct, gsc_site, gsc_acct, bing_site FROM g_sites').all()).results.map((r) => [r.host, r]));
+  const old = new Map((await env.DB.prepare('SELECT host, ga4_property, ga4_name, ga4_account, ga4_acct, ga4_created, gsc_site, gsc_acct, bing_site FROM g_sites').all()).results.map((r) => [r.host, r]));
   const sites = new Map();
   const get = (host) => {
-    if (!sites.has(host)) sites.set(host, { host, ga4_property: '', ga4_name: '', ga4_account: '', ga4_acct: '', gsc_site: '', gsc_acct: '', bing_site: '' });
+    if (!sites.has(host)) sites.set(host, { host, ga4_property: '', ga4_name: '', ga4_account: '', ga4_acct: '', ga4_created: 0, gsc_site: '', gsc_acct: '', bing_site: '' });
     return sites.get(host);
   };
   for (const a of accts) {
     for (const p of a.found?.props || []) {
       const s = get(p.host || `ga4-${p.id}`);
       const keep = old.get(s.host)?.ga4_property;
-      if (!s.ga4_property || (p.id === keep && s.ga4_property !== keep)) Object.assign(s, { ga4_property: p.id, ga4_name: p.name, ga4_account: p.account, ga4_acct: a.id });
+      if (!s.ga4_property || (p.id === keep && s.ga4_property !== keep)) Object.assign(s, { ga4_property: p.id, ga4_name: p.name, ga4_account: p.account, ga4_acct: a.id, ga4_created: p.created || 0 });
     }
   }
   const gsc = accts.flatMap((a) => (a.found?.gsc || []).map((g) => ({ ...g, acct: a.id })));
@@ -368,16 +370,16 @@ export async function rebuildSites(env) {
 
   const now = Date.now();
   const stmts = [];
-  const COLS = ['ga4_property', 'ga4_name', 'ga4_account', 'ga4_acct', 'gsc_site', 'gsc_acct', 'bing_site'];
+  const COLS = ['ga4_property', 'ga4_name', 'ga4_account', 'ga4_acct', 'ga4_created', 'gsc_site', 'gsc_acct', 'bing_site'];
   for (const s of sites.values()) {
     const o = old.get(s.host);
     // 没变化的行不写（每天会重新合并好几次，158 个站点每次都写一遍很浪费）
-    if (o && COLS.every((k) => (o[k] || '') === s[k])) continue;
+    if (o && COLS.every((k) => (o[k] || '') === (s[k] || ''))) continue;
     stmts.push(env.DB.prepare(
-      `INSERT INTO g_sites (host, ga4_property, ga4_name, ga4_account, ga4_acct, gsc_site, gsc_acct, bing_site, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO g_sites (host, ga4_property, ga4_name, ga4_account, ga4_acct, ga4_created, gsc_site, gsc_acct, bing_site, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(host) DO UPDATE SET ga4_property = excluded.ga4_property, ga4_name = excluded.ga4_name, ga4_account = excluded.ga4_account,
-         ga4_acct = excluded.ga4_acct, gsc_site = excluded.gsc_site, gsc_acct = excluded.gsc_acct, bing_site = excluded.bing_site, updated_at = excluded.updated_at`
-    ).bind(s.host, s.ga4_property, s.ga4_name, s.ga4_account, s.ga4_acct, s.gsc_site, s.gsc_acct, s.bing_site, now));
+         ga4_acct = excluded.ga4_acct, ga4_created = excluded.ga4_created, gsc_site = excluded.gsc_site, gsc_acct = excluded.gsc_acct, bing_site = excluded.bing_site, updated_at = excluded.updated_at`
+    ).bind(s.host, s.ga4_property, s.ga4_name, s.ga4_account, s.ga4_acct, s.ga4_created || 0, s.gsc_site, s.gsc_acct, s.bing_site, now));
     if (!o) continue;
     // 数据来源变了：清掉旧来源的每日数据，重新回填
     const gaChanged = o.ga4_property !== s.ga4_property, scChanged = o.gsc_site !== s.gsc_site;
@@ -536,8 +538,9 @@ export async function syncBatch(env, secret, { limit = 12, cutoff = Date.now() -
     await env.DB.prepare('UPDATE g_sites SET synced_at = 0').run();
     await setSetting(env, 'g_backfill', String(BACKFILL_DAYS));
   }
-  // 每个账号每天重新发现一次站点（只查到期的那个账号）
-  for (const a of accts.filter((x) => x.found_at < Date.now() - DAY)) await discover(env, secret, a.id);
+  // 每个账号每天重新发现一次站点；每次最多一个（最久没查的），多个账号同时到期时分到之后几个小时，不挤在一次里
+  const dueAcct = accts.filter((x) => x.found_at < Date.now() - DAY).sort((a, b) => a.found_at - b.found_at)[0];
+  if (dueAcct) await discover(env, secret, dueAcct.id);
   // 还没补过渠道数据的 GA4 站点也算待同步（升级后一次性补）
   const DUE = `synced_at < ? OR (ga4_property IS NOT NULL AND ga4_property != '' AND ch_at = 0)`;
   const due = (await env.DB.prepare(`SELECT * FROM g_sites WHERE ${DUE} ORDER BY ch_at > 0, synced_at LIMIT ?`)
@@ -698,7 +701,7 @@ async function sitesListRaw(env, days, ver) {
     const g = daily[s.host] || EMPTY;
     const users = s.users ? JSON.parse(s.users) : {};
     return {
-      host: s.host, chReady: !!s.ch_at, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '' } : null,
+      host: s.host, chReady: !!s.ch_at, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '', created: s.ga4_created || null } : null,
       gsc: s.gsc_site || null, gscAcct: s.gsc_acct || '', gscEmail: s.gsc_email || '', syncedAt: s.synced_at || null, error: s.error || '',
       users: users[days] ?? null, prevUsers: hasPrev(days) ? users[`p${days}`] ?? null : null,
       tags: tagsOf.get(s.host) || [],
@@ -928,7 +931,7 @@ export async function siteDetail(env, secret, host, days) {
   const { from, to, pfrom, pto } = ranges(days);
   const rows = (await env.DB.prepare('SELECT * FROM g_daily WHERE host = ? AND date >= ? AND date <= ? ORDER BY date').bind(host, pfrom, to).all()).results;
   const out = {
-    host, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '' } : null,
+    host, ga4: s.ga4_property ? { property: s.ga4_property, name: s.ga4_name, account: s.ga4_account, acct: s.ga4_acct, email: s.ga4_email || '', created: s.ga4_created || null } : null,
     gsc: s.gsc_site || null, gscAcct: s.gsc_acct || '', gscEmail: s.gsc_email || '',
     bingSite: s.bing_site || null, bingInIndex: s.bing_site ? s.b_in_index || 0 : null, bingSyncedAt: s.b_synced_at || null, bingError: s.b_error || '',
     syncedAt: s.synced_at || null, error: s.error || '', days,

@@ -285,12 +285,13 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .g3 { display: grid; gap: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 1180px) { .g-main { grid-template-columns: 1fr; } .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g3 > :last-child { grid-column: 1 / -1; } }
 @media (max-width: 960px) { .grid2, .g3 { grid-template-columns: 1fr; } .g3 > :last-child { grid-column: auto; } }
-/* .grid2.fit：左边卡片的高度跟着右边——左边不参与撑高这一排（height: 0），再拉伸到整排的高度；内容多时在卡片里滚动。
-   只在两列并排时生效（单列时各自按内容高度） */
+/* .grid2.fit：左边卡片的高度跟着右边——左边的表格不参与撑高这一排（height: 0，最少留 200px，约 5 行），卡片再拉伸到整排的高度，
+   表格多出来的行在卡片里滚动。表格以外的内容（筛选按钮、说明、“暂无数据”）照常撑高：右边比它们还矮时整排变高，
+   不会溢出卡片（以前整张左边卡片 height: 0，右边很矮时内容会压到下面的卡片上）。只在两列并排时生效（单列时各自按内容高度） */
 @media (min-width: 961px) {
-  .grid2.fit > .card:first-child { height: 0; min-height: 100%; display: flex; flex-direction: column; }
+  .grid2.fit > .card:first-child { display: flex; flex-direction: column; }
   .grid2.fit > .card:first-child > .card-b { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .grid2.fit > .card:first-child > .card-b > .g-scr { flex: 1; min-height: 120px; max-height: none; }
+  .grid2.fit > .card:first-child > .card-b > .g-scr { flex: 1 1 0; height: 0; min-height: 200px; max-height: none; }
 }
 
 /* KPI */
@@ -1685,6 +1686,7 @@ button.gtg { cursor: pointer; }
 .gsh i { display: block; height: 100%; min-width: 2px; border-radius: 3px; background: var(--accent); }
 .gsh-c span { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 /* 行内的短链标记 */
+.gage { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; cursor: default; }
 .gsl { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 600;
   color: var(--accent-ink); background: var(--accent-2); font-variant-numeric: tabular-nums; cursor: default; }
 .gsl-t tbody tr { cursor: pointer; }
@@ -1868,6 +1870,7 @@ html.masked input:focus { filter: none; }
 .ix-r.bad .ell::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--bad); margin-right: 7px; vertical-align: 1px; }
 .ix-main { min-width: 0; }
 .ix-scr { max-height: 440px; }
+.ix-t .ix-more td { padding-top: 14px; padding-bottom: 14px; text-align: center; color: var(--muted); font-size: 12.5px; border-bottom: 0; }
 .ix-t { table-layout: fixed; }
 .ix-t th:nth-child(2) { width: 38%; } .ix-t th:nth-child(3) { width: 84px; } .ix-t th:nth-child(4) { width: 96px; }
 @media (max-width: 600px) {
@@ -2104,6 +2107,14 @@ function ago(ts) {
   if (s < 86400 * 30) return `${Math.floor(s / 86400)} 天前`;
   return ymd(new Date(ts));
 }
+// 网站上线多久（按 GA4 网站数据流的创建时间）：两个月内按天，两年内按月，再久按年
+function siteAge(t) {
+  const d = Math.max(0, Math.floor((Date.now() - t) / 86400000));
+  if (d < 61) return `${d} 天`;
+  const m = Math.floor(d / 30.44);
+  return m < 24 ? `${m} 个月` : `${Number((m / 12).toFixed(1))} 年`;
+}
+const GA4_AGE_TIP = 'GA4 网站数据流的创建时间，也就是开始用 GA4 统计这个网站的时间，大致是网站上线时间';
 let regionNames;
 try { regionNames = new Intl.DisplayNames([EN ? 'en' : 'zh-CN'], { type: 'region' }); } catch {}
 function country(code) {
@@ -6030,7 +6041,7 @@ async function renderSites(token) {
               const h = x.linksFrom.reduce((a, l) => a + l.human, 0), ses = x.cur.ga?.sessions;
               const tip = `${G_LABEL()}从这个站点点出 ${x.linksFrom.length} 个短链，真人点击 ${num(h)}${x.linksFromVisitors ? `（${num(x.linksFromVisitors)} 位访客）` : ''}${ses ? `，点出率 ${pct1(h / ses)}` : ''}：${x.linksFrom.slice(0, 3).map((l) => `/${l.slug} ${num(l.human)}`).join('、')}${x.linksFrom.length > 3 ? ' …' : ''}`;
               return `<span class="gsl" data-tipf-always data-tipf="${esc(tip)}">${ic('link', 12)}${num(h)}</span>`;
-            })() : ''}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div></td>
+            })() : ''}${x.ga4?.created ? `<span class="gage" data-tipf-always data-tipf="${esc(`GA4 接入于 ${ymd(new Date(x.ga4.created))}，大致是网站上线时间`)}">${ic('history', 11)}${siteAge(x.ga4.created)}</span>` : ''}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div></td>
           <td class="num">${x.users != null ? num(x.users) : '—'}${x.prevUsers != null ? gDelta(x.users, x.prevUsers) : ''}</td>
           <td class="num">${ga ? num(ga.sessions) : '—'}${ga && pg ? gDelta(ga.sessions, pg.sessions) : ''}</td>
           <td class="gsh-c">${shareSum && shareOf(x) ? `<div class="gsh"><i style="width:${(shareOf(x) / shareSum) * 100}%"></i></div><span>${pctText(shareOf(x) / shareSum)}</span>` : '<span class="sm">—</span>'}</td>
@@ -6339,7 +6350,9 @@ function idxUrlsView(d, f, reason) {
   };
   const cls = `ix-t${g ? '' : ' nog'}${bg ? ' hasb' : ''}`;
   const table = rows.length ? `<div class="g-scr ix-scr"><table class="tbl gt ${cls}"><thead><tr><th>网址</th>${g ? `<th>${bg ? 'Google' : '状态'}</th>` : ''}${bg ? `<th>Bing</th>` : ''}${g ? '<th class="r">上次抓取</th>' : ''}<th></th></tr></thead>
-    <tbody>${rows.slice(0, 300).map(row).join('')}</tbody></table></div>${rows.length > 300 ? `<div class="hint">只显示前 300 个，共 ${num(rows.length)} 个</div>` : ''}`
+    <tbody>${rows.slice(0, 300).map(row).join('')}${rows.length > 300
+      // 超过 300 个只列前 300 个：说明放在表格最后一行（滚到底才看到），不贴在滚动区下面压着被截了一半的行
+      ? `<tr class="ix-more"><td colspan="${2 + (g ? 2 : 0) + (bg ? 1 : 0)}">只显示前 300 个，共 ${num(rows.length)} 个；用上面的筛选可以缩小范围</td></tr>` : ''}</tbody></table></div>`
     : `<div class="empty">${ic('inbox')}${d.urls.length ? '没有符合条件的网址' : '没有找到网址：站点地图为空，最近 28 天也没有出现在搜索结果里的页面'}</div>`;
   return `<div class="ix-g">${sum}<div class="ix-main">${chips}${table}</div></div>`;
 }
@@ -6684,6 +6697,7 @@ async function renderSite(token, host) {
           <span class="gico${d.ga4 ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.ga4 ? `Google Analytics 4：${d.ga4.account} / ${d.ga4.name}（${d.ga4.property}）${d.ga4.email ? ` · ${d.ga4.email}` : ''}` : '未关联 Google Analytics 4')}">${BRAND.ga(15)}</span>
           <span class="gico${d.gsc ? '' : ' off'}" data-tipf-always data-tipf="${esc(d.gsc ? `Search Console：${d.gsc}${d.gscEmail ? ` · ${d.gscEmail}` : ''}` : '未关联 Search Console')}">${BRAND.gsc(15)}</span>
           ${d.bingSite ? `<span class="gico" data-tipf-always data-tipf="${esc(`Bing Webmaster：${d.bingSite}${d.bingSyncedAt ? `\n同步于 ${fmtTime(d.bingSyncedAt)}` : ''}${d.bingError ? `\n同步出错：${d.bingError}` : ''}`)}">${BRAND.bing(15)}</span>` : ''}
+          ${d.ga4?.created ? `<span class="g-si" data-tipf-always data-tipf="${GA4_AGE_TIP}">${ic('history', 13)}GA4 接入于 ${ymd(new Date(d.ga4.created))}（${siteAge(d.ga4.created)}前）</span>` : ''}
           ${d.syncedAt ? `<span class="g-si" data-tipf-always data-tipf="${esc(fmtTime(d.syncedAt))}">${ic('refresh', 13)}同步于 ${ago(d.syncedAt)}</span>` : ''}
           ${siteTagsBar(host, d.tags || [])}${siteLinksHint(d)}</div>
       </div><div class="acts"><button class="btn ghost g-ai" id="g-ai1">${ic('ai', 15)}AI 分析</button>${gRangeBar()}</div></section>

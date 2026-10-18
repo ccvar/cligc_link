@@ -2,6 +2,21 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.5.1 · 2026-10-18
+
+Google index checks are about twice as fast, and sites show when GA4 was added (roughly when the site went live).
+
+### Improved
+
+- **Faster Google index checks**: they now run alongside the Bing index checks, and each hourly run gives Google 8 minutes instead of 4, checking about 400 URLs an hour (previously about 200). After adding many sites at once, the "Checking" backlog clears in roughly half the time; checks stop at most 12 minutes into the scheduled run, staying within Cloudflare's 15-minute limit
+- **Site age**: each row in the site list shows how long ago the site was added to GA4 (from the GA4 web data stream's creation time; hover for the date), and the site page shows "GA4 added … (N months ago)". This is roughly when the site went live (later, if GA4 was installed some time after launch). After upgrading, the next few scheduled runs fill it in (one Google account per run) without waiting a day
+- In the hourly scheduled run, notifications and usage alerts now run before the page-index checks, so daily / weekly reports aren't affected by how much checking there is and go out a few minutes earlier
+
+### Fixed
+
+- On the site page, when the right-hand card was short (e.g. GA4 on the "Devices" tab, or no Bing crawl data), the Google / Bing search card on the left overflowed onto the card below; it now shows at least about 5 rows and scrolls the rest inside the card
+- In page indexing, with more than 300 URLs the "Showing the first 300" note overlapped the last row; it's now shown as the last row of the list
+
 ## v1.5.0 · 2026-10-18
 
 New optional "Backlinks & authority": see the backlinks Bing has found and the Open PageRank domain score on the Sites pages.

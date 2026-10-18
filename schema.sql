@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS g_sites (
   ga4_property  TEXT NOT NULL DEFAULT '',   -- GA4 媒体资源 ID
   ga4_name      TEXT NOT NULL DEFAULT '',
   ga4_account   TEXT NOT NULL DEFAULT '',
+  ga4_created   INTEGER NOT NULL DEFAULT 0,   -- GA4 网站数据流的创建时间（大致是网站上线时间）
   gsc_site      TEXT NOT NULL DEFAULT '',   -- GSC 资源，如 sc-domain:example.com
   ga4_acct      TEXT NOT NULL DEFAULT '',   -- GA4 数据来自哪个 Google 账号（g_accounts.id）
   gsc_acct      TEXT NOT NULL DEFAULT '',   -- GSC 数据来自哪个 Google 账号
