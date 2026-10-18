@@ -550,6 +550,30 @@ footer a:hover { color: var(--text); }
 .ufb.bad + em { color: #e5484d; }
 
 
+/* 二维码 / 打开 App */
+.t-qr, .t-app { grid-column: span 3; }
+.qrd { margin-top: 24px; display: flex; align-items: center; gap: 18px; }
+.qrb { flex: none; width: 112px; height: 112px; padding: 6px; border-radius: 14px; border: 1px solid var(--line); background: #fff; box-shadow: 0 8px 24px -14px rgba(13, 19, 33, .35); }
+.qrs { width: 100%; height: 100%; display: block; }
+.qri { min-width: 0; display: grid; gap: 6px; }
+.qri code { font-family: var(--mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qri > span { font-size: 12.5px; color: var(--muted); }
+.qrx { display: flex; gap: 6px; margin-top: 4px; }
+.qrx i { font-style: normal; font-size: 12px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text-2); }
+.apd { margin-top: 24px; display: grid; gap: 8px; }
+.apr em b { display: inline; color: var(--accent-ink); }
+.apr:first-child { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-2); }
+/* 优化建议 */
+.t-adv { grid-column: span 6; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 40px; align-items: center; }
+.advd { display: grid; gap: 10px; }
+.avr { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 13px; }
+.avr > i { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 13px; background: var(--sunken); color: var(--muted); }
+.avr.hi > i { color: #e5484d; background: color-mix(in srgb, #e5484d 12%, transparent); }
+.avr.md > i { color: #d97706; background: color-mix(in srgb, #d97706 13%, transparent); }
+.avr b { display: block; font-weight: 650; }
+.avr span { display: block; margin-top: 3px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.avr em { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 6px; background: var(--sunken); color: var(--muted); white-space: nowrap; }
+.avr.hi em { color: #e5484d; } .avr.md em { color: #d97706; }
 /* 网页索引 */
 .t-idx { grid-column: span 6; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 40px; align-items: center; }
 .sti.bi { background: #00809D; border-radius: 2px; clip-path: polygon(14% 4%, 42% 14%, 42% 74%, 68% 58%, 55% 51%, 46% 30%, 90% 46%, 90% 70%, 42% 97%, 14% 83%); }
@@ -710,12 +734,12 @@ footer a:hover { color: var(--text); }
   .stat:nth-child(n+3) { border-top: 1px solid var(--line); }
   .t-sec, .t-free, .t-oss, .t-ana, .t-src { grid-column: span 3; }
   .t-oss { grid-column: span 6; }
-  .t-fb, .t-nt { grid-column: span 6; }
+  .t-fb, .t-nt, .t-qr, .t-app { grid-column: span 6; }
   .t-trk { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .t-bot { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .t-bot > div:first-child { order: 2; }
   .t-seo, .t-cv, .t-out, .t-ai2 { grid-column: span 6; }
-  .t-uf, .t-idx { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .t-uf, .t-idx, .t-adv { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .t-ab, .t-hc, .t-log, .t-dv, .t-sys { grid-column: span 6; grid-row: auto; }
   .t-kb { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .app { grid-template-columns: 1fr; } .app-side { display: none; }
@@ -742,7 +766,7 @@ footer a:hover { color: var(--text); }
   .route-b { padding: 16px; }
   .kp { grid-template-columns: repeat(2, 1fr); }
   .bento { grid-template-columns: 1fr; }
-  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt, .t-trk, .t-bot, .t-st, .t-out, .t-ai2, .t-idx, .t-seo, .t-cv, .t-uf, .t-ab, .t-hc, .t-log, .t-dv, .t-sys, .t-kb { grid-column: auto; }
+  .t-geo, .t-ana, .t-src, .t-sec, .t-free, .t-oss, .t-fb, .t-nt, .t-trk, .t-bot, .t-st, .t-out, .t-ai2, .t-idx, .t-adv, .t-qr, .t-app, .t-seo, .t-cv, .t-uf, .t-ab, .t-hc, .t-log, .t-dv, .t-sys, .t-kb { grid-column: auto; }
   .lgc { white-space: normal; }
   .lng-b .lng-t { display: none; }
   .sth, .str { grid-template-columns: minmax(0, 1.6fr) 1fr 70px; }
@@ -1008,6 +1032,25 @@ footer a:hover { color: var(--text); }
             <div class="hcm"><svg class="i" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg><span>⚠️ 目标页打不开 · <b>/d11</b> 返回 404</span></div>
           </div>
         </article>
+        <article class="tile t-qr reveal">
+          <span class="tag">// qr code</span>
+          <h3>每个短链都有二维码</h3>
+          <p>详情页和列表里一点就有，扫码直接打开短链（也会记一次访问）。可以下载 SVG（矢量，印刷不糊）或 1024 像素 PNG，海报、名片、包装都能用。</p>
+          <div class="qrd" aria-hidden="true">
+            <div class="qrb"><svg class="qrs" viewBox="-2 -2 25 25" shape-rendering="crispEdges"><rect x="-2" y="-2" width="25" height="25" fill="#fff"/><path d="M0 0h1v1h-1zM1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM8 0h1v1h-1zM9 0h1v1h-1zM11 0h1v1h-1zM14 0h1v1h-1zM15 0h1v1h-1zM16 0h1v1h-1zM17 0h1v1h-1zM18 0h1v1h-1zM19 0h1v1h-1zM20 0h1v1h-1zM0 1h1v1h-1zM6 1h1v1h-1zM8 1h1v1h-1zM9 1h1v1h-1zM11 1h1v1h-1zM12 1h1v1h-1zM14 1h1v1h-1zM20 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM6 2h1v1h-1zM8 2h1v1h-1zM9 2h1v1h-1zM10 2h1v1h-1zM12 2h1v1h-1zM14 2h1v1h-1zM16 2h1v1h-1zM17 2h1v1h-1zM18 2h1v1h-1zM20 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM6 3h1v1h-1zM8 3h1v1h-1zM12 3h1v1h-1zM14 3h1v1h-1zM16 3h1v1h-1zM17 3h1v1h-1zM18 3h1v1h-1zM20 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM6 4h1v1h-1zM9 4h1v1h-1zM11 4h1v1h-1zM12 4h1v1h-1zM14 4h1v1h-1zM16 4h1v1h-1zM17 4h1v1h-1zM18 4h1v1h-1zM20 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM9 5h1v1h-1zM11 5h1v1h-1zM14 5h1v1h-1zM20 5h1v1h-1zM0 6h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM15 6h1v1h-1zM16 6h1v1h-1zM17 6h1v1h-1zM18 6h1v1h-1zM19 6h1v1h-1zM20 6h1v1h-1zM8 7h1v1h-1zM10 7h1v1h-1zM11 7h1v1h-1zM0 8h1v1h-1zM1 8h1v1h-1zM4 8h1v1h-1zM6 8h1v1h-1zM9 8h1v1h-1zM11 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM15 8h1v1h-1zM16 8h1v1h-1zM0 9h1v1h-1zM4 9h1v1h-1zM7 9h1v1h-1zM9 9h1v1h-1zM14 9h1v1h-1zM15 9h1v1h-1zM17 9h1v1h-1zM18 9h1v1h-1zM19 9h1v1h-1zM20 9h1v1h-1zM0 10h1v1h-1zM2 10h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM6 10h1v1h-1zM7 10h1v1h-1zM12 10h1v1h-1zM13 10h1v1h-1zM14 10h1v1h-1zM17 10h1v1h-1zM18 10h1v1h-1zM19 10h1v1h-1zM20 10h1v1h-1zM0 11h1v1h-1zM2 11h1v1h-1zM3 11h1v1h-1zM4 11h1v1h-1zM5 11h1v1h-1zM12 11h1v1h-1zM17 11h1v1h-1zM18 11h1v1h-1zM19 11h1v1h-1zM0 12h1v1h-1zM1 12h1v1h-1zM2 12h1v1h-1zM3 12h1v1h-1zM4 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM7 12h1v1h-1zM8 12h1v1h-1zM9 12h1v1h-1zM10 12h1v1h-1zM13 12h1v1h-1zM14 12h1v1h-1zM15 12h1v1h-1zM16 12h1v1h-1zM17 12h1v1h-1zM20 12h1v1h-1zM8 13h1v1h-1zM9 13h1v1h-1zM10 13h1v1h-1zM11 13h1v1h-1zM12 13h1v1h-1zM14 13h1v1h-1zM15 13h1v1h-1zM18 13h1v1h-1zM20 13h1v1h-1zM0 14h1v1h-1zM1 14h1v1h-1zM2 14h1v1h-1zM3 14h1v1h-1zM4 14h1v1h-1zM5 14h1v1h-1zM6 14h1v1h-1zM12 14h1v1h-1zM13 14h1v1h-1zM14 14h1v1h-1zM18 14h1v1h-1zM19 14h1v1h-1zM0 15h1v1h-1zM6 15h1v1h-1zM13 15h1v1h-1zM15 15h1v1h-1zM16 15h1v1h-1zM17 15h1v1h-1zM18 15h1v1h-1zM19 15h1v1h-1zM0 16h1v1h-1zM2 16h1v1h-1zM3 16h1v1h-1zM4 16h1v1h-1zM6 16h1v1h-1zM9 16h1v1h-1zM13 16h1v1h-1zM14 16h1v1h-1zM15 16h1v1h-1zM16 16h1v1h-1zM17 16h1v1h-1zM0 17h1v1h-1zM2 17h1v1h-1zM3 17h1v1h-1zM4 17h1v1h-1zM6 17h1v1h-1zM8 17h1v1h-1zM11 17h1v1h-1zM16 17h1v1h-1zM17 17h1v1h-1zM19 17h1v1h-1zM0 18h1v1h-1zM2 18h1v1h-1zM3 18h1v1h-1zM4 18h1v1h-1zM6 18h1v1h-1zM9 18h1v1h-1zM10 18h1v1h-1zM13 18h1v1h-1zM14 18h1v1h-1zM15 18h1v1h-1zM18 18h1v1h-1zM0 19h1v1h-1zM6 19h1v1h-1zM9 19h1v1h-1zM11 19h1v1h-1zM12 19h1v1h-1zM17 19h1v1h-1zM20 19h1v1h-1zM0 20h1v1h-1zM1 20h1v1h-1zM2 20h1v1h-1zM3 20h1v1h-1zM4 20h1v1h-1zM5 20h1v1h-1zM6 20h1v1h-1zM8 20h1v1h-1zM9 20h1v1h-1zM10 20h1v1h-1zM12 20h1v1h-1zM13 20h1v1h-1zM14 20h1v1h-1zM16 20h1v1h-1zM17 20h1v1h-1zM20 20h1v1h-1z" fill="#0b1220"/></svg></div>
+            <div class="qri"><code>go.example.com/spring</code><span>扫码打开 · 会记一次访问</span><div class="qrx"><i>SVG</i><i>PNG 1024</i></div></div>
+          </div>
+        </article>
+        <article class="tile t-app reveal" style="--d:1">
+          <span class="tag">// open app</span>
+          <h3>点短链，直接打开 App</h3>
+          <p>目标地址可以填 App 地址：Telegram、微信、抖音、小红书……先拉起 App，没装就去备用网页；在微信、QQ 里打开会提示“在浏览器打开”。常用 App 有现成模板，带图标，中英文名都能搜。</p>
+          <div class="apd" aria-hidden="true">
+            <div class="fbr apr" style="--n:0"><span class="f">✈️</span><code>tg://resolve?domain=example</code><em><b>拉起 App</b></em></div>
+            <div class="fbr apr" style="--n:1"><span class="f">🌐</span><code>t.me/example</code><em>没装 App 时</em></div>
+            <div class="fbr apr" style="--n:2"><span class="f">💬</span><code>微信里打开</code><em>提示在浏览器打开</em></div>
+          </div>
+        </article>
         <article class="tile t-trk reveal" id="trk">
           <div>
             <span class="tag">// search attribution</span>
@@ -1064,7 +1107,7 @@ footer a:hover { color: var(--text); }
             <div class="str" style="--n:4"><span><b>news.example.com</b><i class="sti ga off"></i><i class="sti sc"></i><i class="sti bi"></i></span><span>—</span><span></span><span>56<em class="up">↑22%</em></span><svg viewBox="0 0 60 18"><path d="M0 13 8 13 16 12 24 13 32 9 40 11 48 10 60 8"/></svg></div>
             <div class="str" style="--n:5"><span><b>forum.example.com</b><i class="sti ga"></i><i class="sti sc"></i><i class="sti bi"></i></span><span>251<em class="up">↑206%</em></span><span><u style="--w:3%"></u></span><span>11</span><svg viewBox="0 0 60 18"><path d="M0 15 8 14 16 15 24 12 32 13 40 9 48 6 60 4"/></svg></div>
           </div>
-          <div class="chips"><span>多个 Google 账号</span><span>Bing Webmaster</span><span>Google / Bing / 合计</span><span>按域名合并</span><span>分组</span><span>按增长排序</span><span>导出 CSV</span></div>
+          <div class="chips"><span>多个 Google 账号</span><span>Bing Webmaster</span><span>Google / Bing / 合计</span><span>按域名合并</span><span>分组</span><span>按增长排序</span><span>导出 CSV</span><span>Bing 外链</span><span>Open PageRank</span></div>
         </article>
         <article class="tile t-out reveal" style="--d:1">
           <span class="tag">// click-out rate</span>
@@ -1083,6 +1126,19 @@ footer a:hover { color: var(--text); }
           <div class="aib" aria-hidden="true">
             <div class="aim">请打开这份报告，分析这些站点的 SEO：<span>go.example.com/r/k7Qx…</span></div>
             <div class="aio"><i>排名 4–20 的高展示词</i><i>点击率偏低的词</i><i>下滑的页面</i></div>
+          </div>
+        </article>
+        <article class="tile t-adv reveal">
+          <div>
+            <span class="tag">// optimization tips</span>
+            <h3>哪里该改，直接告诉你</h3>
+            <p>根据已经同步的数据自动找问题：GA4 突然没数据、搜索点击下滑、曝光多但点击率低、收录率低、网址打不开、站点地图出错、Bing 收录少、有流量没转化，还有差一点进前 3 的词。每条带具体数字和做法，按重要程度排好；不需要处理的可以忽略。</p>
+            <div class="chips"><span>不额外调用接口</span><span>估算可多得的点击</span><span>一键跳到对应数据</span><span>忽略 30 天 / 不再提醒</span></div>
+          </div>
+          <div class="advd" aria-hidden="true">
+            <div class="avr hi" style="--n:0"><i>!</i><div><b>GA4 最近 3 天没有数据</b><span>前两周 1,240 次会话，最近 3 天一次都没有，统计代码可能掉了</span></div><em>重要</em></div>
+            <div class="avr md" style="--n:1"><i>!</i><div><b>曝光多、点击率偏低</b><span>/pricing 曝光 3,200，点击率 0.8%，排名 4.2 常见约 7%，可多约 200 次点击</span></div><em>建议</em></div>
+            <div class="avr" style="--n:2"><i>?</i><div><b>这些词差一点进前 3</b><span>“short link api” 排名 4.6，曝光 1,180</span></div><em>提示</em></div>
           </div>
         </article>
         <article class="tile t-idx reveal">

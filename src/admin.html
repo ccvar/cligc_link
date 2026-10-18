@@ -646,6 +646,15 @@ tr:hover .row-ext:hover, .lrow:hover .row-ext:hover { color: var(--accent); }
 .hero .ttl { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; color: var(--text-2); font-weight: 550; }
 /* 站点优化建议 */
 .adv .card-h .hint { margin-left: 4px; }
+.adv-hd { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; gap: 8px; }
+.adv-hd > svg { flex: none; color: var(--muted); transition: transform .2s var(--ease); }
+.adv-hd[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.adv-hd[aria-expanded="false"] { padding-bottom: 18px; }
+.adv-sum { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; margin-left: 6px; }
+.adv-c { font-size: 11.5px; line-height: 20px; padding: 0 8px; border-radius: 6px; background: var(--sunken); color: var(--text-2); white-space: nowrap; }
+.adv-c.lv-high { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.adv-c.lv-mid { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+@media (max-width: 640px) { .adv-sum { display: none; } }
 .adv-l { display: grid; gap: 10px; }
 .adv-i { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--sunken); }
 .adv-ic { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--panel); color: var(--muted); }
@@ -6706,7 +6715,7 @@ function advGo(go) {
 }
 const ADV_LV_IC = { high: 'alert', mid: 'info', low: 'help' };
 // 站点详情：优化建议卡片（服务端规则 + 页面 / 搜索词两条）；忽略 30 天 / 不再提醒，已忽略的可以恢复
-async function mountAdvice(host, d) {
+async function mountAdvice(host, d, open = false) {
   const box = document.getElementById('g-adv');
   if (!box) return;
   let r;
@@ -6717,8 +6726,10 @@ async function mountAdvice(host, d) {
   const items = [...r.items, ...advLocal(d).filter((a) => !ignored.has(a.rule))].sort((a, b) => order[b.level] - order[a.level] || b.impact - a.impact);
   if (!items.length && !ignored.size) { box.remove(); return; }
   box.hidden = false;
-  box.innerHTML = `<div class="card-h"><h3>优化建议</h3><span class="hint">${items.length ? `${items.length} 条，按重要程度排列` : '暂时没有需要处理的'}</span></div>
-    <div class="card-b">${items.length ? `<div class="adv-l">${items.map((a) => {
+  // 默认收起：标题行列出每条的名称，点开看详情
+  box.innerHTML = `<button type="button" class="card-h adv-hd" aria-expanded="${open}"><h3>优化建议</h3><span class="hint">${items.length ? `${items.length} 条` : '暂时没有需要处理的'}</span>
+      <span class="adv-sum">${items.map((a) => `<span class="adv-c lv-${a.level}">${esc(ADV_NAME[a.rule] || a.rule)}</span>`).join('')}</span><span class="sp"></span>${ic('chev', 16)}</button>
+    <div class="card-b"${open ? '' : ' hidden'}>${items.length ? `<div class="adv-l">${items.map((a) => {
       const v = advView(a);
       return `<div class="adv-i lv-${a.level}" data-rule="${a.rule}"><span class="adv-ic">${ic(ADV_LV_IC[a.level], 15)}</span>
         <div class="adv-t"><div class="adv-h"><b>${esc(v.t)}</b><span class="adv-lv">${ADV_LV[a.level]}</span></div>${advBody(v)}</div>
@@ -6726,10 +6737,12 @@ async function mountAdvice(host, d) {
     }).join('')}</div>` : ''}
     ${ignored.size ? `<div class="adv-ig hint">已忽略：${[...ignored].map(([rule, until]) => `<span>${esc(ADV_NAME[rule] || rule)}<small>${until > 9e14 ? '（不再提醒）' : `（到 ${ymd(new Date(until))}）`}</small><button type="button" class="lnk" data-restore="${rule}">恢复</button></span>`).join('')}</div>` : ''}</div>`;
   const set = async (rule, days) => {
-    try { await api('/google/advice/ignore', { method: 'POST', body: { host, rule, days } }); toast(days < 0 ? '已恢复提醒' : days ? '已忽略 30 天' : '以后不再提醒这一条'); mountAdvice(host, d); }
+    try { await api('/google/advice/ignore', { method: 'POST', body: { host, rule, days } }); toast(days < 0 ? '已恢复提醒' : days ? '已忽略 30 天' : '以后不再提醒这一条'); mountAdvice(host, d, true); }
     catch (ex) { toast(ex.message, 'bad'); }
   };
   box.onclick = (e) => {
+    const hd = e.target.closest('.adv-hd');
+    if (hd) { const on = hd.getAttribute('aria-expanded') !== 'true'; hd.setAttribute('aria-expanded', on); box.querySelector('.card-b').hidden = !on; return; }
     const go = e.target.closest('[data-go]');
     if (go) return advGo(go.dataset.go);
     const rs = e.target.closest('[data-restore]');
@@ -6742,7 +6755,7 @@ async function mountAdvice(host, d) {
     }
     const ig = e.target.closest('[data-ig]');
     if (!ig) return;
-    if (ig.dataset.ig === 'x') { mountAdvice(host, d); return; }
+    if (ig.dataset.ig === 'x') { mountAdvice(host, d, true); return; }
     set(it.dataset.rule, Number(ig.dataset.ig));
   };
 }
