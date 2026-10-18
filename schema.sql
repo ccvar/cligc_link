@@ -197,6 +197,8 @@ CREATE TABLE IF NOT EXISTS g_urls (
   b_due_at    INTEGER NOT NULL DEFAULT 0,
   b_submitted_at INTEGER NOT NULL DEFAULT 0,  -- 上次提交给 Bing 的时间
   b_error     TEXT NOT NULL DEFAULT '',
+  lastmod     INTEGER NOT NULL DEFAULT 0,   -- 站点地图里写的最后更新时间
+  upd_at      INTEGER NOT NULL DEFAULT 0,   -- 发现最后更新时间变新的时间；比 b_submitted_at 新时要重新提交给 Bing
   PRIMARY KEY (host, url)
 );
 CREATE INDEX IF NOT EXISTS g_urls_due ON g_urls (due_at);

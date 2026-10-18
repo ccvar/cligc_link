@@ -1977,6 +1977,7 @@ html.masked input:focus { filter: none; }
 .ix-sm th:nth-child(2) { width: 150px; } .ix-sm th:nth-child(3), .ix-sm th:nth-child(4), .ix-sm th:nth-child(5) { width: 84px; } .ix-sm th:nth-child(6) { width: 96px; }
 .ix-sm .ix-u a { color: inherit; text-decoration: none; min-width: 0; }
 .ix-auth { margin-bottom: 12px; align-items: center; }
+.ix-sma { margin: 16px 0 0; }
 .ix-err { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--warn); margin: 0; }
 .ix-err svg { flex: none; }
 .ix-err .ell { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -5827,7 +5828,7 @@ function sysChecks(st) {
     : now - c.at > 3 * H ? { lv: 'bad', t: '定时任务', d: `上次运行在 ${ago(c.at)}，超过 3 小时没有运行，请检查 wrangler.toml 里的 [triggers] crons` }
     : failed.length ? { lv: 'bad', t: '定时任务', d: `${ago(c.at)}运行，${failed.map(([k, v]) => `${CRON_NAME[k] || k}失败：${v.error}`).join('；')}` }
     : { lv: 'ok', t: '定时任务', d: `${ago(c.at)}运行，耗时 ${(c.ms / 1000).toFixed(1)} 秒，${Object.keys(steps).length} 个步骤都正常` });
-  out[out.length - 1].act = `<button type="button" class="btn sm ghost" id="sys-run" data-tipf-always data-tipf="按定时任务的步骤立即跑一遍：访问汇总、Google / Bing 同步、网页索引检查、目标页检查。不发推送通知、不自动提交网址给 Bing，每步比整点那次少做一些。请求从你当前访问的 Cloudflare 节点发出">${ic('refresh', 13)}立即运行一次</button>`;
+  out[out.length - 1].act = `<button type="button" class="btn sm ghost" id="sys-run" data-tipf-always data-tipf="按定时任务的步骤立即跑一遍：访问汇总、Google / Bing 同步、网页索引检查、目标页检查。不发推送通知、不自动提交网址和站点地图，每步比整点那次少做一些。请求从你当前访问的 Cloudflare 节点发出">${ic('refresh', 13)}立即运行一次</button>`;
   out.push(!st.aggMark ? { lv: 'warn', t: '访问汇总', d: '还没有汇总过（有访问后自动开始）' }
     : now - st.aggMark > 3 * H ? { lv: 'warn', t: '访问汇总', d: `汇总到 ${fmtTime(st.aggMark)}，落后 ${Math.round((now - st.aggMark) / H)} 小时（之后的访问实时读取，统计不受影响）` }
     : { lv: 'ok', t: '访问汇总', d: `已汇总到 ${fmtTime(st.aggMark)}，之后的访问实时读取` });
@@ -6402,15 +6403,15 @@ function idxUrlsView(d, f, reason) {
   const bad = new Set(by.bad.map((r) => idxState(r)));
   // Bing：已收录 / 未收录 / 待检查，和“提交到 Bing”
   const bYes = d.urls.filter((r) => r.b === 'yes').length, bNo = by.bno.length, bWait = d.urls.filter((r) => !r.b || r.b === 'err').length;
-  const bCand = d.urls.filter((r) => r.b !== 'yes' && (!r.bSubmittedAt || r.bSubmittedAt < Date.now() - 30 * 86400000)).length;
+  const bCand = d.urls.filter((r) => (r.b !== 'yes' && (!r.bSubmittedAt || r.bSubmittedAt < Date.now() - 30 * 86400000)) || r.updAt > (r.bSubmittedAt || 0)).length;
   const bingBox = bg ? `<div class="ix-box ix-bing">
-      <div class="ix-bh">${BRAND.bing(14)}<b>Bing</b><span class="sp"></span>${bg.auto ? '<span class="pill on" data-tipf-always data-tipf="每天刷新站点地图后，自动把未收录的网址提交给 Bing（在 设置 → Bing Webmaster 里可以关掉）">自动提交</span>' : ''}</div>
+      <div class="ix-bh">${BRAND.bing(14)}<b>Bing</b><span class="sp"></span>${bg.auto ? '<span class="pill on" data-tipf-always data-tipf="每天刷新站点地图后，自动把未收录的网址、以及站点地图里显示有更新的网址提交给 Bing（在 设置 → Bing Webmaster 里可以关掉）">自动提交</span>' : ''}</div>
       <div class="ix-n"><div class="ix-k yes"><span>${ic('check', 13)}已收录</span><b>${num(bYes)}</b></div>
         <div class="ix-k no"><span>${ic('info', 13)}未收录</span><b>${num(bNo)}</b></div>
         ${bWait ? `<div class="ix-k wait"><span>${ic('history', 13)}待检查</span><b>${num(bWait)}</b></div>` : ''}</div>
       ${ixDone(bYes, bNo, d.urls.length, d.maxUrls, 'Bing', 'Bing Webmaster 后台')}
       ${bg.inIndex ? `<div class="hint ix-done" data-tipf-always data-tipf="Bing 抓取统计里全站“索引中”的网页数（最近一天），和 Bing Webmaster 后台的数字一致；上面的已收录 / 未收录是逐个检查收集到的网址得出的">全站索引中 <b class="ix-all">${num(bg.inIndex)}</b> 个网页${ic('help', 12)}</div>` : ''}
-      <button type="button" class="btn sm" id="ix-bsub" ${bCand && bg.quota !== 0 ? '' : 'disabled'} data-tipf-always data-tipf="${esc(bg.quota === 0 ? '今天的 Bing 提交配额已用完' : `提交 ${bCand} 个网址给 Bing（未收录或未检查，且 30 天内没提交过）${bg.quota != null ? `\n今天剩余配额 ${bg.quota}` : ''}`)}">${ic('send', 13)}提交到 Bing${bCand ? `<small>${num(bg.quota != null ? Math.min(bCand, bg.quota) : bCand)}</small>` : ''}</button>
+      <button type="button" class="btn sm" id="ix-bsub" ${bCand && bg.quota !== 0 ? '' : 'disabled'} data-tipf-always data-tipf="${esc(bg.quota === 0 ? '今天的 Bing 提交配额已用完' : `提交 ${bCand} 个网址给 Bing（未收录或未检查且 30 天内没提交过的，以及提交后又有更新的）${bg.quota != null ? `\n今天剩余配额 ${bg.quota}` : ''}`)}">${ic('send', 13)}提交到 Bing${bCand ? `<small>${num(bg.quota != null ? Math.min(bCand, bg.quota) : bCand)}</small>` : ''}</button>
       ${bg.issues ? `<div class="hint ix-err" data-tipf-always data-tipf="${esc(bg.issues)}">${ic('alert', 13)}<span class="ell">${esc(bg.issues)}</span></div>` : ''}
     </div>` : '';
   const sum = `<div class="ix-sum">
@@ -6435,7 +6436,7 @@ function idxUrlsView(d, f, reason) {
     const [bc, bl] = bingSt(r);
     const btip = [r.bCrawledAt && `Bing 上次抓取 ${fmtTime(r.bCrawledAt)}`, r.bSubmittedAt && `提交于 ${fmtTime(r.bSubmittedAt)}`, r.bCheckedAt && `检查于 ${fmtTime(r.bCheckedAt)}`, r.bError].filter(Boolean).join('\n');
     return `<tr>
-    <td><div class="ix-u"><a class="ell" href="${esc(r.url)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(r.url)}">${esc(urlPath(r.url))}</a>${!(r.src & 1) ? '<i class="ix-tag" data-tipf-always data-tipf="站点地图里没有这个网址">不在站点地图</i>' : ''}</div></td>
+    <td><div class="ix-u"><a class="ell" href="${esc(r.url)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(`${r.url}${r.lastmod ? `\n站点地图里的更新时间 ${fmtTime(r.lastmod)}` : ''}`)}">${esc(urlPath(r.url))}</a>${!(r.src & 1) ? '<i class="ix-tag" data-tipf-always data-tipf="站点地图里没有这个网址">不在站点地图</i>' : ''}${r.updAt > Date.now() - 7 * 86400000 ? `<i class="ix-tag" data-tipf-always data-tipf="${esc(`站点地图里的更新时间变新了（${fmtTime(r.lastmod)}），${bg ? (r.bSubmittedAt > r.updAt ? '已重新提交给 Bing' : '会重新提交给 Bing') : 'Google 会在一天内重新检查'}`)}">有更新</i>` : ''}</div></td>
     ${g ? `<td><span class="ix-st ${r.indexed ? 'yes' : r.problem || (r.checkedAt && r.indexed == null) ? 'bad' : r.checkedAt ? 'no' : 'wait'}"${r.error || r.canon ? ` data-tipf-always data-tipf="${esc(r.error || `Google 选择的规范网址：${r.canon}`)}"` : ''}><i></i><span class="ell">${esc(idxState(r))}</span></span></td>` : ''}
     ${bg ? `<td><span class="ix-st ${bc}"${btip ? ` data-tipf-always data-tipf="${esc(btip)}"` : ''}><i></i><span class="ell">${esc(bl)}</span></span></td>` : ''}
     ${g ? `<td class="num"><span class="sm"${r.crawledAt ? ` data-tipf-always data-tipf="${esc(`上次抓取 ${fmtTime(r.crawledAt)}${r.checkedAt ? `\n检查于 ${fmtTime(r.checkedAt)}` : ''}`)}"` : ''}>${r.crawledAt ? ago(r.crawledAt) : '—'}</span></td>` : ''}
@@ -6465,7 +6466,11 @@ function idxSitemapsView(d) {
     ${d.sitemaps.length ? `<div class="g-scr"><table class="tbl gt ix-sm"><thead><tr><th>站点地图</th><th>状态</th><th class="r">网址</th><th class="r">上次读取</th><th class="r">上次提交</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
       : `<div class="empty">${ic('inbox')}还没有提交站点地图，网站根目录下也没找到 /sitemap.xml</div>`}
     <div class="hint" style="margin-top:10px">站点地图状态每天刷新一次${d.refreshedAt ? `（上次刷新 ${ago(d.refreshedAt)}）` : ''} · <a href="${esc(gscSitemapsUrl(d))}" target="_blank" rel="noopener">在 Search Console 中查看</a></div>` : '';
-  if (!d.bing) return google;
+  // 全局开关：站点地图里出现新网址时，定时任务自动把已提交的站点地图重新提交一遍
+  const auto = `<label class="opt trk-sw ix-sma"><div class="tx"><b>有新网址或网页更新时自动重新提交</b>
+      <span class="hint">每天刷新站点地图时，如果里面多了新网址、或者有网页的更新时间 lastmod 变新了，自动把已提交的站点地图重新提交给 ${d.google && d.bing ? 'Google 和 Bing' : d.google ? 'Google' : 'Bing'}，让它们早点来读取${d.google && !d.canSubmit ? '（Google 需要先重新授权）' : ''}。对所有站点生效</span></div>
+      <span class="switch"><input type="checkbox" id="ix-sma" ${d.smAuto ? 'checked' : ''}><span class="t"></span></span></label>`;
+  if (!d.bing) return google + auto;
   // Bing：已提交的站点地图；Google 那边有、Bing 还没有的也列出来，可以一键提交
   const bf = d.bing.feeds, have = new Set(bf.map((x) => x.path));
   const missing = d.sitemaps.filter((x) => !have.has(x.path)).map((x) => ({ path: x.path, missing: true }));
@@ -6483,7 +6488,7 @@ function idxSitemapsView(d) {
     ${d.bing.issues ? `<div class="hint ix-err" style="margin-bottom:10px">${ic('alert', 13)}<span>${esc(d.bing.issues)}</span></div>` : ''}
     ${brows ? `<div class="g-scr"><table class="tbl gt ix-sm"><thead><tr><th>站点地图</th><th>状态</th><th class="r">网址</th><th class="r">上次读取</th><th class="r">上次提交</th><th></th></tr></thead><tbody>${brows}</tbody></table></div>`
       : `<div class="empty">${ic('inbox')}Bing 里还没有站点地图</div>`}
-    <div class="hint" style="margin-top:10px"><a href="https://www.bing.com/webmasters/sitemaps?siteUrl=${encodeURIComponent(d.bing.site)}" target="_blank" rel="noopener">在 Bing Webmaster 中查看</a></div>`;
+    <div class="hint" style="margin-top:10px"><a href="https://www.bing.com/webmasters/sitemaps?siteUrl=${encodeURIComponent(d.bing.site)}" target="_blank" rel="noopener">在 Bing Webmaster 中查看</a></div>${auto}`;
 }
 // 站点列表的“权重 / 外链”列（设置里开启后才有）：上面是 Open PageRank 分数，下面是 Bing 外链数
 function blTh(BL, sth, lab) {
@@ -6594,6 +6599,12 @@ async function mountSiteIndex(host) {
     if (b.id === 'ix-bsub') return run(b, 'bing-submit', {}, (r) => `已提交 ${r.submitted} 个网址到 Bing${r.quota != null ? `，今天还能提交 ${r.quota} 个` : ''}`);
     if (b.dataset.ixbs) return run(b, 'bing-feed', { path: b.dataset.ixbs }, () => '已把站点地图提交到 Bing');
     if (b.dataset.ixs) return run(b, 'submit', { path: b.dataset.ixs }, () => '已提交站点地图，Google 会在之后几天内重新读取');
+  });
+  body.addEventListener('change', async (e) => {
+    if (e.target.id !== 'ix-sma') return;
+    const on = e.target.checked;
+    try { d = (await api('/google/index/sm-auto', { method: 'POST', body: { host, on } })).index; toast(on ? '已开启：有新网址或网页更新时自动重新提交站点地图' : '已关闭自动重新提交站点地图'); }
+    catch (err) { e.target.checked = !on; toast(err.message, 'bad'); }
   });
 }
 
@@ -7611,7 +7622,7 @@ function renderBingSettings(box, b, onState) {
       ${b.proxy ? `<p class="hint b-proxy">${ic('globe', 13)}<span>Bing 请求经代理发出：</span><code>${esc(new URL(b.proxy).host)}</code></p>` : ''}
       ${b.siteErrors ? `<p class="hint" style="margin-top:8px">${ic('alert', 13)} ${b.siteErrors} 个站点同步出错，到站点详情页查看原因</p>` : ''}
       <label class="opt trk-sw" style="margin-top:16px"><div class="tx"><b>自动提交未收录的网址</b>
-        <span class="hint">每天刷新站点地图后，把 Bing 还没收录、30 天内没提交过的网址提交给 Bing，不超过 Bing 给每个站点的每日配额。</span></div>
+        <span class="hint">每天刷新站点地图后，把 Bing 还没收录、30 天内没提交过的网址，以及站点地图里显示有更新的网址提交给 Bing，不超过 Bing 给每个站点的每日配额。</span></div>
         <span class="switch"><input type="checkbox" id="bing-auto" ${b.auto ? 'checked' : ''}><span class="t"></span></span></label>
       <div id="bing-fw" hidden style="margin-top:16px">${bingForm(b)}</div></div>`;
   const f = box.querySelector('#bing-f');

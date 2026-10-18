@@ -32,3 +32,12 @@ test('isIndexed / hasProblem', () => {
   assert.equal(hasProblem({ fetch: 'SUCCESSFUL', robots: 'ALLOWED', indexing: 'BLOCKED_BY_META_TAG' }), true);
   assert.equal(hasProblem({ fetch: 'SUCCESSFUL', robots: 'ALLOWED', indexing: 'INDEXING_ALLOWED' }), false);
 });
+
+test('parseSitemap 读取 lastmod（没写、写错、未来时间都不算）', () => {
+  const a = parseSitemap(`<urlset><url><loc>https://a.com/</loc><lastmod>2026-05-01</lastmod></url>
+    <url><loc>https://a.com/x</loc><lastmod>2026-05-02T10:00:00+08:00</lastmod><priority>1</priority></url>
+    <url><loc>https://a.com/y</loc></url><url><loc>https://a.com/z</loc><lastmod>bad</lastmod></url>
+    <url><loc>https://a.com/f</loc><lastmod>2999-01-01</lastmod></url></urlset>`);
+  assert.deepEqual(a.locs, ['https://a.com/', 'https://a.com/x', 'https://a.com/y', 'https://a.com/z', 'https://a.com/f']);
+  assert.deepEqual([...a.mods], [['https://a.com/', Date.UTC(2026, 4, 1)], ['https://a.com/x', Date.UTC(2026, 4, 2, 2)]]);
+});

@@ -21,6 +21,8 @@ const MAX_URLS = 500, QUOTA = 1800, RUN_LIMIT = 500, SITEMAP_PER_RUN = 8, CONCUR
 // 搜索数据每次最多取 SC_ROWS 行（接口上限）；有展示的网址记成这个状态（以 Indexed 开头，算已编入）
 const SC_ROWS = 25000, SEEN_STATE = 'Indexed, seen in search results';
 const B_RUN_LIMIT = 40, B_GAP = 6500, B_BUDGET = 240000, B_AUTO_MAX = 100, NEVER = 9e15;
+// 站点地图里出现新网址时自动重新提交：每边每个站点最多提交几个站点地图
+const SM_AUTO_MAX = 5;
 const ymd = (t) => new Date(t).toISOString().slice(0, 10);
 const API = 'https://www.googleapis.com/webmasters/v3/sites/';
 
@@ -59,14 +61,25 @@ export function inProperty(url, site) {
 }
 
 // 从站点地图 XML 里取 <loc>；返回 { index: 是否为索引文件, locs }
+const LOC_RE = /<loc>\s*(?:<!\[CDATA\[)?\s*([^<\]]+?)\s*(?:\]\]>)?\s*<\/loc>/i;
+const unent = (v) => v.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+// 读取 <loc> 和 <lastmod>（网页的最后更新时间，毫秒；没写、写错或写成一天以后的未来时间都当 0）
 export function parseSitemap(xml) {
-  const locs = [];
-  const re = /<loc>\s*(?:<!\[CDATA\[)?\s*([^<\]]+?)\s*(?:\]\]>)?\s*<\/loc>/gi;
+  const locs = [], mods = new Map(), soon = Date.now() + DAY;
+  const re = /<(url|sitemap)[\s>]([\s\S]*?)<\/\1>/gi;
   let m;
   while ((m = re.exec(xml))) {
-    locs.push(m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'"));
+    const loc = LOC_RE.exec(m[2]);
+    if (!loc) continue;
+    const u = unent(loc[1]);
+    locs.push(u);
+    const lm = /<lastmod>\s*([^<\s]+)\s*<\/lastmod>/i.exec(m[2]);
+    const t = lm ? Date.parse(lm[1]) || 0 : 0;
+    if (t > 0 && t < soon) mods.set(u, t);
   }
-  return { index: /<sitemapindex[\s>]/i.test(xml), locs };
+  // 没有 <url> / <sitemap> 包着的（不规范的站点地图）：只取网址
+  if (!locs.length) for (const x of xml.matchAll(new RegExp(LOC_RE.source, 'gi'))) locs.push(unent(x[1]));
+  return { index: /<sitemapindex[\s>]/i.test(xml), locs, mods };
 }
 
 // 站点地图最多读 MAX_BYTES（解压后），超过就只用已读到的部分，避免超大文件或压缩炸弹撑爆内存
@@ -102,7 +115,7 @@ async function fetchText(url) {
 
 // 读取站点地图里的网址：索引文件最多再读 20 个子站点地图
 async function sitemapUrls(paths, site) {
-  const out = new Set(), errors = [];
+  const out = new Set(), mods = new Map(), errors = [];
   const queue = [...paths], seen = new Set();
   let fetched = 0;
   while (queue.length && fetched < 21 && out.size < MAX_URLS * 2) {
@@ -110,13 +123,13 @@ async function sitemapUrls(paths, site) {
     if (seen.has(p)) continue;
     seen.add(p); fetched++;
     try {
-      const { index, locs } = parseSitemap(await fetchText(p));
+      const { index, locs, mods: lm } = parseSitemap(await fetchText(p));
       // 索引文件里的子站点地图也必须属于这个站点
       if (index) queue.push(...locs.filter((u) => inProperty(u, site)));
-      else for (const u of locs) if (inProperty(u, site)) out.add(u);
+      else for (const u of locs) if (inProperty(u, site)) { out.add(u); if (lm.has(u)) mods.set(u, Math.max(mods.get(u) || 0, lm.get(u))); }
     } catch (e) { errors.push(`${p}：${e.message}`); }
   }
-  return { urls: [...out], errors };
+  return { urls: [...out], mods, errors };
 }
 
 const n = (v) => Number(v) || 0;
@@ -134,10 +147,40 @@ const prop = (s) => (hasG(s) ? s.gsc_site : `sc-domain:${s.host}`);
 const origin = (s) => (hasG(s) && !s.gsc_site.startsWith('sc-domain:') ? s.gsc_site.replace(/\/$/, '') : s.bing_site ? s.bing_site.replace(/\/$/, '') : `https://${s.host}`);
 const today = () => ymd(Date.now());
 
+// 设置：站点地图有新网址时自动重新提交（默认开启）
+export const smAuto = async (env) => (await env.DB.prepare("SELECT value FROM settings WHERE key = 'sm_auto'").first('value')) !== '0';
+export async function setSmAuto(env, on) {
+  await env.DB.prepare(
+    `INSERT INTO settings (key, value, updated_at) VALUES ('sm_auto', ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+  ).bind(on ? '1' : '0', Date.now()).run();
+  return { ok: true };
+}
+
+// 把已经提交过的站点地图重新提交给 Google 和 Bing（站点地图里出现新网址时，定时任务调用），提交成功的更新“上次提交”时间。
+// Google 需要 webmasters 写权限，没有就跳过；只提交已经提交过的，网站根目录下找到、还没提交的（local）不动
+async function resubmitSitemaps(env, secret, s, bkey, list, bf) {
+  const now = Date.now(), gErrs = [], bErrs = [];
+  if (hasG(s) && await canSubmit(env, secret, s.gsc_acct)) {
+    for (const x of list.filter((x) => !x.local).slice(0, SM_AUTO_MAX)) {
+      try { await gfetch(env, secret, s.gsc_acct, `${API}${encodeURIComponent(s.gsc_site)}/sitemaps/${encodeURIComponent(x.path)}`, undefined, 'PUT'); x.submitted = now; }
+      catch (e) { if (e.budget) return { gErrs, bErrs }; gErrs.push(`${urlTail(x.path)}：${e.message}`); }
+    }
+  }
+  if (s.bing_site && bkey) {
+    for (const x of bf.slice(0, SM_AUTO_MAX)) {
+      try { await bing.submitFeed(bkey, s.bing_site, x.path); x.submitted = now; }
+      catch (e) { if (e.budget) return { gErrs, bErrs }; bErrs.push(`${urlTail(x.path)}：${e.message}`); }
+    }
+  }
+  return { gErrs, bErrs };
+}
+const urlTail = (u) => { try { return new URL(u).pathname; } catch { return u; } };
+
 // 刷新一个站点的站点地图列表和网址清单（只写有变化的行）；auto = true（只有定时任务这样调用）且 Bing 开着自动提交时顺便提交
 export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
   const now = Date.now(), errs = [];
-  const old = await env.DB.prepare('SELECT list, b_feeds, g_on, b_on FROM g_sitemaps WHERE host = ?').bind(s.host).first();
+  const old = await env.DB.prepare('SELECT list, b_feeds, g_on, b_on, urls FROM g_sitemaps WHERE host = ?').bind(s.host).first();
   // 先记下这次刷新的时间：万一读到一半出事（比如超大的站点地图），这个站点今天不会被反复重试
   await env.DB.prepare('INSERT INTO g_sitemaps (host, at) VALUES (?, ?) ON CONFLICT(host) DO UPDATE SET at = excluded.at').bind(s.host, now).run();
   let list = [], bfeeds = null, berr = '', unsure = false;
@@ -167,7 +210,7 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
       if (e.status !== 404 && e.status !== 410) unsure = true;
     }
   }
-  const sm = paths.length ? await sitemapUrls(paths, prop(s)) : { urls: [], errors: [] };
+  const sm = paths.length ? await sitemapUrls(paths, prop(s)) : { urls: [], mods: new Map(), errors: [] };
   if (sm.errors.length) errs.push(`读取站点地图失败：${sm.errors.slice(0, 2).join('；')}`);
   // 在 Google 搜索结果里有展示的页面：近 28 天的补进网址清单（按点击排前 MAX_URLS 个），并直接记为已编入；
   // 近 3 个月的网页数存起来，作为站点级“至少已编入”的数字
@@ -187,26 +230,31 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
     if (want.size >= MAX_URLS) break;
     if (!want.has(u)) want.set(u, (inSm.has(u) ? 1 : 0) | (inSc.has(u) ? 2 : 0));
   }
-  const have = new Map((await env.DB.prepare('SELECT url, src, state, verdict, due_at FROM g_urls WHERE host = ?').bind(s.host).all()).results.map((r) => [r.url, r]));
+  const have = new Map((await env.DB.prepare('SELECT url, src, state, verdict, due_at, lastmod FROM g_urls WHERE host = ?').bind(s.host).all()).results.map((r) => [r.url, r]));
   const stmts = [];
   // 拿不到网址、又有出错或说不准的时候不删旧数据（免得一次接口抖动就丢掉收录状态和提交记录）
   const reliable = want.size > 0 || (!errs.length && !unsure);
   // 没关联的一边不排检查（NEVER）；之后关联上了再放开
   const gOn = hasG(s) ? 1 : 0, bOn = s.bing_site ? 1 : 0;
   const gDue = gOn ? 0 : NEVER, bDue = bOn ? 0 : NEVER;
-  let changed = 0;
+  let changed = 0, lmBase = 0;
+  const mods = [];   // [网址, 最后更新时间, 是否算更新]
   // 有搜索展示的网址：7 天后（加点随机）再看；每天刷新时还在展示就继续往后推，一直不用逐个检查
   const later = () => now + 7 * DAY + Math.floor(Math.random() * 12 * HOUR);
   for (const [u, src] of want) {
     const r = have.get(u), hit = gOn && seen.has(u);
     if (!r) {
       stmts.push(hit
-        ? env.DB.prepare("INSERT INTO g_urls (host, url, src, state, verdict, checked_at, due_at, b_due_at) VALUES (?, ?, ?, ?, 'PASS', ?, ?, ?)").bind(s.host, u, src, SEEN_STATE, now, later(), bDue)
-        : env.DB.prepare('INSERT INTO g_urls (host, url, src, due_at, b_due_at) VALUES (?, ?, ?, ?, ?)').bind(s.host, u, src, gDue, bDue));
+        ? env.DB.prepare("INSERT INTO g_urls (host, url, src, state, verdict, checked_at, due_at, b_due_at, lastmod) VALUES (?, ?, ?, ?, 'PASS', ?, ?, ?, ?)").bind(s.host, u, src, SEEN_STATE, now, later(), bDue, sm.mods.get(u) || 0)
+        : env.DB.prepare('INSERT INTO g_urls (host, url, src, due_at, b_due_at, lastmod) VALUES (?, ?, ?, ?, ?, ?)').bind(s.host, u, src, gDue, bDue, sm.mods.get(u) || 0));
       changed++;
       continue;
     }
     if (r.src !== src) stmts.push(env.DB.prepare('UPDATE g_urls SET src = ? WHERE host = ? AND url = ?').bind(src, s.host, u));
+    // 站点地图里的最后更新时间变了：记下来；比上次记的新，才算“网页有更新”（第一次读到时只记下，不算更新）
+    const lm = sm.mods.get(u) || 0;
+    if (lm && lm !== r.lastmod) { mods.push([u, lm, r.lastmod > 0 && lm > r.lastmod]); if (r.lastmod > 0) lmBase++; }
+    else if (lm) lmBase++;
     if (!hit) continue;
     // 还没有结果（没查过或查失败）：直接记为已编入；已经查出已编入、快到复查时间的：往后推。查出未编入的不动，以检查结果为准
     if (!r.state) {
@@ -215,6 +263,15 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
     } else if (isIndexed(r) && r.due_at < now + DAY) {
       stmts.push(env.DB.prepare('UPDATE g_urls SET due_at = ? WHERE host = ? AND url = ?').bind(later(), s.host, u));
     }
+  }
+  // 网页有更新的：Bing 那边排进提交（upd_at 比上次提交时间新就会提交，见 bingSubmit），Google 一天内重新检查一次。
+  // 很多建站工具每次构建都把所有网页的更新时间改成当天，这种情况一次会有一大半同时变：看作不可信，只记下新时间，不逐个提交
+  const updated = mods.filter((x) => x[2]).length;
+  const lmTrusted = updated <= 10 || updated <= lmBase / 2;
+  for (const [u, lm, upd] of mods) {
+    stmts.push(upd && lmTrusted
+      ? env.DB.prepare('UPDATE g_urls SET lastmod = ?, upd_at = ?, due_at = CASE WHEN due_at < ? THEN MIN(due_at, ?) ELSE due_at END WHERE host = ? AND url = ?').bind(lm, now, NEVER, now + DAY, s.host, u)
+      : env.DB.prepare('UPDATE g_urls SET lastmod = ? WHERE host = ? AND url = ?').bind(lm, s.host, u));
   }
   if (reliable) for (const u of have.keys()) if (!want.has(u)) { stmts.push(env.DB.prepare('DELETE FROM g_urls WHERE host = ? AND url = ?').bind(s.host, u)); changed++; }
   // 关联状态变了才调整已有网址的排期（平时不用整站扫一遍）
@@ -225,6 +282,14 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
   if (have.size && old?.b_on !== bOn) {
     stmts.push(bOn ? env.DB.prepare('UPDATE g_urls SET b_due_at = 0 WHERE host = ? AND b_due_at >= ?').bind(s.host, NEVER)
       : env.DB.prepare('UPDATE g_urls SET b_due_at = ? WHERE host = ? AND b_due_at < ?').bind(NEVER, s.host, NEVER));
+  }
+  // 站点地图里出现了新网址（以前没有记录，或以前只是搜索结果里的页面；网址太多存不下时看总数有没有变多），或者有网页的更新时间变新了：
+  // 定时任务把已提交的站点地图重新提交一遍，让 Google / Bing 早点重新读取。第一次读取、读取出错时不算
+  const smNew = [...want].filter(([u, src]) => src & 1 && !(have.get(u)?.src & 1)).length;
+  if (auto && old && (have.size || old.urls > 0) && !sm.errors.length && (smNew || updated || sm.urls.length > old.urls) && await smAuto(env)) {
+    const r = await resubmitSitemaps(env, secret, s, bkey, list, bf);
+    if (r.gErrs.length) errs.push(`自动重新提交站点地图失败：${r.gErrs.slice(0, 2).join('；')}`);
+    if (r.bErrs.length) berr = [berr, `自动重新提交站点地图失败：${r.bErrs.slice(0, 2).join('；')}`].filter(Boolean).join('；');
   }
   stmts.push(env.DB.prepare(
     `UPDATE g_sitemaps SET list = ?, urls = ?, error = ?, at = ?, b_feeds = ?, b_error = ?, g_on = ?, b_on = ? WHERE host = ?`
@@ -241,7 +306,7 @@ export async function refreshSite(env, secret, s, bkey, { auto = false } = {}) {
       await env.DB.prepare('UPDATE g_sitemaps SET b_quota = 0, b_quota_at = ?, b_error = ? WHERE host = ?').bind(Date.now(), `自动提交失败：${String(e.message).slice(0, 150)}`, s.host).run();
     });
   }
-  return { urls: want.size, added: [...want.keys()].filter((u) => !have.has(u)).length };
+  return { urls: want.size, added: [...want.keys()].filter((u) => !have.has(u)).length, updated: lmTrusted ? updated : 0 };
 }
 
 // ---------------------------------------------------------------- Google：网址检查
@@ -366,8 +431,9 @@ export async function bingSubmit(env, key, s, { urls, limit = 500 } = {}) {
   let left = m && m.b_quota >= 0 && ymd(m.b_quota_at) === today() ? m.b_quota : await bing.quota(key, s.bing_site).then((q) => Math.min(q.day, q.month || q.day));
   let list = urls;
   if (!list) {
-    list = (await env.DB.prepare(`SELECT url FROM g_urls WHERE host = ? AND b_state != 'yes' AND b_submitted_at < ?
-      ORDER BY b_state = 'no' DESC, src & 1 DESC, url LIMIT ?`).bind(s.host, Date.now() - 30 * DAY, Math.max(0, Math.min(left, limit))).all()).results.map((r) => r.url);
+    // 未收录、30 天内没提交过的，加上提交之后网页又有更新的（已收录的也提交，让 Bing 重新抓取）
+    list = (await env.DB.prepare(`SELECT url FROM g_urls WHERE host = ? AND ((b_state != 'yes' AND b_submitted_at < ?) OR upd_at > b_submitted_at)
+      ORDER BY b_state = 'no' DESC, upd_at > b_submitted_at DESC, src & 1 DESC, url LIMIT ?`).bind(s.host, Date.now() - 30 * DAY, Math.max(0, Math.min(left, limit))).all()).results.map((r) => r.url);
   } else list = list.slice(0, Math.max(0, left));
   if (list.length) await bing.submitUrls(key, s.bing_site, list);
   left = Math.max(0, left - list.length);
@@ -437,13 +503,13 @@ export async function siteIndex(env, secret, host) {
   // 第一次打开：先把站点地图和网址清单拉下来
   if (!m?.at) { await refreshSite(env, secret, s, await bingKey(env, secret)); m = await env.DB.prepare('SELECT * FROM g_sitemaps WHERE host = ?').bind(host).first(); }
   const urls = (await env.DB.prepare(`SELECT url, src, state, verdict, fetch, robots, indexing, canon, crawled_at, checked_at, error,
-    b_state, b_crawled_at, b_checked_at, b_submitted_at, b_error FROM g_urls WHERE host = ?`).bind(host).all()).results;
+    b_state, b_crawled_at, b_checked_at, b_submitted_at, b_error, lastmod, upd_at FROM g_urls WHERE host = ?`).bind(host).all()).results;
   const email = hasG(s) ? await env.DB.prepare('SELECT email FROM g_accounts WHERE id = ?').bind(s.gsc_acct).first('email') : '';
   return {
     host, google: hasG(s), site: s.gsc_site || '', email: email || '', canSubmit: hasG(s) ? await canSubmit(env, secret, s.gsc_acct) : false,
     sitemaps: m ? JSON.parse(m.list || '[]') : [], sitemapUrls: m?.urls || 0, refreshedAt: m?.at || 0, issues: m?.error || '',
     quota: m?.q_day === today() ? m.q_n : 0, quotaMax: QUOTA, maxUrls: MAX_URLS,
-    scPages: hasG(s) && m?.sc_pages >= 0 ? m.sc_pages : null, scRows: SC_ROWS,
+    scPages: hasG(s) && m?.sc_pages >= 0 ? m.sc_pages : null, scRows: SC_ROWS, smAuto: await smAuto(env),
     bing: s.bing_site ? {
       site: s.bing_site, feeds: JSON.parse(m?.b_feeds || '[]'), issues: m?.b_error || '', auto: await bing.bingAuto(env),
       quota: m && m.b_quota >= 0 && ymd(m.b_quota_at) === today() ? m.b_quota : null,
@@ -452,7 +518,8 @@ export async function siteIndex(env, secret, host) {
     } : null,
     urls: urls.map((r) => ({ url: r.url, src: r.src, state: r.state, fetch: r.fetch, robots: r.robots, indexing: r.indexing, canon: r.canon,
       crawledAt: r.crawled_at || null, checkedAt: r.checked_at || null, error: r.error, indexed: r.checked_at && r.state ? isIndexed(r) : null, problem: hasProblem(r),
-      b: r.b_state || '', bCrawledAt: r.b_crawled_at || null, bCheckedAt: r.b_checked_at || null, bSubmittedAt: r.b_submitted_at || null, bError: r.b_error || '' })),
+      b: r.b_state || '', bCrawledAt: r.b_crawled_at || null, bCheckedAt: r.b_checked_at || null, bSubmittedAt: r.b_submitted_at || null, bError: r.b_error || '',
+      lastmod: r.lastmod || null, updAt: r.upd_at || null })),
   };
 }
 

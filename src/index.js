@@ -283,7 +283,7 @@ async function runCron(env, at = Date.now(), { manual = false, token = '', start
 // 每个 Worker 实例只执行一次；表已存在时 CREATE ... IF NOT EXISTS 不会有影响
 // 数据库版本：表结构（schema.sql 的内容）或下面 migrate() 里的补列有变化时才真正执行，平时每个实例只读一行设置。
 // 改了 migrate() 里的补列逻辑时把 MIGRATE_REV 加一
-const MIGRATE_REV = 6;
+const MIGRATE_REV = 7;
 const hashStr = (t) => { let h = 2166136261; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619); return (h >>> 0).toString(36); };
 const SCHEMA_VER = `${hashStr(SCHEMA_SQL)}-${MIGRATE_REV}`;
 let schemaReady = null;
@@ -347,6 +347,8 @@ async function migrate(env) {
   const dcols = (await env.DB.prepare('PRAGMA table_info(g_daily)').all()).results.map((c) => c.name);
   if (!dcols.includes('channels')) await env.DB.prepare('ALTER TABLE g_daily ADD COLUMN channels TEXT').run();
   for (const c of ['b_clicks', 'b_impressions']) if (!dcols.includes(c)) await env.DB.prepare(`ALTER TABLE g_daily ADD COLUMN ${c} INTEGER`).run();
+  const ucols = (await env.DB.prepare('PRAGMA table_info(g_urls)').all()).results.map((c) => c.name);
+  for (const c of ['lastmod', 'upd_at']) if (!ucols.includes(c)) await env.DB.prepare(`ALTER TABLE g_urls ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`).run();
   const scols = (await env.DB.prepare('PRAGMA table_info(g_sitemaps)').all()).results.map((c) => c.name);
   for (const c of ['g_on', 'b_on', 'sc_pages']) if (!scols.includes(c)) await env.DB.prepare(`ALTER TABLE g_sitemaps ADD COLUMN ${c} INTEGER NOT NULL DEFAULT -1`).run();
   if (!scols.includes('sc_at')) await env.DB.prepare('ALTER TABLE g_sitemaps ADD COLUMN sc_at INTEGER NOT NULL DEFAULT 0').run();
@@ -2484,6 +2486,7 @@ async function googleApi(request, env, url) {
         : path === '/api/google/index/submit' ? await gindex.submitSitemap(env, secret, host, String(b.path || ''))
         : path === '/api/google/index/bing-feed' ? await gindex.bingFeed(env, secret, host, String(b.path || ''))
         : path === '/api/google/index/bing-submit' ? await gindex.bingSubmitNow(env, secret, host, b.url ? String(b.url) : '')
+        : path === '/api/google/index/sm-auto' ? await gindex.setSmAuto(env, !!b.on)
         : { error: 'not found' };
       return r.error ? json(r, 400) : json({ ...r, index: await gindex.siteIndex(env, secret, host) });
     }
