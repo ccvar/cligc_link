@@ -5861,6 +5861,7 @@ function renderGoogleSettings(box, st, onState) {
 
 // 站点列表 / 站点详情：切换时间范围等会用同一个 routeToken 重新加载，按请求序号丢掉较慢的旧结果
 let sitesSeq = 0, siteSeq = 0;
+let gFresh = false;   // 下一次加载站点列表时跳过缓存（手动同步完成后）
 async function renderSites(token) {
   const my = ++sitesSeq;
   // 接了 Bing 时标题和说明带上 Bing（记住上次的结果，首屏也不会闪）
@@ -5897,7 +5898,9 @@ async function renderSites(token) {
     return;
   }
 
-  const d = await api('/google/sites?days=' + gState.days);
+  // 刚手动同步完：让服务端用最新数据重算列表，不沿用缓存
+  const d = await api('/google/sites?days=' + gState.days + (gFresh ? '&fresh=1' : ''));
+  gFresh = false;
   const BL = d.bl || {};   // 外链与权重开了哪几项
   if (token !== routeToken || my !== sitesSeq) return;
   const hasBing = d.items.some((x) => x.bing);
@@ -6135,6 +6138,7 @@ async function renderSites(token) {
       setRunning(false);
       if (token !== routeToken) return;
       toast(wasStopped ? '已停止同步。已同步的站点会保留，剩下的由定时任务每小时继续' : '同步完成，列表已更新', wasStopped ? 'warn' : 'ok');
+      gFresh = true;
       renderSites(routeToken);
     } catch (err) { toast(err.message, 'bad'); prog.hidden = true; setRunning(false); }
   };

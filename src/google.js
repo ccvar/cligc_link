@@ -407,8 +407,10 @@ export async function rebuildSites(env) {
         env.DB.prepare('DELETE FROM g_urls WHERE host = ?').bind(host), env.DB.prepare('DELETE FROM g_sitemaps WHERE host = ?').bind(host));
     }
   }
-  // 有变化才更新数据版本（站点列表的缓存据此失效）
-  if (stmts.length) stmts.push(gVerStmt(env));
+  // 有变化才更新数据版本；站点本身变了（新站点、关联关系、GA4 接入时间）另记 sites_ver，站点列表的缓存立即失效
+  if (stmts.length) stmts.push(gVerStmt(env), env.DB.prepare(
+    "INSERT INTO settings (key, value, updated_at) VALUES ('sites_ver', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+  ).bind(String(now), now));
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
   return { sites: sites.size, changed: stmts.length };
 }
@@ -611,7 +613,8 @@ export function ranges(days) {
 
 // 站点列表缓存 5 分钟；数据版本（Google 数据版本、访问汇总进度、短链改动、账号数）变了就重算。
 // 其中按天汇总 Google 数据的部分最耗读取，单独按 Google 数据版本缓存，访问汇总每小时推进时不用重读
-export async function sitesList(env, days) {
+// fresh：刚手动同步完，Google / Bing 数据变了就重算（不沿用一小时内的旧结果）
+export async function sitesList(env, days, { fresh = false } = {}) {
   const v = await env.DB.prepare(`SELECT
       COALESCE((SELECT value FROM settings WHERE key = 'g_ver'), '0') || ':' || (SELECT COUNT(*) FROM g_sites) AS g,
       (SELECT value FROM settings WHERE key = 'agg_mark') AS a,
@@ -619,13 +622,15 @@ export async function sitesList(env, days) {
       (SELECT COALESCE(MAX(updated_at), 0) || ':' || COUNT(*) FROM link_targets) AS t,
       (SELECT COUNT(*) FROM g_accounts) AS n,
       (SELECT value FROM settings WHERE key = 'tags_ver') AS tv,
-      (SELECT value FROM settings WHERE key = 'bl_ver') AS bv`).first();
+      (SELECT value FROM settings WHERE key = 'bl_ver') AS bv,
+      (SELECT value FROM settings WHERE key = 'sites_ver') AS sv`).first();
   // 固定的缓存键（每个时间范围一行，覆盖写，不会越积越多）；版本存在值里。
-  // 短链、分组、访问汇总、外链开关变了立即重算；Google / Bing 数据每小时都会小幅更新，变了以后最多沿用一小时
-  const rest = `${ranges(days).to}|${v.a}|${v.l}|${v.t}|${v.n}|${v.tv || 0}|${v.bv || 0}`;
+  // 短链、分组、访问汇总、外链开关、站点本身（新站点、关联关系、GA4 接入时间）变了立即重算；
+  // Google / Bing 数据每小时都会小幅更新，变了以后最多沿用一小时
+  const rest = `${ranges(days).to}|${v.a}|${v.l}|${v.t}|${v.n}|${v.tv || 0}|${v.bv || 0}|${v.sv || 0}`;
   const hit = await cacheGet(env, `sites|${days}`);
-  if (hit && hit.rest === rest && (hit.g === v.g || hit.at > Date.now() - 3600000)) return hit.data;
-  const out = await sitesListRaw(env, days, v.g);
+  if (hit && hit.rest === rest && (hit.g === v.g || (!fresh && hit.at > Date.now() - 3600000))) return hit.data;
+  const out = await sitesListRaw(env, days, v.g, fresh);
   await cachePut(env, `sites|${days}`, { rest, g: v.g, at: Date.now(), data: out });
   return out;
 }
@@ -645,10 +650,10 @@ async function cachePut(env, k, val) {
 
 // 每个站点区间内的 Google / Bing 数据汇总和每日序列。按日期范围读 g_daily（有日期索引），是站点列表最耗读取的部分：
 // 数据版本没变就一直用缓存；变了（每小时同步都会小幅更新）最多沿用一小时再重算
-async function sitesDaily(env, days, ver) {
+async function sitesDaily(env, days, ver, fresh = false) {
   const { from, to, pfrom, pto } = ranges(days);
   const hit = await cacheGet(env, `sitesd|${days}`);
-  if (hit && hit.to === to && (hit.ver === ver || hit.at > Date.now() - 3600000)) return hit.data;
+  if (hit && hit.to === to && (hit.ver === ver || (!fresh && hit.at > Date.now() - 3600000))) return hit.data;
   const rows = (await env.DB.prepare('SELECT * FROM g_daily WHERE date >= ? AND date <= ?').bind(pfrom, to).all()).results;
   const byHost = new Map();
   for (const r of rows) { if (!byHost.has(r.host)) byHost.set(r.host, []); byHost.get(r.host).push(r); }
@@ -685,11 +690,11 @@ function blFields(s, detail = false) {
   return out;
 }
 
-async function sitesListRaw(env, days, ver) {
+async function sitesListRaw(env, days, ver, fresh = false) {
   const [sites, daily] = await Promise.all([
     env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email, m.n_urls, m.n_yes, m.n_done, m.nb_yes, m.nb_done FROM g_sites s
       LEFT JOIN g_accounts a ON a.id = s.ga4_acct LEFT JOIN g_accounts b ON b.id = s.gsc_acct LEFT JOIN g_sitemaps m ON m.host = s.host ORDER BY s.host`).all().then((r) => r.results),
-    sitesDaily(env, days, ver),
+    sitesDaily(env, days, ver, fresh),
   ]);
   const hostSet = new Set(sites.map((s) => s.host));
   const tagRows = (await env.DB.prepare('SELECT host, tag FROM site_tags ORDER BY tag').all()).results;

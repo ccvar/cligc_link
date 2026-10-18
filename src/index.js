@@ -2500,7 +2500,7 @@ async function googleApi(request, env, url) {
     }
     const days = google.RANGE_DAYS.includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 28;
     // bl：外链与权重开了哪几项（不进缓存，开关一变立即生效）
-    if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days), bl: await backlinks.blFlags(env) });
+    if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days, { fresh: url.searchParams.get('fresh') === '1' }), bl: await backlinks.blFlags(env) });
     if (path === '/api/google/tags' && method === 'GET') return json({ tags: await google.tagsList(env) });
     if (path === '/api/google/tags' && method === 'PUT') {
       const r = await google.tagsUpdate(env, await request.json().catch(() => ({})));
