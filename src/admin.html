@@ -1984,17 +1984,21 @@ html.masked input:focus { filter: none; }
 .ix-sm + .hint, .ix-auth + .ix-err { margin-top: 10px; }
 /* 手机上卡片内边距收小一点（左右用 --cp，表格首尾列、列表行也跟着变），放在最后覆盖前面的桌面值 */
 @media (max-width: 640px) {
-  :root { --cp: 14px; }
-  .card-h { padding-top: 12px; }
-  .card-b { padding: 12px var(--cp) 14px; }
-  .fold-h { padding-bottom: 12px; }
-  .acc-i .fold-h { gap: 12px; padding-top: 14px; padding-bottom: 14px; }
-  .acc-i .card-b { padding-top: 10px; }
-  .hero { padding: 16px var(--cp); gap: 16px; }
-  .kc { padding: 12px var(--cp); }
-  .lrow { padding: 12px var(--cp); }
-  .opt { padding: 11px 12px; }
+  :root { --cp: 12px; }
+  .wrap, .shell.mini .wrap { padding: 18px 12px 56px; }
+  .stack, .grid2, .g-main, .g3, .kpis { gap: 12px; }
+  .ph { margin-bottom: 18px; }
+  .card-h { padding-top: 10px; }
+  .card-b { padding: 10px var(--cp) 12px; }
+  .fold-h { padding-bottom: 10px; }
+  .acc-i .fold-h { gap: 10px; padding-top: 12px; padding-bottom: 12px; }
+  .acc-i .card-b { padding-top: 8px; }
+  .hero { padding: 14px var(--cp); gap: 14px; }
+  .kc { padding: 10px var(--cp); }
+  .lrow { padding: 10px var(--cp); }
+  .opt { padding: 10px; }
   .ix-box { padding: 10px; }
+  .adv-hd[aria-expanded="false"] { padding-bottom: 12px; }
   /* 设置里的账号 / API Key 行：文字占满一行，按钮换到下一行（和文字左对齐），不再把文字挤成好几行 */
   .g-acc-r { flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; }
   .g-acc-t { flex-basis: calc(100% - 38px); }
