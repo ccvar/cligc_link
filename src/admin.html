@@ -1982,6 +1982,24 @@ html.masked input:focus { filter: none; }
 .ix-err svg { flex: none; }
 .ix-err .ell { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ix-sm + .hint, .ix-auth + .ix-err { margin-top: 10px; }
+/* 手机上卡片内边距收小一点（左右用 --cp，表格首尾列、列表行也跟着变），放在最后覆盖前面的桌面值 */
+@media (max-width: 640px) {
+  :root { --cp: 14px; }
+  .card-h { padding-top: 12px; }
+  .card-b { padding: 12px var(--cp) 14px; }
+  .fold-h { padding-bottom: 12px; }
+  .acc-i .fold-h { gap: 12px; padding-top: 14px; padding-bottom: 14px; }
+  .acc-i .card-b { padding-top: 10px; }
+  .hero { padding: 16px var(--cp); gap: 16px; }
+  .kc { padding: 12px var(--cp); }
+  .lrow { padding: 12px var(--cp); }
+  .opt { padding: 11px 12px; }
+  .ix-box { padding: 10px; }
+  /* 设置里的账号 / API Key 行：文字占满一行，按钮换到下一行（和文字左对齐），不再把文字挤成好几行 */
+  .g-acc-r { flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; }
+  .g-acc-t { flex-basis: calc(100% - 38px); }
+  .g-acc-r > .btn:first-of-type { margin-left: 38px; }
+}
 </style>
 </head>
 <body>
