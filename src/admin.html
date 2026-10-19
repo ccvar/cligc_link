@@ -2044,6 +2044,16 @@ html.masked input:focus { filter: none; }
 .hq-tb { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .hq-tb .qf { margin: 0; flex-wrap: nowrap; }
 .hq-kw { width: 180px; min-width: 0; }
+.hq-x { width: min(348px, calc(100vw - 16px)); padding: 10px; }
+.hq-x .qf { margin: 0 0 10px; flex-wrap: wrap; overflow: visible; }   /* 手机上筛选按钮默认排一行横向滚动，面板里要换行 */
+/* 面板里的选项按钮沿用筛选按钮的样子（.menu button 是整行菜单项的样式，这里还原） */
+.hq-x .qf button { display: inline-flex; width: auto; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text-2); font-size: 12.5px; }
+.hq-x .qf button:hover { background: var(--panel); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); color: var(--text); }
+.hq-x .qf button.on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-2); color: var(--accent-ink); font-weight: 550; }
+.hq-xl { font-size: 12px; color: var(--muted); margin: 2px 2px 6px; }
+.hq-xn { font-size: 12.5px; color: var(--text-2); margin: 2px 2px 0; }
+.hq-xn b { color: var(--text); font-variant-numeric: tabular-nums; }
+.hq-x button[role=menuitem]:disabled { opacity: .45; cursor: default; background: none; }
 .hq-more { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 10px 8px 12px; border-radius: 10px; background: var(--sunken); color: var(--text-2); font-size: 12.5px; }
 .hq-more > svg { flex: none; color: var(--muted); }
 .hq-err { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
@@ -6251,7 +6261,7 @@ async function aiApiDialog() {
 async function hotQueriesDialog(hosts) {
   const { d, close } = gaDlg('hq-d');
   const days = gState.days;
-  d.innerHTML = `<div id="hq"><div class="dlg-h"><h3>${ic('flame', 18)}热门搜索词</h3><span class="sp"></span><button type="button" class="btn ghost icon" id="hq-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV" disabled>${ic('dl', 17)}</button><button type="button" class="btn ghost icon" data-x aria-label="关闭">${ic('x', 18)}</button></div>
+  d.innerHTML = `<div id="hq"><div class="dlg-h"><h3>${ic('flame', 18)}热门搜索词</h3><span class="sp"></span><button type="button" class="btn ghost icon" id="hq-csv" data-tipf-always data-tipf="导出当前列表（按当前筛选和排序）" aria-label="导出" aria-haspopup="menu" aria-expanded="false" disabled>${ic('dl', 17)}</button><button type="button" class="btn ghost icon" data-x aria-label="关闭">${ic('x', 18)}</button></div>
     <div class="hint hq-sub">${hosts.length} 个站点 · 最近 ${days} 天 · 热度 = 搜索结果里的展示次数，同一个词在各站点的数据加在一起</div>
     <div class="hq-b">${skel(260)}</div></div>`;
   d.querySelector('[data-x]').onclick = close;
@@ -6269,22 +6279,68 @@ async function hotQueriesDialog(hosts) {
   };
   const heat = (x) => (x.g?.i || 0) + (x.b?.i || 0);
   const SORT = { all: heat, g: (x) => x.g?.i || 0, b: (x) => x.b?.i || 0, c: (x) => (x.g?.c || 0) + (x.b?.c || 0) };
-  const shownRows = () => { const k = kw.trim().toLowerCase(); return r.items.filter((x) => !k || x.q.toLowerCase().includes(k)).sort((a, b) => SORT[sort](b) - SORT[sort](a) || heat(b) - heat(a)); };
-  // 导出：当前筛选和排序下的搜索词（最多 500 个）
+  // 选了 Google / Bing 时只列这个搜索引擎有数据的词（否则没数据的会排在最后，看着像多出来的）
+  const shownRows = () => { const k = kw.trim().toLowerCase(); return r.items.filter((x) => (!k || x.q.toLowerCase().includes(k)) && (sort === 'g' || sort === 'b' ? x[sort] : true)).sort((a, b) => SORT[sort](b) - SORT[sort](a) || heat(b) - heat(a)); };
+  // 导出：当前筛选和排序下的搜索词（最多 500 个）。可以导出带数据的列表（CSV），也可以只要搜索词（一行一个）
+  const save = (text, name, type) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
   const csvBtn = d.querySelector('#hq-csv');
+  // 导出面板：范围就是弹窗里的筛选和排序，这里只选数量（前 100 / 前 200 / 全部），再选格式
+  let xTop = 0;
+  const exportRows = () => (xTop ? shownRows().slice(0, xTop) : shownRows());
+  const exportTxt = (rows) => {
+    save(rows.map((x) => x.q).join('\n') + '\n', `search-queries-${r.from}_${r.to}.txt`, 'text/plain;charset=utf-8');
+    toast(`已导出 ${rows.length} 个搜索词`);
+  };
   csvBtn.onclick = () => {
-    const rows = shownRows();
+    const open = document.querySelector('.hq-x');
+    if (open) { open._close(); return; }
+    const m = document.createElement('div');
+    m.className = 'menu hq-x'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', '导出');
+    const chip = (k, v, l, on) => `<button type="button" class="${on ? 'on' : ''}" data-${k}="${v}">${l}</button>`;
+    const paint = () => {
+      const all = shownRows(), n = exportRows().length;
+      m.innerHTML = `<div class="hq-xl">数量</div><div class="qf">${[100, 200].filter((v) => v < all.length).map((v) => chip('xt', v, `前 ${v} 个`, xTop === v)).join('')}${chip('xt', 0, `全部 ${num(all.length)} 个`, !xTop || xTop >= all.length)}</div>
+        <div class="hq-xn">按弹窗里的筛选和排序，导出 <b>${num(n)}</b> 个搜索词</div>
+        <hr><button role="menuitem" data-xf="csv" ${n ? '' : 'disabled'}>${ic('dl', 16)}导出列表数据（CSV）</button>
+        <button role="menuitem" data-xf="txt" ${n ? '' : 'disabled'}>${ic('dl', 16)}只导出搜索词（TXT）</button>
+        <button role="menuitem" data-xf="copy" ${n ? '' : 'disabled'}>${ic('copy', 16)}复制搜索词</button>`;
+    };
+    paint();
+    document.body.appendChild(m);
+    const place = () => { const rc = csvBtn.getBoundingClientRect(); m.style.top = `${rc.bottom + 6}px`; m.style.left = `${Math.max(8, Math.min(rc.right - m.offsetWidth, innerWidth - m.offsetWidth - 8))}px`; };
+    place();
+    csvBtn.setAttribute('aria-expanded', 'true');
+    const close = m._close = () => { m.remove(); csvBtn.setAttribute('aria-expanded', 'false'); document.removeEventListener('mousedown', onDoc, true); document.removeEventListener('keydown', onKey, true); removeEventListener('hashchange', close); };
+    const onDoc = (e) => { if (!m.contains(e.target) && !csvBtn.contains(e.target)) close(); };
+    // Esc 只关面板，不关弹窗
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); close(); csvBtn.focus(); } };
+    document.addEventListener('mousedown', onDoc, true);
+    document.addEventListener('keydown', onKey, true);
+    addEventListener('hashchange', close);
+    m.onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b || b.disabled) return;
+      if (b.dataset.xt != null) { xTop = Number(b.dataset.xt); paint(); place(); return; }
+      const rows = exportRows();
+      close();
+      if (b.dataset.xf === 'csv') exportCsv(rows);
+      else if (b.dataset.xf === 'txt') exportTxt(rows);
+      else copy(rows.map((x) => x.q).join('\n'), `已复制 ${rows.length} 个搜索词`);
+    };
+  };
+  const exportCsv = (rows) => {
     const cell = (v) => { const t = v == null ? '' : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
     const r2 = (v) => Math.round(v * 100) / 100;
     const eng = (e) => (e ? [e.i, e.c, e.i ? r2((e.c / e.i) * 100) + '%' : '', e.p ?? ''] : ['', '', '', '']);
     const head = ['搜索词', '热度合计（展示）', 'Google 展示', 'Google 点击', 'Google 点击率', 'Google 平均排名', 'Bing 展示', 'Bing 点击', 'Bing 点击率', 'Bing 平均排名', '站点数', '站点'].map(T);
     const lines = [head.map(cell).join(','), ...rows.map((x) => [x.q, heat(x), ...eng(x.g), ...eng(x.b), x.n, x.hosts.map(([h]) => h).join(' / ') + (x.n > x.hosts.length ? ' …' : '')].map(cell).join(','))];
-    const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `search-queries-${r.from}_${r.to}.csv`;
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    save('\ufeff' + lines.join('\n'), `search-queries-${r.from}_${r.to}.csv`, 'text/csv;charset=utf-8');
     toast(`已导出 ${rows.length} 个搜索词`);
   };
   const draw = () => {
@@ -6310,7 +6366,7 @@ async function hotQueriesDialog(hosts) {
         <input class="input sm hq-kw" id="hq-kw" type="search" placeholder="筛选搜索词" value="${esc(kw)}" autocomplete="off"></div>
       <div class="ev-w hq-w"><table class="tbl gt hq-t"><thead><tr><th>搜索词 <small>${num(r.total)}${r.total > r.items.length ? `（显示前 ${num(r.items.length)} 个）` : ''}</small></th>
         ${hasG ? `<th class="r">${BRAND.gsc(13)} Google 热度</th>` : ''}${hasB ? `<th class="r">${BRAND.bing(13)} Bing 热度</th>` : ''}</tr></thead>
-        <tbody>${rows.map(row).join('') || `<tr><td colspan="3"><div class="empty">${ic('search')}没有包含“${esc(kw)}”的搜索词</div></td></tr>`}</tbody></table></div>`
+        <tbody>${rows.map(row).join('') || `<tr><td colspan="3"><div class="empty">${ic('search')}${kw.trim() ? `没有包含“${esc(kw)}”的搜索词` : '没有符合条件的搜索词'}</div></td></tr>`}</tbody></table></div>`
       : `<div class="empty">${ic('inbox')}${hasG || hasB ? '这段时间还没有搜索数据' : '这些站点都没有关联 Search Console 或 Bing'}</div>`}`;
     body.querySelectorAll('[data-hqs]').forEach((b) => (b.onclick = () => { sort = b.dataset.hqs; draw(); }));
     const inp = body.querySelector('#hq-kw');
