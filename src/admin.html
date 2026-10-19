@@ -133,6 +133,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .nav a.on::before { content: ''; position: absolute; right: 14px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .side .foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
 .side .acct { display: none; }
+.nav .nav-s { display: none; }   /* 手机端顶部导航的搜索（宽屏侧栏有“搜索 ⌘K”） */
 .menu { position: fixed; z-index: 60; min-width: 188px; padding: 6px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-3);
   animation: popin .18s var(--ease-out) both; transform-origin: top right; }
 .menu-h { padding: 6px 10px 8px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
@@ -203,6 +204,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
   .side.stuck { box-shadow: 0 6px 20px -12px rgba(13,19,33,.18); }
   .side .foot { display: none; }
   .side .acct { display: grid; flex: none; width: 38px; height: 38px; border-radius: 11px; }
+  .side .acct.on { color: var(--accent-ink); }   /* 通知、设置页在账号菜单里 */
+  /* 顶部导航：搜索放在外面，通知收进账号菜单 */
+  .nav .nav-n { display: none !important; }
+  .nav .nav-s { display: flex !important; }
   .main { box-shadow: none; }
   .wrap, .shell.mini .wrap { max-width: none; padding: 22px 16px 64px; }
 }
@@ -1081,9 +1086,9 @@ details[open] > summary::before { transform: rotate(90deg); }
 @media (max-width: 760px) { .use-g { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .chi.ret { background: color-mix(in srgb, var(--teal) 14%, transparent); color: var(--teal); }
 .acc { display: grid; gap: 12px; max-width: 880px; }
-.acc-i .fold-h { gap: 14px; padding-top: 18px; padding-bottom: 18px; }
+.acc-i .fold-h { gap: 14px; padding-top: 18px; padding-bottom: 18px; flex-wrap: nowrap; }   /* 说明文字太长时省略，不把右边的箭头挤到下一行 */
 .acc-i.open .fold-h { padding-bottom: 6px; }
-.acc-t { min-width: 0; display: grid; gap: 2px; }
+.acc-t { min-width: 0; flex: 0 1 auto; display: grid; gap: 2px; }
 .acc-t h3 { margin: 0; }
 .acc-t .sub { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .acc-s { flex: none; }
@@ -1271,7 +1276,8 @@ pre.code { margin: 0; padding: 14px 16px; border-radius: 9px; background: var(--
 .hs-r b { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
 .hs-r .gd { font-size: 11.5px; text-align: right; }
 .hs-sp { height: 18px; } .hs-sp svg { width: 100%; height: 100%; display: block; }
-@media (max-width: 760px) { .hs-top { max-width: none; margin-left: 0; } }
+/* 窄屏上单独一行：行的左右内边距（悬停背景用）往外扩掉，文字和上面的数字左右对齐 */
+@media (max-width: 760px) { .hs-top { max-width: none; margin: 0 -8px; } }
 .setup .card-h { gap: 12px; }
 .setup-p { width: 120px; height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
 .setup-p i { display: block; height: 100%; border-radius: 3px; background: var(--good); }
@@ -2042,6 +2048,15 @@ html.masked input:focus { filter: none; }
   .lh .sp { flex: 1; }
   .lh #sort { order: 5; flex: 1 1 100%; }
   .lh #sort button { flex: 1; padding: 0 6px; }
+  /* 页头操作（站点页的 AI 分析、隐藏、导出、同步）和站点详情顶部的“AI 分析”：手机上单独一行时，第一个无边框按钮往左挪掉内边距，图标和上面的文字对齐 */
+  .ph-acts > .btn.ghost:first-of-type:not(.icon), .hero:not(.lk-hero) .acts > .btn.ghost:first-child:not(.icon) { margin-left: -14px; }
+  .ph-acts > .btn.ghost.icon:first-of-type { margin-left: -9px; }
+  .ph:has(> .ph-acts) > .sp { display: none; }
+  .ph > .ph-acts { flex-basis: 100%; }
+  /* 站点列表筛选栏的“有优化建议”：往右挪掉内边距和边框，文字和上面搜索框的右边对齐 */
+  .g-advf { margin-right: -11px; }
+  /* 短链列表每行的操作图标：最后一个往右挪掉内边距，和上面的访问数右边对齐 */
+  .lrow .acts > :last-child { margin-right: -8px; }
   /* 卡片标题行里的开关（通知页的目标页异常、每周 SEO、用量预警等）：说明文字放不下换行时，开关不再掉到说明下面，留在标题右边 */
   .card-h:has(> .switch) > .sp { display: none; }
   .card-h > .switch { order: 1; margin-left: auto; }
@@ -2063,9 +2078,9 @@ html.masked input:focus { filter: none; }
   /* 首列固定的表格：没滚动时没有分隔；往左滑了，首列右侧外面淡淡地渐出一层阴影（逐格的 box-shadow 在 iPhone 上会显示成一条硬线）。
      行被点中变灰时，固定的首列也跟着变灰 */
   .has-hbar tr > :first-child { overflow: visible; }
-  .has-hbar tr > :first-child::after { content: ''; position: absolute; top: 0; bottom: 0; left: 100%; width: 10px; pointer-events: none;
-    background: linear-gradient(90deg, rgba(13, 19, 33, .07), transparent); opacity: 0; transition: opacity .2s; }
-  .has-hbar.scrolled tr > :first-child::after { opacity: 1; }
+  .has-hbar tbody tr > :first-child::after { content: ''; position: absolute; top: 0; bottom: 0; left: 100%; width: 8px; pointer-events: none;
+    background: linear-gradient(90deg, rgba(13, 19, 33, .035), transparent); opacity: 0; transition: opacity .2s; }
+  .has-hbar.scrolled tbody tr > :first-child::after { opacity: 1; }   /* 标题行不加 */
   .has-hbar tbody tr:hover > td:first-child { background: var(--panel-2); }
   /* 横向滚动的表格：隐藏原生滚动条，用从第二列开始的细滚动条（跟着滚动容器横向固定，不随内容滑走） */
   .has-hbar { scrollbar-width: none; }
@@ -3028,9 +3043,10 @@ function shell(active, inner) {
         <a href="#/" class="${active === 'home' ? 'on' : ''}" data-tip="概览" data-tip-at="right" aria-label="概览">${ic('home')}<span>概览</span></a>
         <a href="#/links" class="${active === 'links' ? 'on' : ''}" data-tip="短链" data-tip-at="right" aria-label="短链">${ic('link')}<span>短链</span></a>
         <a href="#/sites" class="${active === 'sites' ? 'on' : ''}" data-tip="站点" data-tip-at="right" aria-label="站点">${ic('globe')}<span>站点</span></a>
-        <a href="#/notify" class="${active === 'notify' ? 'on' : ''}" data-tip="通知" data-tip-at="right" aria-label="通知">${ic('bell')}<span>通知</span></a>
+        <a href="#/notify" class="nav-n ${active === 'notify' ? 'on' : ''}" data-tip="通知" data-tip-at="right" aria-label="通知">${ic('bell')}<span>通知</span></a>
+        <a href="#" class="nav-s" id="nav-s" role="button" aria-label="搜索和快速跳转">${ic('search')}<span>搜索</span></a>
       </nav>
-      <button class="btn ghost icon acct" id="acct" aria-label="账号菜单" aria-haspopup="menu" aria-expanded="false">${ic('user', 19)}</button>
+      <button class="btn ghost icon acct${active === 'notify' || active === 'settings' ? ' on' : ''}" id="acct" aria-label="账号菜单" aria-haspopup="menu" aria-expanded="false">${ic('user', 19)}</button>
       <div class="foot">
         <a class="btn ghost ${active === 'settings' ? 'on' : ''}" href="#/settings" data-tip="设置" data-tip-at="right" aria-label="设置">${ic('gear', 18)}<span>设置</span></a>
         <div class="host"><i title="服务运行中"></i><span class="hn" data-tip="${esc(`${HOST} · v${APP_VERSION}`)}" data-tip-at="right">${esc(HOST)}</span><span class="ver">v${esc(APP_VERSION)}</span>
@@ -3040,6 +3056,8 @@ function shell(active, inner) {
     <main class="main"><div class="wrap" id="page">${inner}</div></main>
   </div>`;
   document.getElementById('kbar-b').onclick = openKbar;
+  // 手机端顶部导航：第 4 个图标是搜索（通知收进账号菜单）
+  document.getElementById('nav-s').onclick = (e) => { e.preventDefault(); openKbar(); };
   document.getElementById('fold').onclick = () => {
     const el = document.querySelector('.shell');
     el.classList.toggle('mini');
@@ -3057,7 +3075,7 @@ function shell(active, inner) {
     const m = document.createElement('div');
     m.className = 'menu'; m.setAttribute('role', 'menu');
     m.innerHTML = `<div class="menu-h">${esc(HOST)}</div>
-      <button role="menuitem" data-a="search">${ic('search', 16)}搜索、跳转</button>
+      <button role="menuitem" data-a="notify">${ic('bell', 16)}通知</button>
       <button role="menuitem" data-a="settings">${ic('gear', 16)}设置</button>
       <hr><button role="menuitem" data-a="out" class="danger">${ic('out', 16)}退出登录</button>`;
     const r = acct.getBoundingClientRect();
@@ -3073,7 +3091,7 @@ function shell(active, inner) {
       const b = ev.target.closest('button');
       if (!b) return;
       close();
-      ({ search: openKbar, settings: () => { location.hash = '#/settings'; }, out: logout })[b.dataset.a]();
+      ({ notify: () => { location.hash = '#/notify'; }, settings: () => { location.hash = '#/settings'; }, out: logout })[b.dataset.a]();
     };
   };
 }
