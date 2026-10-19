@@ -2,6 +2,34 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.8.0 · 2026-10-19
+
+Estimates when each site's content was last updated from its sitemap, a much better admin on phones, and a fix for blank pages on slow connections.
+
+### New
+
+- **Content update time**: the daily sitemap refresh uses page lastmod values and observed changes (new URLs, updated pages) to estimate when a site's content was last updated, and counts pages that appeared in the last 30 days. When most pages share the same lastmod day (usually set on every build), it isn't treated as a content update
+  - The site page header shows "Content updated … · N new pages in 30 days", with the basis on hover
+  - The Sites list shows the update time under each site name, in orange after 90 days without updates
+  - New suggestion "Content not updated for a long time": no new or updated pages for 90+ days while search clicks are dropping
+  - The AI analysis report includes the last content update
+
+### Improved (phones)
+
+- Tapping an input no longer zooms the page (iPhone zooms inputs smaller than 16px); small buttons and links have larger tap areas
+- Top navigation: the 4th icon is now search; notifications moved into the account menu
+- Links list: shows only /suffix, a tidier toolbar, quick create on one row; visit counts line up with the title
+- Link page: a more compact header (QR code top-right, five actions in one row); visits listed as two-line rows without sideways scrolling
+- Sites list: one-line header, a narrower site column fixed on the left with the scrollbar starting after it; the header sticks to the top when scrolling
+- Site page: promoted links table, filter chips and header actions aligned; source / target site tables keep the first column fixed and no longer stretch past the screen
+- Overview, notifications and settings: page headers, switches, accordion rows, the Cloudflare usage panel and the daily usage table laid out for phones
+- Smaller gaps and card padding, so more fits on one screen
+
+### Fixed
+
+- Pages were blank while loading on slow connections: the loading placeholders were overridden by the sort icon's styles into invisible 10px boxes; they're visible again, with a shimmer
+- In the English UI, multi-line tooltips were squashed onto one line and only partly translated; they're now translated line by line
+
 ## v1.7.1 · 2026-10-18
 
 A more compact admin on phones.
