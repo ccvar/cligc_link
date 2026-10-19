@@ -89,7 +89,9 @@ test('事件：列表合并收到的事件、关键事件、规则；设置关�
   try {
     const d = await ga.listEvents(env, SECRET, 'a.com');
     assert.equal(d.measurementId, 'G-A');
-    assert.deepEqual(d.events.map((e) => [e.name, e.count, e.key]), [['page_view', 120, false], ['purchase', 3, true], ['sign_up', 0, false]]);
+    assert.deepEqual(d.events.map((e) => [e.name, e.count, e.key, e.type]), [['page_view', 120, false, 'auto'], ['purchase', 3, true, 'recommended'], ['sign_up', 0, false, 'recommended']]);
+    assert.equal(ga.eventType('scroll'), 'enhanced');
+    assert.equal(ga.eventType('exchange_signup_click'), 'custom');
     assert.equal(d.events[2].rules[0].id, '88');
     await assert.rejects(ga.setKeyEvent(env, SECRET, 'a.com', 'purchase', false), /不能取消/);
     await ga.setKeyEvent(env, SECRET, 'a.com', 'sign_up', true);

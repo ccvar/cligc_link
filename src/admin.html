@@ -2011,9 +2011,22 @@ html.masked input:focus { filter: none; }
 .ev-fl .f-dd { flex: 0 1 auto; min-width: 120px; }
 .ev-fl .f-dd .combo-btn { height: 34px; }
 .dialog.ga-d.ev-d, .dialog.ga-d.aik-d { width: min(760px, calc(100vw - 32px)); }
-.ev-dh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.ev-dh h3 { margin: 0; min-width: 0; }
+.ev-dh, .dlg-h { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.dlg-h h3, .ev-dh h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dlg-h h3 svg, .ev-dh h3 svg { vertical-align: -3px; margin-right: 6px; }
+.dialog.ga-d .dlg-h h3, .dialog.ga-d .ev-dh h3 { display: block; }   /* 省略号要求块级（对话框标题默认是 flex） */
+.ev-dh [data-x], .dlg-h [data-x] { margin-right: -8px; }   /* 标题栏右边的关闭按钮：图标和内容右边对齐 */
+.aik-d, .ev-d { padding-bottom: 24px; }
 .ev-d .card-b { padding: 0; }
+/* 事件列表弹窗：标题、新建事件、筛选固定在上面，只有表格在里面滚动（表头也固定） */
+.dialog.ga-d.ev-d { display: flex; flex-direction: column; overflow: hidden; }
+.ev-d #g-ev, .ev-d #g-ev > .card-b { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.ev-d #g-ev > .card-b > * { flex: none; }
+.ev-d #g-ev > .card-b > .ev-w { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.ev-d .ev-w thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line); border-bottom: 0; }
+.ev-d .empty { flex: none; }
+/* AI 接口弹窗：整页滚动，标题栏和关闭按钮固定在顶部 */
+.aik-d .dlg-h { position: sticky; top: -24px; z-index: 3; margin: -24px -24px 12px; padding: 24px 24px 12px; background: var(--panel); }
 .ev-d .ev-w { margin: 0 -24px; }
 .ev-d .ev-w .tbl th:first-child, .ev-d .ev-w .tbl td:first-child { padding-left: 24px; }
 .ev-d .ev-w .tbl th:last-child, .ev-d .ev-w .tbl td:last-child { padding-right: 24px; }
@@ -2038,7 +2051,7 @@ html.masked input:focus { filter: none; }
 .ga-mid { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--sunken); min-width: 0; }
 .ga-mid > span:first-child { font-size: 12.5px; color: var(--muted); flex: none; }
 .ga-mid code { font-family: var(--mono); font-size: 14px; font-weight: 600; min-width: 0; }
-.ga-h { margin: 12px 0 6px; }
+.ga-h, .dialog p.ga-h { margin: 14px 0 8px; line-height: 1.55; }   /* 带上 .dialog p：否则被 .dialog p { margin: 0 0 22px } 盖掉 */
 .ga-code { margin: 0 0 14px; padding: 12px 14px; border-radius: 10px; background: var(--sunken); font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; color: var(--text-2); max-height: 260px; overflow: auto; }
 .tbl.gt.ev-t { table-layout: auto; }   /* 列宽按内容分（固定列宽时英文表头会被截断） */
 .tbl.gt.ev-t th:first-child { width: auto; }
@@ -2052,6 +2065,11 @@ html.masked input:focus { filter: none; }
 .ev-k .switch { justify-content: flex-end; }
 .ev-a { text-align: right; white-space: nowrap; width: 1%; }
 .ev-all { margin: 10px 0 0; }
+.ev-tag { flex: none; font-style: normal; font-size: 11px; padding: 0 6px; line-height: 18px; border-radius: 5px; cursor: default; }
+.ev-tag.auto, .ev-tag.enhanced { background: var(--sunken); color: var(--muted); }
+.ev-tag.recommended { background: var(--accent-2); color: var(--accent-ink); }
+.ev-tag.custom { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
+.ev-qf { margin-bottom: 4px; }
 .ev-f { padding: 14px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
 .ev-fl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
 .ev-fl .input { width: auto; height: 34px; min-width: 0; }
@@ -6166,9 +6184,8 @@ function popMenu(btn, items) {
 function eventsDialog(host) {
   const { d, close } = gaDlg('ev-d');
   d.innerHTML = `<div id="g-ev"><div class="ev-dh"><h3>${ic('pulse', 18)}事件 · ${esc(host)}</h3><span class="sp"></span>
-      <button type="button" class="btn sm" id="ev-new">${ic('plus', 14)}新建事件</button></div>
-    <div class="card-b">${skel(200)}</div></div>
-    <div class="row"><button class="btn" data-x>关闭</button></div>`;
+      <button type="button" class="btn sm" id="ev-new">${ic('plus', 14)}新建事件</button><button type="button" class="btn ghost icon" data-x aria-label="关闭">${ic('x', 18)}</button></div>
+    <div class="card-b">${skel(200)}</div></div>`;
   d.querySelector('[data-x]').onclick = close;
   mountEvents(host);
 }
@@ -6181,7 +6198,7 @@ const aiBadge = (a) => {
 };
 async function aiApiDialog() {
   const { d, close } = gaDlg('aik-d');
-  d.innerHTML = `<h3>${ic('key', 18)}AI 接口</h3><div id="aik-b">${skel(220)}</div><div class="row"><button class="btn" data-x>关闭</button></div>`;
+  d.innerHTML = `<div class="dlg-h"><h3>${ic('key', 18)}AI 接口</h3><span class="sp"></span><button type="button" class="btn ghost icon" data-x aria-label="关闭">${ic('x', 18)}</button></div><div id="aik-b">${skel(220)}</div>`;
   d.querySelector('[data-x]').onclick = close;
   const box = d.querySelector('#aik-b');
   try { const a = await api('/ai-tokens'); aiBadge(a); renderAiApi(box, a, aiBadge); }
@@ -6198,12 +6215,19 @@ const gaRuleText = (r) => (r.conditions.length
   ? `当 ${r.source || '任意事件'} 的「${gaFieldName(r.conditions[0].field)}」${gaMatchName(r.conditions[0].match)} “${r.conditions[0].value}” 时，记为 ${r.event}${r.conditions.length > 1 ? `（另有 ${r.conditions.length - 1} 个条件）` : ''}`
   : `收到 ${r.source || '任意事件'} 时，记为 ${r.event}`);
 
+// 事件类型的标签（类型由服务端按事件名判断，见 ga4admin.js eventType）
+const EV_TAG = {
+  auto: ['自动', 'GA4 自动收集的事件：装了 GA4 就有'],
+  enhanced: ['自动', '增强型衡量：GA4 自动收集，在 GA4 网站数据流设置里默认开启，可以关掉'],
+  recommended: ['推荐', 'Google 推荐的事件名，需要网站代码自己发送'],
+  custom: ['自定义', '自定义事件：网站代码发送的、你自己起名的事件'],
+};
 // 站点详情的“事件”卡片：最近 28 天收到的事件、关键事件开关、事件规则（新建 / 删除）
 async function mountEvents(host) {
   const el = document.getElementById('g-ev');
   if (!el) return;
   const body = el.querySelector('.card-b');
-  let d, all = false, formOpen = false;
+  let d, formOpen = false, kind = 'all';
   const load = async () => {
     try { d = await api(`/google/ga4/events?host=${encodeURIComponent(host)}`); }
     catch (e) {
@@ -6216,9 +6240,15 @@ async function mountEvents(host) {
   };
   const draw = () => {
     const ro = !d.canEdit;
-    const list = all ? d.events : d.events.slice(0, 12);
+    // 按类型筛选：自动收集（含增强型衡量）/ 推荐 / 自定义；通过规则新建的算自定义
+    const kindOf = (e) => (e.rules.length ? 'custom' : e.type === 'enhanced' ? 'auto' : e.type || 'custom');
+    const cnt = { all: d.events.length, auto: 0, recommended: 0, custom: 0 };
+    for (const e of d.events) cnt[kindOf(e)]++;
+    if (kind !== 'all' && !cnt[kind]) kind = 'all';
+    const shown = kind === 'all' ? d.events : d.events.filter((e) => kindOf(e) === kind);
+    const list = shown;   // 弹窗里表格自己滚动，全部列出
     const row = (e) => `<tr>
-      <td><div class="ev-n"><code class="ell" data-tipf="${esc(e.name)}">${esc(e.name)}</code>${e.rules.length ? `<i class="ix-tag" data-tipf-always data-tipf="${esc(e.rules.map(gaRuleText).join('\n'))}">规则</i>` : ''}</div></td>
+      <td><div class="ev-n"><code class="ell" data-tipf="${esc(e.name)}">${esc(e.name)}</code>${e.rules.length ? `<i class="ix-tag" data-tipf-always data-tipf="${esc(e.rules.map(gaRuleText).join('\n'))}">规则</i>` : EV_TAG[e.type] ? `<i class="ev-tag ${e.type}" data-tipf-always data-tipf="${esc(EV_TAG[e.type][1])}">${EV_TAG[e.type][0]}</i>` : ''}</div></td>
       <td class="num">${e.count ? num(e.count) : '<span class="sm" data-tipf-always data-tipf="最近 28 天还没收到这个事件">还没收到</span>'}</td>
       <td class="ev-k"><label class="switch" ${ro ? 'data-tipf-always data-tipf="需要先重新授权 GA4 编辑权限"' : e.key && !e.deletable ? 'data-tipf-always data-tipf="GA4 默认的关键事件，不能取消"' : ''}><input type="checkbox" data-key="${esc(e.name)}" ${e.key ? 'checked' : ''} ${ro || (e.key && !e.deletable) ? 'disabled' : ''} aria-label="${esc(e.name)} 设为关键事件"><span class="t"></span></label></td>
       <td class="ev-a">${e.rules.map((r) => `<button type="button" class="btn sm ghost icon" data-del="${esc(r.id)}" ${ro ? 'disabled' : ''} aria-label="删除规则" data-tipf-always data-tipf="${esc(`删除规则：${gaRuleText(r)}`)}">${ic('trash', 14)}</button>`).join('')}</td></tr>`;
@@ -6235,12 +6265,14 @@ async function mountEvents(host) {
         <p class="hint">新事件从保存后开始统计，GA4 里大约几小时后能看到；已经收集的历史数据不会补算。</p>
       </div>
       ${d.rulesError ? `<p class="hint ix-err">${ic('alert', 13)}<span>读取事件规则失败：${esc(d.rulesError)}</span></p>` : ''}
+      ${d.events.length ? `<div class="qf ev-qf">${[['all', '全部'], ['auto', '自动收集'], ['recommended', '推荐'], ['custom', '自定义']].filter(([k]) => k === 'all' || cnt[k])
+        .map(([k, l]) => `<button type="button" class="${kind === k ? 'on' : ''}" data-evk="${k}">${l}<small>${cnt[k]}</small></button>`).join('')}</div>` : ''}
       ${d.events.length ? `<div class="ev-w"><table class="tbl gt ev-t"><thead><tr><th>事件</th><th class="r"><span class="th-l">近 28 天</span><span class="th-s">28 天</span></th><th class="r"><span class="th-l">关键事件</span><span class="th-s">关键</span></th><th></th></tr></thead>
         <tbody>${list.map(row).join('')}</tbody></table></div>
-        ${d.events.length > 12 ? `<button type="button" class="hr-more ev-all" id="ev-all">${all ? '收起' : `显示全部 ${d.events.length} 个`}</button>` : ''}`
+`
         : `<div class="empty">${ic('inbox')}最近 28 天还没收到事件：确认统计代码已经贴到网站上</div>`}`;
     body.querySelector('[data-ga-re]')?.addEventListener('click', (e) => googleConnect(e.currentTarget));
-    body.querySelector('#ev-all')?.addEventListener('click', () => { all = !all; draw(); });
+    body.querySelectorAll('[data-evk]').forEach((b) => (b.onclick = () => { kind = b.dataset.evk; draw(); }));
     const f = body.querySelector('#ev-f');
     const ddSrc = selectDd(f.querySelector('#ev-src'), srcs.map((x) => ({ v: x, l: x })), 'page_view', { aria: '来源事件', search: srcs.length > 8 ? '搜索事件' : '' });
     const ddFld = selectDd(f.querySelector('#ev-fld'), GA_FIELD.map(([v, l]) => ({ v, l })), 'page_location', { aria: '条件' });

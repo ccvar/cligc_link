@@ -15,6 +15,22 @@ export const MATCHES = ['EQUALS', 'EQUALS_CASE_INSENSITIVE', 'CONTAINS', 'CONTAI
   'ENDS_WITH', 'ENDS_WITH_CASE_INSENSITIVE', 'REGULAR_EXPRESSION', 'REGULAR_EXPRESSION_CASE_INSENSITIVE'];
 
 const fail = (message, extra = {}) => Object.assign(new Error(message), extra);
+
+// 事件类型（按 Google 文档里的事件名对照，GA4 接口本身不区分）：
+//   auto       自动收集：装了 GA4 就有
+//   enhanced   增强型衡量：也是自动收集，在网站数据流设置里默认开启、可以关掉
+//   recommended 推荐事件：Google 规定好的事件名，要网站代码自己发送
+//   custom     自定义事件：其余的名字
+const AUTO_EVENTS = new Set(['page_view', 'session_start', 'first_visit', 'user_engagement', 'first_open', 'app_remove', 'os_update', 'app_update',
+  'ad_click', 'ad_exposure', 'ad_impression', 'ad_query', 'ad_reward', 'adunit_exposure', 'app_clear_data', 'app_exception', 'dynamic_link_app_open',
+  'dynamic_link_app_update', 'dynamic_link_first_open', 'error', 'firebase_campaign', 'in_app_purchase', 'notification_dismiss', 'notification_foreground',
+  'notification_open', 'notification_receive', 'screen_view']);
+const ENHANCED_EVENTS = new Set(['scroll', 'click', 'view_search_results', 'video_start', 'video_progress', 'video_complete', 'file_download', 'form_start', 'form_submit']);
+const RECOMMENDED_EVENTS = new Set(['purchase', 'refund', 'sign_up', 'login', 'search', 'share', 'select_content', 'generate_lead', 'add_payment_info',
+  'add_shipping_info', 'add_to_cart', 'add_to_wishlist', 'begin_checkout', 'remove_from_cart', 'select_item', 'select_promotion', 'view_cart', 'view_item',
+  'view_item_list', 'view_promotion', 'earn_virtual_currency', 'spend_virtual_currency', 'join_group', 'level_start', 'level_end', 'level_up', 'post_score',
+  'tutorial_begin', 'tutorial_complete', 'unlock_achievement', 'close_convert_lead', 'close_unconvert_lead', 'disqualify_lead', 'qualify_lead', 'working_lead']);
+export const eventType = (name) => (AUTO_EVENTS.has(name) ? 'auto' : ENHANCED_EVENTS.has(name) ? 'enhanced' : RECOMMENDED_EVENTS.has(name) ? 'recommended' : 'custom');
 const REAUTH = '这个 Google 账号还没授予 GA4 编辑权限，请到 设置 → Google 集成 重新授权';
 
 // 统计代码（gtag.js），贴到网站每个页面的 <head> 里
@@ -137,7 +153,7 @@ export async function listEvents(env, secret, host) {
     catch (e) { if (e.budget) throw e; rulesError = e.message; }
   }
   const ev = new Map();
-  const get = (name) => { if (!ev.has(name)) ev.set(name, { name, count: 0, key: false, deletable: true, rules: [] }); return ev.get(name); };
+  const get = (name) => { if (!ev.has(name)) ev.set(name, { name, type: eventType(name), count: 0, key: false, deletable: true, rules: [] }); return ev.get(name); };
   for (const r of rep.rows || []) get(r.dimensionValues[0].value).count = Number(r.metricValues[0].value) || 0;
   for (const k of keys.keyEvents || []) { const e = get(k.eventName); e.key = true; e.deletable = k.deletable !== false; e.custom = !!k.custom; }
   for (const r of rules) get(r.event).rules.push(r);

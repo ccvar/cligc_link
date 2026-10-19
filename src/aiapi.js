@@ -187,7 +187,7 @@ export function aiDoc(origin) {
 - \`GET /api/ai/sites\`：所有站点。每项有 host（域名）、ga4（关联的 GA4 媒体资源，没有为 null）、sessions28（近 28 天会话）、gsc / bing（是否关联 Search Console / Bing）
 - \`GET /api/ai/ga4/accounts\`：可以新建媒体资源的 GA4 账号。每项 acct 是已连接的 Google 账号 ID，canEdit 表示有没有编辑权限，accounts 里的 name（如 accounts/123）是 GA4 账号
 - \`GET /api/ai/sites/{host}/code\`：站点的衡量 ID（G-XXXX）和统计代码 snippet
-- \`GET /api/ai/sites/{host}/events\`：最近 28 天收到的事件（name、count、key 是否关键事件、rules 由哪些规则生成），以及事件创建规则 rules
+- \`GET /api/ai/sites/{host}/events\`：最近 28 天收到的事件（name、count、key 是否关键事件、rules 由哪些规则生成、type 类型），以及事件创建规则 rules。type：auto 自动收集、enhanced 增强型衡量（也是自动收集）、recommended Google 推荐的事件名（要网站代码发送）、custom 自定义
 
 ## 新建站点统计（需要 create 权限）
 
