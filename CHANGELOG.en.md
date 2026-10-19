@@ -2,6 +2,23 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.10.0 · 2026-10-19
+
+New "Top search queries": Google and Bing queries across your sites, merged and sorted by popularity, with export. Page paths on the site page now open the page.
+
+### New
+
+- **Top search queries**: the flame icon at the top of the Sites list. Queries from Google (Search Console) and Bing for the filtered sites are merged; the same query (ignoring case and spaces) is summed across sites
+  - Popularity = impressions in search results, one column each for Google and Bing, with a bar; hover for clicks, CTR and average position
+  - Sort by overall / Google / Bing / clicks (choosing Google or Bing lists only queries with data from that engine), and filter by text
+  - Each query shows which sites it appears on; click to open the site page
+  - Export: choose top 100 / top 200 / all, then export a CSV with the data, a TXT with only the queries (one per line), or copy the queries
+  - Data is fetched live from Google / Bing when opened and cached for 1 hour per site; with many sites, up to 60 are fetched at a time and "Load more" continues; sites that fail to load are listed with the reason
+
+### Improved
+
+- Site page: page paths in the Google search, Bing search and GA4 "Pages" tables and in Bing crawl issues are links that open in a new window; when several URLs share a path (http / https, with or without www), the host is shown to tell them apart
+
 ## v1.9.0 · 2026-10-19
 
 Manage GA4 from the admin: create site tracking, get the tracking code, set key events, and create or delete events. You can also generate a temporary token so an AI can do all this through an API.
