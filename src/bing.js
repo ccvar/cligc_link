@@ -238,7 +238,7 @@ export async function syncBatch(env, secret, { limit = 25, cutoff = Date.now() -
 // ---------------------------------------------------------------- 详情页：搜索词 / 页面 / 抓取
 
 // 按周的统计行：落在区间里的周相加；排名按展示加权
-function weekly(rows, from, to) {
+export function weekly(rows, from, to) {
   const m = new Map();
   for (const r of rows || []) {
     const d = bingDate(r.Date);

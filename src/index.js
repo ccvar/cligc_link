@@ -14,6 +14,7 @@ import * as backlinks from './backlinks.js';
 import * as advice from './advice.js';
 import * as ga4admin from './ga4admin.js';
 import * as aiapi from './aiapi.js';
+import { hotQueries } from './queries.js';
 import { subreq } from './budget.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT, normalizeTarget, isAppUrl, isWebUrl, inAppBrowser, intentWithFallback, guardKey, isDbError } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAggStmts, pruneClicks, backfillSourceUv, prunePerRun, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
@@ -2552,6 +2553,11 @@ async function googleApi(request, env, url) {
     const days = google.RANGE_DAYS.includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 28;
     // bl：外链与权重开了哪几项（不进缓存，开关一变立即生效）
     if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days, { fresh: url.searchParams.get('fresh') === '1' }), bl: await backlinks.blFlags(env) });
+    // 热门搜索词：body.hosts 是站点列表当前筛选出来的站点（空 = 全部）
+    if (path === '/api/google/queries' && method === 'POST') {
+      const b = await request.json().catch(() => ({}));
+      return json(await hotQueries(env, secret, Array.isArray(b.hosts) ? b.hosts.slice(0, 2000) : [], days));
+    }
     if (path === '/api/google/tags' && method === 'GET') return json({ tags: await google.tagsList(env) });
     if (path === '/api/google/tags' && method === 'PUT') {
       const r = await google.tagsUpdate(env, await request.json().catch(() => ({})));

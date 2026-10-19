@@ -2027,6 +2027,45 @@ html.masked input:focus { filter: none; }
 .ev-d #g-ev > .card-b > .ev-w { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .ev-d .ev-w thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line); border-bottom: 0; }
 .ev-d .empty { flex: none; }
+/* 热门搜索词弹窗：和事件列表一样，只有表格滚动 */
+.dialog.ga-d.hq-d { width: min(820px, calc(100vw - 32px)); display: flex; flex-direction: column; overflow: hidden; padding-bottom: 24px; }
+.hq-d #hq, .hq-d .hq-b { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.hq-d .hq-b > * { flex: none; }
+.hq-d .dlg-h { margin-bottom: 4px; }
+.hq-sub { margin: 0 0 12px; }
+.hq-d .hq-b > .hq-w { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; margin: 0 -24px; }
+.hq-w thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line); border-bottom: 0; }
+.hq-w thead th svg { vertical-align: -2px; margin-right: 2px; }
+.hq-w thead th small { font-weight: 400; color: var(--muted); margin-left: 4px; }
+.hq-w .tbl th:first-child, .hq-w .tbl td:first-child { padding-left: 24px; }
+.hq-w .tbl th:last-child, .hq-w .tbl td:last-child { padding-right: 24px; }
+.tbl.gt.hq-t th:first-child { width: auto; }
+.tbl.gt.hq-t th.r { width: 168px; }
+.hq-tb { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.hq-tb .qf { margin: 0; flex-wrap: nowrap; }
+.hq-kw { width: 180px; min-width: 0; }
+.hq-more { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 10px 8px 12px; border-radius: 10px; background: var(--sunken); color: var(--text-2); font-size: 12.5px; }
+.hq-more > svg { flex: none; color: var(--muted); }
+.hq-err { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+.hq-q { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hq-q .ell { font-weight: 500; color: var(--text); }
+.hq-s { font-size: 12px; color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: flex-start; max-width: 100%; }
+.hq-s:hover { color: var(--accent); }
+.hq-s em { font-style: normal; font-variant-numeric: tabular-nums; }
+.hq-c { text-align: right; vertical-align: top; }
+.hq-h { display: grid; justify-items: end; gap: 3px; }
+.hq-h b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.hq-h i { display: block; height: 4px; width: var(--w); max-width: 120px; min-width: 3px; border-radius: 2px; background: var(--accent); opacity: .75; }
+.hq-h.b i { background: #00809D; }
+.hq-h small { font-size: 11.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hq-no { color: var(--muted); }
+@media (max-width: 640px) {
+  .hq-tb { flex-wrap: wrap; }
+  .hq-kw { width: 100%; flex: 1 1 100%; order: 3; }
+  .tbl.gt.hq-t th.r { width: 108px; }
+  .hq-h small, .hq-w thead th small { display: none; }
+  .tbl.gt.hq-t td .hq-q .ell { white-space: normal; overflow-wrap: anywhere; }   /* 手机上搜索词换行显示全，不截断 */
+}
 /* AI 接口弹窗：整页滚动，标题栏和关闭按钮固定在顶部 */
 .aik-d .dlg-h { position: sticky; top: -24px; z-index: 3; margin: -24px -24px 12px; padding: 24px 24px 12px; background: var(--panel); }
 .ev-d .ev-w { margin: 0 -24px; }
@@ -2407,6 +2446,7 @@ const I = {
   chart: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+  flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4.1 2-6 .5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   back: '<path d="m15 18-6-6 6-6"/>',
   code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
@@ -6207,6 +6247,84 @@ async function aiApiDialog() {
   catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
 }
 
+// 站点列表“热门搜索词”：当前筛选的站点在 Google / Bing 上的搜索词合在一起，按热度（展示次数）排序
+async function hotQueriesDialog(hosts) {
+  const { d, close } = gaDlg('hq-d');
+  const days = gState.days;
+  d.innerHTML = `<div id="hq"><div class="dlg-h"><h3>${ic('flame', 18)}热门搜索词</h3><span class="sp"></span><button type="button" class="btn ghost icon" id="hq-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV" disabled>${ic('dl', 17)}</button><button type="button" class="btn ghost icon" data-x aria-label="关闭">${ic('x', 18)}</button></div>
+    <div class="hint hq-sub">${hosts.length} 个站点 · 最近 ${days} 天 · 热度 = 搜索结果里的展示次数，同一个词在各站点的数据加在一起</div>
+    <div class="hq-b">${skel(260)}</div></div>`;
+  d.querySelector('[data-x]').onclick = close;
+  const body = d.querySelector('.hq-b');
+  let r, sort = 'all', kw = '';
+  const load = async () => {
+    try { r = await api(`/google/queries?days=${days}`, { method: 'POST', body: { hosts } }); }
+    catch (e) {
+      if (!document.body.contains(d)) return;
+      body.innerHTML = `<div class="empty">${ic('alert')}${esc(e.message)}<button type="button" class="btn sm" id="hq-retry" style="margin-top:10px">重试</button></div>`;
+      body.querySelector('#hq-retry').onclick = () => { body.innerHTML = skel(260); load(); };
+      return;
+    }
+    if (document.body.contains(d)) draw();
+  };
+  const heat = (x) => (x.g?.i || 0) + (x.b?.i || 0);
+  const SORT = { all: heat, g: (x) => x.g?.i || 0, b: (x) => x.b?.i || 0, c: (x) => (x.g?.c || 0) + (x.b?.c || 0) };
+  const shownRows = () => { const k = kw.trim().toLowerCase(); return r.items.filter((x) => !k || x.q.toLowerCase().includes(k)).sort((a, b) => SORT[sort](b) - SORT[sort](a) || heat(b) - heat(a)); };
+  // 导出：当前筛选和排序下的搜索词（最多 500 个）
+  const csvBtn = d.querySelector('#hq-csv');
+  csvBtn.onclick = () => {
+    const rows = shownRows();
+    const cell = (v) => { const t = v == null ? '' : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    const r2 = (v) => Math.round(v * 100) / 100;
+    const eng = (e) => (e ? [e.i, e.c, e.i ? r2((e.c / e.i) * 100) + '%' : '', e.p ?? ''] : ['', '', '', '']);
+    const head = ['搜索词', '热度合计（展示）', 'Google 展示', 'Google 点击', 'Google 点击率', 'Google 平均排名', 'Bing 展示', 'Bing 点击', 'Bing 点击率', 'Bing 平均排名', '站点数', '站点'].map(T);
+    const lines = [head.map(cell).join(','), ...rows.map((x) => [x.q, heat(x), ...eng(x.g), ...eng(x.b), x.n, x.hosts.map(([h]) => h).join(' / ') + (x.n > x.hosts.length ? ' …' : '')].map(cell).join(','))];
+    const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `search-queries-${r.from}_${r.to}.csv`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast(`已导出 ${rows.length} 个搜索词`);
+  };
+  const draw = () => {
+    const hasG = r.g.sites > 0, hasB = r.b.sites > 0;
+    const rows = shownRows();
+    csvBtn.disabled = !rows.length;
+    const maxG = Math.max(1, ...r.items.map((x) => x.g?.i || 0)), maxB = Math.max(1, ...r.items.map((x) => x.b?.i || 0));
+    const cell = (e, max, src) => (e ? `<td class="hq-c"><div class="hq-h ${src}" data-tipf-always data-tipf="${esc(`展示 ${num(e.i)} 次 · 点击 ${num(e.c)} 次 · 点击率 ${pct1(e.i ? e.c / e.i : 0)}${e.p ? ` · 平均排名 ${e.p.toFixed(1)}` : ''}`)}">
+        <b>${num(e.i)}</b><i style="--w:${Math.max(3, Math.round(Math.sqrt(e.i / max) * 100))}%"></i><small>${e.c ? `点击 ${num(e.c)}` : '没有点击'}${e.p ? ` · 排名 ${e.p.toFixed(1)}` : ''}</small></div></td>`
+      : '<td class="hq-c"><span class="hq-no">—</span></td>');
+    const siteTip = (x) => x.hosts.map(([h, g, b]) => `${h}${EN ? ': ' : '：'}${[hasG && g ? `Google ${num(g)}` : '', hasB && b ? `Bing ${num(b)}` : ''].filter(Boolean).join(' · ')}`).join('\n') + (x.n > x.hosts.length ? `\n…还有 ${x.n - x.hosts.length} 个站点` : '');
+    const row = (x) => `<tr><td><div class="hq-q"><span class="ell" translate="no" data-tipf="${esc(x.q)}">${esc(x.q)}</span>
+        <a class="hq-s" href="#/site/${encodeURIComponent(x.hosts[0][0])}" data-tipf-always data-tipf="${esc(siteTip(x))}">${esc(x.hosts[0][0])}${x.n > 1 ? ` <em>+${x.n - 1}</em>` : ''}</a></div></td>
+      ${hasG ? cell(x.g, maxG, 'g') : ''}${hasB ? cell(x.b, maxB, 'b') : ''}</tr>`;
+    const loadedAll = r.g.loaded >= r.g.sites && r.b.loaded >= r.b.sites;
+    const chips = [['all', '综合'], hasG && hasB && ['g', 'Google'], hasG && hasB && ['b', 'Bing'], ['c', '点击']].filter(Boolean);
+    // 没加载全：一次查不完（还有站点没查）或者有站点读取失败；失败原因放在浮动提示里
+    const errTip = r.errors.slice(0, 20).map((e) => `${e.host}（${e.src === 'g' ? 'Google' : 'Bing'}）：${e.error}`).join('\n') + (r.errors.length > 20 ? `\n…还有 ${r.errors.length - 20} 个` : '');
+    body.innerHTML = `${!loadedAll ? `<div class="hq-more">${ic('info', 15)}<span>${[r.pending ? `还有 ${r.pending} 个站点的搜索词没加载（一次最多查 60 个）` : '',
+        r.errors.length ? `<span class="hq-err" data-tipf-always data-tipf="${esc(errTip)}">${r.errors.length} 个站点读取失败</span>` : ''].filter(Boolean).join('，')}</span><span class="sp"></span>
+        <button type="button" class="btn sm" id="hq-go">${r.pending ? '继续加载' : '重试'}</button></div>` : ''}
+      ${r.items.length ? `<div class="hq-tb"><div class="qf">${chips.map(([v, l]) => `<button type="button" class="${sort === v ? 'on' : ''}" data-hqs="${v}">${l}</button>`).join('')}</div><span class="sp"></span>
+        <input class="input sm hq-kw" id="hq-kw" type="search" placeholder="筛选搜索词" value="${esc(kw)}" autocomplete="off"></div>
+      <div class="ev-w hq-w"><table class="tbl gt hq-t"><thead><tr><th>搜索词 <small>${num(r.total)}${r.total > r.items.length ? `（显示前 ${num(r.items.length)} 个）` : ''}</small></th>
+        ${hasG ? `<th class="r">${BRAND.gsc(13)} Google 热度</th>` : ''}${hasB ? `<th class="r">${BRAND.bing(13)} Bing 热度</th>` : ''}</tr></thead>
+        <tbody>${rows.map(row).join('') || `<tr><td colspan="3"><div class="empty">${ic('search')}没有包含“${esc(kw)}”的搜索词</div></td></tr>`}</tbody></table></div>`
+      : `<div class="empty">${ic('inbox')}${hasG || hasB ? '这段时间还没有搜索数据' : '这些站点都没有关联 Search Console 或 Bing'}</div>`}`;
+    body.querySelectorAll('[data-hqs]').forEach((b) => (b.onclick = () => { sort = b.dataset.hqs; draw(); }));
+    const inp = body.querySelector('#hq-kw');
+    if (inp) inp.oninput = () => {
+      kw = inp.value; const pos = inp.selectionStart;
+      draw();
+      const n = body.querySelector('#hq-kw'); n.focus(); n.setSelectionRange(pos, pos);
+    };
+    const go = body.querySelector('#hq-go');
+    if (go) go.onclick = () => { go.disabled = true; go.textContent = '加载中…'; load(); };
+  };
+  load();
+}
+
 // 事件规则的条件写成一句话
 const GA_MATCH = [['CONTAINS', '包含'], ['EQUALS', '等于'], ['STARTS_WITH', '开头是'], ['ENDS_WITH', '结尾是'], ['REGULAR_EXPRESSION', '符合正则'],
   ['CONTAINS_CASE_INSENSITIVE', '包含（不分大小写）'], ['EQUALS_CASE_INSENSITIVE', '等于（不分大小写）']];
@@ -6821,7 +6939,7 @@ async function renderSites(token) {
   store.set('g:bing', hasBing);
   const accts = st.accounts || [], many = accts.length > 1, bad = accts.some((a) => a.error);
   if (gState.acct && !accts.some((a) => a.id === gState.acct)) gState.acct = '';
-  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost g-aik" id="g-aik" aria-label="AI 接口" data-tip="生成临时令牌，让 AI 帮你新建站点统计、管理事件">${ic('key', 15)}<span class="g-aik-t">AI 接口</span><span class="g-aik-n" hidden></span></button><button class="btn ghost icon g-sync" id="g-new" data-tip="新建站点：在 GA4 里新建媒体资源，拿到统计代码" aria-label="新建站点">${ic('plus', 18)}</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步（可以选 Google / Bing）' : '立即同步'}" aria-label="立即同步"${hasBing ? ' aria-haspopup="menu" aria-expanded="false"' : ''}>${ic('refresh', 17)}</button>`, true)}
+  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost g-aik" id="g-aik" aria-label="AI 接口" data-tip="生成临时令牌，让 AI 帮你新建站点统计、管理事件">${ic('key', 15)}<span class="g-aik-t">AI 接口</span><span class="g-aik-n" hidden></span></button><button class="btn ghost icon g-sync" id="g-new" data-tip="新建站点：在 GA4 里新建媒体资源，拿到统计代码" aria-label="新建站点">${ic('plus', 18)}</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-hq" data-tip="热门搜索词：当前筛选的站点在 Google / Bing 上的搜索词，按热度排序" aria-label="热门搜索词">${ic('flame', 17)}</button><button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步（可以选 Google / Bing）' : '立即同步'}" aria-label="立即同步"${hasBing ? ' aria-haspopup="menu" aria-expanded="false"' : ''}>${ic('refresh', 17)}</button>`, true)}
     ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<span>${esc(st.error)}</span><span class="sp"></span><button type="button" class="btn sm" id="g-re">重新连接</button></div>` : ''}
     ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
     <section class="card kstrip gs rv" id="g-sum"></section>
@@ -7110,6 +7228,7 @@ async function renderSites(token) {
   document.getElementById('g-ai').onclick = () => shareDialog(siteItems(d.items), siteItems(lastRows).map((x) => x.host));
   document.getElementById('g-new').onclick = () => newSiteDialog(() => { gFresh = true; route(); });
   document.getElementById('g-aik').onclick = aiApiDialog;
+  document.getElementById('g-hq').onclick = () => hotQueriesDialog(lastRows.map((x) => x.host));
   api('/ai-tokens').then(aiBadge).catch(() => {});   // AI 提交了删除操作等确认时，按钮上显示数字
   const re = document.getElementById('g-re');
   if (re) re.onclick = () => googleConnect(re);
