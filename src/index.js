@@ -12,6 +12,8 @@ import * as gindex from './gindex.js';
 import * as bing from './bing.js';
 import * as backlinks from './backlinks.js';
 import * as advice from './advice.js';
+import * as ga4admin from './ga4admin.js';
+import * as aiapi from './aiapi.js';
 import { subreq } from './budget.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT, normalizeTarget, isAppUrl, isWebUrl, inAppBrowser, intentWithFallback, guardKey, isDbError } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAggStmts, pruneClicks, backfillSourceUv, prunePerRun, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
@@ -724,6 +726,10 @@ async function handleApi(request, env, url) {
   const path = url.pathname;
   const method = request.method;
 
+  // AI 接口：用临时令牌认证（Authorization 请求头），不用后台会话，也不受下面的来源检查（没有 Cookie，不存在跨站请求伪造）
+  if (path === '/api/ai' || path.startsWith('/api/ai/')) {
+    return aiapi.handleAi(request, env, url, { secret: await sessionSecret(env), sitesForAi: google.sitesForAi });
+  }
   // 写操作只接受本站后台页面发起的请求：带了 Origin 又不是本站的直接拒绝。
   // 会话 Cookie 是 SameSite=Strict，但短链域名是主站的子域名时（go.example.com），兄弟子域名上的页面也算“同站”，会带上 Cookie
   const origin = request.headers.get('origin');
@@ -842,6 +848,22 @@ async function authedApi(request, env, url, cred) {
   if (path.startsWith('/api/google/')) return googleApi(request, env, url);
   if (path.startsWith('/api/bing/')) return bingApi(request, env, url);
   if (path.startsWith('/api/backlinks/')) return backlinksApi(request, env, url);
+  // AI 接口的临时令牌和操作记录（见 aiapi.js；AI 调用的接口在 /api/ai/*）
+  if (path === '/api/ai-tokens' && method === 'GET') {
+    return json({ tokens: await aiapi.listTokens(env), ops: await aiapi.listOps(env), doc: `${url.origin}/api/ai`, actions: aiapi.ACTION_NAMES });
+  }
+  if (path === '/api/ai-tokens' && method === 'POST') {
+    const r = await aiapi.createToken(env, await request.json().catch(() => ({})));
+    return r.error ? json(r, 400) : json({ ...r, doc: `${url.origin}/api/ai` });
+  }
+  if (path.startsWith('/api/ai-tokens/') && method === 'DELETE') return json(await aiapi.revokeToken(env, decodeURIComponent(path.slice('/api/ai-tokens/'.length))));
+  {
+    const m = /^\/api\/ai-ops\/(\d+)\/(confirm|reject)$/.exec(path);
+    if (m && method === 'POST') {
+      const r = await aiapi.decideOp(env, await sessionSecret(env), m[1], m[2] === 'confirm', url.origin);
+      return r.error ? json(r, 400) : json(r);
+    }
+  }
   if (path === '/api/shares' && method === 'GET') return json(await listShares(env, url));
   if (path === '/api/shares' && method === 'POST') return createShare(request, env, url);
   if (path.startsWith('/api/shares/') && path.endsWith('/views') && method === 'GET') {
@@ -2509,6 +2531,24 @@ async function googleApi(request, env, url) {
       await google.disconnect(env, secret, id || undefined);
       return json(await google.status(env, secret));
     }
+    // GA4 管理：新建媒体资源和统计代码、站点事件（见 ga4admin.js）。出错返回 400 和原因；reauth 表示要重新授权 Google 账号
+    if (path.startsWith('/api/google/ga4/')) {
+      const q = (k) => url.searchParams.get(k) || '';
+      const b = method === 'GET' || method === 'DELETE' ? {} : await request.json().catch(() => ({}));
+      const run = async (fn) => {
+        try { return json(await fn()); }
+        catch (e) { if (e.budget) throw e; return json({ error: e.message, ...(e.reauth ? { reauth: true } : {}), ...(e.exists ? { exists: true } : {}) }, e.status || 400); }
+      };
+      if (path === '/api/google/ga4/accounts' && method === 'GET') return run(async () => ({ accounts: await ga4admin.ga4Accounts(env, secret) }));
+      if (path === '/api/google/ga4/properties' && method === 'POST') return run(() => ga4admin.createProperty(env, secret, b));
+      if (path === '/api/google/ga4/account-ticket' && method === 'POST') return run(() => ga4admin.accountTicket(env, secret, b, url.origin));
+      if (path === '/api/google/ga4/code' && method === 'GET') return run(() => ga4admin.siteCode(env, secret, q('host')));
+      if (path === '/api/google/ga4/events' && method === 'GET') return run(() => ga4admin.listEvents(env, secret, q('host')));
+      if (path === '/api/google/ga4/key-events' && method === 'POST') return run(() => ga4admin.setKeyEvent(env, secret, String(b.host || ''), b.event, !!b.on));
+      if (path === '/api/google/ga4/event-rules' && method === 'POST') return run(() => ga4admin.createEventRule(env, secret, String(b.host || ''), b));
+      if (path === '/api/google/ga4/event-rules' && method === 'DELETE') return run(() => ga4admin.deleteEventRule(env, secret, q('host'), q('id')));
+      return json({ error: 'not found' }, 404);
+    }
     const days = google.RANGE_DAYS.includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 28;
     // bl：外链与权重开了哪几项（不进缓存，开关一变立即生效）
     if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days, { fresh: url.searchParams.get('fresh') === '1' }), bl: await backlinks.blFlags(env) });
@@ -2607,6 +2647,13 @@ async function backlinksApi(request, env, url) {
 async function googleCallback(env, url) {
   let r;
   const secret = await sessionSecret(env);
+  // 新建 GA4 账号：用户在 Google 页面同意服务条款后也跳回这个地址（没有 code / state）。重新发现所有账号，新账号就能选了
+  if (!url.searchParams.get('code') && !url.searchParams.get('state') && !url.searchParams.get('error')) {
+    if (await google.googleConfigured(env, secret)) await google.discover(env, secret).catch(() => {});
+    return new Response(`<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>正在返回后台…</title>
+<body style="font:14px -apple-system,sans-serif;color:#888;display:grid;place-items:center;min-height:90vh">正在返回后台…
+<script>location.replace('/admin#/sites?ga4acct=ok')</script></body>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  }
   if (!(await google.googleConfigured(env, secret))) r = { error: '未配置 Google OAuth 客户端' };
   else {
     r = await google.handleCallback(env, url, secret, hmac, safeEqual).catch((e) => ({ error: e.message }));

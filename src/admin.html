@@ -2004,6 +2004,67 @@ html.masked input:focus { filter: none; }
 .ix-err svg { flex: none; }
 .ix-err .ell { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ix-sm + .hint, .ix-auth + .ix-err { margin-top: 10px; }
+/* GA4 管理：新建站点统计、统计代码（对话框）；站点详情的事件卡片；设置 → AI 接口 */
+.f-dd .combo-btn { height: 38px; min-width: 0; padding: 0 12px; }   /* 表单里的下拉：和输入框一样高，名称不截短 */
+.f-dd .combo-btn .nm { max-width: none; }
+.pop .oi-h { margin-left: auto; padding-left: 10px; color: var(--muted); font-size: 12px; flex: none; }
+.ev-fl .f-dd { flex: 0 1 auto; min-width: 120px; }
+.ev-fl .f-dd .combo-btn { height: 34px; }
+.dialog.ga-d { width: min(560px, calc(100vw - 32px)); top: max(24px, 8vh); max-height: calc(100vh - max(24px, 8vh) - 24px); overflow: auto; }
+.dialog.ga-d h3 { display: flex; align-items: center; gap: 8px; }
+.dialog.ga-d .bulk-bad { margin-bottom: 14px; }
+.ga-f { display: grid; gap: 6px; margin-bottom: 14px; min-width: 0; }
+.ga-f > span { font-size: 12.5px; color: var(--text-2); font-weight: 500; }
+.ga-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+.ga-na { margin: -4px 0 12px; }
+.ga-naf { padding: 14px 14px 4px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.ga-naf .hint { margin: 0 0 10px; }
+.ga-nab { justify-content: flex-start !important; margin-bottom: 10px; }
+.dialog.ga-d .err, .ai-new .err, .ev-f .err { color: var(--bad); font-size: 12.5px; min-height: 0; margin: 0 0 10px; }
+.dialog.ga-d .err:empty, .ai-new .err:empty, .ev-f .err:empty { display: none; }
+.ga-mid { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--sunken); min-width: 0; }
+.ga-mid > span:first-child { font-size: 12.5px; color: var(--muted); flex: none; }
+.ga-mid code { font-family: var(--mono); font-size: 14px; font-weight: 600; min-width: 0; }
+.ga-h { margin: 12px 0 6px; }
+.ga-code { margin: 0 0 14px; padding: 12px 14px; border-radius: 10px; background: var(--sunken); font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; color: var(--text-2); max-height: 260px; overflow: auto; }
+.tbl.gt.ev-t { table-layout: auto; }   /* 列宽按内容分（固定列宽时英文表头会被截断） */
+.tbl.gt.ev-t th:first-child { width: auto; }
+.ev-t th { white-space: nowrap; }
+.ev-t td { vertical-align: middle; }
+.ev-w { overflow-x: auto; margin: 0 calc(-1 * var(--cp)); }
+.ev-t td:first-child { max-width: 0; width: 100%; }
+.ev-n { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ev-n code { font-family: var(--mono); font-size: 12.5px; color: var(--text); }
+.ev-k, .ev-t th:nth-child(3) { text-align: right; }
+.ev-k .switch { justify-content: flex-end; }
+.ev-a { text-align: right; white-space: nowrap; width: 1%; }
+.ev-all { margin: 10px 0 0; }
+.ev-f { padding: 14px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.ev-fl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
+.ev-fl .input { width: auto; height: 34px; min-width: 0; }
+.ev-fl #ev-v { flex: 1 1 140px; }
+.ev-fl .ev-name { width: 140px; font-family: var(--mono); }
+.ev-fb { display: flex; align-items: center; gap: 8px; margin: 12px 0 10px; }
+.ev-f .hint { margin: 0; }
+.ai-pend { padding: 12px 14px; margin-bottom: 16px; border-radius: 12px; background: var(--warn-bg); }
+.ai-pend h4 { display: flex; align-items: center; gap: 6px; color: var(--warn); }
+.ai-pend .ai-op { border-top-color: color-mix(in srgb, var(--warn) 18%, transparent); }
+.ai-new { padding: 16px; border: 1px solid var(--line); border-radius: 12px; max-width: 640px; }
+.ai-perms { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; }
+.ai-perms label { display: inline-flex; align-items: center; gap: 6px; }
+.ai-tok-new { margin-top: 14px; padding: 16px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 12px; background: var(--accent-2); max-width: 640px; }
+.ai-tok-new .ga-mid { background: var(--panel); }
+.ai-tok-new .ga-code { background: var(--panel); }
+.ai-tok-new .row { display: flex; justify-content: flex-end; }
+.ai-toks, .ai-log { display: grid; max-width: 760px; }
+.ai-tk { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-2); }
+.ai-tk.off { opacity: .55; }
+.ai-tk-t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ai-tk-t b { font-size: 13.5px; font-weight: 600; }
+.ai-op { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-2); font-size: 13px; min-width: 0; }
+.ai-op .ell { flex: 1; min-width: 0; }
+.ai-op .sm { flex: none; color: var(--muted); }
+.ai-op .pill { flex: none; }
 /* 手机上卡片内边距收小一点（左右用 --cp，表格首尾列、列表行也跟着变），放在最后覆盖前面的桌面值 */
 @media (max-width: 640px) {
   :root { --cp: 12px; }
@@ -2107,6 +2168,13 @@ html.masked input:focus { filter: none; }
   .ph:has(> .ov-title > .ov-date) > .toolbar > .mask-btn { grid-area: 2 / 4; }
   .ph:has(> .ov-title > .ov-date) > .toolbar > .switch { grid-area: 2 / 5; }
   .ph:has(> .ov-title > .ov-date) > .toolbar > #range { grid-area: 3 / 1 / 4 / -1; margin-top: 6px; }
+  /* GA4 管理：对话框里的两列改成一列；事件规则的条件一行放不下就换行 */
+  .ga-2 { grid-template-columns: minmax(0, 1fr); }
+  .ev-fl .input, .ev-fl .f-dd { flex: 1 1 120px; }
+  .ev-fl .ev-name { width: auto; }
+  .ai-op { flex-wrap: wrap; }
+  .ev-n { flex-wrap: wrap; }
+  .tbl.gt.ev-t td .ev-n code.ell { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
   /* 卡片标题行里的开关（通知页的目标页异常、每周 SEO、用量预警等）：说明文字放不下换行时，开关不再掉到说明下面，留在标题右边 */
   .card-h:has(> .switch) > .sp { display: none; }
   .card-h > .switch { order: 1; margin-left: auto; }
@@ -2533,7 +2601,7 @@ async function api(path, opts = {}) {
   if (res.status === 401 && path !== '/login' && path !== '/login/2fa') { renderLogin(); throw new Error('unauthorized'); }
   const data = await res.json().catch(() => ({}));
   if (res.status === 403 && data.mustChange) { renderSetPassword(); throw new Error('unauthorized'); }
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data, status: res.status });
   return data;
 }
 
@@ -5645,6 +5713,7 @@ const mailTip = (e) => `<span data-tipf-always data-tipf="${esc(e)}">${esc(maskE
 // 授权回来后的提示。只认本标签页刚从后台发起的授权（googleConnect 里留的标记）：
 // 否则任何人都能发一个 #/sites?google=任意文字 的链接，让真后台弹出伪造的红色“系统错误”
 function googleFlash() {
+  if (/[?&]ga4acct=ok/.test(location.hash)) { history.replaceState(null, '', '#/sites'); toast('GA4 账号已创建，新建站点时就能选了'); return; }
   const m = location.hash.match(/[?&]google=([^&]*)/);
   if (!m) return;
   let v = '';
@@ -5901,6 +5970,324 @@ function shareHosts(s) {
   return `<span class="ai-hs">${shown.map((h) => `<i class="mono">${esc(h)}</i>`).join('')}${rest > 0
     ? `<i class="more" data-tipf-always data-tipf="${esc(`共 ${hs.length} 个站点：\n${hs.join('\n')}`)}">+${rest}</i>` : ''}</span>`;
 }
+// ---------------------------------------------------------------- GA4 管理：新建站点统计、统计代码、事件（接口见 src/ga4admin.js）
+// 表单里的下拉（替代原生 select，和后台其他下拉一致）。list：[{ v, l, g?（分组标题）, h?（右侧灰字） }]；返回的对象 .value 是当前值
+function selectDd(root, list, value, { aria = '', search = '', onChange } = {}) {
+  root.classList.add('combo', 'f-dd');
+  const by = new Map(list.map((x) => [x.v, x]));
+  return dropdown(root, {
+    value: by.has(value) ? value : list[0]?.v, aria, search, onChange, minWidth: 200, maxWidth: 420,
+    groups: (q) => {
+      const hit = list.filter((x) => !q || `${x.l} ${x.v} ${x.h || ''}`.toLowerCase().includes(q));
+      const gs = [];
+      for (const x of hit) { const g = gs.find((y) => y[0] === (x.g || '')); g ? g[1].push(x.v) : gs.push([x.g || '', [x.v]]); }
+      return gs.map(([t, vs]) => [t ? esc(t) : '', vs]);
+    },
+    button: (v) => `<span class="nm">${esc(by.get(v)?.l ?? '')}</span>`,
+    option: (v, q) => `<span class="ell">${hl(by.get(v)?.l ?? '', q)}</span>${by.get(v)?.h ? `<small class="oi-h">${esc(by.get(v).h)}</small>` : ''}`,
+  });
+}
+
+// 简单的对话框：返回对话框元素和关闭函数
+function gaDlg(cls = '') {
+  const ov = document.createElement('div'); ov.className = 'ov';
+  const d = document.createElement('div'); d.className = `dialog ga-d ${cls}`; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+  const close = () => { ov.remove(); d.remove(); document.removeEventListener('keydown', onKey); removeEventListener('hashchange', close); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  ov.onclick = close;
+  document.addEventListener('keydown', onKey);
+  addEventListener('hashchange', close);
+  document.body.append(ov, d);
+  return { d, close };
+}
+// 统计代码区：衡量 ID + 代码 + 复制
+const gaCodeHtml = (mid, snippet) => `<div class="ga-mid"><span>衡量 ID</span><code>${esc(mid || '—')}</code><span class="sp"></span>${mid ? copyBtn(mid, 'btn sm', '复制') : ''}</div>
+  <p class="hint ga-h">把这段代码贴到网站每个页面的 &lt;head&gt; 里，贴好后约 30 分钟能在 GA4 看到数据</p>
+  <pre class="ga-code">${esc(snippet || '')}</pre>`;
+const gaReauthBar = (text) => `<div class="bulk-bad ix-auth">${ic('key', 15)}<span>${esc(text)}</span><span class="sp"></span><button type="button" class="btn sm" data-ga-re>重新授权</button></div>`;
+const GA_TZ = () => [...new Set([Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai', 'Asia/Shanghai', 'Asia/Hong_Kong', 'Asia/Taipei', 'Asia/Tokyo',
+  'Asia/Singapore', 'Europe/London', 'Europe/Berlin', 'America/New_York', 'America/Los_Angeles', 'UTC'])];
+const GA_CUR = ['USD', 'CNY', 'HKD', 'TWD', 'EUR', 'GBP', 'JPY'];
+const GA_REGION = [['US', '美国'], ['CN', '中国'], ['HK', '中国香港'], ['SG', '新加坡'], ['JP', '日本'], ['GB', '英国'], ['DE', '德国']];
+
+// 站点页“新建站点”：选 GA4 账号、填网址 → 新建媒体资源和网站数据流 → 给出统计代码
+async function newSiteDialog(onDone) {
+  const { d, close } = gaDlg();
+  d.innerHTML = `<h3>${ic('plus', 18)}新建站点统计</h3>${skel(180)}`;
+  let accts;
+  try { accts = (await api('/google/ga4/accounts')).accounts; }
+  catch (e) {
+    d.innerHTML = `<h3>新建站点统计</h3><p class="err">${esc(e.message)}</p><div class="row"><button class="btn" data-x>关闭</button></div>`;
+    d.querySelector('[data-x]').onclick = close;
+    return;
+  }
+  const many = accts.length > 1;
+  const editable = accts.filter((a) => a.canEdit && !a.error);
+  const noEdit = accts.filter((a) => !a.canEdit && !a.error);
+  const accList = editable.flatMap((a) => a.accounts.map((x) => ({ v: `${a.acct}|${x.name}`, l: x.displayName, h: `${x.properties} 个媒体资源`, g: many ? maskEmail(a.email) : '' })));
+  const opts = accList.length;
+  let dd = {};
+  const form = (pre = {}) => {
+    d.innerHTML = `<h3>${ic('plus', 18)}新建站点统计</h3>
+      <p>在 GA4 里新建媒体资源和网站数据流，拿到统计代码贴到网站上；站点会自动出现在列表里。</p>
+      ${noEdit.length ? gaReauthBar(`${noEdit.map((a) => maskEmail(a.email)).join('、')} 还没授予 GA4 编辑权限，重新授权后才能在这里新建`) : ''}
+      <label class="ga-f"><span>网站地址</span><input class="input" id="ga-url" placeholder="https://example.com" inputmode="url" autocomplete="off" value="${esc(pre.url || '')}"></label>
+      <div class="ga-f"><span>放在哪个 GA4 账号下</span>${opts ? '<div id="ga-acc"></div>' : '<span class="hint">没有可用的 GA4 账号：先新建一个，或重新授权</span>'}</div>
+      <div class="ga-2"><div class="ga-f"><span>时区</span><div id="ga-tz"></div></div>
+        <div class="ga-f"><span>币种</span><div id="ga-cur"></div></div></div>
+      ${editable.length ? `<button type="button" class="hr-more ga-na" id="ga-na">${ic('plus', 12)}新建 GA4 账号</button>
+      <div class="ga-naf" id="ga-naf" hidden>
+        <div class="ga-2"><label class="ga-f"><span>账号名称</span><input class="input" id="ga-nan" placeholder="My Sites"></label>
+          <div class="ga-f"><span>国家 / 地区</span><div id="ga-nar"></div></div></div>
+        ${many ? '<div class="ga-f"><span>用哪个 Google 账号</span><div id="ga-nag"></div></div>' : ''}
+        <p class="hint">Google 要求账号所有者本人同意服务条款：点下面的按钮会打开 Google Analytics，同意后回到这里刷新账号列表。</p>
+        <div class="row ga-nab"><button type="button" class="btn sm" id="ga-nago">${ic('ext', 13)}打开 Google 同意条款</button><button type="button" class="btn sm ghost" id="ga-rl">${ic('refresh', 13)}刷新账号列表</button></div>
+      </div>` : ''}
+      <div class="err" role="alert"></div>
+      <div class="row"><button class="btn" data-x>取消</button><button class="btn primary" id="ga-ok" ${opts ? '' : 'disabled'}>创建</button></div>`;
+    d.querySelector('[data-x]').onclick = close;
+    const mk = (id, list, v, aria, search) => { const el = d.querySelector(`#${id}`); if (el) dd[id] = selectDd(el, list, v, { aria, search }); };
+    mk('ga-acc', accList, dd['ga-acc']?.value, '选择 GA4 账号', accList.length > 8 ? '搜索账号' : '');
+    mk('ga-tz', GA_TZ().map((t) => ({ v: t, l: t })), dd['ga-tz']?.value, '选择时区');
+    mk('ga-cur', GA_CUR.map((c) => ({ v: c, l: c })), dd['ga-cur']?.value, '选择币种');
+    mk('ga-nar', GA_REGION.map(([v, l]) => ({ v, l, h: v })), dd['ga-nar']?.value, '选择国家或地区');
+    mk('ga-nag', editable.map((a) => ({ v: a.acct, l: maskEmail(a.email) })), dd['ga-nag']?.value, '选择 Google 账号');
+    d.querySelector('[data-ga-re]')?.addEventListener('click', (e) => googleConnect(e.currentTarget));
+    const na = d.querySelector('#ga-na');
+    if (na) na.onclick = () => { const f = d.querySelector('#ga-naf'); f.hidden = !f.hidden; if (!f.hidden) f.querySelector('#ga-nan').focus(); };
+    d.querySelector('#ga-rl')?.addEventListener('click', () => { close(); newSiteDialog(onDone); });
+    d.querySelector('#ga-nago')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget, err = d.querySelector('.err');
+      const name = d.querySelector('#ga-nan').value.trim();
+      if (!name) { err.textContent = '请填写账号名称'; d.querySelector('#ga-nan').focus(); return; }
+      // 先打开空白窗口再跳转：等接口返回后再 window.open 会被浏览器当成弹窗拦掉
+      const w = window.open('', '_blank');
+      btn.disabled = true; err.textContent = '';
+      try {
+        const r = await api('/google/ga4/account-ticket', { method: 'POST', body: { acct: dd['ga-nag']?.value || editable[0].acct, name, region: dd['ga-nar'].value } });
+        if (w) w.location = r.url; else location.href = r.url;
+        toast('在新打开的页面同意条款后，回来点“刷新账号列表”');
+      } catch (ex) { w?.close(); err.textContent = ex.message; }
+      finally { btn.disabled = false; }
+    });
+    const ok = d.querySelector('#ga-ok');
+    if (pre.url) setTimeout(() => d.querySelector('#ga-url').focus(), 0);
+    else d.querySelector('#ga-url').focus();
+    ok.onclick = async (ev, force = false) => {
+      const err = d.querySelector('.err'), url = d.querySelector('#ga-url').value.trim();
+      if (!url) { err.textContent = '请填写网站地址'; d.querySelector('#ga-url').focus(); return; }
+      const [acct, account] = dd['ga-acc'].value.split('|');
+      ok.disabled = true; ok.textContent = '正在创建…'; err.textContent = '';
+      try {
+        const r = await api('/google/ga4/properties', { method: 'POST', body: { url, acct, account, timeZone: dd['ga-tz'].value, currency: dd['ga-cur'].value, force } });
+        done(r);
+      } catch (ex) {
+        ok.disabled = false; ok.textContent = '创建';
+        if (ex.data?.exists && !force) {
+          const go = await confirmDialog({ title: '这个域名已经有 GA4 媒体资源', text: `${ex.message}。仍要再新建一个吗？`, ok: '仍要新建' });
+          if (go) ok.onclick(null, true);
+          return;
+        }
+        err.textContent = ex.message;
+      }
+    };
+    d.querySelector('#ga-url').onkeydown = (e) => { if (e.key === 'Enter') ok.click(); };
+  };
+  const done = (r) => {
+    d.innerHTML = `<h3>${ic('check', 18)}已创建 · ${esc(r.host)}</h3>
+      ${gaCodeHtml(r.measurementId, r.snippet)}
+      <div class="row"><a class="btn" href="#/site/${encodeURIComponent(r.host)}">查看站点</a><button class="btn primary" id="ga-cp">${ic('copy', 14)}复制代码</button></div>`;
+    d.querySelector('#ga-cp').onclick = (e) => copy(r.snippet, '统计代码已复制', e.currentTarget);
+    onDone?.();
+  };
+  form();
+}
+
+// 站点的统计代码和发送自定义事件的示例
+async function gaCodeDialog(host) {
+  const { d, close } = gaDlg();
+  d.innerHTML = `<h3>${ic('code', 18)}统计代码 · ${esc(host)}</h3>${skel(160)}`;
+  try {
+    const r = await api(`/google/ga4/code?host=${encodeURIComponent(host)}`);
+    d.innerHTML = `<h3>${ic('code', 18)}统计代码 · ${esc(host)}</h3>
+      ${gaCodeHtml(r.measurementId, r.snippet)}
+      <p class="hint ga-h">点击按钮、提交表单这类事件要在网站代码里发送，例如：</p>
+      <pre class="ga-code">${esc(r.eventSnippet)}</pre>
+      <div class="row"><button class="btn" data-x>关闭</button><button class="btn primary" id="ga-cp">${ic('copy', 14)}复制统计代码</button></div>`;
+    d.querySelector('#ga-cp').onclick = (e) => copy(r.snippet, '统计代码已复制', e.currentTarget);
+  } catch (e) {
+    d.innerHTML = `<h3>统计代码 · ${esc(host)}</h3><p class="err">${esc(e.message)}</p><div class="row"><button class="btn" data-x>关闭</button></div>`;
+  }
+  d.querySelector('[data-x]').onclick = close;
+}
+
+// 事件规则的条件写成一句话
+const GA_MATCH = [['CONTAINS', '包含'], ['EQUALS', '等于'], ['STARTS_WITH', '开头是'], ['ENDS_WITH', '结尾是'], ['REGULAR_EXPRESSION', '符合正则'],
+  ['CONTAINS_CASE_INSENSITIVE', '包含（不分大小写）'], ['EQUALS_CASE_INSENSITIVE', '等于（不分大小写）']];
+const GA_FIELD = [['page_location', '页面网址'], ['page_title', '页面标题'], ['page_referrer', '来源网址'], ['link_url', '点击的链接']];
+const gaMatchName = (m) => GA_MATCH.find(([k]) => k === m)?.[1] || m;
+const gaFieldName = (f) => GA_FIELD.find(([k]) => k === f)?.[1] || f;
+const gaRuleText = (r) => (r.conditions.length
+  ? `当 ${r.source || '任意事件'} 的「${gaFieldName(r.conditions[0].field)}」${gaMatchName(r.conditions[0].match)} “${r.conditions[0].value}” 时，记为 ${r.event}${r.conditions.length > 1 ? `（另有 ${r.conditions.length - 1} 个条件）` : ''}`
+  : `收到 ${r.source || '任意事件'} 时，记为 ${r.event}`);
+
+// 站点详情的“事件”卡片：最近 28 天收到的事件、关键事件开关、事件规则（新建 / 删除）
+async function mountEvents(host) {
+  const el = document.getElementById('g-ev');
+  if (!el) return;
+  const body = el.querySelector('.card-b');
+  let d, all = false, formOpen = false;
+  const load = async () => {
+    try { d = await api(`/google/ga4/events?host=${encodeURIComponent(host)}`); }
+    catch (e) {
+      if (!document.body.contains(el)) return;
+      body.innerHTML = `<div class="empty">${ic('alert')}${esc(e.message)}<button type="button" class="btn sm" id="ev-retry" style="margin-top:10px">重试</button></div>`;
+      body.querySelector('#ev-retry').onclick = () => { body.innerHTML = skel(160); load(); };
+      return;
+    }
+    if (document.body.contains(el)) draw();
+  };
+  const draw = () => {
+    const ro = !d.canEdit;
+    const list = all ? d.events : d.events.slice(0, 12);
+    const row = (e) => `<tr>
+      <td><div class="ev-n"><code class="ell" data-tipf="${esc(e.name)}">${esc(e.name)}</code>${e.rules.length ? `<i class="ix-tag" data-tipf-always data-tipf="${esc(e.rules.map(gaRuleText).join('\n'))}">规则</i>` : ''}</div></td>
+      <td class="num">${e.count ? num(e.count) : '<span class="sm" data-tipf-always data-tipf="最近 28 天还没收到这个事件">还没收到</span>'}</td>
+      <td class="ev-k"><label class="switch" ${ro ? 'data-tipf-always data-tipf="需要先重新授权 GA4 编辑权限"' : e.key && !e.deletable ? 'data-tipf-always data-tipf="GA4 默认的关键事件，不能取消"' : ''}><input type="checkbox" data-key="${esc(e.name)}" ${e.key ? 'checked' : ''} ${ro || (e.key && !e.deletable) ? 'disabled' : ''} aria-label="${esc(e.name)} 设为关键事件"><span class="t"></span></label></td>
+      <td class="ev-a">${e.rules.map((r) => `<button type="button" class="btn sm ghost icon" data-del="${esc(r.id)}" ${ro ? 'disabled' : ''} aria-label="删除规则" data-tipf-always data-tipf="${esc(`删除规则：${gaRuleText(r)}`)}">${ic('trash', 14)}</button>`).join('')}</td></tr>`;
+    const srcs = [...new Set(['page_view', ...d.events.filter((e) => e.count).map((e) => e.name)])].slice(0, 30);
+    body.innerHTML = `${ro ? gaReauthBar('当前 Google 账号只有只读权限，重新授权后才能设置关键事件、新建和删除事件') : ''}
+      <div class="ev-f" id="ev-f" ${formOpen ? '' : 'hidden'}>
+        <div class="ev-fl">当 <div id="ev-src"></div> 的
+          <div id="ev-fld"></div>
+          <div id="ev-m"></div>
+          <input class="input" id="ev-v" placeholder="/thank-you"> 时，记为 <input class="input ev-name" id="ev-name" placeholder="purchase" autocomplete="off"></div>
+        <div class="ev-fb"><label class="switch"><input type="checkbox" id="ev-key" checked><span class="t"></span>同时设为关键事件</label><span class="sp"></span>
+          <button type="button" class="btn sm" id="ev-cancel">取消</button><button type="button" class="btn sm primary" id="ev-save">保存</button></div>
+        <div class="err" role="alert"></div>
+        <p class="hint">新事件从保存后开始统计，GA4 里大约几小时后能看到；已经收集的历史数据不会补算。</p>
+      </div>
+      ${d.rulesError ? `<p class="hint ix-err">${ic('alert', 13)}<span>读取事件规则失败：${esc(d.rulesError)}</span></p>` : ''}
+      ${d.events.length ? `<div class="ev-w"><table class="tbl gt ev-t"><thead><tr><th>事件</th><th class="r"><span class="th-l">近 28 天</span><span class="th-s">28 天</span></th><th class="r"><span class="th-l">关键事件</span><span class="th-s">关键</span></th><th></th></tr></thead>
+        <tbody>${list.map(row).join('')}</tbody></table></div>
+        ${d.events.length > 12 ? `<button type="button" class="hr-more ev-all" id="ev-all">${all ? '收起' : `显示全部 ${d.events.length} 个`}</button>` : ''}`
+        : `<div class="empty">${ic('inbox')}最近 28 天还没收到事件：确认统计代码已经贴到网站上</div>`}`;
+    body.querySelector('[data-ga-re]')?.addEventListener('click', (e) => googleConnect(e.currentTarget));
+    body.querySelector('#ev-all')?.addEventListener('click', () => { all = !all; draw(); });
+    const f = body.querySelector('#ev-f');
+    const ddSrc = selectDd(f.querySelector('#ev-src'), srcs.map((x) => ({ v: x, l: x })), 'page_view', { aria: '来源事件', search: srcs.length > 8 ? '搜索事件' : '' });
+    const ddFld = selectDd(f.querySelector('#ev-fld'), GA_FIELD.map(([v, l]) => ({ v, l })), 'page_location', { aria: '条件' });
+    const ddM = selectDd(f.querySelector('#ev-m'), GA_MATCH.slice(0, 5).map(([v, l]) => ({ v, l })), 'CONTAINS', { aria: '匹配方式' });
+    body.querySelector('#ev-cancel').onclick = () => { formOpen = false; f.hidden = true; };
+    body.querySelector('#ev-save').onclick = async (e) => {
+      const btn = e.currentTarget, err = f.querySelector('.err');
+      const event = f.querySelector('#ev-name').value.trim();
+      if (!/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(event)) { err.textContent = '事件名只能用字母、数字、下划线，字母开头，最长 40 个字符'; f.querySelector('#ev-name').focus(); return; }
+      btn.disabled = true; err.textContent = '';
+      try {
+        await api('/google/ga4/event-rules', { method: 'POST', body: { host, event, source: ddSrc.value, field: ddFld.value,
+          match: ddM.value, value: f.querySelector('#ev-v').value.trim(), key: f.querySelector('#ev-key').checked } });
+        toast(`已新建事件 ${event}`); formOpen = false; await load();
+      } catch (ex) { err.textContent = ex.message; btn.disabled = false; }
+    };
+    body.querySelectorAll('[data-key]').forEach((cb) => (cb.onchange = async () => {
+      cb.disabled = true;
+      try { await api('/google/ga4/key-events', { method: 'POST', body: { host, event: cb.dataset.key, on: cb.checked } }); toast(cb.checked ? `${cb.dataset.key} 已设为关键事件` : `${cb.dataset.key} 已取消关键事件`); await load(); }
+      catch (ex) { cb.checked = !cb.checked; cb.disabled = false; toast(ex.message, 'bad'); }
+    }));
+    body.querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => {
+      const ok = await confirmDialog({ title: '删除这条事件规则？', text: '删除后不再生成这个事件；已经收集到的历史数据不会删除。', ok: '删除', danger: true });
+      if (!ok) return;
+      b.disabled = true;
+      try { await api(`/google/ga4/event-rules?host=${encodeURIComponent(host)}&id=${encodeURIComponent(b.dataset.del)}`, { method: 'DELETE' }); toast('已删除规则'); await load(); }
+      catch (ex) { b.disabled = false; toast(ex.message, 'bad'); }
+    }));
+  };
+  el.querySelector('#ev-new').onclick = () => {
+    if (!d) return;
+    if (!d.canEdit) { toast('需要先重新授权 GA4 编辑权限', 'warn'); return; }
+    formOpen = true;
+    const f = body.querySelector('#ev-f');
+    f.hidden = false;
+    f.querySelector('#ev-v').focus();
+  };
+  el.querySelector('#ev-code').onclick = () => gaCodeDialog(host);
+  load();
+}
+
+// ---------------------------------------------------------------- 设置 → AI 接口（接口见 src/aiapi.js）
+const AI_PERMS = [['create', '新建站点统计'], ['events', '管理事件'], ['delete', '删除不用确认']];
+const AI_HOURS = [[1, '1 小时'], [24, '1 天'], [168, '7 天']];
+const aiPending = (a) => (a.ops || []).filter((o) => o.status === 'pending').length;
+const aiLive = (a) => (a.tokens || []).filter((t) => !t.revoked && !t.expired).length;
+const aiPill = (a) => (aiPending(a) ? `<span class="pill exp">${aiPending(a)} 条待确认</span>` : `<span class="pill ${aiLive(a) ? 'on' : 'off'}">${aiLive(a) ? `${aiLive(a)} 个有效` : '无'}</span>`);
+const aiSummary = (a) => (aiPending(a) ? `AI 提交了 ${aiPending(a)} 个删除操作，等你确认` : aiLive(a) ? `${aiLive(a)} 个有效令牌，可随时吊销` : '让 AI 帮你新建站点统计、管理 GA4 事件');
+const aiOpText = (o, names) => `${names[o.action] || o.action}${o.host ? ` · ${o.host}` : ''}${o.params?.event ? ` · ${o.params.event}` : ''}${o.params?.url ? ` · ${o.params.url}` : ''}${o.action === 'key_event' ? (o.params?.on ? '（设为关键事件）' : '（取消关键事件）') : ''}${o.action === 'delete_rule' ? ` · 规则 ${o.params?.id}` : ''}`;
+const AI_ST = { pending: ['exp', '待你确认'], done: ['on', '完成'], failed: ['bad-p', '失败'], rejected: ['off', '已拒绝'] };
+const aiPrompt = (doc, token, exp) => `请帮我管理网站统计（GA4）。先读接口说明：${doc}
+调用接口时在请求头加上：Authorization: Bearer ${token}
+（令牌 ${fmtTime(exp)} 失效）
+读完说明后告诉我你能做什么，然后按我的要求操作；动手前先说明要做的事。`;
+
+function renderAiApi(box, a, onState) {
+  const pend = (a.ops || []).filter((o) => o.status === 'pending');
+  const toks = a.tokens || [];
+  box.innerHTML = `<p class="set-p">生成一个临时令牌，把下面那段话发给 Claude、ChatGPT 等 AI，它就能帮你新建站点的 GA4 统计、设置关键事件、新建或删除事件。令牌有有效期，随时可以吊销；AI 的每一步操作都会记在这里，删除类操作要你确认后才执行。</p>
+    ${pend.length ? `<div class="ai-pend"><h4 class="set-h" style="margin-top:0">${ic('alert', 15)}待你确认</h4>${pend.map((o) => `<div class="ai-op"><span class="ell">${esc(aiOpText(o, a.actions))}</span><span class="sm">${ago(o.at)}</span>
+      <button type="button" class="btn sm" data-op-no="${o.id}">拒绝</button><button type="button" class="btn sm primary" data-op-ok="${o.id}">确认执行</button></div>`).join('')}</div>` : ''}
+    <div class="ai-new">
+      <div class="ga-f"><span>有效期</span><div class="seg" id="ai-h">${AI_HOURS.map(([h, l]) => `<button type="button" data-h="${h}" class="${h === 24 ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+      <div class="ga-f"><span>允许 AI 做的事</span><div class="ai-perms"><label><input type="checkbox" checked disabled> 读取站点数据</label>
+        ${AI_PERMS.map(([k, l]) => `<label><input type="checkbox" data-perm="${k}" ${k !== 'delete' ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>
+      <label class="ga-f"><span>备注（可选）</span><input class="input" id="ai-label" placeholder="Claude Code · 新站点" maxlength="60"></label>
+      <div class="err" role="alert"></div>
+      <button type="button" class="btn primary" id="ai-gen">${ic('key', 15)}生成令牌</button>
+    </div>
+    <div id="ai-out"></div>
+    ${toks.length ? `<h4 class="set-h">令牌</h4><div class="ai-toks">${toks.map((t) => `<div class="ai-tk${t.revoked || t.expired ? ' off' : ''}">
+      <div class="ai-tk-t"><b>${esc(t.label || `令牌 ••••${t.tail}`)}</b><span class="sm">${t.label ? `••••${esc(t.tail)} · ` : ''}${t.perms.filter((p) => p !== 'read').map((p) => AI_PERMS.find(([k]) => k === p)?.[1] || p).join('、') || '只读'}
+        · ${t.revoked ? '已吊销' : t.expired ? '已过期' : `${fmtTime(t.expiresAt)} 失效`}${t.lastUsed ? ` · 最近使用 ${ago(t.lastUsed)}（共 ${num(t.uses)} 次）` : ' · 还没用过'}</span></div>
+      ${t.revoked || t.expired ? '' : `<button type="button" class="btn sm ghost danger-t" data-revoke="${esc(t.id)}">吊销</button>`}</div>`).join('')}</div>` : ''}
+    ${(a.ops || []).length ? `<h4 class="set-h">操作记录</h4><div class="ai-log">${a.ops.slice(0, 30).map((o) => `<div class="ai-op">
+      <span class="ell" data-tipf-always data-tipf="${esc(`${aiOpText(o, a.actions)}\n${fmtTime(o.at)}${o.tokenLabel ? ` · ${o.tokenLabel}` : o.tokenTail ? ` · 令牌 ••••${o.tokenTail}` : ''}${typeof o.result === 'string' && o.result ? `\n${o.result}` : ''}`)}">${esc(aiOpText(o, a.actions))}</span>
+      <span class="sm">${ago(o.at)}</span><span class="pill ${AI_ST[o.status]?.[0] || 'off'}">${AI_ST[o.status]?.[1] || o.status}</span></div>`).join('')}</div>` : ''}`;
+  const reload = async () => { const n = await api('/ai-tokens'); onState(n); renderAiApi(box, n, onState); return n; };
+  const seg = box.querySelector('#ai-h');
+  segThumb(seg);
+  let hours = 24;
+  seg.querySelectorAll('button').forEach((b) => (b.onclick = () => { hours = Number(b.dataset.h); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); segThumb(seg); }));
+  box.querySelector('#ai-gen').onclick = async (e) => {
+    const btn = e.currentTarget, err = box.querySelector('.ai-new .err');
+    btn.disabled = true; err.textContent = '';
+    try {
+      const r = await api('/ai-tokens', { method: 'POST', body: { hours, label: box.querySelector('#ai-label').value.trim(), perms: ['read', ...[...box.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm)] } });
+      await reload();
+      const text = aiPrompt(r.doc, r.token, r.expiresAt);
+      const out = box.querySelector('#ai-out');
+      out.innerHTML = `<div class="ai-tok-new"><div class="ga-mid"><span>令牌</span><code class="ell">${esc(r.token)}</code></div>
+        <p class="hint ga-h">令牌只显示这一次。把下面这段话发给 AI：</p><pre class="ga-code">${esc(text)}</pre>
+        <div class="row"><button type="button" class="btn primary" id="ai-cp">${ic('copy', 14)}复制给 AI 的话</button></div></div>`;
+      out.querySelector('#ai-cp').onclick = (ev) => copy(text, '已复制，粘贴给 AI 即可', ev.currentTarget);
+      out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (ex) { err.textContent = ex.message; btn.disabled = false; }
+  };
+  box.querySelectorAll('[data-revoke]').forEach((b) => (b.onclick = async () => {
+    const ok = await confirmDialog({ title: '吊销这个令牌？', text: '吊销后 AI 立即不能再用它；它提交的待确认操作也会作废。', ok: '吊销', danger: true });
+    if (!ok) return;
+    try { await api(`/ai-tokens/${encodeURIComponent(b.dataset.revoke)}`, { method: 'DELETE' }); toast('已吊销'); reload(); } catch (ex) { toast(ex.message, 'bad'); }
+  }));
+  const decide = async (id, ok, b) => {
+    b.disabled = true;
+    try {
+      const r = await api(`/ai-ops/${id}/${ok ? 'confirm' : 'reject'}`, { method: 'POST' });
+      toast(!ok ? '已拒绝' : r.status === 'done' ? '已执行' : `执行失败：${r.result}`, !ok || r.status === 'done' ? 'ok' : 'bad');
+      reload();
+    } catch (ex) { b.disabled = false; toast(ex.message, 'bad'); }
+  };
+  box.querySelectorAll('[data-op-ok]').forEach((b) => (b.onclick = () => decide(b.dataset.opOk, true, b)));
+  box.querySelectorAll('[data-op-no]').forEach((b) => (b.onclick = () => decide(b.dataset.opNo, false, b)));
+}
+
 function renderShares(box, list, onState) {
   const items = list.items || [];
   box.innerHTML = items.length ? `<div class="ai-sl">${items.map((s) => `<div class="ai-si${s.expired ? ' off' : ''}">
@@ -6243,7 +6630,7 @@ function renderGoogleSettings(box, st, onState) {
         <div class="g-acc-t"><b>${a.email ? mailTip(a.email) : esc(a.id)}</b>
           <span>${a.error ? esc(a.error) : [n(a.ga4, 'GA4'), n(a.gsc, 'GSC'), `连接于 ${fmtTime(a.connectedAt)}`].filter(Boolean).join(' · ')}</span></div>
         ${a.error ? '<button type="button" class="btn sm" data-re>重新连接</button>'
-          : !a.canSubmit && a.gsc ? '<button type="button" class="btn sm" data-re data-tipf-always data-tipf="早先只授予了 Search Console 只读权限；重新授权一次后，才能在后台提交站点地图">重新授权</button>' : ''}
+          : (!a.canSubmit && a.gsc) || (!a.canEdit && a.ga4) ? `<button type="button" class="btn sm" data-re data-tipf-always data-tipf="${esc(`早先只授予了${[!a.canSubmit && a.gsc && ' Search Console', !a.canEdit && a.ga4 && ' GA4'].filter(Boolean).join(' 和')} 只读权限；重新授权一次后，才能在后台${[!a.canSubmit && a.gsc && '提交站点地图', !a.canEdit && a.ga4 && '新建站点统计、管理事件'].filter(Boolean).join('、')}`)}">重新授权</button>` : ''}
         <button type="button" class="btn sm ghost danger-t" data-off="${esc(a.id)}" data-mail="${esc(a.email)}">断开</button></div>`).join('')}</div>
         <p class="hint" style="margin-top:10px">所有账号的站点按域名合并显示；多个账号都能看到同一个站点时，用最早连接的账号的数据。添加账号请到 <a href="#/sites">站点</a> 页。</p>
         <label class="opt trk-sw" style="margin-top:18px"><div class="tx"><b>有新网址或网页更新时自动重新提交站点地图</b>
@@ -6333,7 +6720,7 @@ async function renderSites(token) {
   store.set('g:bing', hasBing);
   const accts = st.accounts || [], many = accts.length > 1, bad = accts.some((a) => a.error);
   if (gState.acct && !accts.some((a) => a.id === gState.acct)) gState.acct = '';
-  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步（可以选 Google / Bing）' : '立即同步'}" aria-label="立即同步"${hasBing ? ' aria-haspopup="menu" aria-expanded="false"' : ''}>${ic('refresh', 17)}</button>`, true)}
+  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost icon g-sync" id="g-new" data-tip="新建站点：在 GA4 里新建媒体资源，拿到统计代码" aria-label="新建站点">${ic('plus', 18)}</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步（可以选 Google / Bing）' : '立即同步'}" aria-label="立即同步"${hasBing ? ' aria-haspopup="menu" aria-expanded="false"' : ''}>${ic('refresh', 17)}</button>`, true)}
     ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<span>${esc(st.error)}</span><span class="sp"></span><button type="button" class="btn sm" id="g-re">重新连接</button></div>` : ''}
     ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
     <section class="card kstrip gs rv" id="g-sum"></section>
@@ -6470,7 +6857,7 @@ async function renderSites(token) {
               const h = x.linksFrom.reduce((a, l) => a + l.human, 0), ses = x.cur.ga?.sessions;
               const tip = `${G_LABEL()}从这个站点点出 ${x.linksFrom.length} 个短链，真人点击 ${num(h)}${x.linksFromVisitors ? `（${num(x.linksFromVisitors)} 位访客）` : ''}${ses ? `，点出率 ${pct1(h / ses)}` : ''}：${x.linksFrom.slice(0, 3).map((l) => `/${l.slug} ${num(l.human)}`).join('、')}${x.linksFrom.length > 3 ? ' …' : ''}`;
               return `<span class="gsl" data-tipf-always data-tipf="${esc(tip)}">${ic('link', 12)}${num(h)}</span>`;
-            })() : ''}${x.ga4?.created ? `<span class="gage" data-tipf-always data-tipf="${esc(`GA4 接入于 ${ymd(new Date(x.ga4.created))}，大致是网站上线时间`)}">${ic('history', 11)}${siteAge(x.ga4.created)}</span>` : ''}${x.content?.at ? `<span class="gage${contentDays(x.content.at) >= C_STALE ? ' old' : ''}" data-tipf-always data-tipf="${esc(contentTip(x.content))}">${ic('edit', 11)}${contentDays(x.content.at) < 1 ? '今天' : siteAge(x.content.at)}</span>` : ''}${advOf(x.host).length ? `<span class="gadv lv-${advOf(x.host)[0].level}" data-tipf-always data-tipf="${esc(`${advOf(x.host).length} 条优化建议\n${advTip(advOf(x.host))}`)}">${ic(ADV_LV_IC[advOf(x.host)[0].level], 11)}${advOf(x.host).length}</span>` : ''}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${!x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div>${x.tags.length ? `<div class="sm gm gtl">${x.tags.slice(0, 3).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}${x.tags.length > 3 ? `<span class="gtg sm-t" data-tipf-always data-tipf="${esc(x.tags.join(LIST_SEP))}">+${x.tags.length - 3}</span>` : ''}</div>` : ''}</td>
+            })() : ''}${x.ga4?.created ? `<span class="gage" data-tipf-always data-tipf="${esc(`GA4 接入于 ${ymd(new Date(x.ga4.created))}，大致是网站上线时间`)}">${ic('history', 11)}${siteAge(x.ga4.created)}</span>` : ''}${x.content?.at ? `<span class="gage${contentDays(x.content.at) >= C_STALE ? ' old' : ''}" data-tipf-always data-tipf="${esc(contentTip(x.content))}">${ic('edit', 11)}${contentDays(x.content.at) < 1 ? '今天' : siteAge(x.content.at)}</span>` : ''}${advOf(x.host).length ? `<span class="gadv lv-${advOf(x.host)[0].level}" data-tipf-always data-tipf="${esc(`${advOf(x.host).length} 条优化建议\n${advTip(advOf(x.host))}`)}">${ic(ADV_LV_IC[advOf(x.host)[0].level], 11)}${advOf(x.host).length}</span>` : ''}${x.error ? `<span class="gtag bad" data-tipf-always data-tipf="${esc(x.error)}">同步出错</span>` : ''}${x.ga4?.created > Date.now() - 7 * 86400000 && !x.cur.ga?.sessions ? '<span class="gtag off" data-tipf-always data-tipf="GA4 还没收到数据：确认统计代码已经贴到网站上（贴好后约 30 分钟有数据）">待接入</span>' : !x.syncedAt ? '<span class="gtag off">待同步</span>' : ''}</div>${x.tags.length ? `<div class="sm gm gtl">${x.tags.slice(0, 3).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}${x.tags.length > 3 ? `<span class="gtg sm-t" data-tipf-always data-tipf="${esc(x.tags.join(LIST_SEP))}">+${x.tags.length - 3}</span>` : ''}</div>` : ''}</td>
           <td class="num">${x.users != null ? num(x.users) : '—'}${x.prevUsers != null ? gDelta(x.users, x.prevUsers) : ''}</td>
           <td class="num">${ga ? num(ga.sessions) : '—'}${ga && pg ? gDelta(ga.sessions, pg.sessions) : ''}${ga?.keyEvents ? `<div class="gd ix-pg" data-tipf-always data-tipf="GA4 关键事件（标记为转化的事件）">关键事件 ${num(ga.keyEvents)}</div>` : ''}</td>
           <td class="gsh-c c-share">${shareSum && shareOf(x) ? `<div class="gsh"><i style="width:${(shareOf(x) / shareSum) * 100}%"></i></div><span>${pctText(shareOf(x) / shareSum)}</span>` : '<span class="sm">—</span>'}</td>
@@ -6620,6 +7007,7 @@ async function renderSites(token) {
   const siteItems = (rows) => rows.map((x) => ({ host: x.host, sessions: x.cur.ga?.sessions || 0 }))
     .sort((a, b) => b.sessions - a.sessions);
   document.getElementById('g-ai').onclick = () => shareDialog(siteItems(d.items), siteItems(lastRows).map((x) => x.host));
+  document.getElementById('g-new').onclick = () => newSiteDialog(() => { gFresh = true; route(); });
   const re = document.getElementById('g-re');
   if (re) re.onclick = () => googleConnect(re);
 
@@ -7037,7 +7425,7 @@ function advView(a) {
       ? { t: '还没有提交站点地图', d: ['Search Console 里没有站点地图。', '提交后 Google 能更快发现新网页，可以在“网页索引 → 站点地图”里一键提交。'], go: 'idx:sm', gl: '去提交' }
       : { t: '站点地图读取失败', li: [[String(n.error || '').replace(/^读取站点地图失败：/, ''), '']], d2: ['检查站点地图地址能不能打开、格式对不对。'], go: 'idx:sm', gl: '看站点地图' };
     case 'bing_low': return { t: `Bing 收录少：${num(n.yes)} / ${num(n.done)}`, d: [n.g != null ? `Bing 已检查的网址里收录不到 20%，Google 是 ${pctText(n.g)}。` : 'Bing 已检查的网址里收录不到 20%。', '把没收录的网址提交给 Bing，或在 Bing Webmaster 里提交站点地图。'], go: 'idx:bno', gl: '看 Bing 未收录' };
-    case 'no_conversion': return { t: '有流量但没有转化', d: [`近 28 天 ${num(n.sessions)} 次会话，没有一次关键事件。`, '在 GA4 里把重要的操作（注册、下载、点推广链接）标记为关键事件，才看得出哪些流量有价值。'] };
+    case 'no_conversion': return { t: '有流量但没有转化', d: [`近 28 天 ${num(n.sessions)} 次会话，没有一次关键事件。`, '在 GA4 里把重要的操作（注册、下载、点推广链接）标记为关键事件，才看得出哪些流量有价值。'], go: 'ev', gl: '设置关键事件' };
     case 'stale_content': return { t: n.at ? `内容 ${n.days} 天没更新` : `${n.days} 天没发现内容更新`,
       d: [n.at ? `按站点地图推测，最近一次内容更新是 ${ymd(new Date(n.at))}${n.src === 'build' ? '（站点地图日期，可能只是构建时间）' : ''}。` : `${n.days} 天里站点地图没有新网址，也没有网页更新。`,
         `搜索点击最近两周 ${num(n.cur)} 次，之前两周 ${num(n.prev)} 次，少了 ${n.pct}%。`, '定期发布新内容、更新旧文章（补充信息、更新日期和 lastmod），有助于保持搜索排名。'], go: 'sc:pages', gl: '看页面数据' };
@@ -7065,6 +7453,7 @@ const advTip = (items) => items.map((a) => `· ${ADV_NAME[a.rule] || a.rule}`).j
 // “查看”：滚到对应卡片并切到对应筛选
 function advGo(go) {
   const [card, k] = go.split(':');
+  if (card === 'ev') { document.getElementById('g-ev')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (card === 'sc') {
     const el = document.getElementById('g-sc');
     if (!el) return;
@@ -7349,6 +7738,9 @@ async function renderSite(token, host) {
       </div>
       ${d.bingSite ? bingCardsHtml(d) : ''}
       ${blCardHtml(d)}
+      ${d.ga4 ? `<section class="card rv" id="g-ev"><div class="card-h"><h3>事件 · GA4</h3><span class="sp"></span>
+        <button type="button" class="btn sm" id="ev-new">${ic('plus', 14)}新建事件</button><button type="button" class="btn sm" id="ev-code">${ic('code', 14)}代码</button></div>
+        <div class="card-b">${skel(160)}</div></section>` : ''}
       ${d.gsc || d.bingSite ? `<section class="card rv" id="g-idx"><div class="card-h"><h3>${d.gsc && d.bingSite ? '网页索引' : d.gsc ? '网页索引 · Search Console' : '网页索引 · Bing'}</h3><span class="sp"></span>
         <div class="tabs"><button>网址</button><button>站点地图</button></div>
         <button type="button" class="btn sm icon" id="ix-chk" aria-label="立即检查" data-tipf-always data-tipf="立即检查：刷新站点地图，再检查待检查的网址（每次最多 60 个）">${ic('refresh', 14)}</button></div>
@@ -7357,6 +7749,7 @@ async function renderSite(token, host) {
   const page = document.getElementById('page');
   reveal(page);
   if (d.gsc || d.bingSite) mountSiteIndex(host);
+  if (d.ga4) mountEvents(host);
   bindBlCard(host);
   mountSiteSwitch(host);
   mountAdvice(host, d);
@@ -7401,9 +7794,10 @@ async function renderSite(token, host) {
 async function renderSettings(token) {
   const head = `<header class="ph"><div><div class="kicker">设置</div><h1>账号与安全</h1><div class="sub">管理后台登录密码、两步验证、来源追踪和第三方集成</div></div></header>`;
   shell('settings', `${head}<div class="acc">${skel(76, 3)}</div>`);
-  const [mfa, trk, ret, use, goo, shr, sys, ses, bst, bls] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'),
+  const [mfa, trk, ret, use, goo, shr, sys, ses, bst, bls, aia] = await Promise.all([api('/2fa'), api('/tracking'), api('/retention'),
     api('/usage').catch((e) => ({ configured: true, errors: [e.message], days: [] })), api('/google/status').catch(() => ({ configured: false })), api('/shares').catch(() => ({ items: [] })), api('/status').catch(() => null),
-    api('/sessions').catch(() => ({ items: [] })), api('/bing/status').catch(() => ({ configured: false })), api('/backlinks/status').catch(() => null)]);
+    api('/sessions').catch(() => ({ items: [] })), api('/bing/status').catch(() => ({ configured: false })), api('/backlinks/status').catch(() => null),
+    api('/ai-tokens').catch(() => null)]);
   if (token !== routeToken) return;
   const item = (id, icon, cls, title, sub, status, body) => `
     <section class="card rv fold acc-i" data-acc="${id}">
@@ -7439,6 +7833,7 @@ async function renderSettings(token) {
       ${item('bing', 'bing', 'bing brand', 'Bing Webmaster', bingSummary(bst), bingPill(bst), '')}
       ${bls ? item('bl', 'link', 'bl', '外链与权重', blSummary(bls), blPill(bls), '') : ''}
       ${goo.connected || shr.items.length ? item('ai', 'ai', 'ai', 'AI 分析链接', sharesSummary(shr), sharesPill(shr), '') : ''}
+      ${aia && (goo.connected || aia.tokens.length) ? item('aiapi', 'key', 'ai', 'AI 接口', aiSummary(aia), aiPill(aia), '') : ''}
       ${sys ? item('sys', 'pulse', 'sys', '系统状态', sysSummary(sys), sysPill(sys), sysBody(sys)) : ''}
       ${item('ret', 'inbox', 'ret', '数据保留', '访问明细保存多久；统计数据长期保留', `<span class="pill on">${ret.days ? ret.days + ' 天' : '永久'}</span>`, '')}
       ${item('lang', 'globe', 'lang', '界面语言', '后台显示的语言，默认跟随浏览器', `<span class="pill on notranslate">${EN ? 'English' : '中文'}</span>`, `
@@ -7521,6 +7916,11 @@ async function renderSettings(token) {
   if (shBox) renderShares(shBox, shr, (l) => {
     page.querySelector('[data-st="ai"]').innerHTML = sharesPill(l);
     page.querySelector('[data-sub="ai"]').innerHTML = sharesSummary(l);
+  });
+  const aiBox = document.getElementById('acc-aiapi');
+  if (aiBox) renderAiApi(aiBox, aia, (a) => {
+    page.querySelector('[data-st="aiapi"]').innerHTML = aiPill(a);
+    page.querySelector('[data-sub="aiapi"]').innerHTML = aiSummary(a);
   });
   renderUsage(document.getElementById('acc-use'), use, (u) => {
     page.querySelector('[data-st="use"]').innerHTML = usagePill(u);

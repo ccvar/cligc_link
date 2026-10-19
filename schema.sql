@@ -328,3 +328,32 @@ CREATE TABLE IF NOT EXISTS site_ignores (
   until  INTEGER NOT NULL,
   PRIMARY KEY (host, rule)
 );
+
+-- AI 接口的临时令牌（见 src/aiapi.js）：只存哈希；perms 为 JSON 数组（read / create / events / delete）
+CREATE TABLE IF NOT EXISTS ai_tokens (
+  id          TEXT PRIMARY KEY,
+  hash        TEXT NOT NULL UNIQUE,
+  tail        TEXT NOT NULL DEFAULT '',      -- 令牌后 4 位，后台显示用
+  label       TEXT NOT NULL DEFAULT '',
+  perms       TEXT NOT NULL DEFAULT '[]',
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  revoked_at  INTEGER NOT NULL DEFAULT 0,
+  last_used   INTEGER NOT NULL DEFAULT 0,
+  uses        INTEGER NOT NULL DEFAULT 0,
+  hour        INTEGER NOT NULL DEFAULT 0,    -- 限流：当前小时序号和本小时请求次数
+  hour_n      INTEGER NOT NULL DEFAULT 0
+);
+-- AI 的写操作记录；删除类操作先记为 pending，后台确认后执行
+CREATE TABLE IF NOT EXISTS ai_ops (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  token_id    TEXT NOT NULL,
+  at          INTEGER NOT NULL,
+  action      TEXT NOT NULL,
+  host        TEXT NOT NULL DEFAULT '',
+  params      TEXT NOT NULL DEFAULT '{}',
+  status      TEXT NOT NULL,                 -- pending / done / failed / rejected
+  result      TEXT,
+  done_at     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS ai_ops_token ON ai_ops (token_id);

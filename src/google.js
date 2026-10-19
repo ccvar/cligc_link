@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------- Google：GA4 + Search Console
-// 授权：OAuth 2.0（Web 应用），权限 analytics.readonly、webmasters（Search Console 读取 + 提交站点地图）。
-// 早先授权的账号只有 webmasters.readonly，读取不受影响；要提交站点地图需重新连接一次。
+// 授权：OAuth 2.0（Web 应用），权限 analytics.readonly、analytics.edit（新建 GA4 媒体资源、管理事件）、webmasters（Search Console 读取 + 提交站点地图）。
+// 早先授权的账号没有写权限，读取不受影响；要提交站点地图、新建媒体资源、管理事件需重新连接一次。
 // OAuth 客户端：在后台填写，加密保存在 settings.int_google（旧版本的环境变量会自动导入一次）。
 // 回调地址为 <域名>/api/google/callback。
 // 可以连接多个 Google 账号：每个账号一行 g_accounts，刷新令牌用会话密钥派生的 AES-GCM 密钥加密保存。
@@ -15,15 +15,20 @@ import { contentOf } from './content.js';
 const SCOPES = [
   'openid', 'email',
   'https://www.googleapis.com/auth/analytics.readonly',
+  'https://www.googleapis.com/auth/analytics.edit',
   'https://www.googleapis.com/auth/webmasters',
 ];
 const SC_WRITE = 'https://www.googleapis.com/auth/webmasters';
-// 账号是否授予了 Search Console 写权限（提交站点地图要用）
-export async function canSubmit(env, secret, acct) {
+export const GA_EDIT = 'https://www.googleapis.com/auth/analytics.edit';
+async function hasScope(env, secret, acct, scope) {
   const row = acct && await env.DB.prepare('SELECT auth FROM g_accounts WHERE id = ?').bind(acct).first();
   if (!row) return false;
-  try { return String((await unseal(secret, row.auth)).scope || '').split(/\s+/).includes(SC_WRITE); } catch { return false; }
+  try { return String((await unseal(secret, row.auth)).scope || '').split(/\s+/).includes(scope); } catch { return false; }
 }
+// 账号是否授予了 Search Console 写权限（提交站点地图要用）
+export const canSubmit = (env, secret, acct) => hasScope(env, secret, acct, SC_WRITE);
+// 账号是否授予了 GA4 编辑权限（新建媒体资源、管理事件要用）
+export const canEdit = (env, secret, acct) => hasScope(env, secret, acct, GA_EDIT);
 const DAY = 86400000;
 // 首次回填 486 天（Search Console 最多保留 16 个月），够“最近 6 个月”做环比；回填天数变了会重新回填一次
 const BACKFILL_DAYS = 486, GA_REFRESH = 4, SC_REFRESH = 5;
@@ -332,6 +337,28 @@ export async function discover(env, secret, only) {
   return rebuildSites(env);
 }
 
+// AI 接口（GET /api/ai/sites）：所有站点的基本情况和近 28 天会话
+export async function sitesForAi(env) {
+  const rows = (await env.DB.prepare(`SELECT s.host, s.ga4_property, s.ga4_name, s.ga4_created, s.gsc_site, s.bing_site,
+    (SELECT SUM(d.sessions) FROM g_daily d WHERE d.host = s.host AND d.date >= ?) AS sessions28,
+    (SELECT SUM(d.clicks) FROM g_daily d WHERE d.host = s.host AND d.date >= ?) AS clicks28
+    FROM g_sites s`).bind(ymd(Date.now() - 29 * DAY), ymd(Date.now() - 29 * DAY)).all()).results;
+  return rows.map((r) => ({
+    host: r.host, ga4: r.ga4_property ? { property: r.ga4_property, name: r.ga4_name, createdAt: r.ga4_created ? new Date(r.ga4_created).toISOString().slice(0, 10) : null } : null,
+    gsc: !!r.gsc_site, bing: !!r.bing_site, sessions28: r.sessions28 ?? null, searchClicks28: r.clicks28 ?? null,
+  })).sort((a, b) => (b.sessions28 || 0) - (a.sessions28 || 0) || a.host.localeCompare(b.host));
+}
+
+// 新建了 GA4 媒体资源（见 ga4admin.js）：直接加进这个账号上次的发现结果并合并站点，不用等下一次发现
+export async function addProp(env, acct, prop) {
+  const row = await env.DB.prepare('SELECT found FROM g_accounts WHERE id = ?').bind(acct).first();
+  if (!row) return;
+  const found = row.found ? JSON.parse(row.found) : { props: [], gsc: [], errors: [] };
+  found.props = [...(found.props || []).filter((p) => p.id !== prop.id), prop];
+  await env.DB.prepare('UPDATE g_accounts SET found = ? WHERE id = ?').bind(JSON.stringify(found), acct).run();
+  await rebuildSites(env);
+}
+
 // 把所有账号的发现结果按主域名合并进 g_sites。
 // 同一个媒体资源 / 站点多个账号都能看到时，用最早连接的账号；同一域名有“网域”和“网址前缀”两种 GSC 资源时优先网域资源
 export async function rebuildSites(env) {
@@ -574,10 +601,12 @@ export async function status(env, secret) {
     env.DB.prepare('SELECT COUNT(*) AS n FROM g_sites').first('n'),
     env.DB.prepare('SELECT MAX(synced_at) AS t, SUM(synced_at = 0) AS pending FROM g_sites').first(),
   ]);
-  await Promise.all(accts.map(async (a) => { try { a._w = String((await unseal(secret, a.auth)).scope || '').split(/\s+/).includes(SC_WRITE); } catch { a._w = false; } }));
+  await Promise.all(accts.map(async (a) => {
+    try { const sc = String((await unseal(secret, a.auth)).scope || '').split(/\s+/); a._w = sc.includes(SC_WRITE); a._e = sc.includes(GA_EDIT); } catch { a._w = a._e = false; }
+  }));
   const list = accts.map((a) => {
     const f = a.found ? JSON.parse(a.found) : null;
-    return { id: a.id, email: a.email, connectedAt: a.connected_at, error: a.error || '', canSubmit: !!a._w,
+    return { id: a.id, email: a.email, connectedAt: a.connected_at, error: a.error || '', canSubmit: !!a._w, canEdit: !!a._e,
       ga4: f ? f.props.length : null, gsc: f ? f.gsc.length : null, errors: f?.errors || [], discoveredAt: a.found_at || null };
   });
   const many = list.length > 1;
