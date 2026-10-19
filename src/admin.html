@@ -2074,6 +2074,24 @@ html.masked input:focus { filter: none; }
   .acc-i .fold-h > .acc-s { grid-column: 3; grid-row: 1; }
   .acc-i .fold-h > svg:last-child { grid-column: 4; grid-row: 1; }
   .acc-t .sub .use-sum { flex-wrap: wrap; white-space: normal; row-gap: 4px; }
+  /* 设置 → Cloudflare 用量：第一行是套餐切换 + 修改凭据 / 刷新按钮，识别说明单独一行；用量结论的对勾在左边，推算方式放在下面一行；用量卡片标题可以换行 */
+  .use-h { flex-wrap: wrap; row-gap: 8px; }
+  .use-h .seg { order: 1; }
+  .use-h .sp { order: 2; }
+  .use-h > .btn { order: 3; }
+  .use-h .use-why { order: 4; flex-basis: 100%; }
+  .use-v-b { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; align-items: start; padding: 10px 12px; }
+  .use-v-b > svg { margin-top: 2px; }
+  .use-v-b .hint { grid-column: 2; margin-left: 0; font-size: 12px; }
+  .use-m { padding: 10px 12px; }
+  .use-l { white-space: normal; overflow: visible; }
+  /* 每日用量表：去掉用量条那列，按内容分列宽（固定列宽时表头叠在一起、数字被截断） */
+  .use-t { table-layout: auto; }
+  .use-t th { width: auto !important; }
+  .use-t th:nth-child(3), .use-t td:nth-child(3) { display: none; }
+  .use-t th, .use-t td { padding-left: 4px; padding-right: 4px; }
+  .use-t th:first-child, .use-t td:first-child { padding-left: var(--cp); }
+  .use-t th:last-child, .use-t td:last-child { padding-right: var(--cp); }
   /* 卡片标题行里的开关（通知页的目标页异常、每周 SEO、用量预警等）：说明文字放不下换行时，开关不再掉到说明下面，留在标题右边 */
   .card-h:has(> .switch) > .sp { display: none; }
   .card-h > .switch { order: 1; margin-left: auto; }
@@ -7740,7 +7758,7 @@ function renderUsage(box, u, onState) {
         : meter('D1 存储（整个账户）', u.storageBytes, 5e9, u.myStorage, u.myStorage != null, bytes, '包含')}
     </div>
     <div class="hint" style="margin-top:10px">额度按整个 Cloudflare 账户计算，${paid ? '付费版按自然月累计，超出部分按量计费' : '免费版每天 UTC 0 点（北京时间 8 点）重置，超出后当天的请求会失败'}。按 UTC 日期统计${u.updatedAt ? ` · 更新于 ${fmtTime(u.updatedAt)}` : ''}。</div>
-    <table class="tbl use-t"><thead><tr><th>日期（UTC）</th><th style="text-align:right">D1 读取</th><th></th><th style="text-align:right">D1 写入</th><th style="text-align:right">Worker 请求</th></tr></thead>
+    <table class="tbl use-t"><thead><tr><th><span class="th-l">日期（UTC）</span><span class="th-s">日期</span></th><th style="text-align:right">D1 读取</th><th></th><th style="text-align:right">D1 写入</th><th style="text-align:right">Worker 请求</th></tr></thead>
       <tbody>${(u.days || []).slice().reverse().map((d) => `<tr>
         <td>${d.date.slice(5)}${d.date === u.today ? ' <span class="sm">今天</span>' : ''}</td>
         <td class="num">${wan(d.rowsRead)}${u.hasMine?.d1 ? `<div class="sm">本项目 ${wan(d.mine?.rowsRead || 0)}</div>` : ''}</td>
