@@ -2,6 +2,34 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.9.0 · 2026-10-19
+
+Manage GA4 from the admin: create site tracking, get the tracking code, set key events, and create or delete events. You can also generate a temporary token so an AI can do all this through an API.
+
+### New
+
+- **Create site tracking**: the "+" at the top right of the Sites list. Pick a Google account and GA4 account and enter the site URL; a GA4 property and web data stream are created, and you get the tracking code. The site shows up in the list on its own. If you don't have a GA4 account yet, you can create one here too (accept Google's terms, then come back and refresh). You're warned first if the domain already has a property
+- **Event management**: a new "Events" dropdown at the top of the site page with two dialogs, "Event list" and "Tracking code"
+  - The event list shows the events received in the last 28 days with counts, tagged by type: Auto (collected by GA4, including enhanced measurement), Recommended (event names recommended by Google) and Custom; filter by type
+  - Turn any event into a key event, or back, with one switch
+  - Create events with rules (for example, record sign_up when a URL is visited or a link is clicked) and delete rules
+  - The tracking code dialog shows the measurement ID, the gtag snippet and an example of sending a custom event, each with a copy button
+  - The "No conversions" suggestion opens the event list directly
+- **AI API**: the "AI API" button on the Sites list generates a temporary token with an expiry. Send the generated message to Claude, ChatGPT or another AI, and it can read site data, create site tracking, set key events, and create or delete events
+  - Each token has its own permissions and can be revoked at any time; only a hash of the token is stored
+  - Every AI action is logged; deletions run only after you confirm them in the admin, and the button shows how many are waiting
+  - Up to 300 requests per token per hour; the API guide is at `GET /api/ai`
+
+### Improved
+
+- The admin no longer uses the browser's native dropdowns; they're replaced with a new dropdown menu
+- Dialog close buttons moved to the top right of the title bar; in the event list only the table scrolls, while the title, filters and table header stay in place
+
+### Upgrade notes
+
+- Creating properties and managing events needs GA4 edit access: after upgrading, click "Re-authorize" once when the event list or the create-tracking dialog asks for it (self-hosted setups need the Google Analytics Admin API enabled in their Google Cloud project)
+- The database adds the new tables automatically after the upgrade; nothing to do by hand
+
 ## v1.8.0 · 2026-10-19
 
 Estimates when each site's content was last updated from its sitemap, a much better admin on phones, and a fix for blank pages on slow connections.
