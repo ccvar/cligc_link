@@ -2052,6 +2052,21 @@ html.masked input:focus { filter: none; }
   .gsl-from th:nth-child(2), .gsl-from td:nth-child(2), .gsl-from th:nth-child(5), .gsl-from td:nth-child(5),
   .gsl-to th:nth-child(4), .gsl-to td:nth-child(4) { display: none; }
   .gsl-t .ell { min-width: 70px; max-width: 120px; }
+  /* 短链页的快速创建：后缀、推广地址、创建按钮排成一行（去掉域名前缀，按钮写“创建”，和工具栏里“高级创建”的“+”区分开） */
+  .quick { grid-template-columns: 108px minmax(0, 1fr) auto; gap: 6px; }
+  .quick .slug { padding-left: 10px; }
+  .quick .slug span { display: none; }
+  .quick .slug input { padding: 0 8px 0 0; }
+  .quick .btn { padding: 0 12px; }
+  .quick .btn > svg { display: none; }
+  .quick .input { padding: 0 10px; }
+  /* 首列固定的表格：没滚动时没有分隔；往左滑了，首列右侧外面淡淡地渐出一层阴影（逐格的 box-shadow 在 iPhone 上会显示成一条硬线）。
+     行被点中变灰时，固定的首列也跟着变灰 */
+  .has-hbar tr > :first-child { overflow: visible; }
+  .has-hbar tr > :first-child::after { content: ''; position: absolute; top: 0; bottom: 0; left: 100%; width: 10px; pointer-events: none;
+    background: linear-gradient(90deg, rgba(13, 19, 33, .07), transparent); opacity: 0; transition: opacity .2s; }
+  .has-hbar.scrolled tr > :first-child::after { opacity: 1; }
+  .has-hbar tbody tr:hover > td:first-child { background: var(--panel-2); }
   /* 横向滚动的表格：隐藏原生滚动条，用从第二列开始的细滚动条（跟着滚动容器横向固定，不随内容滑走） */
   .has-hbar { scrollbar-width: none; }
   .has-hbar::-webkit-scrollbar { display: none; }
@@ -2061,13 +2076,11 @@ html.masked input:focus { filter: none; }
   .hbar i { position: absolute; top: 0; left: var(--hb-l, 0); width: var(--hb-w, 0); height: 4px; border-radius: 2px;
     background: color-mix(in srgb, var(--text) 22%, transparent); transform: translateX(var(--hb-x, 0)); }
   /* 概览的机器访问来源表：同样首列（运营商）固定 */
-  .tbl.mtbl th:first-child, .tbl.mtbl td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); transition: box-shadow .2s; }
-  .scroll.scrolled .tbl.mtbl th:first-child, .scroll.scrolled .tbl.mtbl td:first-child { box-shadow: 6px 0 8px -6px rgba(13, 19, 33, .18); }
+  .tbl.mtbl th:first-child, .tbl.mtbl td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); }
   .tbl.mtbl td:first-child .ell { max-width: 130px !important; }
   /* 短链详情的来源站点 / 目标站点表（列多）：首列固定在左边，后面的列左右拖动；首列收窄 */
-  .gsl-t th:first-child, .gsl-t td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); padding-right: 8px; transition: box-shadow .2s; }
-  .scroll.scrolled .gsl-t th:first-child, .scroll.scrolled .gsl-t td:first-child { box-shadow: 6px 0 8px -6px rgba(13, 19, 33, .18); }
-  .gsl-t td:first-child { max-width: 128px; }
+  .gsl-t th:first-child, .gsl-t td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); padding-right: 8px; }
+  .gsl-t td:first-child > * { max-width: 112px; }
   .gsl-t td:first-child .gh { display: block; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
   .gsl-t .gm .gico { width: 16px; height: 16px; }
   .th-l { display: none; }
@@ -2111,16 +2124,14 @@ html.masked input:focus { filter: none; }
   .tbl.vt td:nth-child(2), .tbl.vt td:nth-child(4) { text-align: right; max-width: 150px; }
   .tbl.vt td:nth-child(5), .tbl.vt td:nth-child(6) { display: none; }
   /* 站点表格：列多，横向滚动时站点名那一列固定在左边 */
-  .tbl.gl th:first-child, .tbl.gl td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); transition: box-shadow .2s; }
-  /* 没滚动时不加分隔线；往左滑了才在右边缘出现一点阴影，表示后面的列从下面滑过 */
-  .gl-wrap.scrolled .tbl.gl th:first-child, .gl-wrap.scrolled .tbl.gl td:first-child { box-shadow: 6px 0 8px -6px rgba(13, 19, 33, .18); }
+  .tbl.gl th:first-child, .tbl.gl td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); }
   /* 表头放一行（来源图标放回文字左边），行距收小 */
   .tbl.gl th { padding-top: 8px; padding-bottom: 8px; }
   .tbl.gl td { padding-top: 9px; padding-bottom: 9px; }
   .se-th, .bl-th { flex-direction: row; align-items: center; gap: 3px; }
   /* 站点名那列尽量窄：域名小一号、太长省略，图标和小标记缩小；“打开网站”在站点详情页里有 */
   .tbl.gl th:first-child, .tbl.gl td:first-child { padding-right: 8px; }
-  .tbl.gl td:first-child { max-width: 140px; }
+  .tbl.gl td:first-child > * { max-width: 124px; }   /* Safari 不认表格单元格的 max-width，限制里面的内容 */
   .tbl.gl .gh { display: block; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
   .tbl.gl .gh .row-ext { display: none; }
   .tbl.gl .gm { gap: 3px; row-gap: 3px; }
@@ -2959,7 +2970,16 @@ function hbarSync(el) {
   bar.style.setProperty('--hb-w', `${tw}px`);
   bar.style.setProperty('--hb-x', `${(el.scrollLeft / (sw - cw)) * (track - tw)}px`);
 }
+// 手机上输入框放不下长提示：带 data-ph-m 的换成短提示（原来的存在 data-ph，回到宽屏时换回去）
+function phonePh() {
+  for (const el of document.querySelectorAll('[data-ph-m]')) {
+    if (!el.dataset.ph) el.dataset.ph = el.placeholder;
+    const want = PHONE.matches ? (window.T ? window.T(el.dataset.phM) : el.dataset.phM) : el.dataset.ph;
+    if (el.placeholder !== want) el.placeholder = want;
+  }
+}
 function hbarScan() {
+  phonePh();
   if (!PHONE.matches) return;
   for (const el of document.querySelectorAll('#page .gl-wrap, #page .scroll')) {
     const td = el.querySelector('tbody td');
@@ -3943,9 +3963,9 @@ async function renderLinks(token, opts = {}) {
       <div class="stack">
         <section class="rv">
           <form class="quick" id="quick">
-            <div class="slug"><span>${esc(HOST)}/</span><input name="slug" placeholder="后缀（留空自动生成）" autocomplete="off" aria-label="短链后缀"></div>
-            <input class="input" name="target_url" placeholder="默认推广地址（可选，之后也能设置）" autocomplete="off" aria-label="默认推广地址">
-            <button class="btn primary">${ic('plus')}创建短链</button>
+            <div class="slug"><span>${esc(HOST)}/</span><input name="slug" placeholder="后缀（留空自动生成）" data-ph-m="自定义后缀" autocomplete="off" aria-label="短链后缀"></div>
+            <input class="input" name="target_url" placeholder="默认推广地址（可选，之后也能设置）" data-ph-m="推广地址（可选）" autocomplete="off" aria-label="默认推广地址">
+            <button class="btn primary">${ic('plus')}<span class="th-l">创建短链</span><span class="th-s">创建</span></button>
           </form>
           <div id="qres"></div>
         </section>
