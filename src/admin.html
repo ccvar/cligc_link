@@ -1781,6 +1781,12 @@ button.gtg { cursor: pointer; }
 #lk-gs:empty { display: none; }
 .th-s { display: none; }   /* 表头的短写法（手机上用） */
 .hbar { display: none; }   /* 手机上横向滚动表格的自绘滚动条（见 hbarScan） */
+/* 手机上站点表格的悬浮表头（见 glFloat） */
+.gl-float { position: fixed; z-index: 4; overflow: hidden; background: var(--panel); box-shadow: 0 1px 0 var(--line), 0 6px 12px -10px rgba(13, 19, 33, .25); transition: top .35s var(--ease-out); }
+.gl-float[hidden] { display: none; }
+.gl-float table { table-layout: fixed; margin: 0; }
+.gl-float th { box-sizing: border-box; border-bottom: 0; }
+.gl-float th:first-child { position: relative; left: auto; z-index: 1; background: var(--panel); }
 .g-empty.sm-e { border-top: 1px solid var(--line-2); padding: 14px var(--cp); }
 .g-empty code { font-family: var(--mono); font-size: 11.5px; padding: 1px 5px; border-radius: 5px; background: var(--sunken); }
 .gsl-t .ell { min-width: 110px; max-width: 260px; }
@@ -2055,8 +2061,19 @@ html.masked input:focus { filter: none; }
   .ph > .ph-acts { flex-basis: 100%; }
   /* 站点列表筛选栏的“有优化建议”：往右挪掉内边距和边框，文字和上面搜索框的右边对齐 */
   .g-advf { margin-right: -11px; }
+  /* 短链列表的访问数：和第一行（/后缀 · 标题）齐平，不随下面几行上下居中 */
+  .lrow .c-clicks { align-self: start; }
   /* 短链列表每行的操作图标：最后一个往右挪掉内边距，和上面的访问数右边对齐 */
   .lrow .acts > :last-child { margin-right: -8px; }
+  /* 设置页折叠项的标题行：图标、标题、状态、箭头在第一行居中对齐，说明文字放第二行完整换行（不再省略，也不把箭头挤下去） */
+  .acc-i .fold-h { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; column-gap: 12px; row-gap: 2px; align-items: center; }
+  .acc-i .fold-h > .acc-t { display: contents; }
+  .acc-i .fold-h > .sp { display: none; }
+  .acc-i .fold-h .acc-t h3 { grid-column: 2; grid-row: 1; min-width: 0; }
+  .acc-i .fold-h .acc-t .sub { grid-column: 2 / -1; grid-row: 2; white-space: normal; overflow: visible; }
+  .acc-i .fold-h > .acc-s { grid-column: 3; grid-row: 1; }
+  .acc-i .fold-h > svg:last-child { grid-column: 4; grid-row: 1; }
+  .acc-t .sub .use-sum { flex-wrap: wrap; white-space: normal; row-gap: 4px; }
   /* 卡片标题行里的开关（通知页的目标页异常、每周 SEO、用量预警等）：说明文字放不下换行时，开关不再掉到说明下面，留在标题右边 */
   .card-h:has(> .switch) > .sp { display: none; }
   .card-h > .switch { order: 1; margin-left: auto; }
@@ -3003,9 +3020,51 @@ function hbarScan() {
     hbarSync(el);
   }
 }
+// 手机上站点表格要横向滚动，表头的 position: sticky 只在滚动容器里生效，整页往下滚时会跟着滚走：
+// 表头滚出屏幕后，在页面顶部（导航条下面）显示一份表头副本，列宽、横向位置和原表格同步，首列同样固定在左边；点副本的表头等于点原表头（排序）
+function glFloat() {
+  const wrap = PHONE.matches && document.querySelector('#page .gl-wrap:not(.fits)');
+  let fl = document.getElementById('gl-float');
+  if (!wrap) { fl?.remove(); return; }
+  const src = wrap.querySelector('table'), thead = src?.tHead;
+  if (!thead) return;
+  const top = parseFloat(getComputedStyle(wrap).getPropertyValue('--sticky-top')) || 0;
+  const r = wrap.getBoundingClientRect(), hh = thead.offsetHeight;
+  if (!(r.top < top && r.bottom - hh * 2 > top)) { if (fl) fl.hidden = true; return; }
+  if (!fl) {
+    fl = document.createElement('div');
+    fl.id = 'gl-float'; fl.className = 'gl-float'; fl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(fl);
+    fl.addEventListener('click', (e) => {
+      const th = e.target.closest('th');
+      const row = document.querySelector('#page .gl-wrap thead tr');
+      if (th && row) row.children[[...th.parentElement.children].indexOf(th)]?.click();
+    });
+  }
+  if (fl._html !== thead.innerHTML || fl._cls !== src.className) {
+    fl.innerHTML = `<table class="${src.className}"><thead>${thead.innerHTML}</thead></table>`;
+    fl._html = thead.innerHTML; fl._cls = src.className;
+  }
+  fl.hidden = false;
+  const t = fl.firstElementChild, ths = thead.rows[0].cells, cths = t.tHead.rows[0].cells;
+  t.style.width = `${src.offsetWidth}px`;
+  for (let i = 0; i < ths.length; i++) cths[i].style.width = `${ths[i].offsetWidth}px`;
+  Object.assign(fl.style, { top: `${top}px`, left: `${r.left}px`, width: `${wrap.clientWidth}px` });
+  t.style.transform = `translateX(${-wrap.scrollLeft}px)`;
+  cths[0].style.transform = `translateX(${wrap.scrollLeft}px)`;
+}
+{
+  let fr = 0;
+  const tick = () => { cancelAnimationFrame(fr); fr = requestAnimationFrame(glFloat); };
+  addEventListener('scroll', tick, { passive: true });
+  document.addEventListener('scroll', (e) => { if (e.target.classList?.contains('gl-wrap')) tick(); }, { capture: true, passive: true });
+  addEventListener('resize', tick);
+  // 导航条收起 / 出现有 .35s 动画，结束后再对一次位置
+  document.addEventListener('transitionend', (e) => { if (e.target.classList?.contains('side')) tick(); });
+}
 {
   let raf = 0;
-  const later = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(hbarScan); };
+  const later = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { hbarScan(); glFloat(); }); };
   new MutationObserver(later).observe(document.getElementById('app'), { childList: true, subtree: true });
   addEventListener('resize', later);
 }
