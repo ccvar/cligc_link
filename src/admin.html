@@ -2010,6 +2010,19 @@ html.masked input:focus { filter: none; }
 .pop .oi-h { margin-left: auto; padding-left: 10px; color: var(--muted); font-size: 12px; flex: none; }
 .ev-fl .f-dd { flex: 0 1 auto; min-width: 120px; }
 .ev-fl .f-dd .combo-btn { height: 34px; }
+.dialog.ga-d.ev-d, .dialog.ga-d.aik-d { width: min(760px, calc(100vw - 32px)); }
+.ev-dh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.ev-dh h3 { margin: 0; min-width: 0; }
+.ev-d .card-b { padding: 0; }
+.ev-d .ev-w { margin: 0 -24px; }
+.ev-d .ev-w .tbl th:first-child, .ev-d .ev-w .tbl td:first-child { padding-left: 24px; }
+.ev-d .ev-w .tbl th:last-child, .ev-d .ev-w .tbl td:last-child { padding-right: 24px; }
+.aik-d .ai-new, .aik-d .ai-tok-new, .aik-d .ai-toks, .aik-d .ai-log { max-width: none; }
+.g-evm, .g-aik { height: 36px; }
+.g-evm > svg:last-child { margin-left: -2px; color: var(--muted); }
+.g-aik svg { color: var(--violet); }
+.g-aik-n { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px; border-radius: 9px; background: var(--warn); color: #fff; font-size: 11px; font-weight: 650; }
+.g-aik-n[hidden] { display: none; }
 .dialog.ga-d { width: min(560px, calc(100vw - 32px)); top: max(24px, 8vh); max-height: calc(100vh - max(24px, 8vh) - 24px); overflow: auto; }
 .dialog.ga-d h3 { display: flex; align-items: center; gap: 8px; }
 .dialog.ga-d .bulk-bad { margin-bottom: 14px; }
@@ -2175,6 +2188,14 @@ html.masked input:focus { filter: none; }
   .ai-op { flex-wrap: wrap; }
   .ev-n { flex-wrap: wrap; }
   .tbl.gt.ev-t td .ev-n code.ell { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+  /* 站点详情顶部：AI 分析、事件、时间范围排成一行（按钮不拉伸），时间范围靠右 */
+  .hero:not(.lk-hero) .acts { flex-wrap: nowrap; gap: 2px; width: 100%; }
+  .hero:not(.lk-hero) .acts > .btn:not(.icon) { flex: none; }
+  .hero:not(.lk-hero) .acts > :last-child { margin-left: auto; }
+  .g-evm { padding: 0 10px; }
+  /* 站点页头一行放不下：“AI 接口”只留钥匙图标（待确认的数字照样显示） */
+  .g-aik { padding: 0 9px; }
+  .g-aik-t { display: none; }
   /* 卡片标题行里的开关（通知页的目标页异常、每周 SEO、用量预警等）：说明文字放不下换行时，开关不再掉到说明下面，留在标题右边 */
   .card-h:has(> .switch) > .sp { display: none; }
   .card-h > .switch { order: 1; margin-left: auto; }
@@ -6121,6 +6142,52 @@ async function gaCodeDialog(host) {
   d.querySelector('[data-x]').onclick = close;
 }
 
+// 小下拉菜单（样式和账号菜单一样）：items = [{ icon, label, run }]
+function popMenu(btn, items) {
+  const open = document.querySelector('.menu');
+  if (open) { open.remove(); if (open._btn === btn) { btn.setAttribute('aria-expanded', 'false'); return; } }
+  const m = document.createElement('div');
+  m.className = 'menu'; m.setAttribute('role', 'menu'); m._btn = btn;
+  m.innerHTML = items.map((x, i) => `<button role="menuitem" data-i="${i}">${ic(x.icon, 16)}${x.label}</button>`).join('');
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect(), w = m.offsetWidth;
+  m.style.top = `${r.bottom + 6}px`; m.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
+  btn.setAttribute('aria-expanded', 'true');
+  m.querySelector('button').focus();
+  const close = () => { m.remove(); btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('mousedown', onDoc, true); document.removeEventListener('keydown', onKey); removeEventListener('scroll', close, true); };
+  const onDoc = (e) => { if (!m.contains(e.target) && !btn.contains(e.target)) close(); };
+  const onKey = (e) => { if (e.key === 'Escape') { close(); btn.focus(); } };
+  document.addEventListener('mousedown', onDoc, true);
+  document.addEventListener('keydown', onKey);
+  addEventListener('scroll', close, true);
+  m.onclick = (e) => { const b = e.target.closest('[data-i]'); if (!b) return; close(); items[Number(b.dataset.i)].run(); };
+}
+// 站点详情顶部“事件”下拉里的“事件列表”：弹窗里管理事件（内容见 mountEvents）
+function eventsDialog(host) {
+  const { d, close } = gaDlg('ev-d');
+  d.innerHTML = `<div id="g-ev"><div class="ev-dh"><h3>${ic('pulse', 18)}事件 · ${esc(host)}</h3><span class="sp"></span>
+      <button type="button" class="btn sm" id="ev-new">${ic('plus', 14)}新建事件</button></div>
+    <div class="card-b">${skel(200)}</div></div>
+    <div class="row"><button class="btn" data-x>关闭</button></div>`;
+  d.querySelector('[data-x]').onclick = close;
+  mountEvents(host);
+}
+// 站点列表“AI 接口”：弹窗里生成令牌、确认 AI 的删除操作（内容和 设置 → AI 接口 一样）
+const aiBadge = (a) => {
+  const b = document.querySelector('#g-aik .g-aik-n');
+  if (!b || !a) return;
+  const n = aiPending(a);
+  b.hidden = !n; b.textContent = n;
+};
+async function aiApiDialog() {
+  const { d, close } = gaDlg('aik-d');
+  d.innerHTML = `<h3>${ic('key', 18)}AI 接口</h3><div id="aik-b">${skel(220)}</div><div class="row"><button class="btn" data-x>关闭</button></div>`;
+  d.querySelector('[data-x]').onclick = close;
+  const box = d.querySelector('#aik-b');
+  try { const a = await api('/ai-tokens'); aiBadge(a); renderAiApi(box, a, aiBadge); }
+  catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+
 // 事件规则的条件写成一句话
 const GA_MATCH = [['CONTAINS', '包含'], ['EQUALS', '等于'], ['STARTS_WITH', '开头是'], ['ENDS_WITH', '结尾是'], ['REGULAR_EXPRESSION', '符合正则'],
   ['CONTAINS_CASE_INSENSITIVE', '包含（不分大小写）'], ['EQUALS_CASE_INSENSITIVE', '等于（不分大小写）']];
@@ -6211,7 +6278,7 @@ async function mountEvents(host) {
     f.hidden = false;
     f.querySelector('#ev-v').focus();
   };
-  el.querySelector('#ev-code').onclick = () => gaCodeDialog(host);
+  el.querySelector('#ev-code')?.addEventListener('click', () => gaCodeDialog(host));
   load();
 }
 
@@ -6720,7 +6787,7 @@ async function renderSites(token) {
   store.set('g:bing', hasBing);
   const accts = st.accounts || [], many = accts.length > 1, bad = accts.some((a) => a.error);
   if (gState.acct && !accts.some((a) => a.id === gState.acct)) gState.acct = '';
-  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost icon g-sync" id="g-new" data-tip="新建站点：在 GA4 里新建媒体资源，拿到统计代码" aria-label="新建站点">${ic('plus', 18)}</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步（可以选 Google / Bing）' : '立即同步'}" aria-label="立即同步"${hasBing ? ' aria-haspopup="menu" aria-expanded="false"' : ''}>${ic('refresh', 17)}</button>`, true)}
+  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost g-aik" id="g-aik" aria-label="AI 接口" data-tip="生成临时令牌，让 AI 帮你新建站点统计、管理事件">${ic('key', 15)}<span class="g-aik-t">AI 接口</span><span class="g-aik-n" hidden></span></button><button class="btn ghost icon g-sync" id="g-new" data-tip="新建站点：在 GA4 里新建媒体资源，拿到统计代码" aria-label="新建站点">${ic('plus', 18)}</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步（可以选 Google / Bing）' : '立即同步'}" aria-label="立即同步"${hasBing ? ' aria-haspopup="menu" aria-expanded="false"' : ''}>${ic('refresh', 17)}</button>`, true)}
     ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<span>${esc(st.error)}</span><span class="sp"></span><button type="button" class="btn sm" id="g-re">重新连接</button></div>` : ''}
     ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
     <section class="card kstrip gs rv" id="g-sum"></section>
@@ -7008,6 +7075,8 @@ async function renderSites(token) {
     .sort((a, b) => b.sessions - a.sessions);
   document.getElementById('g-ai').onclick = () => shareDialog(siteItems(d.items), siteItems(lastRows).map((x) => x.host));
   document.getElementById('g-new').onclick = () => newSiteDialog(() => { gFresh = true; route(); });
+  document.getElementById('g-aik').onclick = aiApiDialog;
+  api('/ai-tokens').then(aiBadge).catch(() => {});   // AI 提交了删除操作等确认时，按钮上显示数字
   const re = document.getElementById('g-re');
   if (re) re.onclick = () => googleConnect(re);
 
@@ -7453,7 +7522,7 @@ const advTip = (items) => items.map((a) => `· ${ADV_NAME[a.rule] || a.rule}`).j
 // “查看”：滚到对应卡片并切到对应筛选
 function advGo(go) {
   const [card, k] = go.split(':');
-  if (card === 'ev') { document.getElementById('g-ev')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  if (card === 'ev') { const h = (location.hash.match(/^#\/site\/([^?]+)/) || [])[1]; if (h) eventsDialog(decodeURIComponent(h)); return; }
   if (card === 'sc') {
     const el = document.getElementById('g-sc');
     if (!el) return;
@@ -7697,7 +7766,7 @@ async function renderSite(token, host) {
           ${contentShow(d.content) ? `<span class="g-si" data-tipf-always data-tipf="${esc(contentTip(d.content))}">${ic('edit', 13)}<span>${d.content.at ? `${d.content.src === 'build' ? '站点地图日期' : '内容更新于'} ${contentAgo(d.content.at)}` : `${siteAge(d.content.since)}内没发现内容更新`}</span>${d.content.new30 ? `<span class="sm">· 近 30 天新增 ${num(d.content.new30)} 个页面</span>` : ''}</span>` : ''}
           ${d.syncedAt ? `<span class="g-si" data-tipf-always data-tipf="${esc(fmtTime(d.syncedAt))}">${ic('refresh', 13)}同步于 ${ago(d.syncedAt)}</span>` : ''}
           ${siteTagsBar(host, d.tags || [])}${siteLinksHint(d)}</div>
-      </div><div class="acts"><button class="btn ghost g-ai" id="g-ai1">${ic('ai', 15)}AI 分析</button>${gRangeBar()}</div></section>
+      </div><div class="acts"><button class="btn ghost g-ai" id="g-ai1">${ic('ai', 15)}AI 分析</button>${d.ga4 ? `<button type="button" class="btn ghost g-evm" id="g-evm" aria-haspopup="menu" aria-expanded="false">${ic('pulse', 15)}事件${ic('chev', 13)}</button>` : ''}${gRangeBar()}</div></section>
       ${d.errors?.length || d.error ? `<div class="bulk-bad">${ic('info', 15)}<div>${[d.error, ...(d.errors || [])].filter(Boolean).map(esc).join('<br>')}</div></div>` : ''}
       <section class="card kstrip gk g8 rv">
         ${kc2('ga', '用户', ga?.users != null ? num(ga.users) : '—', ga?.users != null && gp?.users != null ? gDelta(ga.users, gp.users) : '', ga ? sk('u', 'pu', 'var(--accent)') : '', ga?.newUsers != null ? `新用户 ${num(ga.newUsers)}` : ga ? '' : NO_GA, GA_TIP)}
@@ -7738,9 +7807,6 @@ async function renderSite(token, host) {
       </div>
       ${d.bingSite ? bingCardsHtml(d) : ''}
       ${blCardHtml(d)}
-      ${d.ga4 ? `<section class="card rv" id="g-ev"><div class="card-h"><h3>事件 · GA4</h3><span class="sp"></span>
-        <button type="button" class="btn sm" id="ev-new">${ic('plus', 14)}新建事件</button><button type="button" class="btn sm" id="ev-code">${ic('code', 14)}代码</button></div>
-        <div class="card-b">${skel(160)}</div></section>` : ''}
       ${d.gsc || d.bingSite ? `<section class="card rv" id="g-idx"><div class="card-h"><h3>${d.gsc && d.bingSite ? '网页索引' : d.gsc ? '网页索引 · Search Console' : '网页索引 · Bing'}</h3><span class="sp"></span>
         <div class="tabs"><button>网址</button><button>站点地图</button></div>
         <button type="button" class="btn sm icon" id="ix-chk" aria-label="立即检查" data-tipf-always data-tipf="立即检查：刷新站点地图，再检查待检查的网址（每次最多 60 个）">${ic('refresh', 14)}</button></div>
@@ -7749,7 +7815,10 @@ async function renderSite(token, host) {
   const page = document.getElementById('page');
   reveal(page);
   if (d.gsc || d.bingSite) mountSiteIndex(host);
-  if (d.ga4) mountEvents(host);
+  document.getElementById('g-evm')?.addEventListener('click', (e) => popMenu(e.currentTarget, [
+    { icon: 'pulse', label: '事件列表', run: () => eventsDialog(host) },
+    { icon: 'code', label: '统计代码', run: () => gaCodeDialog(host) },
+  ]));
   bindBlCard(host);
   mountSiteSwitch(host);
   mountAdvice(host, d);
