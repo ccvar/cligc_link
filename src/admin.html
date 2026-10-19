@@ -1795,6 +1795,8 @@ button.gtg { cursor: pointer; }
 .tbl.gt th:first-child { width: 46%; }
 .tbl.gt td { overflow: hidden; }
 .tbl.gt td .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pg-a { display: block; color: inherit; text-decoration: none; }
+.pg-a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 /* 手机、以及两栏并排的中等宽度下，数字列只剩十几像素，“100.0%”被截成“100.(”：收紧列间距；5 列的表（搜索词、页面等）首列让出宽度
    （首列放不下时照旧省略，悬停能看全文）。网页索引表（.ix-t）、站点地图表（.ix-sm）有自己的列宽，短链表（.gsl-t）可以横向滚动 */
 @media (max-width: 640px), (min-width: 961px) and (max-width: 1280px) {
@@ -7195,6 +7197,16 @@ const idxState = (r) => {
 const gscInspectUrl = (d, url) => `https://search.google.com/search-console/inspect?resource_id=${encodeURIComponent(d.site)}&id=${encodeURIComponent(url)}${d.email ? `&authuser=${encodeURIComponent(d.email)}` : ''}`;
 const gscSitemapsUrl = (d) => `https://search.google.com/search-console/sitemaps?resource_id=${encodeURIComponent(d.site)}${d.email ? `&authuser=${encodeURIComponent(d.email)}` : ''}`;
 const urlPath = (u) => u.replace(/^https?:\/\/[^/]+/, '') || '/';
+// 搜索表现、抓取问题里的网页：显示路径，点击在新窗口打开，悬停看完整网址
+const pageCell = (u, label) => (/^https?:\/\//i.test(u || '')
+  ? `<a class="ell pg-a" href="${esc(u)}" target="_blank" rel="noopener" data-tipf-always data-tipf="${esc(u)}">${esc(label ?? urlPath(u))}</a>`
+  : `<div class="ell" data-tipf="${esc(u)}">${esc(u || '(未设置)')}</div>`);
+// 同一个路径对应多个网址（http / https、带不带 www）时，路径一样分不出来：这几个改成带上域名
+const pageLabel = (urls) => {
+  const n = new Map();
+  for (const u of urls) n.set(urlPath(u), (n.get(urlPath(u)) || 0) + 1);
+  return (u) => (n.get(urlPath(u)) > 1 ? u.replace(/^https:\/\//i, '') : urlPath(u));
+};
 const IDX_F = [['all', '全部'], ['yes', '已编入'], ['no', '未编入'], ['bad', '有问题'], ['wait', '待检查'], ['err', '检查失败'], ['bno', 'Bing 未收录'], ['nosm', '不在站点地图']];
 const IDX_F_HINT = {
   bad: '抓取失败、被 robots.txt 屏蔽或带 noindex 的网址，通常需要改网站本身',
@@ -7462,9 +7474,9 @@ function bingQueryView(b, f) {
 const BING_ISSUES = [[1, '301 重定向'], [2, '302 重定向'], [4, '4xx 错误'], [8, '5xx 错误'], [16, '被 robots.txt 屏蔽'], [32, '含恶意软件'], [64, '重要网址被 robots.txt 屏蔽'], [128, 'DNS 错误'], [256, '超时']];
 function bingCardsHtml(d) {
   const b = d.bing;
-  const pg = (u) => u.replace(/^https?:\/\/[^/]+/, '') || '/';
+  const lab = pageLabel((b?.pages || []).map((x) => x.k));
   const pages = b?.pages?.length ? `<div class="g-scr"><table class="tbl gt"><thead><tr><th>页面</th><th class="r">点击</th><th class="r">展示</th><th class="r">点击率</th><th class="r">排名</th></tr></thead>
-    <tbody>${b.pages.map((x) => `<tr><td><div class="ell" data-tipf="${esc(x.k)}">${esc(pg(x.k))}</div></td><td class="num">${num(x.clicks)}</td><td class="num">${num(x.impressions)}</td><td class="num">${pct1(x.ctr)}</td><td class="num">${x.position ? x.position.toFixed(1) : '—'}</td></tr>`).join('')}</tbody></table></div>`
+    <tbody>${b.pages.map((x) => `<tr><td>${pageCell(x.k, lab(x.k))}</td><td class="num">${num(x.clicks)}</td><td class="num">${num(x.impressions)}</td><td class="num">${pct1(x.ctr)}</td><td class="num">${x.position ? x.position.toFixed(1) : '—'}</td></tr>`).join('')}</tbody></table></div>`
     : `<div class="empty">${ic('inbox')}该时间段内暂无数据</div>`;
   const cr = b?.crawl || [], last = cr[cr.length - 1];
   const S = (k) => cr.reduce((a, r) => a + r[k], 0);
@@ -7476,7 +7488,7 @@ function bingCardsHtml(d) {
       <div class="ix-k${S('errors') ? ' bad' : ''}"><span>抓取错误</span><b>${num(S('errors'))}</b><small>${[S('c4xx') && `4xx ${num(S('c4xx'))}`, S('c5xx') && `5xx ${num(S('c5xx'))}`, S('robots') && `robots ${num(S('robots'))}`].filter(Boolean).join(' · ') || '区间合计'}</small></div></div>
     <div class="chart xs" id="ch-bcr"></div>
     ${issues.length ? `<h4 class="bk-h">抓取问题 <small>${issues.length}</small></h4><div class="g-scr bk-iss"><table class="tbl gt"><thead><tr><th>网址</th><th>问题</th><th class="r">HTTP</th></tr></thead>
-      <tbody>${issues.map((x) => `<tr><td><div class="ell" data-tipf="${esc(x.url)}">${esc(pg(x.url))}</div></td><td><div class="ell">${esc(bits(x.issues))}</div></td><td class="num">${x.code || '—'}</td></tr>`).join('')}</tbody></table></div>` : ''}`
+      <tbody>${issues.map((x) => `<tr><td>${pageCell(x.url)}</td><td><div class="ell">${esc(bits(x.issues))}</div></td><td class="num">${x.code || '—'}</td></tr>`).join('')}</tbody></table></div>` : ''}`
     : `<div class="empty">${ic('inbox')}${b ? '该时间段内暂无抓取数据' : '暂时无法读取 Bing 数据'}</div>`;
   return `<div class="grid2 fit">
     ${tabCard('b-sc', `${BRAND.bing(15)}Bing 搜索`, [
@@ -7822,7 +7834,7 @@ async function renderSite(token, host) {
       <div class="grid2${d.gsc && d.ga4 ? ' fit' : ''}">
         ${d.gsc ? tabCard('g-sc', 'Google 搜索', [
           { label: '搜索词', get html() { return queryView(d.sc, store.get('g:qf', 'all')); } },
-          { label: '页面', html: gt(d.sc?.pages?.map((r) => ({ ...r, k: r.k.replace(/^https?:\/\/[^/]+/, '') || '/' })), scCols('页面')) },
+          { label: '页面', get html() { const lab = pageLabel((d.sc?.pages || []).map((r) => r.k)); return gt(d.sc?.pages, [{ h: '页面', f: (r) => pageCell(r.k, lab(r.k)) }, ...scCols('页面').slice(1)]); } },
           { label: '国家', html: gt(d.sc?.countries?.map((r) => ({ ...r, k: r.k.toUpperCase() })), scCols('国家')) },
           { label: '设备', html: gt(d.sc?.devices, scCols('设备')) },
         ], 'rv') : ''}
@@ -7832,7 +7844,7 @@ async function renderSite(token, host) {
             return `${donut(ch, { unit: '次会话', name: gaChannel })}<div class="hint ch-h">按会话数 · GA4 默认渠道分组${d.ga?.src?.length ? '；具体来源看“来源 / 媒介”' : ''}</div>`;
           } },
           { label: '来源 / 媒介', html: gt(d.ga?.src, [{ h: '来源 / 媒介', f: (r) => kcell(r.k) }, { h: '会话', r: 1, f: (r) => num(r.v[0]) }, { h: '用户', r: 1, f: (r) => num(r.v[1]) }, { h: '关键事件', r: 1, f: (r) => num(r.v[2]) }]) },
-          { label: '页面', html: gt(d.ga?.pages, [{ h: '页面', f: (r) => kcell(r.k) }, { h: '浏览量', r: 1, f: (r) => num(r.v[0]) }, { h: '用户', r: 1, f: (r) => num(r.v[1]) }]) },
+          { label: '页面', html: gt(d.ga?.pages, [{ h: '页面', f: (r) => (r.k?.startsWith('/') ? pageCell(`https://${host}${r.k}`, r.k) : kcell(r.k)) }, { h: '浏览量', r: 1, f: (r) => num(r.v[0]) }, { h: '用户', r: 1, f: (r) => num(r.v[1]) }]) },
           { label: '国家', html: gt(d.ga?.countries, [{ h: '国家', f: (r) => kcell(r.k) }, { h: '用户', r: 1, f: (r) => num(r.v[0]) }, { h: '会话', r: 1, f: (r) => num(r.v[1]) }]) },
           { label: '设备', html: gt(d.ga?.devices, [{ h: '设备', f: (r) => kcell(r.k) }, { h: '用户', r: 1, f: (r) => num(r.v[0]) }, { h: '会话', r: 1, f: (r) => num(r.v[1]) }]) },
         ], 'rv') : ''}
