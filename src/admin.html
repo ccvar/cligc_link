@@ -33,6 +33,7 @@
   --shadow-2: 0 1px 2px rgba(13,19,33,.04), 0 6px 20px -6px rgba(13,19,33,.08);
   --shadow-3: 0 24px 48px -12px rgba(13,19,33,.22);
   --r-lg: 16px;
+  --sk-hi: rgba(255,255,255,.9);   /* 加载占位扫过的亮光 */
   --ease: cubic-bezier(.2,.7,.2,1); --ease-out: cubic-bezier(.16,1,.3,1);
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -49,6 +50,7 @@
     --violet: #9d85ff; --teal: #2fd0bf;
     --good: #3cc985; --good-bg: #122a1e; --bad: #ff6f74; --bad-bg: #331b1d; --warn: #e5ad48; --warn-bg: #2d2411;
     --shadow-1: 0 1px 2px rgba(0,0,0,.3); --shadow-2: 0 1px 2px rgba(0,0,0,.3); --shadow-3: 0 24px 48px -12px rgba(0,0,0,.6);
+    --sk-hi: rgba(255,255,255,.06);
     color-scheme: dark;
   }
 }
@@ -1769,8 +1771,10 @@ button.gtg { cursor: pointer; }
 .gsl-t tbody tr:hover { background: var(--panel-2); }
 .gsl-t .mono { font-family: var(--mono); font-size: 13px; font-weight: 600; }
 .gsl-t th { white-space: nowrap; }
-#lk-gs { display: grid; gap: 20px; }
+#lk-gs { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }   /* 列宽限定在容器内，表格太宽时在卡片里横向滚动，不把卡片撑出屏幕 */
 #lk-gs:empty { display: none; }
+.th-s { display: none; }   /* 表头的短写法（手机上用） */
+.hbar { display: none; }   /* 手机上横向滚动表格的自绘滚动条（见 hbarScan） */
 .g-empty.sm-e { border-top: 1px solid var(--line-2); padding: 14px var(--cp); }
 .g-empty code { font-family: var(--mono); font-size: 11.5px; padding: 1px 5px; border-radius: 5px; background: var(--sunken); }
 .gsl-t .ell { min-width: 110px; max-width: 260px; }
@@ -1835,8 +1839,12 @@ button.gtg { cursor: pointer; }
 .login .ts-ph { height: 65px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; }
 
 /* ================================================================ skeleton */
-.sk { background: linear-gradient(90deg, var(--line-2), var(--sunken), var(--line-2)); background-size: 200% 100%; animation: sk 1.4s infinite linear; border-radius: var(--r-lg); }
-@keyframes sk { to { background-position: -200% 0; } }
+/* 加载占位：灰色底块上一道亮光从左往右扫过（原来两种颜色几乎一样，看不出在动） */
+.sk { position: relative; overflow: hidden; background: color-mix(in srgb, var(--line) 65%, var(--sunken)); border-radius: var(--r-lg); }
+.sk::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 15%, var(--sk-hi) 50%, transparent 85%);
+  animation: sk 1.5s ease-in-out infinite; }
+@keyframes sk { to { transform: translateX(100%); } }
 @media (max-width: 760px) { .hide-m { display: none !important; } }
 
 /* 汇总卡片的来源图标 */
@@ -1854,10 +1862,10 @@ th.sortable { cursor: pointer; user-select: none; white-space: nowrap; transitio
 th.sortable:hover, th.sortable[aria-sort] { color: var(--text); }
 th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
 .sl { display: inline-flex; align-items: center; }
-.sk { width: 10px; height: 10px; margin-left: 3px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .15s, transform .2s var(--ease-out); vertical-align: -1px; }
-th.sortable:hover .sk { opacity: .45; }
-th.sortable[aria-sort] .sk { opacity: 1; color: var(--accent); }
-th.sortable[aria-sort="ascending"] .sk { transform: rotate(180deg); }
+.sort-i { width: 10px; height: 10px; margin-left: 3px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .15s, transform .2s var(--ease-out); vertical-align: -1px; }
+th.sortable:hover .sort-i { opacity: .45; }
+th.sortable[aria-sort] .sort-i { opacity: 1; color: var(--accent); }
+th.sortable[aria-sort="ascending"] .sort-i { transform: rotate(180deg); }
 .se-i svg { flex: none; display: block; }
 /* 屏幕不够宽时，来源图标放到表头文字上面，不占列宽（站点表格列很多） */
 @media (max-width: 1440px) { .se-th { flex-direction: column; align-items: flex-end; gap: 2px; } }
@@ -2004,6 +2012,124 @@ html.masked input:focus { filter: none; }
   .g-acc-r { flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; }
   .g-acc-t { flex-basis: calc(100% - 38px); }
   .g-acc-r > .btn:first-of-type { margin-left: 38px; }
+}
+/* iOS Safari 点进字号小于 16px 的输入框会自动放大整个页面，点完还得手动缩回来。
+   触屏设备上所有输入框至少 16px；用 !important 盖过各处更具体的小字号（网址输入框、下拉里的搜索框等），两步验证码本来就大，不动 */
+@media (hover: none), (pointer: coarse) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not(.otp), textarea, select { font-size: 16px !important; }
+}
+/* 触屏设备：手指点得准、iPhone 不自动放大 */
+@media (hover: none) and (pointer: coarse) {
+  /* 分段切换（时间范围、排序、标签页）至少 32px 高 */
+  .seg button { height: 32px; }
+  /* 正文里的小按钮和链接：不改排版，只把可点的范围往外扩一圈 */
+  .hr-more, .kc-a, .back, .gtg button, .row-ext, .ix-sma a, .s-clear { position: relative; }
+  .hr-more::before, .kc-a::before, .back::before, .gtg button::before, .row-ext::before, .ix-sma a::before, .s-clear::before { content: ''; position: absolute; inset: -9px -6px; }
+  .gtg button::before { inset: -10px; }
+  /* 没有鼠标悬停：列表行的操作按钮一直正常显示（不再半透明），键盘快捷键提示也不用显示 */
+  .lrow .acts { opacity: 1; }
+  .search .kbd { display: none; }
+}
+/* 手机排版 */
+@media (max-width: 640px) {
+  /* 概览：实时访问、国家 / 地区不在卡片里再套一层纵向滚动（会“吃掉”页面滚动），直接全部列出 */
+  .home-feed .feed { max-height: none; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+  #c-geo .card-b { max-height: none; overflow: visible; }
+  /* 短链列表：域名都一样，只显示 /后缀，不会在后缀中间断行；工具栏：搜索一行，分组和按钮一行，排序一行 */
+  .lrow .su-h { display: none; }
+  .lh { gap: 10px; }
+  .lh .search { flex: 1 1 100%; max-width: none; min-width: 0; }
+  .lh .sp { flex: 1; }
+  .lh #sort { order: 5; flex: 1 1 100%; }
+  .lh #sort button { flex: 1; padding: 0 6px; }
+  /* 卡片标题行里的开关（通知页的目标页异常、每周 SEO、用量预警等）：说明文字放不下换行时，开关不再掉到说明下面，留在标题右边 */
+  .card-h:has(> .switch) > .sp { display: none; }
+  .card-h > .switch { order: 1; margin-left: auto; }
+  .card-h:has(> .switch) > .sub { order: 2; flex-basis: 100%; }
+  /* 站点详情的两张短链表：固定列宽时数字列只剩 38px、表头叠在一起；改成按内容分宽，并省掉“来源标识”“含机器”（点进短链详情能看到） */
+  .tbl.gt.gsl-t { table-layout: auto; }
+  .tbl.gt.gsl-t th:first-child { width: auto; }
+  .gsl-from th:nth-child(2), .gsl-from td:nth-child(2), .gsl-from th:nth-child(5), .gsl-from td:nth-child(5),
+  .gsl-to th:nth-child(4), .gsl-to td:nth-child(4) { display: none; }
+  .gsl-t .ell { min-width: 70px; max-width: 120px; }
+  /* 横向滚动的表格：隐藏原生滚动条，用从第二列开始的细滚动条（跟着滚动容器横向固定，不随内容滑走） */
+  .has-hbar { scrollbar-width: none; }
+  .has-hbar::-webkit-scrollbar { display: none; }
+  .hbar { display: block; position: sticky; left: 0; height: 4px; margin: 4px 0 6px; pointer-events: none; }
+  .hbar[hidden] { display: none; }
+  .hbar::before { content: ''; position: absolute; top: 0; left: var(--hb-l, 0); width: var(--hb-t, 0); height: 4px; border-radius: 2px; background: var(--line-2); }
+  .hbar i { position: absolute; top: 0; left: var(--hb-l, 0); width: var(--hb-w, 0); height: 4px; border-radius: 2px;
+    background: color-mix(in srgb, var(--text) 22%, transparent); transform: translateX(var(--hb-x, 0)); }
+  /* 概览的机器访问来源表：同样首列（运营商）固定 */
+  .tbl.mtbl th:first-child, .tbl.mtbl td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); transition: box-shadow .2s; }
+  .scroll.scrolled .tbl.mtbl th:first-child, .scroll.scrolled .tbl.mtbl td:first-child { box-shadow: 6px 0 8px -6px rgba(13, 19, 33, .18); }
+  .tbl.mtbl td:first-child .ell { max-width: 130px !important; }
+  /* 短链详情的来源站点 / 目标站点表（列多）：首列固定在左边，后面的列左右拖动；首列收窄 */
+  .gsl-t th:first-child, .gsl-t td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); padding-right: 8px; transition: box-shadow .2s; }
+  .scroll.scrolled .gsl-t th:first-child, .scroll.scrolled .gsl-t td:first-child { box-shadow: 6px 0 8px -6px rgba(13, 19, 33, .18); }
+  .gsl-t td:first-child { max-width: 128px; }
+  .gsl-t td:first-child .gh { display: block; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+  .gsl-t .gm .gico { width: 16px; height: 16px; }
+  .th-l { display: none; }
+  .th-s { display: inline; }
+  /* 搜索词等表格上方的筛选按钮：缩小一点排成一行，实在放不下就左右滑，不换行 */
+  .qf { flex-wrap: nowrap; gap: 3px; overflow-x: auto; scrollbar-width: none; }
+  .qf::-webkit-scrollbar { display: none; }
+  .qf button { flex: none; gap: 3px; padding: 0 6px; font-size: 12px; }
+  .qf small { font-size: 10.5px; }
+  /* 网页索引的筛选有 7 个，一行放不下：照常换行（横向滑动会把后面几个藏起来） */
+  .ix-main .qf { flex-wrap: wrap; overflow: visible; row-gap: 4px; }
+  /* 短链详情顶部：短链地址小一号，复制 / 打开跟在后面同一行；二维码缩小放到右上角；5 个按钮排成一行（文字按钮等宽、去掉前面的图标） */
+  .lk-hero { gap: 12px; }
+  .lk-hero .info { min-width: 0; flex-basis: 100%; }
+  .lk-hero .ttl, .lk-hero .short { padding-right: 58px; }
+  .lk-hero .short { flex-wrap: nowrap; gap: 6px; font-size: 18px; margin: 6px 0 8px; }
+  .lk-hero .short-t { min-width: 0; overflow-wrap: anywhere; }
+  .lk-hero .short-h { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+  .lk-hero .target { flex-wrap: nowrap; min-width: 0; word-break: normal; }
+  .lk-hero .target a { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lk-hero .target > :not(a) { flex: none; }
+  .lk-hero .short .btn { flex: none; }
+  /* “复制”只留图标（和旁边的“打开”一样大），文字字号设 0 藏起来，读屏仍能读到“复制” */
+  .lk-hero .short [data-copy] { width: 30px; padding: 0; gap: 0; font-size: 0; }
+  .lk-hero .hero-side { width: 100%; }
+  .lk-hero .acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 36px 36px; gap: 6px; width: 100%; }
+  .lk-hero .acts .btn:not(.icon) { padding: 0 6px; gap: 4px; font-size: 13px; min-width: 0; }
+  .lk-hero .acts .btn:not(.icon) > svg { display: none; }
+  .lk-hero .acts .cnt { margin-left: 0; }
+  .lk-hero .hero-qr { position: absolute; top: 14px; right: var(--cp); margin: 0; }
+  .lk-hero .hero-qr img { width: 52px; height: 52px; padding: 3px; border-radius: 8px; }
+  .lk-hero .hero-qr span { display: none; }
+  /* 短链详情：默认地址那行的“管理规则”和下面的“跳转规则”按钮重复，手机上省掉，给地址留位置 */
+  .hroutes .hr-u > .hr-more { display: none; }
+  /* 访问明细：不横向滚动，每条访问两行（来源 / 时间、地区；跳转到、设备），IP 和 Referer 点进电脑上看 */
+  .tbl.vt thead { display: none; }
+  .tbl.vt, .tbl.vt tbody { display: block; }
+  .tbl.vt tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); gap: 6px 12px; padding: 10px var(--cp); border-bottom: 1px solid var(--line-2); }
+  .tbl.vt td { display: block; padding: 0 !important; border: 0; min-width: 0; max-width: none; overflow: hidden; }
+  .tbl.vt td > div, .tbl.vt td > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: none !important; }
+  .tbl.vt td:nth-child(2), .tbl.vt td:nth-child(4) { text-align: right; max-width: 150px; }
+  .tbl.vt td:nth-child(5), .tbl.vt td:nth-child(6) { display: none; }
+  /* 站点表格：列多，横向滚动时站点名那一列固定在左边 */
+  .tbl.gl th:first-child, .tbl.gl td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); transition: box-shadow .2s; }
+  /* 没滚动时不加分隔线；往左滑了才在右边缘出现一点阴影，表示后面的列从下面滑过 */
+  .gl-wrap.scrolled .tbl.gl th:first-child, .gl-wrap.scrolled .tbl.gl td:first-child { box-shadow: 6px 0 8px -6px rgba(13, 19, 33, .18); }
+  /* 表头放一行（来源图标放回文字左边），行距收小 */
+  .tbl.gl th { padding-top: 8px; padding-bottom: 8px; }
+  .tbl.gl td { padding-top: 9px; padding-bottom: 9px; }
+  .se-th, .bl-th { flex-direction: row; align-items: center; gap: 3px; }
+  /* 站点名那列尽量窄：域名小一号、太长省略，图标和小标记缩小；“打开网站”在站点详情页里有 */
+  .tbl.gl th:first-child, .tbl.gl td:first-child { padding-right: 8px; }
+  .tbl.gl td:first-child { max-width: 140px; }
+  .tbl.gl .gh { display: block; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+  .tbl.gl .gh .row-ext { display: none; }
+  .tbl.gl .gm { gap: 3px; row-gap: 3px; }
+  .tbl.gl .gm .gico { width: 16px; height: 16px; }
+  .tbl.gl .gm .gico svg { width: 12px; height: 12px; }
+  .tbl.gl .gm .gico + .gico { margin-left: 0; }
+  .tbl.gl .gsl, .tbl.gl .gadv { height: 16px; padding: 0 4px; gap: 2px; font-size: 10.5px; }
+  .tbl.gl .gage { gap: 2px; font-size: 10.5px; }
+  .tbl.gl .gsl svg, .tbl.gl .gadv svg, .tbl.gl .gage svg { width: 10px; height: 10px; }
 }
 </style>
 </head>
@@ -2815,7 +2941,45 @@ function fitNums(root = document) {
     if (anim) el.textContent = cur;
   });
 }
-{ let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => fitNums(), 150); }); }
+{ let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { fitNums(); document.querySelectorAll('.seg').forEach(segThumb); }, 150); }); }
+
+// 手机上表格横向滚动时首列固定在左边：滑动后给滚动容器加 .scrolled，首列右边缘才出现阴影（见 CSS）。
+// 原生滚动条从最左边开始、左半段被固定的首列压着：手机上换成自绘的细滚动条（.hbar），轨道从第二列开始
+const PHONE = matchMedia('(max-width: 640px)');
+function hbarSync(el) {
+  const bar = el.querySelector(':scope > .hbar');
+  if (!bar) return;
+  const fc = el.querySelector('tr > :first-child')?.offsetWidth || 0;
+  const cw = el.clientWidth, sw = el.scrollWidth, track = Math.max(0, cw - fc - 4);
+  bar.hidden = sw <= cw + 1;
+  if (bar.hidden) return;
+  const tw = Math.max(24, track * (cw - fc) / Math.max(1, sw - fc));
+  bar.style.setProperty('--hb-l', `${fc}px`);
+  bar.style.setProperty('--hb-t', `${track}px`);
+  bar.style.setProperty('--hb-w', `${tw}px`);
+  bar.style.setProperty('--hb-x', `${(el.scrollLeft / (sw - cw)) * (track - tw)}px`);
+}
+function hbarScan() {
+  if (!PHONE.matches) return;
+  for (const el of document.querySelectorAll('#page .gl-wrap, #page .scroll')) {
+    const td = el.querySelector('tbody td');
+    if (!td || getComputedStyle(td).position !== 'sticky') continue;
+    if (!el.querySelector(':scope > .hbar')) { el.classList.add('has-hbar'); el.insertAdjacentHTML('beforeend', '<div class="hbar" aria-hidden="true"><i></i></div>'); }
+    hbarSync(el);
+  }
+}
+{
+  let raf = 0;
+  const later = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(hbarScan); };
+  new MutationObserver(later).observe(document.getElementById('app'), { childList: true, subtree: true });
+  addEventListener('resize', later);
+}
+document.addEventListener('scroll', (e) => {
+  const t = e.target;
+  if (!t.classList || !(t.classList.contains('gl-wrap') || t.classList.contains('scroll'))) return;
+  t.classList.toggle('scrolled', t.scrollLeft > 2);
+  if (t.classList.contains('has-hbar')) hbarSync(t);
+}, { capture: true, passive: true });
 
 // 分段控件：滑块跟随选中项
 function segThumb(seg) {
@@ -3819,7 +3983,7 @@ async function renderLinks(token, opts = {}) {
     ${d.items.map((l) => `
     <div class="lrow ${listState.flash === l.id ? 'flash' : ''}${listState.sel.has(l.id) ? ' sel-r' : ''}" data-go="${l.id}" tabindex="0">
       <div class="c-main"><label class="lck" aria-label="选择 ${esc(l.slug)}"><input type="checkbox" data-sel="${l.id}" ${listState.sel.has(l.id) ? 'checked' : ''}></label><div style="min-width:0">
-        <div class="su">${esc(shortDisp(l.slug))}${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}<a class="row-ext" href="${esc(shortUrl(l.slug))}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 13)}</a>${(l.tags || []).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}</div>
+        <div class="su"><span><span class="su-h">${esc(HOST)}</span>${esc('/' + l.slug)}</span>${l.title ? `<span class="tt">· ${esc(l.title)}</span>` : ''}<a class="row-ext" href="${esc(shortUrl(l.slug))}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 13)}</a>${(l.tags || []).map((t) => `<span class="gtg sm-t">${esc(t)}</span>`).join('')}</div>
         <div class="tg">${l.rules ? `<span class="rb has-pop" tabindex="0">${ic('route')}${l.rules} 条跳转规则${rulePop(l)}</span>` : ''}${l.arms ? `<span class="rb ab-rb" data-tipf-always data-tipf="${esc(`按比例分到 ${l.arms} 个额外版本（A/B 测试）`)}">${ic('split')}A/B</span>` : ''}<span>${l.target_url ? esc(l.target_url) : `<span class="warn">${l.rules ? '未设置默认地址' : '未设置推广地址'}</span>`}</span></div>
       </div></div>
       <div class="c-spark">${sparkline(l.spark)}</div>
@@ -4290,7 +4454,7 @@ async function linkSitesCard(token, id) {
     return `<td class="num">${num(c.sessions)}</td><td class="num">${l?.human ? pctText(Math.min(1, c.sessions / l.human)) : '—'}</td><td class="num">${num(c.keyEvents)}</td>`;
   };
   box.innerHTML = (d.sources?.length ? card('来源站点', `从这些站点点进这个短链 · 最近 28 天，截至 ${d.ranges.to}`,
-      '<th>站点</th><th class="r">从该站点的真人点击</th><th class="r"><span data-tipf-always data-tipf="按 IP 去重（估算，误差约 5%）">访客</span></th><th class="r"><span data-tipf-always data-tipf="真人点击 ÷ 站点会话">点出率</span></th><th class="r">站点会话</th><th class="r">搜索点击</th>',
+      '<th>站点</th><th class="r"><span class="th-l">从该站点的真人点击</span><span class="th-s">真人点击</span></th><th class="r"><span data-tipf-always data-tipf="按 IP 去重（估算，误差约 5%）">访客</span></th><th class="r"><span data-tipf-always data-tipf="真人点击 ÷ 站点会话">点出率</span></th><th class="r">站点会话</th><th class="r">搜索点击</th>',
       d.sources.map((x) => { const l = x.linksFrom[0], ses = x.cur.ga?.sessions;
         return `<tr data-href="#/site/${encodeURIComponent(x.host)}" tabindex="0">${site(x)}
           <td class="num">${num(l.human)}${gDelta(l.human, l.prevHuman)}</td><td class="num">${l.visitors != null ? num(l.visitors) : '—'}</td><td class="num">${ses ? pct1(l.human / ses) : '—'}</td>${gaCells(x)}</tr>`; }).join('')) : '')
@@ -4391,10 +4555,10 @@ async function renderLink(token, id) {
   document.getElementById('page').innerHTML = `
     <a class="back" href="#/links">${ic('back', 14)}全部短链</a>
     <div class="stack">
-      <section class="card hero rv">
+      <section class="card hero lk-hero rv">
         <div class="info">
           <div class="ttl"><span class="ttl-t" title="${esc(link.title)}">${esc(link.title) || '未命名短链'}</span>${statusPill(link)}</div>
-          <div class="short">${esc(shortDisp(link.slug))}
+          <div class="short"><span class="short-t"><span class="short-h">${esc(HOST)}/</span>${esc(link.slug)}</span>
             ${copyBtn(url, 'btn sm', '复制')}
             <a class="btn sm ghost icon" href="${esc(url)}" target="_blank" rel="noopener" data-tip="打开短链（会记录一次访问）" aria-label="打开短链">${ic('ext', 15)}</a></div>
           ${link.targets.length ? heroRoutes(link) : `<div class="target">${ic('arrow', 14)}${link.target_url ? `<a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>${healthDot(link.health?.[link.target_url])}${appPill(link, link.target_url)}${abChip(link, 0)}` : '<span class="warn">未设置默认推广地址</span>'}<button type="button" class="hr-more" data-panel-open="rules">${link.arms?.length ? 'A/B 分流' : '按地区 / 设备分流'} ${ic('chev', 12)}</button></div>`}
@@ -5158,7 +5322,8 @@ function seTh(label, rank = false) {
   return `<span class="se-th" data-tipf-always data-tipf="${esc(tip)}"><i class="se-i">${icons}</i><span class="sl">${label}${SORT_IC}</span></span>`;
 }
 // 表头的排序箭头：平时隐藏，鼠标移上去淡淡显示，当前排序列用主题色（倒序朝下、正序朝上）
-const SORT_IC = '<svg class="sk" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1.5v7M2.2 5.8 5 8.6l2.8-2.8"/></svg>';
+// 排序箭头（类名别用 .sk：那是加载占位的骨架块）
+const SORT_IC = '<svg class="sort-i" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1.5v7M2.2 5.8 5 8.6l2.8-2.8"/></svg>';
 // 其他数据表（搜索词、页面、GA4 各标签、短链列表等）：点表头就在页面上按这一列排序，再点反过来。
 // 只给第一列（名称）和右对齐的数字列加；数字取单元格的 data-v，没有就取第一行文字里的数；“—”等没数的永远排最后
 {
@@ -5173,7 +5338,7 @@ const SORT_IC = '<svg class="sk" viewBox="0 0 10 10" aria-hidden="true"><path d=
     [...t.tHead.rows[0].cells].forEach((th, i) => {
       if (i && !th.classList.contains('r')) return;
       th.classList.add('sortable'); th.tabIndex = 0; th.dataset.col = i;
-      if (!th.querySelector('.sk')) th.insertAdjacentHTML('beforeend', SORT_IC);
+      if (!th.querySelector('.sort-i')) th.insertAdjacentHTML('beforeend', SORT_IC);
     });
   };
   const sortBy = (th) => {
@@ -6353,7 +6518,7 @@ function siteLinksCard(d) {
   const fromCard = !from.length ? '' : `<section class="card rv">
     <div class="card-h"><h3>站点上的推广短链</h3><span class="sp"></span>
       <span class="sub">${from.length ? `${from.length} 个短链 · ${G_LABEL()}真人点击 ${num(fromTotal)}${d.linksFromVisitors ? ` · <span data-tipf-always data-tipf="按 IP 去重（估算，误差约 5%）">${num(d.linksFromVisitors)} 位访客</span>` : ''}${ses ? ` · 点出率 <b data-tipf-always data-tipf="短链真人点击 ÷ 站点会话">${pct1(fromTotal / ses)}</b>` : ''}` : '按短链访问的来源（src 参数或 Referer）匹配'}</span></div>
-    ${from.length ? `<div class="scroll"><table class="tbl gt gsl-t">
+    ${from.length ? `<div class="scroll"><table class="tbl gt gsl-t gsl-from">
       <thead><tr><th>短链</th><th>来源标识</th><th class="r">真人点击</th><th class="r"><span data-tipf-always data-tipf="按 IP 去重（估算，误差约 5%）">访客</span></th><th class="r">含机器</th><th class="r">占比</th></tr></thead>
       <tbody>${from.map((l) => `<tr data-href="#/link/${l.id}" tabindex="0">${slug(l)}
         <td><div class="ell sm" data-tipf="${esc(l.sources.join('、'))}">${esc(l.sources.join('、'))}</div></td>
@@ -6365,7 +6530,7 @@ function siteLinksCard(d) {
   </section>`;
   const toCard = to.length ? `<section class="card rv">
     <div class="card-h"><h3>跳转到这个站点的短链</h3><span class="sp"></span><span class="sub">${to.length} 个短链 · ${G_LABEL()}真人点击 ${num(toTotal)}</span></div>
-    <div class="scroll"><table class="tbl gt gsl-t">
+    <div class="scroll"><table class="tbl gt gsl-t gsl-to">
       <thead><tr><th>短链</th><th>跳转去向</th><th class="r">真人点击</th><th class="r">含机器</th><th class="r">占比</th></tr></thead>
       <tbody>${to.map((l) => `<tr data-href="#/link/${l.id}" tabindex="0">${slug(l)}
         <td><div class="ell" data-tipf-always data-tipf="${esc(l.routes.map((r) => `${routeLabel(r)}：${r.url}`).join('\n'))}">${esc(l.routes.map(routeLabel).join(' · '))}</div></td>
