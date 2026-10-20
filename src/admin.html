@@ -2010,8 +2010,8 @@ html.masked input:focus { filter: none; }
 .f-dd .combo-btn { height: 38px; min-width: 0; padding: 0 12px; }   /* 表单里的下拉：和输入框一样高，名称不截短 */
 .f-dd .combo-btn .nm { max-width: none; }
 .pop .oi-h { margin-left: auto; padding-left: 10px; color: var(--muted); font-size: 12px; flex: none; }
-.ev-fl .f-dd { flex: 0 1 auto; min-width: 120px; }
-.ev-fl .f-dd .combo-btn { height: 34px; }
+.ev-fl .f-dd { flex: 0 1 auto; min-width: 0; }
+.ev-fl .f-dd .combo-btn { height: 32px; padding: 0 10px; font-size: 13px; }
 .dialog.ga-d.ev-d, .dialog.ga-d.aik-d { width: min(760px, calc(100vw - 32px)); }
 .ev-dh, .dlg-h { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .dlg-h h3, .ev-dh h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2203,13 +2203,18 @@ html.masked input:focus { filter: none; }
 .ev-tag.recommended { background: var(--accent-2); color: var(--accent-ink); }
 .ev-tag.custom { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
 .ev-qf { margin-bottom: 4px; }
-.ev-f { padding: 14px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
-.ev-fl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
-.ev-fl .input { width: auto; height: 34px; min-width: 0; }
-.ev-fl #ev-v { flex: 1 1 140px; }
-.ev-fl .ev-name { width: 140px; font-family: var(--mono); }
-.ev-fb { display: flex; align-items: center; gap: 8px; margin: 12px 0 10px; }
-.ev-f .hint { margin: 0; }
+/* 新建事件：两行，“当 …（条件）”一行，“记为 …（事件名）+ 关键事件 + 按钮”一行 */
+.ev-f { padding: 12px 14px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.ev-g { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 10px; }
+.ev-k { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.ev-g > .ev-k { text-align: right; }
+.ev-fl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; font-size: 13px; color: var(--text-2); }
+.ev-fl .input { width: auto; height: 32px; min-width: 0; padding: 0 10px; font-size: 13px; }
+.ev-fl #ev-v { flex: 1 1 120px; }
+.ev-fl .ev-name { width: 150px; font-family: var(--mono); }
+.ev-sw { margin-left: 6px; font-size: 13px; white-space: nowrap; }
+.ev-f .err { margin: 8px 0 0; }
+.ev-f .ev-h { margin: 8px 0 0; font-size: 12px; }
 .ai-pend { padding: 12px 14px; margin-bottom: 16px; border-radius: 12px; background: var(--warn-bg); }
 .ai-pend h4 { display: flex; align-items: center; gap: 6px; color: var(--warn); }
 .ai-pend .ai-op { border-top-color: color-mix(in srgb, var(--warn) 18%, transparent); }
@@ -2334,8 +2339,13 @@ html.masked input:focus { filter: none; }
   .ph:has(> .ov-title > .ov-date) > .toolbar > #range { grid-area: 3 / 1 / 4 / -1; margin-top: 6px; }
   /* GA4 管理：对话框里的两列改成一列；事件规则的条件一行放不下就换行 */
   .ga-2 { grid-template-columns: minmax(0, 1fr); }
-  .ev-fl .input, .ev-fl .f-dd { flex: 1 1 120px; }
-  .ev-fl .ev-name { width: auto; }
+  /* 新建事件：标签单独一行；条件两个一行（事件 + 字段，匹配方式 + 值）；事件名整行，开关和按钮一行 */
+  .ev-g { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .ev-g > .ev-k { text-align: left; margin-top: 2px; }
+  .ev-fl > .ev-k { display: none; }
+  .ev-fl .f-dd, .ev-fl #ev-v { flex: 1 1 calc(50% - 6px); width: auto; }
+  .ev-fl .ev-name { flex: 1 1 100%; width: auto; }
+  .ev-sw { margin-left: 0; }
   .ai-op { flex-wrap: wrap; }
   .ev-n { flex-wrap: wrap; }
   .tbl.gt.ev-t td .ev-n code.ell { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
@@ -6758,14 +6768,16 @@ async function mountEvents(host) {
     const srcs = [...new Set(['page_view', ...d.events.filter((e) => e.count).map((e) => e.name)])].slice(0, 30);
     body.innerHTML = `${ro ? gaReauthBar('当前 Google 账号只有只读权限，重新授权后才能设置关键事件、新建和删除事件') : ''}
       <div class="ev-f" id="ev-f" ${formOpen ? '' : 'hidden'}>
-        <div class="ev-fl">当 <div id="ev-src"></div> 的
-          <div id="ev-fld"></div>
-          <div id="ev-m"></div>
-          <input class="input" id="ev-v" placeholder="/thank-you"> 时，记为 <input class="input ev-name" id="ev-name" placeholder="purchase" autocomplete="off"></div>
-        <div class="ev-fb"><label class="switch"><input type="checkbox" id="ev-key" checked><span class="t"></span>同时设为关键事件</label><span class="sp"></span>
-          <button type="button" class="btn sm" id="ev-cancel">取消</button><button type="button" class="btn sm primary" id="ev-save">保存</button></div>
+        <div class="ev-g">
+          <span class="ev-k">当</span>
+          <div class="ev-fl"><div id="ev-src"></div><span class="ev-k">的</span><div id="ev-fld"></div><div id="ev-m"></div><input class="input" id="ev-v" placeholder="/thank-you"></div>
+          <span class="ev-k">记为</span>
+          <div class="ev-fl"><input class="input ev-name" id="ev-name" placeholder="purchase" autocomplete="off">
+            <label class="switch ev-sw"><input type="checkbox" id="ev-key" checked><span class="t"></span>设为关键事件</label><span class="sp"></span>
+            <button type="button" class="btn sm" id="ev-cancel">取消</button><button type="button" class="btn sm primary" id="ev-save">保存</button></div>
+        </div>
         <div class="err" role="alert"></div>
-        <p class="hint">新事件从保存后开始统计，GA4 里大约几小时后能看到；已经收集的历史数据不会补算。</p>
+        <p class="hint ev-h">从保存后开始统计，GA4 里约几小时后能看到；历史数据不会补算</p>
       </div>
       ${d.rulesError ? `<p class="hint ix-err">${ic('alert', 13)}<span>读取事件规则失败：${esc(d.rulesError)}</span></p>` : ''}
       ${d.events.length ? `<div class="qf ev-qf">${[['all', '全部'], ['auto', '自动收集'], ['recommended', '推荐'], ['custom', '自定义']].filter(([k]) => k === 'all' || cnt[k])
