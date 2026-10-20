@@ -28,7 +28,9 @@ async function cacheRead(env, keys) {
 // 搜索词压缩成 [词, 点击, 展示, 平均排名]，省缓存空间
 const slim = (rows) => rows.filter((r) => r.impressions > 0).map((r) => [r.k, r.clicks, r.impressions, Math.round(r.position * 10) / 10]);
 
-export async function hotQueries(env, secret, hosts, days) {
+// kind：query = 搜索词；country = 地区（只有 Google 有：Bing 的接口不按国家 / 地区拆分搜索数据）
+export async function hotQueries(env, secret, hosts, days, kind = 'query') {
+  const country = kind === 'country';
   const { from, to } = ranges(days);
   const want = new Set((hosts || []).map(String));
   let sites = (await env.DB.prepare(`SELECT s.host, s.gsc_site, s.gsc_acct, s.bing_site, COALESCE(SUM(d.impressions), 0) + COALESCE(SUM(d.b_impressions), 0) AS imp
@@ -38,8 +40,8 @@ export async function hotQueries(env, secret, hosts, days) {
   sites.sort((a, b) => b.imp - a.imp);
   const jobs = [];
   for (const s of sites) {
-    if (s.gsc_site) jobs.push({ s, src: 'g', key: `hq-g|${s.gsc_site}|${days}|${to}` });
-    if (s.bing_site) jobs.push({ s, src: 'b', key: `hq-b|${s.bing_site}|${days}|${to}` });
+    if (s.gsc_site) jobs.push({ s, src: 'g', key: `${country ? 'hq-gc' : 'hq-g'}|${s.gsc_site}|${days}|${to}` });
+    if (s.bing_site && !country) jobs.push({ s, src: 'b', key: `hq-b|${s.bing_site}|${days}|${to}` });
   }
   const got = await cacheRead(env, jobs.map((j) => j.key));
   const todo = jobs.filter((j) => !got.has(j.key));
@@ -51,8 +53,9 @@ export async function hotQueries(env, secret, hosts, days) {
       let rows;
       if (j.src === 'g') {
         const d = await gfetch(env, secret, j.s.gsc_acct, `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(j.s.gsc_site)}/searchAnalytics/query`,
-          { startDate: from, endDate: to, dimensions: ['query'], rowLimit: 1000, dataState: 'all' });
-        rows = slim((d.rows || []).map((r) => ({ k: r.keys[0], clicks: r.clicks, impressions: r.impressions, position: r.position })));
+          { startDate: from, endDate: to, dimensions: [country ? 'country' : 'query'], rowLimit: country ? 250 : 1000, dataState: 'all' });
+        // 国家 / 地区是 ISO 三位代码（小写，如 usa），统一成大写
+        rows = slim((d.rows || []).map((r) => ({ k: country ? String(r.keys[0]).toUpperCase() : r.keys[0], clicks: r.clicks, impressions: r.impressions, position: r.position })));
       } else {
         if (!bc) throw new Error('未配置 Bing API Key');
         rows = slim(weekly(await bget(bc, 'GetQueryStats', { siteUrl: j.s.bing_site }), from, to));

@@ -406,11 +406,13 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 
 配置（每个部署需要自己的 OAuth 客户端）：
 
-1. 在 [Google Cloud 控制台](https://console.cloud.google.com/) 新建项目，启用 **Google Analytics Admin API**、**Google Analytics Data API**、**Google Search Console API**。
+1. 在 [Google Cloud 控制台](https://console.cloud.google.com/) 新建项目，启用 **Google Analytics Admin API**、**Google Analytics Data API**、**Google Search Console API**、**Site Verification API**（把新站点接入 Search Console 时验证所有权用）。
 2. “OAuth 权限请求页面”：用户类型选“外部”，填写应用名称和邮箱，然后点 **发布应用**。未发布（测试状态）的应用授权 7 天后失效；个人使用无需 Google 审核，授权时如果出现“Google 未验证此应用”，点“继续”；没有“继续”按钮时，先点“高级”，再点下面的“转到…（不安全）”。这是你自己创建的应用，可以放心继续。
 3. “凭据 → 创建凭据 → OAuth 客户端 ID”，类型选 **Web 应用**，已获授权的重定向 URI 填 `https://<你的域名>/api/google/callback`。
 4. 打开后台“设置 → Google 集成”，填写客户端 ID 和客户端密钥并保存（密钥加密保存在 D1，之后只显示末 4 位）。
 5. 到“站点”页点“连接 Google 账号”完成授权。
+
+把新站点接入 Search Console / Bing：站点列表右上角“+ → 接入 Search Console / Bing”，或者站点详情的“接入搜索引擎”。先验证网站所有权，再添加站点、提交站点地图。在“设置 → Cloudflare DNS”填一个“编辑区域 DNS”权限的 Cloudflare API 令牌后，域名在这个 Cloudflare 账号里的站点会自动加验证用的 DNS 记录（Google 一条 TXT，验证整个域名；Bing 一条 CNAME），网站代码不用改；不在 Cloudflare 的用页面 meta 标签验证。DNS 还没生效时定时任务每小时会再试。
 
 客户端可以在“设置 → Google 集成”里修改或删除；更换客户端 ID 会断开所有已连接的账号。旧版本写在环境变量（`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`）里的客户端，升级后第一次用到时会自动导入后台，之后可以把环境变量删掉。
 

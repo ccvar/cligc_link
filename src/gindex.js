@@ -100,7 +100,7 @@ async function readCapped(stream) {
   for (const p of parts) { buf.set(p, o); o += p.byteLength; }
   return { buf, cut };
 }
-async function fetchText(url) {
+export async function fetchText(url) {
   spend();
   const res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; cligc-link sitemap reader)', accept: 'application/xml,text/xml,*/*' }, signal: AbortSignal.timeout(10000), redirect: 'follow' });
   if (!res.ok) { res.body?.cancel().catch(() => {}); throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status }); }

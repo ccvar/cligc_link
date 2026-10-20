@@ -17,6 +17,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/analytics.readonly',
   'https://www.googleapis.com/auth/analytics.edit',
   'https://www.googleapis.com/auth/webmasters',
+  'https://www.googleapis.com/auth/siteverification',
 ];
 const SC_WRITE = 'https://www.googleapis.com/auth/webmasters';
 export const GA_EDIT = 'https://www.googleapis.com/auth/analytics.edit';
@@ -29,6 +30,9 @@ async function hasScope(env, secret, acct, scope) {
 export const canSubmit = (env, secret, acct) => hasScope(env, secret, acct, SC_WRITE);
 // 账号是否授予了 GA4 编辑权限（新建媒体资源、管理事件要用）
 export const canEdit = (env, secret, acct) => hasScope(env, secret, acct, GA_EDIT);
+// 账号是否授予了网站验证权限（把新站点加进 Search Console 前要先验证所有权）
+export const SITE_VERIFY = 'https://www.googleapis.com/auth/siteverification';
+export const canVerify = (env, secret, acct) => hasScope(env, secret, acct, SITE_VERIFY);
 const DAY = 86400000;
 // 首次回填 486 天（Search Console 最多保留 16 个月），够“最近 6 个月”做环比；回填天数变了会重新回填一次
 const BACKFILL_DAYS = 486, GA_REFRESH = 4, SC_REFRESH = 5;
@@ -359,6 +363,21 @@ export async function addProp(env, acct, prop) {
   await rebuildSites(env);
 }
 
+// 新加进 Search Console 的站点（见 onboard.js）：同样直接加进发现结果
+export async function addGsc(env, acct, url) {
+  const row = await env.DB.prepare('SELECT found FROM g_accounts WHERE id = ?').bind(acct).first();
+  if (!row) return;
+  const found = row.found ? JSON.parse(row.found) : { props: [], gsc: [], errors: [] };
+  found.gsc = [...(found.gsc || []).filter((g) => g.url !== url), { url, host: siteHost(url) }];
+  await env.DB.prepare('UPDATE g_accounts SET found = ? WHERE id = ?').bind(JSON.stringify(found), acct).run();
+  await rebuildSites(env);
+}
+// 账号列表（给接入搜索引擎的弹窗选账号用）
+export async function accountList(env, secret) {
+  return Promise.all((await accounts(env, secret)).map(async (a) => ({ id: a.id, email: a.email, error: a.error || '',
+    canVerify: await canVerify(env, secret, a.id), canSubmit: await canSubmit(env, secret, a.id) })));
+}
+
 // 把所有账号的发现结果按主域名合并进 g_sites。
 // 同一个媒体资源 / 站点多个账号都能看到时，用最早连接的账号；同一域名有“网域”和“网址前缀”两种 GSC 资源时优先网域资源
 export async function rebuildSites(env) {
@@ -602,11 +621,11 @@ export async function status(env, secret) {
     env.DB.prepare('SELECT MAX(synced_at) AS t, SUM(synced_at = 0) AS pending FROM g_sites').first(),
   ]);
   await Promise.all(accts.map(async (a) => {
-    try { const sc = String((await unseal(secret, a.auth)).scope || '').split(/\s+/); a._w = sc.includes(SC_WRITE); a._e = sc.includes(GA_EDIT); } catch { a._w = a._e = false; }
+    try { const sc = String((await unseal(secret, a.auth)).scope || '').split(/\s+/); a._w = sc.includes(SC_WRITE); a._e = sc.includes(GA_EDIT); a._v = sc.includes(SITE_VERIFY); } catch { a._w = a._e = a._v = false; }
   }));
   const list = accts.map((a) => {
     const f = a.found ? JSON.parse(a.found) : null;
-    return { id: a.id, email: a.email, connectedAt: a.connected_at, error: a.error || '', canSubmit: !!a._w, canEdit: !!a._e,
+    return { id: a.id, email: a.email, connectedAt: a.connected_at, error: a.error || '', canSubmit: !!a._w, canEdit: !!a._e, canVerify: !!a._v,
       ga4: f ? f.props.length : null, gsc: f ? f.gsc.length : null, errors: f?.errors || [], discoveredAt: a.found_at || null };
   });
   const many = list.length > 1;

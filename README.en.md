@@ -408,11 +408,13 @@ The "Page indexing" card on a site page lists sitemaps (status, errors, last rea
 
 Setup (each deployment needs its own OAuth client):
 
-1. In the [Google Cloud console](https://console.cloud.google.com/), create a project and enable the **Google Analytics Admin API**, **Google Analytics Data API** and **Google Search Console API**.
+1. In the [Google Cloud console](https://console.cloud.google.com/), create a project and enable the **Google Analytics Admin API**, **Google Analytics Data API**, **Google Search Console API** and **Site Verification API** (used to verify ownership when adding new sites to Search Console).
 2. "OAuth consent screen": user type "External", fill in the app name and email, then click **Publish app**. Unpublished (testing) apps lose authorization after 7 days; personal use doesn't need Google review — when you see "Google hasn't verified this app", click "Continue"; if there's no "Continue" button, click "Advanced", then the "Go to … (unsafe)" link below it — it's your own app, so it's safe to continue.
 3. "Credentials → Create credentials → OAuth client ID", type **Web application**, authorized redirect URI `https://<your domain>/api/google/callback`.
 4. In the admin, open "Settings → Google integration", enter the client ID and secret and save (the secret is stored encrypted in D1 and only the last 4 characters are shown afterwards).
 5. On the "Sites" page, click "Connect a Google account" to authorize.
+
+To add new sites to Search Console / Bing: "+ → Add to Search Console / Bing" at the top right of the Sites list, or "Add to search engines" on a site page. It verifies ownership, adds the site and submits its sitemaps. With a Cloudflare API token that can edit zone DNS under "Settings → Cloudflare DNS", sites whose domain is in that Cloudflare account get their verification DNS records added automatically (a TXT record for Google, verifying the whole domain; a CNAME for Bing), with no change to the site's code; other sites are verified with a page meta tag. If DNS hasn't taken effect yet, the hourly cron tries again.
 
 The client can be changed or deleted under "Settings → Google integration"; changing the client ID disconnects all connected accounts. Clients that older versions kept in environment variables (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) are imported into the admin automatically the first time they're used after upgrading; you can then delete the environment variables.
 

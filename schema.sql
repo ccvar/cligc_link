@@ -357,3 +357,19 @@ CREATE TABLE IF NOT EXISTS ai_ops (
   done_at     INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS ai_ops_token ON ai_ops (token_id);
+
+-- 接入 Search Console / Bing 的进度（见 src/onboard.js）：DNS 验证要等记录生效，没通过的定时任务会再试
+CREATE TABLE IF NOT EXISTS site_onboard (
+  host        TEXT PRIMARY KEY,
+  method      TEXT NOT NULL DEFAULT '',     -- dns：Cloudflare DNS 自动加记录；meta：页面 meta 标签
+  g_acct      TEXT NOT NULL DEFAULT '',     -- 用哪个 Google 账号
+  g_site      TEXT NOT NULL DEFAULT '',     -- Search Console 资源，如 sc-domain:example.com
+  g_state     TEXT NOT NULL DEFAULT '',     -- pending（等 DNS 生效）/ done / error
+  g_msg       TEXT NOT NULL DEFAULT '',
+  b_site      TEXT NOT NULL DEFAULT '',
+  b_state     TEXT NOT NULL DEFAULT '',
+  b_msg       TEXT NOT NULL DEFAULT '',
+  tries       INTEGER NOT NULL DEFAULT 0,   -- 定时任务自动重试的次数
+  created_at  INTEGER NOT NULL DEFAULT 0,
+  updated_at  INTEGER NOT NULL DEFAULT 0
+);

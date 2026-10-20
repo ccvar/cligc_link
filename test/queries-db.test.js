@@ -89,3 +89,24 @@ test('站点太多时分批查，出错的站点单独列出', { skip }, async (
     assert.equal(r2.items[0].n, 69);
   } finally { m.restore(); }
 });
+
+test('地区：只查 Google 的国家 / 地区，代码统一大写，和搜索词分开缓存', { skip }, async () => {
+  const { env } = await setup();
+  const m = mock((u, body) => {
+    if (u.includes('searchAnalytics')) {
+      assert.deepEqual(body.dimensions, ['country']);
+      return u.includes('a.com') ? { rows: [{ keys: ['usa'], clicks: 5, impressions: 100, position: 3 }, { keys: ['chn'], clicks: 1, impressions: 40, position: 8 }] }
+        : { rows: [{ keys: ['usa'], clicks: 1, impressions: 50, position: 5 }] };
+    }
+    if (u.includes('GetQueryStats')) throw new Error('地区不该查 Bing');
+    return {};
+  });
+  try {
+    const r = await hotQueries(env, SECRET, [], 28, 'country');
+    assert.equal(r.b.sites, 0, '地区没有 Bing');
+    assert.deepEqual(r.items.map((x) => x.q), ['USA', 'CHN']);
+    assert.deepEqual(r.items[0].g, { c: 6, i: 150, p: 3.7 });
+    assert.equal(r.items[0].n, 2);
+    assert.ok(!m.calls.some((u) => u.includes('GetQueryStats')));
+  } finally { m.restore(); }
+});

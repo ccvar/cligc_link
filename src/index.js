@@ -15,6 +15,7 @@ import * as advice from './advice.js';
 import * as ga4admin from './ga4admin.js';
 import * as aiapi from './aiapi.js';
 import { hotQueries } from './queries.js';
+import * as onboard from './onboard.js';
 import { subreq } from './budget.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT, normalizeTarget, isAppUrl, isWebUrl, inAppBrowser, intentWithFallback, guardKey, isDbError } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAggStmts, pruneClicks, backfillSourceUv, prunePerRun, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
@@ -260,6 +261,8 @@ async function runCron(env, at = Date.now(), { manual = false, token = '', start
   await step('bing', async () => bing.syncBatch(env, await sessionSecret(env), manual ? { limit: 5, deadline: Date.now() + 15000 } : {}));
   // 外链与权重（设置里开启后才查）：Bing 外链每次最多 10 个站点，Open PageRank 最多 200 个域名；每个站点每周一次
   await step('links', async () => backlinks.cronBatch(env, await sessionSecret(env), { manual }));
+  // 接入 Search Console / Bing：DNS 验证还没通过的再试一次（DNS 记录要等生效）
+  await step('onboard', async () => onboard.onboardCron(env, await sessionSecret(env), { limit: manual ? 3 : 10 }));
   await step('health', () => runHealthChecks(env));
   await step('update', () => checkUpdate(env, false, { notify: !manual }));
   if (!manual) {
@@ -2553,10 +2556,29 @@ async function googleApi(request, env, url) {
     const days = google.RANGE_DAYS.includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 28;
     // bl：外链与权重开了哪几项（不进缓存，开关一变立即生效）
     if (path === '/api/google/sites') return json({ days, ranges: google.ranges(days), items: await google.sitesList(env, days, { fresh: url.searchParams.get('fresh') === '1' }), bl: await backlinks.blFlags(env) });
+    // 接入 Search Console / Bing（见 onboard.js）：列出没接入的站点和进度、取页面验证标签、执行接入；Cloudflare DNS 令牌用来自动加验证记录
+    if (path === '/api/google/onboard' && method === 'GET') {
+      const list = (k) => (url.searchParams.get(k) || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 500);
+      return json(await onboard.onboardList(env, secret, list('hosts'), list('extra')));
+    }
+    if (path === '/api/google/onboard' && method === 'POST') {
+      const r = await onboard.onboardRun(env, secret, await request.json().catch(() => ({})));
+      return r.error ? json(r, 400) : json(r);
+    }
+    if (path === '/api/google/onboard/meta' && method === 'POST') {
+      const r = await onboard.onboardMeta(env, secret, await request.json().catch(() => ({})));
+      return r.error ? json(r, 400) : json(r);
+    }
+    if (path === '/api/google/cf-dns' && method === 'GET') return json(await onboard.cfDnsStatus(env, secret));
+    if (path === '/api/google/cf-dns' && method === 'PUT') {
+      const r = await onboard.saveCfDns(env, secret, await request.json().catch(() => ({})));
+      return r.error ? json(r, 400) : json(r);
+    }
+    if (path === '/api/google/cf-dns' && method === 'DELETE') return json(await onboard.deleteCfDns(env));
     // 热门搜索词：body.hosts 是站点列表当前筛选出来的站点（空 = 全部）
     if (path === '/api/google/queries' && method === 'POST') {
       const b = await request.json().catch(() => ({}));
-      return json(await hotQueries(env, secret, Array.isArray(b.hosts) ? b.hosts.slice(0, 2000) : [], days));
+      return json(await hotQueries(env, secret, Array.isArray(b.hosts) ? b.hosts.slice(0, 2000) : [], days, url.searchParams.get('kind') === 'country' ? 'country' : 'query'));
     }
     if (path === '/api/google/tags' && method === 'GET') return json({ tags: await google.tagsList(env) });
     if (path === '/api/google/tags' && method === 'PUT') {
