@@ -2,6 +2,36 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.11.0 · 2026-10-20
+
+Add sites to Google Search Console and Bing from the admin: ownership is verified automatically through Cloudflare DNS, then the site is added and its sitemaps submitted. Top queries gain a region tab, a hide-domains toggle and daily automatic updates.
+
+### New
+
+- **Add to Search Console / Bing**: "+ → Add to Search Console / Bing" at the top right of the Sites list, the gray Search Console / Bing icons in the list, "Add to search engines" on a site page, or right after creating a GA4 site
+  - Verifies site ownership → adds the site → finds sitemaps in robots.txt or common locations and submits them; the site then shows up in the list
+  - **Automatic Cloudflare DNS verification**: for domains in your Cloudflare account, verification records are added automatically (a TXT for Google, verifying the whole domain including www and subdomains; a CNAME for Bing), with no change to the site's code. While DNS hasn't taken effect, the status shows "Verifying" and is retried every 30 seconds while the dialog is open and hourly by the cron
+  - **Page tags**: for domains not on Cloudflare, paste the Google and Bing meta tags into the home page, then verify
+  - Bulk: lists every site not yet added, with its connection date (when GA4 started tracking it, newest first) and sortable columns; select sites and add them together, or add other domains by hand
+- **Top queries · Regions**: a new "Regions" tab shows popularity by the searcher's country / region (Google data only), with sorting, filtering and export
+- **Top queries · Hide site domains**: hides site names for screenshots and sharing; exports leave out the site columns too
+
+### Improved
+
+- Top queries data is cached for 24 hours and refreshed daily by the cron (last 28 days); the update time is shown with a manual refresh button; with many sites, batches load automatically with progress, no more "Load more"
+- Settings: "Cloudflare usage" and automatic DNS verification are merged into one "Cloudflare" item sharing a single token (add "Zone · DNS · Edit" to it), or use a separate DNS-only token; the "Create token in Cloudflare" link prefills the needed permissions
+- Cloudflare token errors now distinguish "invalid token" from "valid token that can't read domains", with Cloudflare's own message
+
+### Fixed
+
+- After cancelling on Google's consent page and returning, the "Re-authorize" button couldn't be clicked
+
+### Upgrade notes
+
+- Adding sites to Search Console needs the **Site Verification API** enabled in your Google Cloud project, and re-authorizing your Google account once in the admin (it now includes "site verification")
+- Automatic DNS verification needs a Cloudflare token with "Zone · DNS · Edit" (not "DNS Settings") and Zone Resources set to "All zones"
+- The database adds the new table automatically; nothing to do by hand
+
 ## v1.10.0 · 2026-10-19
 
 New "Top search queries": Google and Bing queries across your sites, merged and sorted by popularity, with export. Page paths on the site page now open the page.
