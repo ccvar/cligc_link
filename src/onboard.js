@@ -117,6 +117,13 @@ async function ensureRecord(token, zone, type, name, content) {
   return 'added';
 }
 
+// 删掉一条我们加的记录（名字、值都对上，并且备注是我们写的才删）
+async function removeRecord(token, zone, type, name, content) {
+  const bare = (v) => String(v || '').replace(/^"|"$/g, '').toLowerCase().replace(/\.$/, '');
+  const list = (await cf(token, `/zones/${zone.id}/dns_records?type=${type}&name=${encodeURIComponent(name)}&per_page=100`)).result || [];
+  for (const r of list) if (bare(r.name) === bare(name) && bare(r.content) === bare(content) && r.comment === COMMENT) await cf(token, `/zones/${zone.id}/dns_records/${r.id}`, { method: 'DELETE' });
+}
+
 // ---------------------------------------------------------------- 工具
 
 // 网站实际的首页地址：http 跳 https、不带 www 跳 www 之类，跟着跳转走一遍；打不开就用 https://域名/
@@ -231,8 +238,12 @@ async function runBing(env, secret, ctx, row) {
         const zone = zoneOf(ctx.zones, bhost);
         if (!zone) return { state: 'error', msg: '这个域名不在 Cloudflare 账号里，请改用页面标签验证' };
         if (!s.DnsVerificationCode) return { state: 'error', msg: 'Bing 没有给出 DNS 验证码，请改用页面标签验证' };
-        rec = `${s.DnsVerificationCode}.${bhost}`;
+        // Bing 给的 DnsVerificationCode 就是完整的记录名（如 e4a2….example.com）；只有一串码（不带点）时才拼上域名
+        const code = String(s.DnsVerificationCode).trim().replace(/\.$/, '').toLowerCase();
+        rec = code.includes('.') ? code : `${code}.${bhost}`;
         await ensureRecord(ctx.cfToken, zone, 'CNAME', rec, 'verify.bing.com');
+        // 以前的版本把域名多拼了一次（….example.com.example.com），加错的那条删掉
+        if (code.includes('.')) await removeRecord(ctx.cfToken, zone, 'CNAME', `${code}.${bhost}`, 'verify.bing.com').catch(() => {});
       }
       // VerifySite 本身出错（限流、参数不对等）也记下来，不然只会一直显示“验证中”看不出原因
       let ok = false, verr = '';

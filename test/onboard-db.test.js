@@ -40,8 +40,9 @@ function mockAll({ dnsLive = true } = {}) {
     st.calls.push(`${m} ${u}`);
     if (u.startsWith('https://oauth2.googleapis.com/token')) return J({ access_token: 'at', expires_in: 3600 });
     if (u.startsWith('https://api.cloudflare.com/client/v4/zones?')) return J({ success: true, result: [{ id: 'z1', name: 'a.com' }], result_info: { total_pages: 1 } });
-    if (u.includes('/zones/z1/dns_records') && m === 'GET') return J({ success: true, result: st.records.filter((r) => u.includes(`type=${r.type}`) && u.includes(`name=${encodeURIComponent(r.name)}`)) });
+    if (u.includes('/zones/z1/dns_records') && m === 'GET') { const q = new URL(u).searchParams; return J({ success: true, result: st.records.filter((r) => r.type === q.get('type') && r.name === q.get('name')) }); }
     if (u.includes('/zones/z1/dns_records') && m === 'POST') { st.records.push({ ...body, id: `r${st.records.length}` }); return J({ success: true, result: {} }); }
+    if (u.includes('/zones/z1/dns_records/') && m === 'DELETE') { const id = u.split('/dns_records/')[1]; st.records = st.records.filter((r) => r.id !== id); return J({ success: true, result: {} }); }
     if (u === 'https://www.googleapis.com/siteVerification/v1/token') return J({ token: body.verificationMethod === 'META' ? '<meta name="google-site-verification" content="gm" />' : 'google-site-verification=gt' });
     if (u.startsWith('https://www.googleapis.com/siteVerification/v1/webResource')) {
       const ok = body.site.type === 'INET_DOMAIN' ? st.live && st.records.some((r) => r.type === 'TXT' && r.content === '"google-site-verification=gt"') : st.live;
@@ -54,7 +55,7 @@ function mockAll({ dnsLive = true } = {}) {
     if (u.startsWith('https://ssl.bing.com/webmaster/api.svc/json/')) {
       const meth = u.split('/json/')[1].split('?')[0];
       if (meth === 'GetUserSites') return J({ d: st.bSites });
-      if (meth === 'AddSite') { st.bSites.push({ Url: body.siteUrl, IsVerified: false, AuthenticationCode: 'BAUTH', DnsVerificationCode: 'abc123' }); return J({ d: null }); }
+      if (meth === 'AddSite') { st.bSites.push({ Url: body.siteUrl, IsVerified: false, AuthenticationCode: 'BAUTH', DnsVerificationCode: 'abc123.a.com' }); return J({ d: null }); }
       if (meth === 'VerifySite') {
         const ok = st.live && st.records.some((r) => r.type === 'CNAME' && r.name === 'abc123.a.com' && r.content === 'verify.bing.com');
         if (ok) st.bSites.forEach((s) => { s.IsVerified = true; });
@@ -175,4 +176,18 @@ test('保存 DNS 令牌时分清“令牌无效”和“有效但读不到域名
     verifyOk = false;
     assert.match((await ob.saveCfDns(env, SECRET, { token: 'tok-tok-tok-tok-tok-tok' })).error, /^令牌无效/);
   } finally { globalThis.fetch = real; }
+});
+
+test('Bing 的 DNS 验证码本身带域名：记录名不再多拼一次，以前加错的那条删掉', { skip }, async () => {
+  const { env } = await setup();
+  const m = mockAll();
+  try {
+    await ob.saveCfDns(env, SECRET, { token: 'cf-token-cf-token-cf-token' });
+    // 旧版本加错的记录
+    m.st.records.push({ type: 'CNAME', name: 'abc123.a.com.a.com', content: 'verify.bing.com', comment: 'cligc link：搜索引擎所有权验证，验证通过后请保留', id: 'old' });
+    const r = await ob.onboardRun(env, SECRET, { host: 'a.com', method: 'dns' });
+    assert.equal(r.b.state, 'done', r.b.msg);
+    const cn = m.st.records.filter((x) => x.type === 'CNAME').map((x) => x.name);
+    assert.deepEqual(cn, ['abc123.a.com'], '只剩正确的那条');
+  } finally { m.restore(); }
 });
