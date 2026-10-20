@@ -120,7 +120,7 @@ async function ensureRecord(token, zone, type, name, content) {
 // ---------------------------------------------------------------- 工具
 
 // 网站实际的首页地址：http 跳 https、不带 www 跳 www 之类，跟着跳转走一遍；打不开就用 https://域名/
-async function homeOrigin(host) {
+export async function homeOrigin(host) {
   for (const u of [`https://${host}/`, `https://www.${host}/`]) {
     try {
       spend();
@@ -133,7 +133,7 @@ async function homeOrigin(host) {
 }
 
 // 网站的站点地图：robots.txt 里写的，没有就试常见的几个地址
-async function findSitemaps(origin, host) {
+export async function findSitemaps(origin, host) {
   const base = origin.replace(/\/$/, '');
   const mine = (u) => { const h = siteHost(u); return h === host || h.endsWith(`.${host}`); };
   try {

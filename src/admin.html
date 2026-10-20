@@ -2088,7 +2088,15 @@ html.masked input:focus { filter: none; }
 .ob-s.wait { color: var(--warn); }
 .ob-s.bad { color: var(--bad); }
 .ob-s.off { color: var(--muted); }
+.ob-why { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; font-size: 11.5px; line-height: 1.4; color: var(--muted); white-space: normal; overflow-wrap: anywhere; }
 .ob-add { display: flex; gap: 8px; margin: 0 0 6px; }
+.ob-q { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+.ob-q .input { width: 220px; max-width: 60%; }
+.ob-q .hint { font-size: 12px; }
+.sm-k { margin: 0; }
+.sm-d .ob-q .input { width: 180px; }
+.tbl.gt.ob-t th.sm-n { width: 96px; }
+@media (max-width: 640px) { .tbl.gt.ob-t .sm-n { display: none; } .sm-d .ob-q { flex-wrap: wrap; } .sm-d .ob-q .input { width: 100%; max-width: none; } }
 .ob-add .input { flex: 1; min-width: 0; }
 .gico.onb { cursor: pointer; }
 .gico.onb:hover { opacity: 1; filter: none; }
@@ -6556,6 +6564,93 @@ async function hotQueriesDialog(hosts) {
   load(kind);
 }
 
+// 站点地图批量提交：已接入的站点给 Google / Bing 各提交了哪些站点地图，缺的一键补交
+// （一边有、另一边没有的补交过去；两边都没有的，去 robots.txt 和常见地址找）
+async function sitemapDialog() {
+  const { d, close } = gaDlg('ob-d sm-d');
+  d.innerHTML = `<div class="dlg-h"><h3>${ic('send', 18)}提交站点地图</h3><span class="sp"></span><button type="button" class="btn ghost icon" data-x aria-label="关闭">${ic('x', 18)}</button></div>
+    <div id="ob-b">${skel(220)}</div>`;
+  d.querySelector('[data-x]').onclick = close;
+  const box = d.querySelector('#ob-b');
+  let items = null, kind = 'miss', q = '', running = false;
+  const sel = new Set();
+  const miss = (x) => x.g.missing.length + x.b.missing.length;
+  const kindOf = (x) => (miss(x) ? 'miss' : !x.known.length ? 'none' : 'ok');
+  const canRun = (x) => kindOf(x) !== 'ok';
+  const RANK = { miss: 0, none: 1, ok: 2 };
+  const list = (a) => a.map((p) => { try { return new URL(p).pathname; } catch { return p; } }).join('\n');
+  const cell = (x, k) => {
+    const e = x[k], res = x.res?.[k];
+    if (res?.state === 'run') return `<span class="ob-s wait">${ic('refresh', 13)}提交中…</span>`;
+    if (!e.on) return '<span class="ob-s off">未接入</span>';
+    const errs = res?.errors?.length ? `<small class="ob-why" data-tipf-always data-tipf="${esc(res.errors.join('\n'))}">${esc(res.errors[0])}</small>` : '';
+    if (e.missing.length) return `<span class="ob-s wait" data-tipf-always data-tipf="${esc(`还没提交：\n${list(e.missing)}`)}">${ic('alert', 13)}缺 ${e.missing.length} 个</span>${errs}`;
+    if (e.n) return `<span class="ob-s ok" data-tipf-always data-tipf="${esc(`已提交 ${e.n} 个${res?.done?.length ? `（刚补交 ${res.done.length} 个）` : ''}`)}">${ic('check', 13)}已提交 ${e.n}</span>${errs}`;
+    return `<span class="ob-s off">—</span>${errs}`;
+  };
+  const load = async () => {
+    try { items = (await api('/google/sitemaps')).items; }
+    catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+    if (!document.body.contains(d)) return;
+    if (!items.some((x) => kindOf(x) === kind)) kind = items.some((x) => kindOf(x) === 'none') ? 'none' : 'all';
+    draw();
+  };
+  const draw = () => {
+    const keepTop = box.querySelector('.ob-w')?.scrollTop || 0, keepD = d.scrollTop;
+    const ae = document.activeElement, keepQ = ae?.id === 'sm-q' && box.contains(ae) ? ae.selectionStart : null;
+    const cnt = { all: items.length, miss: 0, none: 0, ok: 0 };
+    for (const x of items) cnt[kindOf(x)]++;
+    const qq = q.trim().toLowerCase();
+    const shown = items.filter((x) => (kind === 'all' || kindOf(x) === kind) && (!qq || x.host.includes(qq)))
+      .sort((a, b) => RANK[kindOf(a)] - RANK[kindOf(b)] || a.host.localeCompare(b.host));
+    const todo = items.filter((x) => sel.has(x.host) && canRun(x));
+    const chips = [['miss', '缺站点地图'], ['none', '没找到'], ['ok', '都已提交'], ['all', '全部']].filter(([k]) => k === 'all' || cnt[k]);
+    box.innerHTML = `<p class="hint ob-intro">已接入的站点给 Google、Bing 各提交了几个站点地图。补交时：一边有、另一边没有的交过去；两边都没有的，去 robots.txt 和 /sitemap.xml 找。设置里“自动重新提交站点地图”开着时，定时任务每天也会自动补交。</p>
+      <div class="ob-q"><div class="qf sm-k">${chips.map(([k, l]) => `<button type="button" class="${kind === k ? 'on' : ''}" data-smk="${k}">${l}<small>${cnt[k]}</small></button>`).join('')}</div><span class="sp"></span>
+        ${items.length > 10 ? `<input class="input sm" id="sm-q" type="search" placeholder="筛选站点" value="${esc(q)}" autocomplete="off" spellcheck="false">` : ''}</div>
+      ${shown.length ? `<div class="ob-w"><table class="tbl gt ob-t nosort"><thead><tr><th class="ob-ck"><input type="checkbox" id="sm-all" aria-label="全选" ${shown.some(canRun) && shown.filter(canRun).every((x) => sel.has(x.host)) ? 'checked' : ''} ${running ? 'disabled' : ''}></th><th>站点</th><th class="sm-n">站点地图</th><th>Search Console</th><th>Bing</th></tr></thead>
+        <tbody>${shown.map((x) => `<tr><td class="ob-ck"><input type="checkbox" data-smh="${esc(x.host)}" ${sel.has(x.host) && canRun(x) ? 'checked' : ''} ${canRun(x) && !running ? '' : 'disabled'} aria-label="${esc(x.host)}"></td>
+          <td><span class="ell mono">${esc(x.host)}</span></td>
+          <td class="sm-n">${x.known.length ? `<span class="ob-tv" data-tipf-always data-tipf="${esc(list(x.known))}">${x.known.length}${EN ? '' : ' 个'}</span>` : `<span class="ob-s off" data-tipf-always data-tipf="还不知道这个站点的站点地图；补交时会去 robots.txt 和 /sitemap.xml 找">没找到</span>`}</td>
+          <td>${cell(x, 'g')}</td><td>${cell(x, 'b')}</td></tr>`).join('')}</tbody></table></div>`
+        : `<div class="empty">${ic(qq ? 'search' : 'check')}${qq ? `没有包含“${esc(q)}”的站点` : kind === 'miss' ? '没有缺站点地图的站点' : '没有站点'}</div>`}
+      <div class="row"><button class="btn" data-close>关闭</button><button class="btn primary" id="sm-go" ${todo.length && !running ? '' : 'disabled'}>${running ? '正在提交…' : `补交${todo.length ? ` ${todo.length} 个站点` : ''}`}</button></div>`;
+    const w0 = box.querySelector('.ob-w'); if (w0) w0.scrollTop = keepTop;
+    d.scrollTop = keepD;
+    box.querySelector('[data-close]').onclick = close;
+    box.querySelectorAll('[data-smk]').forEach((b) => (b.onclick = () => { kind = b.dataset.smk; draw(); }));
+    const qi = box.querySelector('#sm-q');
+    if (qi) { qi.oninput = () => { q = qi.value; draw(); }; if (keepQ != null) { qi.focus(); qi.setSelectionRange(keepQ, keepQ); } }
+    box.querySelector('#sm-all')?.addEventListener('change', (e) => { shown.filter(canRun).forEach((x) => (e.target.checked ? sel.add(x.host) : sel.delete(x.host))); draw(); });
+    box.querySelectorAll('[data-smh]').forEach((c) => (c.onchange = () => { c.checked ? sel.add(c.dataset.smh) : sel.delete(c.dataset.smh); draw(); }));
+    box.querySelector('#sm-go').onclick = () => run(todo.map((x) => x.host));
+  };
+  // 一个一个站点提交（每个站点几次接口调用）；提交完更新这一行
+  const run = async (hosts) => {
+    running = true;
+    let g = 0, b = 0, bad = 0;
+    for (const host of hosts) {
+      if (!document.body.contains(d)) return;
+      const i = items.findIndex((x) => x.host === host);
+      if (i < 0) continue;
+      items[i] = { ...items[i], res: { g: { state: 'run' }, b: { state: 'run' } } };
+      draw();
+      try {
+        const r = await api('/google/sitemaps/submit', { method: 'POST', body: { host } });
+        items[i] = { ...r.state, res: { g: r.g, b: r.b } };
+        g += r.g.done.length; b += r.b.done.length; bad += r.g.errors.length + r.b.errors.length;
+        if (!r.found) items[i].res.g = { errors: ['网站上也没找到站点地图（robots.txt、/sitemap.xml）'] };
+      } catch (e) { items[i] = { ...items[i], res: { g: { errors: [e.message] }, b: { errors: [] } } }; bad++; }
+      sel.delete(host);
+      draw();
+    }
+    running = false;
+    draw();
+    toast(g + b ? `已补交：Google ${g} 个、Bing ${b} 个站点地图${bad ? `，${bad} 个没成功（看表格）` : ''}` : bad ? '没有补交成功，原因看表格' : '没有需要补交的站点地图', g + b && !bad ? 'ok' : 'warn');
+  };
+  load();
+}
+
 // 接入 Search Console / Bing：验证网站所有权（Cloudflare DNS 自动加记录，或者页面 meta 标签）→ 添加站点 → 提交站点地图。
 // hosts 只有一个时是单个站点（站点详情、新建站点后打开）；不传时列出所有还没接入的站点，可以勾选批量接入
 async function onboardDialog(hosts = [], onDone) {
@@ -6568,6 +6663,7 @@ async function onboardDialog(hosts = [], onDone) {
   let L, method = '', acct = '', useG = true, useB = true, extra = [], tags = null, running = false, timer = 0, rounds = 0, changed = false;
   // 表头排序：默认按接入时间新的在前；重画表格时照这个排
   let sortK = 'since', sortAsc = false;
+  let q = '';   // 站点多（超过 10 个）时可以按域名筛选
   const sel = new Set();
   const load = async () => {
     try { L = await api(`/google/onboard?${new URLSearchParams({ hosts: hosts.join(','), extra: extra.join(',') })}`); }
@@ -6590,8 +6686,10 @@ async function onboardDialog(hosts = [], onDone) {
     if (k === 'g' ? x.gsc : x.bingSite) return `<span class="ob-s ok" data-tipf-always data-tipf="${esc(k === 'g' ? x.gsc : x.bingSite)}">${ic('check', 13)}已接入</span>`;
     const s = x[k] || {};
     if (s.state === 'done') return `<span class="ob-s ok" data-tipf-always data-tipf="${esc(s.msg)}">${ic('check', 13)}已接入</span>`;
-    if (s.state === 'pending') return `<span class="ob-s wait" data-tipf-always data-tipf="${esc(`${s.msg}\n弹窗开着时每 30 秒再试一次；关掉也没关系，后台每小时会再试`)}">${ic('history', 13)}验证中</span>`;
-    if (s.state === 'error') return `<span class="ob-s bad" data-tipf-always data-tipf="${esc(s.msg)}">${ic('alert', 13)}没成功</span>`;
+    // 验证中、没成功：原因直接写在下面（最多两行，悬停看全文）
+    const why = s.msg ? `<small class="ob-why" data-tipf-always data-tipf="${esc(s.msg)}">${esc(s.msg)}</small>` : '';
+    if (s.state === 'pending') return `<span class="ob-s wait" data-tipf-always data-tipf="${esc(`${s.msg}\n弹窗开着时每 30 秒再试一次；关掉也没关系，后台每小时会再试`)}">${ic('history', 13)}验证中</span>${why}`;
+    if (s.state === 'error') return `<span class="ob-s bad">${ic('alert', 13)}没成功</span>${why}`;
     if (s.state === 'run') return `<span class="ob-s wait">${ic('refresh', 13)}进行中…</span>`;
     return '<span class="ob-s off">未接入</span>';
   };
@@ -6617,8 +6715,13 @@ async function onboardDialog(hosts = [], onDone) {
   };
   const th = (k, label, cls = '') => `<th class="sortable ${cls}" data-obs="${k}" tabindex="0"${sortK === k ? ` aria-sort="${sortAsc ? 'ascending' : 'descending'}"` : ''}>${label}${SORT_IC}</th>`;
   const draw = () => {
+    // 勾选、排序、状态变化都会整个重画：记下表格和弹窗的滚动位置，画完还原，列表不会跳回顶部
+    const keepTop = box.querySelector('.ob-w')?.scrollTop || 0, keepD = d.scrollTop;
+    const ae = document.activeElement, keepQ = ae?.id === 'ob-q' && box.contains(ae) ? ae.selectionStart : null;
     const noVerify = !L.accounts.some((a) => a.canVerify && !a.error);
-    const items = sorted(), todo = items.filter((x) => sel.has(x.host) && canRun(x));
+    // todo：勾选了的（筛选掉的也算）；shown：表格里显示的
+    const all = sorted(), todo = all.filter((x) => sel.has(x.host) && canRun(x));
+    const qq = q.trim().toLowerCase(), items = qq ? all.filter((x) => x.host.includes(qq)) : all;
     const accOpts = L.accounts.map((a) => ({ v: a.id, l: maskEmail(a.email), h: a.canVerify ? '' : '需要重新授权' }));
     const one = single ? items[0] : null;
     // 方式说明：一行就够，细节放在浮动提示里
@@ -6644,14 +6747,19 @@ async function onboardDialog(hosts = [], onDone) {
           <pre class="ga-code">${esc([useG && tags.google, useB && tags.bing].filter(Boolean).join('\n'))}</pre>
           <div class="row ob-tr">${copyBtn([useG && tags.google, useB && tags.bing].filter(Boolean).join('\n'), 'btn sm', '复制标签')}</div>` : ''}`
         : `<button type="button" class="btn sm" id="ob-tags">${ic('code', 14)}获取验证标签</button>`}</div>` : ''}
-      ${items.length ? `<div class="ob-w"><table class="tbl gt ob-t nosort"><thead><tr>${single ? '' : `<th class="ob-ck"><input type="checkbox" id="ob-all" aria-label="全选" ${todo.length && todo.length === items.filter(canRun).length ? 'checked' : ''}></th>`}${th('host', '站点')}${th('since', '接入时间', 'ob-tm')}${th('g', 'Search Console')}${th('b', 'Bing')}</tr></thead>
+      ${!single && all.length > 10 ? `<div class="ob-q"><input class="input sm" id="ob-q" type="search" placeholder="筛选站点" value="${esc(q)}" autocomplete="off" spellcheck="false"><span class="hint">${qq ? `${items.length} / ${all.length} 个站点` : `${all.length} 个站点`}${todo.length ? ` · 已勾选 ${todo.length} 个` : ''}</span></div>` : ''}
+      ${items.length ? `<div class="ob-w"><table class="tbl gt ob-t nosort"><thead><tr>${single ? '' : `<th class="ob-ck"><input type="checkbox" id="ob-all" aria-label="全选" ${items.some(canRun) && items.filter(canRun).every((x) => sel.has(x.host)) ? 'checked' : ''}></th>`}${th('host', '站点')}${th('since', '接入时间', 'ob-tm')}${th('g', 'Search Console')}${th('b', 'Bing')}</tr></thead>
         <tbody>${items.map((x) => `<tr>${single ? '' : `<td class="ob-ck"><input type="checkbox" data-obh="${esc(x.host)}" ${sel.has(x.host) && canRun(x) ? 'checked' : ''} ${canRun(x) && !running ? '' : 'disabled'} aria-label="${esc(x.host)}"></td>`}
           <td><div class="ob-h">${single ? `<span class="ell mono">${esc(x.host)}</span>` : `<button type="button" class="ob-one ell mono" data-one="${esc(x.host)}" data-tipf-always data-tipf="单独接入这个站点（可以用页面标签）">${esc(x.host)}</button>`}${method === 'dns' && x.zone === false ? '<i class="ix-tag" data-tipf-always data-tipf="这个域名不在 Cloudflare 账号里（或 DNS 令牌没有包含它），只能用页面标签验证：到站点详情里单独接入">不在 Cloudflare</i>' : ''}</div></td>
           <td class="ob-tm">${since(x)}</td><td>${cell(x, 'g')}</td><td>${cell(x, 'b')}</td></tr>`).join('')}</tbody></table></div>`
-        : `<div class="empty">${ic('check')}所有站点都已经接入 Search Console 和 Bing</div>`}
+        : qq ? `<div class="empty">${ic('search')}没有包含“${esc(q)}”的站点</div>` : `<div class="empty">${ic('check')}所有站点都已经接入 Search Console 和 Bing</div>`}
       ${single ? '' : `<div class="ob-add"><input class="input sm" id="ob-x" placeholder="其他域名，如 example.com（多个用逗号分开）" autocomplete="off"><button type="button" class="btn sm" id="ob-xa">添加</button></div>`}
       <div class="err" role="alert"></div>
       <div class="row"><button class="btn" data-close>关闭</button><button class="btn primary" id="ob-go" ${todo.length && !running && (useG || useB) && !(single && method === 'meta' && !tags) ? '' : 'disabled'}>${running ? '正在接入…' : single ? method === 'meta' ? '验证并接入' : '开始接入' : `开始接入${todo.length ? ` ${todo.length} 个站点` : ''}`}</button></div>`;
+    const w0 = box.querySelector('.ob-w'); if (w0) w0.scrollTop = keepTop;
+    d.scrollTop = keepD;
+    const qi = box.querySelector('#ob-q');
+    if (qi) { qi.oninput = () => { q = qi.value; draw(); }; if (keepQ != null) { qi.focus(); qi.setSelectionRange(keepQ, keepQ); } }
     box.querySelector('[data-close]').onclick = close;
     box.querySelector('[data-ga-re]')?.addEventListener('click', (e) => googleConnect(e.currentTarget));
     box.querySelectorAll('[data-ob-cf]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); close(); goSettings('use'); }));
@@ -6665,9 +6773,7 @@ async function onboardDialog(hosts = [], onDone) {
         const k = h.dataset.obs;
         sortAsc = sortK === k ? !sortAsc : k !== 'since';
         sortK = k;
-        const top = box.querySelector('.ob-w')?.scrollTop || 0;
         draw();
-        const w = box.querySelector('.ob-w'); if (w) w.scrollTop = top;
       };
       h.onclick = go;
       h.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); box.querySelector(`[data-obs="${h.dataset.obs}"]`)?.focus(); } };
@@ -6707,7 +6813,10 @@ async function onboardDialog(hosts = [], onDone) {
     if (!document.body.contains(d)) return;
     draw();
     const ok = list.filter((h) => { const x = L.items.find((i) => i.host === h); return x && (!useG || linked(x, 'g')) && (!useB || !L.bing || linked(x, 'b')); }).length;
-    if (!retry) toast(ok === list.length ? `已接入 ${ok} 个站点` : `${ok} / ${list.length} 个站点已接入，其余看表格里的状态`, ok === list.length ? 'ok' : 'warn');
+    // 只接入一个站点又没成功：提示里直接写原因
+    const one1 = list.length === 1 ? L.items.find((i) => i.host === list[0]) : null;
+    const why1 = one1 && [one1.g?.state === 'error' && `Search Console：${one1.g.msg}`, one1.b?.state === 'error' && `Bing：${one1.b.msg}`].filter(Boolean).join('；');
+    if (!retry) toast(ok === list.length ? `已接入 ${ok} 个站点` : why1 ? `没接入成功：${why1}` : `${ok} / ${list.length} 个站点已接入，其余看表格里的状态`, ok === list.length ? 'ok' : 'warn');
     // DNS 刚加的记录要等生效：弹窗开着时每 30 秒再试一次，最多 10 次
     const pend = L.items.filter((x) => x.g?.state === 'pending' || x.b?.state === 'pending').map((x) => x.host);
     clearTimeout(timer);
@@ -7154,7 +7263,7 @@ function exportSitesCsv(rows, d) {
 // ---------------------------------------------------------------- 系统状态
 // 每一项：ok / warn / bad + 说明；定时任务超过 3 小时没跑算异常
 // 定时任务各步骤的中文名
-const CRON_NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', bing: 'Bing 同步', links: '外链与权重', onboard: '接入搜索引擎', hotq: '热门搜索词', gindex: '网页索引检查', health: '目标页检查', update: '检查更新', notify: '推送通知', usage: '用量预警' };
+const CRON_NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', bing: 'Bing 同步', links: '外链与权重', onboard: '接入搜索引擎', smfill: '补交站点地图', hotq: '热门搜索词', gindex: '网页索引检查', health: '目标页检查', update: '检查更新', notify: '推送通知', usage: '用量预警' };
 function sysChecks(st) {
   const H = 3600000, now = st.now, c = st.cron;
   const out = [];
@@ -7249,7 +7358,7 @@ function renderGoogleSettings(box, st, onState) {
         <button type="button" class="btn sm ghost danger-t" data-off="${esc(a.id)}" data-mail="${esc(a.email)}">断开</button></div>`).join('')}</div>
         <p class="hint" style="margin-top:10px">所有账号的站点按域名合并显示；多个账号都能看到同一个站点时，用最早连接的账号的数据。添加账号请到 <a href="#/sites">站点</a> 页。</p>
         <label class="opt trk-sw" style="margin-top:18px"><div class="tx"><b>有新网址或网页更新时自动重新提交站点地图</b>
-          <span class="hint">每天刷新站点地图时，如果里面多了新网址、或者有网页的更新时间 lastmod 变新了，自动把已提交的站点地图重新提交给 Google，让 Google 早点来读取。${accts.some((a) => !a.canSubmit && a.gsc) ? '标着“重新授权”的账号要先重新授权才会提交。' : ''}</span></div>
+          <span class="hint">每天刷新站点地图时，如果里面多了新网址、或者有网页的更新时间 lastmod 变新了，自动把已提交的站点地图重新提交给 Google，让 Google 早点来读取。另外，Bing 里有、Google 里没有（或者网站根目录找到但没提交过）的站点地图，每天也会自动补交给 Google。${accts.some((a) => !a.canSubmit && a.gsc) ? '标着“重新授权”的账号要先重新授权才会提交。' : ''}</span></div>
           <span class="switch"><input type="checkbox" id="g-sma" ${st.smAuto ? 'checked' : ''}><span class="t"></span></span></label>`
       : `<p class="set-p">还没有连接账号，到 <a href="#/sites">站点</a> 页连接 Google 账号。</p>`}` : ''}`;
   bindGoogleConfig(box, st, reload);
@@ -7335,7 +7444,7 @@ async function renderSites(token) {
   store.set('g:bing', hasBing);
   const accts = st.accounts || [], many = accts.length > 1, bad = accts.some((a) => a.error);
   if (gState.acct && !accts.some((a) => a.id === gState.acct)) gState.acct = '';
-  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost g-aik" id="g-aik" aria-label="AI 接口" data-tip="生成临时令牌，让 AI 帮你新建站点统计、管理事件">${ic('key', 15)}<span class="g-aik-t">AI 接口</span><span class="g-aik-n" hidden></span></button><button class="btn ghost icon g-sync" id="g-new" data-tip="新建站点 / 接入 Search Console、Bing" aria-label="新建站点" aria-haspopup="menu" aria-expanded="false">${ic('plus', 18)}</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-hq" data-tip="热门搜索词：当前筛选的站点在 Google / Bing 上的搜索词，按热度排序" aria-label="热门搜索词">${ic('flame', 17)}</button><button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步（可以选 Google / Bing）' : '立即同步'}" aria-label="立即同步"${hasBing ? ' aria-haspopup="menu" aria-expanded="false"' : ''}>${ic('refresh', 17)}</button>`, true)}
+  page.innerHTML = `${head(`<span class="g-prog" id="g-prog" role="status" hidden data-tipf-always data-tipf="每批同步十几个站点，每批要几十秒；全部同步完后列表会自动刷新"><span></span><i></i></span><button class="btn ghost g-ai" id="g-ai" data-tip="生成只读链接发给 AI，分析当前筛选的站点">${ic('ai', 15)}AI 分析</button><button class="btn ghost g-aik" id="g-aik" aria-label="AI 接口" data-tip="生成临时令牌，让 AI 帮你新建站点统计、管理事件">${ic('key', 15)}<span class="g-aik-t">AI 接口</span><span class="g-aik-n" hidden></span></button><button class="btn ghost icon g-sync" id="g-new" data-tip="新建站点 / 接入 Search Console、Bing / 提交站点地图" aria-label="新建站点" aria-haspopup="menu" aria-expanded="false">${ic('plus', 18)}</button>${maskBtn()}<button class="btn ghost icon g-sync" id="g-hq" data-tip="热门搜索词：当前筛选的站点在 Google / Bing 上的搜索词，按热度排序" aria-label="热门搜索词">${ic('flame', 17)}</button><button class="btn ghost icon g-sync" id="g-csv" data-tip="导出当前列表（CSV）" aria-label="导出 CSV">${ic('dl', 17)}</button><button class="btn ghost icon g-sync" id="g-sync" data-tip="${hasBing ? '立即同步（可以选 Google / Bing）' : '立即同步'}" aria-label="立即同步"${hasBing ? ' aria-haspopup="menu" aria-expanded="false"' : ''}>${ic('refresh', 17)}</button>`, true)}
     ${st.error ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<span>${esc(st.error)}</span><span class="sp"></span><button type="button" class="btn sm" id="g-re">重新连接</button></div>` : ''}
     ${st.errors?.length ? `<div class="bulk-bad rv" style="margin-bottom:16px">${ic('info', 15)}<div>${st.errors.map(esc).join('<br>')}</div></div>` : ''}
     <section class="card kstrip gs rv" id="g-sum"></section>
@@ -7630,6 +7739,7 @@ async function renderSites(token) {
   document.getElementById('g-new').onclick = (e) => popMenu(e.currentTarget, [
     { icon: 'plus', label: '新建站点统计（GA4）', run: () => newSiteDialog(reload) },
     { icon: 'globe', label: '接入 Search Console / Bing', run: () => onboardDialog([], reload) },
+    { icon: 'send', label: '提交站点地图', run: () => sitemapDialog() },
   ]);
   document.getElementById('g-aik').onclick = aiApiDialog;
   document.getElementById('g-hq').onclick = () => hotQueriesDialog(lastRows.map((x) => x.host));
@@ -9014,7 +9124,7 @@ function renderBingSettings(box, b, onState) {
         <span class="hint">每天刷新站点地图后，把 Bing 还没收录、30 天内没提交过的网址，以及站点地图里显示有更新的网址提交给 Bing，不超过 Bing 给每个站点的每日配额。</span></div>
         <span class="switch"><input type="checkbox" id="bing-auto" ${b.auto ? 'checked' : ''}><span class="t"></span></span></label>
       <label class="opt trk-sw"><div class="tx"><b>有新网址或网页更新时自动重新提交站点地图</b>
-        <span class="hint">每天刷新站点地图时，如果里面多了新网址、或者有网页的更新时间 lastmod 变新了，自动把已提交的站点地图重新提交给 Bing，让 Bing 早点来读取。</span></div>
+        <span class="hint">每天刷新站点地图时，如果里面多了新网址、或者有网页的更新时间 lastmod 变新了，自动把已提交的站点地图重新提交给 Bing，让 Bing 早点来读取。另外，Google 里有、Bing 里没有（或者网站根目录找到但没提交过）的站点地图，每天也会自动补交给 Bing。</span></div>
         <span class="switch"><input type="checkbox" id="bing-sma" ${b.smAuto ? 'checked' : ''}><span class="t"></span></span></label>
       <div id="bing-fw" hidden style="margin-top:16px">${bingForm(b)}</div></div>`;
   const f = box.querySelector('#bing-f');

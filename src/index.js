@@ -16,6 +16,7 @@ import * as ga4admin from './ga4admin.js';
 import * as aiapi from './aiapi.js';
 import { hotQueries, warmQueries } from './queries.js';
 import * as onboard from './onboard.js';
+import { smList, smSubmit, smAutoFill } from './sitemaps.js';
 import { subreq } from './budget.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT, normalizeTarget, isAppUrl, isWebUrl, inAppBrowser, intentWithFallback, guardKey, isDbError } from './lib.js';
 import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAggStmts, pruneClicks, backfillSourceUv, prunePerRun, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
@@ -263,6 +264,8 @@ async function runCron(env, at = Date.now(), { manual = false, token = '', start
   await step('links', async () => backlinks.cronBatch(env, await sessionSecret(env), { manual }));
   // 接入 Search Console / Bing：DNS 验证还没通过的再试一次（DNS 记录要等生效）
   await step('onboard', async () => onboard.onboardCron(env, await sessionSecret(env), { limit: manual ? 3 : 10 }));
+  // 站点地图：已知但没提交的（比如提交给了 Google、没提交给 Bing）自动补交，每个站点一天最多试一次
+  await step('smfill', async () => (manual ? { skipped: true } : smAutoFill(env, await sessionSecret(env), { limit: 20 })));
   // 热门搜索词：每天把各站点“最近 28 天”的搜索词和地区提前查好（每次最多 40 个，超过 20 小时的重查），打开弹窗不用等
   await step('hotq', async () => (manual ? { skipped: true } : warmQueries(env, await sessionSecret(env), { limit: 40 })));
   await step('health', () => runHealthChecks(env));
@@ -2569,6 +2572,12 @@ async function googleApi(request, env, url) {
     }
     if (path === '/api/google/onboard/meta' && method === 'POST') {
       const r = await onboard.onboardMeta(env, secret, await request.json().catch(() => ({})));
+      return r.error ? json(r, 400) : json(r);
+    }
+    // 站点地图批量提交（见 sitemaps.js）：列出各站点两边提交了哪些、缺哪些；补交一个站点
+    if (path === '/api/google/sitemaps' && method === 'GET') return json(await smList(env));
+    if (path === '/api/google/sitemaps/submit' && method === 'POST') {
+      const r = await smSubmit(env, secret, String((await request.json().catch(() => ({}))).host || ''));
       return r.error ? json(r, 400) : json(r);
     }
     if (path === '/api/google/cf-dns' && method === 'GET') return json(await onboard.cfDnsStatus(env, secret));

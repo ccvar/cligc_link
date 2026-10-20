@@ -416,6 +416,8 @@ Setup (each deployment needs its own OAuth client):
 
 To add new sites to Search Console / Bing: "+ → Add to Search Console / Bing" at the top right of the Sites list, or "Add to search engines" on a site page. It verifies ownership, adds the site and submits its sitemaps. When the Cloudflare token under "Settings → Cloudflare" also has "Zone · DNS · Edit" (the same token as for usage, or a separate DNS-only one), sites whose domain is in that Cloudflare account get their verification DNS records added automatically (a TXT record for Google, verifying the whole domain; a CNAME for Bing), with no change to the site's code; other sites are verified with a page meta tag. If DNS hasn't taken effect yet, the hourly cron tries again.
 
+Bulk sitemap submission: "+ → Submit sitemaps" at the top right of the Sites list shows how many sitemaps each site has submitted to Google and Bing and fills in the missing ones (sitemaps on one side are submitted to the other; if neither has any, robots.txt and /sitemap.xml are checked). With "auto-resubmit sitemaps" on in Settings, the daily cron fills them in too.
+
 The client can be changed or deleted under "Settings → Google integration"; changing the client ID disconnects all connected accounts. Clients that older versions kept in environment variables (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) are imported into the admin automatically the first time they're used after upgrading; you can then delete the environment variables.
 
 Above the list is a summary of the filtered sites (and how many are growing / declining), users, sessions, key events, search clicks and link clicks; the table shows each site's share of sessions (or search clicks).
