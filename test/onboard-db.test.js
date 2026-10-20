@@ -111,13 +111,16 @@ test('DNS 还没生效：记为验证中，定时任务再试时通过', { skip 
 });
 
 test('页面标签方式：取 Google / Bing 的 meta 标签，验证后加网址前缀资源', { skip }, async () => {
-  const { env } = await setup();
+  const { db, env } = await setup();
+  db.prepare("INSERT INTO g_sites (host, ga4_property, ga4_created, gsc_site, updated_at) VALUES ('new.com', '222', ?, '', 1), ('old.com', '333', 1000, '', 1), ('done.com', '', 0, 'sc-domain:done.com', 1)").run(Date.now());
+  db.prepare("UPDATE g_sites SET bing_site = 'https://done.com/' WHERE host = 'done.com'").run();
   const m = mockAll();
   try {
     const list = await ob.onboardList(env, SECRET, []);
     const acct = list.accounts[0].id;
     assert.equal(list.accounts[0].canVerify, true);
-    assert.deepEqual(list.items.map((x) => x.host), ['a.com'], '列出还没接入的站点');
+    assert.deepEqual(list.items.map((x) => x.host), ['new.com', 'old.com', 'a.com'], '列出还没接入的站点，GA4 接入时间新的在前，没有的排后面');
+    assert.ok(list.items[0].since > 0);
     const tags = await ob.onboardMeta(env, SECRET, { host: 'a.com', acct });
     assert.match(tags.google, /google-site-verification/); assert.match(tags.bing, /msvalidate\.01.*BAUTH/);
     const r = await ob.onboardRun(env, SECRET, { host: 'a.com', method: 'meta', acct });

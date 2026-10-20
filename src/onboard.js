@@ -253,7 +253,7 @@ async function context(env, secret, needCf) {
 // hosts：只看这几个站点（站点详情页打开时）；extra：列表之外手动加的域名
 export async function onboardList(env, secret, hosts, extra = []) {
   const want = (hosts || []).map(normHost).filter(Boolean);
-  const sites = (await env.DB.prepare("SELECT host, gsc_site, bing_site FROM g_sites WHERE host LIKE '%.%'").all()).results;
+  const sites = (await env.DB.prepare("SELECT host, gsc_site, bing_site, ga4_created FROM g_sites WHERE host LIKE '%.%'").all()).results;
   const rows = new Map((await env.DB.prepare('SELECT * FROM site_onboard').all()).results.map((r) => [r.host, r]));
   const by = new Map(sites.map((s) => [s.host, s]));
   const list = want.length ? want : sites.filter((s) => !s.gsc_site || !s.bing_site).map((s) => s.host);
@@ -264,10 +264,11 @@ export async function onboardList(env, secret, hosts, extra = []) {
     cf: { configured: !!ctx.cfToken, zones: ctx.zones.length },
     bing: !!ctx.bing,
     accounts: await accountList(env, secret),
-    items: [...new Set(list)].sort().map((host) => ({
-      host, gsc: by.get(host)?.gsc_site || '', bingSite: by.get(host)?.bing_site || '',
+    // since：GA4 网站数据流的创建时间（大致是站点上线 / 开始统计的时间）；新站点排在前面，没有的按域名排
+    items: [...new Set(list)].map((host) => ({
+      host, gsc: by.get(host)?.gsc_site || '', bingSite: by.get(host)?.bing_site || '', since: by.get(host)?.ga4_created || 0,
       zone: ctx.cfToken ? !!zoneOf(ctx.zones, host) : null, ...(rowOut(rows.get(host)) || {}),
-    })),
+    })).sort((a, b) => (b.since || 0) - (a.since || 0) || a.host.localeCompare(b.host)),
   };
 }
 

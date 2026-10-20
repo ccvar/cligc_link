@@ -2036,13 +2036,25 @@ html.masked input:focus { filter: none; }
   .ob-d #ob-b > * { flex: none; }
   .ob-d #ob-b > .ob-w { flex: 1 1 auto; min-height: 120px; max-height: none; overscroll-behavior: contain; }
 }
-.ob-intro { margin: 0 0 14px; }
-.ob-m { margin: 0; }
-.ob-m button svg { color: inherit; }
-.ga-f > .hint { font-size: 12px; line-height: 1.55; color: var(--muted); }
-.ob-e { display: flex; flex-wrap: wrap; gap: 8px 18px; }
-.ob-c { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; cursor: pointer; }
-.ob-c input { margin: 0 2px 0 0; }
+.ob-intro { margin: -6px 0 14px; }
+.ob-note { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 14px; padding: 9px 12px; border-radius: 10px; background: var(--sunken); color: var(--text-2); font-size: 12.5px; line-height: 1.55; }
+.ob-note > svg { flex: none; margin-top: 1px; color: var(--muted); }
+.ob-note a, .ob-mh a { color: var(--accent); }
+/* 三项选项排一行（放不下时换行）：小标题在上，按钮 / 下拉在下 */
+.ob-opts { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; margin: 0 0 8px; }
+.ob-o { display: grid; gap: 6px; min-width: 0; }
+.ob-l { font-size: 12px; color: var(--muted); }
+.ob-o .qf { margin: 0; flex-wrap: nowrap; }
+.ob-o .qf button { height: 32px; }
+.ob-o .qf button svg { color: inherit; flex: none; }
+.ob-e button:not(.on) svg { filter: grayscale(1); opacity: .5; }
+.ob-acc { flex: 1 1 150px; max-width: 280px; }
+.ob-acc .f-dd { width: 100%; }
+.ob-acc .f-dd .combo-btn { height: 32px; }
+.ob-mh { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 0 14px; font-size: 12px; }
+.ob-mh .ob-i { display: inline-flex; color: var(--muted); cursor: help; }
+.ob-one { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.ob-one:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 .ob-tags { margin: 0 0 14px; }
 .ob-tags .ga-code { margin-bottom: 8px; }
 .ob-tr { margin: 0 !important; justify-content: flex-start; }
@@ -2053,6 +2065,9 @@ html.masked input:focus { filter: none; }
 .tbl.gt.ob-t th:first-child { width: auto; }
 .tbl.gt.ob-t th.ob-ck, .tbl.gt.ob-t td.ob-ck { width: 44px; padding-right: 0; }
 .tbl.gt.ob-t th:not(:first-child):not(.ob-ck) { width: 130px; }
+.tbl.gt.ob-t th.ob-tm { width: 112px; }
+.ob-tv { font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ob-tv.new { color: var(--accent); font-weight: 550; }   /* 30 天内的新站点 */
 .ob-h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
 .ob-h .ell { max-width: 100%; }
 .ob-s { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; white-space: nowrap; }
@@ -2066,6 +2081,7 @@ html.masked input:focus { filter: none; }
 .gico.onb:hover { opacity: 1; filter: none; }
 @media (max-width: 640px) {
   .tbl.gt.ob-t th:not(:first-child):not(.ob-ck) { width: 92px; }
+  .tbl.gt.ob-t .ob-tm { display: none; }   /* 手机上放不下，省掉接入时间 */
 }
 /* 热门搜索词弹窗：和事件列表一样，只有表格滚动 */
 .dialog.ga-d.hq-d { width: min(820px, calc(100vw - 32px)); display: flex; flex-direction: column; overflow: hidden; padding-bottom: 24px; }
@@ -6487,6 +6503,8 @@ async function onboardDialog(hosts = [], onDone) {
   d.querySelector('[data-x]').onclick = close;
   const box = d.querySelector('#ob-b');
   let L, method = '', acct = '', useG = true, useB = true, extra = [], tags = null, running = false, timer = 0, rounds = 0, changed = false;
+  // 表头排序：默认按接入时间新的在前；重画表格时照这个排
+  let sortK = 'since', sortAsc = false;
   const sel = new Set();
   const load = async () => {
     try { L = await api(`/google/onboard?${new URLSearchParams({ hosts: hosts.join(','), extra: extra.join(',') })}`); }
@@ -6496,12 +6514,14 @@ async function onboardDialog(hosts = [], onDone) {
     if (!acct || !L.accounts.some((a) => a.id === acct)) acct = (single && L.items[0]?.acct) || ok[0]?.id || L.accounts[0]?.id || '';
     if (!method) method = L.cf.configured && L.cf.zones && (!single || L.items[0]?.zone !== false) ? 'dns' : 'meta';
     useB = useB && L.bing;
-    if (!sel.size) L.items.filter((x) => canRun(x)).forEach((x) => sel.add(x.host));
+    // 批量时默认一个都不勾，自己挑；单个站点没有复选框，就是它
+    if (single) L.items.forEach((x) => sel.add(x.host));
     draw();
   };
   const linked = (x, k) => (k === 'g' ? !!x.gsc : !!x.bingSite) || x[k]?.state === 'done';
   const need = (x) => (useG && !linked(x, 'g')) || (useB && !linked(x, 'b'));
-  const canRun = (x) => need(x) && (method !== 'dns' || x.zone !== false);
+  // 批量只能用 DNS（页面标签要一个一个贴）；DNS 方式下域名得在 Cloudflare 里
+  const canRun = (x) => need(x) && (method === 'dns' ? x.zone !== false : single);
   const cell = (x, k) => {
     if (k === 'b' && !L.bing) return '<span class="ob-s off" data-tipf-always data-tipf="没有配置 Bing API Key（设置 → Bing Webmaster）">—</span>';
     if (k === 'g' ? x.gsc : x.bingSite) return `<span class="ob-s ok" data-tipf-always data-tipf="${esc(k === 'g' ? x.gsc : x.bingSite)}">${ic('check', 13)}已接入</span>`;
@@ -6512,45 +6532,83 @@ async function onboardDialog(hosts = [], onDone) {
     if (s.state === 'run') return `<span class="ob-s wait">${ic('refresh', 13)}进行中…</span>`;
     return '<span class="ob-s off">未接入</span>';
   };
+  // 接入时间：GA4 开始统计这个站点的时间；通过这里接入 Search Console / Bing 的，提示里再写完成时间
+  const since = (x) => {
+    const done = [x.g?.state === 'done' && 'Search Console', x.b?.state === 'done' && 'Bing'].filter(Boolean);
+    const tip = [x.since ? `GA4 接入于 ${fmtTime(x.since)}（${siteAge(x.since)}前）` : '没有 GA4 数据，不知道接入时间', done.length && x.at ? `${done.join(LIST_SEP)} 接入于 ${fmtTime(x.at)}` : ''].filter(Boolean).join('\n');
+    return `<span class="ob-tv${x.since && x.since > Date.now() - 30 * 86400000 ? ' new' : ''}" data-tipf-always data-tipf="${esc(tip)}">${x.since ? ymd(new Date(x.since)) : '—'}</span>`;
+  };
+  // 接入状态排序用：没接入 < 没成功 < 验证中 / 进行中 < 已接入
+  const rank = (x, k) => (k === 'b' && !L.bing ? -1 : linked(x, k) ? 3 : { pending: 2, run: 2, error: 1 }[x[k]?.state] ?? 0);
+  const SORTS = {
+    host: (a, b) => a.host.localeCompare(b.host),
+    since: (a, b) => (a.since || 0) - (b.since || 0),
+    g: (a, b) => rank(a, 'g') - rank(b, 'g'),
+    b: (a, b) => rank(a, 'b') - rank(b, 'b'),
+  };
+  // 一样的按域名排（不跟着正序 / 倒序反过来）；接入时间：没有时间的永远排最后
+  const sorted = () => {
+    const f = SORTS[sortK], cmp = (a, b) => (sortAsc ? 1 : -1) * f(a, b) || a.host.localeCompare(b.host);
+    if (sortK === 'since') return [...L.items.filter((x) => x.since).sort(cmp), ...L.items.filter((x) => !x.since).sort(SORTS.host)];
+    return [...L.items].sort(cmp);
+  };
+  const th = (k, label, cls = '') => `<th class="sortable ${cls}" data-obs="${k}" tabindex="0"${sortK === k ? ` aria-sort="${sortAsc ? 'ascending' : 'descending'}"` : ''}>${label}${SORT_IC}</th>`;
   const draw = () => {
     const noVerify = !L.accounts.some((a) => a.canVerify && !a.error);
-    const items = L.items, todo = items.filter((x) => sel.has(x.host) && canRun(x));
+    const items = sorted(), todo = items.filter((x) => sel.has(x.host) && canRun(x));
     const accOpts = L.accounts.map((a) => ({ v: a.id, l: maskEmail(a.email), h: a.canVerify ? '' : '需要重新授权' }));
     const one = single ? items[0] : null;
-    box.innerHTML = `<p class="hint ob-intro">先验证网站所有权，再把站点加进 Search Console 和 Bing、提交站点地图；接入后站点页会有搜索数据，网页索引也会开始检查。</p>
+    // 方式说明：一行就够，细节放在浮动提示里
+    const mHint = method === 'dns'
+      ? `<span>自动在 Cloudflare 加验证记录，网站代码不用改</span><span class="ob-i" data-tipf-always data-tipf="Google：一条 TXT 记录，验证整个域名（含 www 和子域名）\nBing：一条 CNAME 记录（不走 Cloudflare 代理）\n记录生效一般要几分钟，没通过时会自动再试">${ic('help', 13)}</span>`
+      : single ? `<span>把验证标签贴到网站首页 &lt;head&gt; 里再验证；Google 验证的是网址前缀</span>${L.cf.configured ? '' : `<a href="#/settings" data-ob-cf>改用 DNS 自动验证</a>`}` : '';
+    box.innerHTML = `<p class="hint ob-intro">验证所有权 → 添加站点 → 提交站点地图，接入后站点页就有搜索数据</p>
       ${!L.accounts.length ? gaReauthBar('还没有连接 Google 账号') : noVerify ? gaReauthBar('Google 账号还没授予网站验证权限，重新授权后才能把站点加进 Search Console') : ''}
-      <div class="ga-f"><span>验证方式</span><div class="qf ob-m">
-        <button type="button" class="${method === 'dns' ? 'on' : ''}" data-obm="dns" ${L.cf.configured ? '' : 'disabled'}>${ic('globe', 14)}自动（Cloudflare DNS）</button>
-        <button type="button" class="${method === 'meta' ? 'on' : ''}" data-obm="meta" ${single ? '' : 'disabled data-tipf-always data-tipf="页面标签要一个一个贴到网站上，请到站点详情里单独接入"'}>${ic('code', 14)}页面标签</button></div>
-        <div class="hint">${method === 'dns'
-          ? 'Google 验证整个域名（含 www 和子域名），Bing 用 CNAME 记录；DNS 记录由后台自动加到 Cloudflare，网站代码不用改'
-          : L.cf.configured ? '把 Google 和 Bing 的验证标签贴到网站首页的 &lt;head&gt; 里，再点验证；Google 验证的是网址前缀（https://域名/）'
-          : `把 Google 和 Bing 的验证标签贴到网站首页的 &lt;head&gt; 里，再点验证。${EN ? ' ' : ''}<a href="#/settings" data-ob-cf>在 设置 → Cloudflare DNS 填写令牌</a>${EN ? ' ' : ''}后可以自动验证，网站代码不用改`}</div></div>
-      ${L.accounts.length > 1 ? '<div class="ga-f"><span>用哪个 Google 账号</span><div id="ob-acct"></div></div>' : ''}
-      <div class="ga-f"><span>接入到</span><div class="ob-e">
-        <label class="ob-c"><input type="checkbox" id="ob-g" ${useG ? 'checked' : ''}>${BRAND.gsc(14)}Google Search Console</label>
-        <label class="ob-c"${L.bing ? '' : ' data-tipf-always data-tipf="没有配置 Bing API Key（设置 → Bing Webmaster）"'}><input type="checkbox" id="ob-bi" ${useB ? 'checked' : ''} ${L.bing ? '' : 'disabled'}>${BRAND.bing(14)}Bing Webmaster</label></div></div>
+      ${!single && !L.cf.configured ? `<div class="ob-note">${ic('info', 15)}<span>批量接入要用 Cloudflare DNS 自动验证。<a href="#/settings" data-ob-cf>去设置 Cloudflare DNS</a>，或者点表格里的站点，单独用页面标签接入。</span></div>` : ''}
+      <div class="ob-opts">
+        <div class="ob-o"><span class="ob-l">验证方式</span><div class="qf ob-m">
+          <button type="button" class="${method === 'dns' ? 'on' : ''}" data-obm="dns" ${L.cf.configured ? '' : 'disabled data-tipf-always data-tipf="还没有 Cloudflare DNS 令牌（设置 → Cloudflare DNS）"'}>${ic('globe', 14)}Cloudflare DNS</button>
+          <button type="button" class="${method === 'meta' && single ? 'on' : ''}" data-obm="meta" ${single ? '' : 'disabled data-tipf-always data-tipf="页面标签要一个一个贴到网站上：点表格里的站点单独接入"'}>${ic('code', 14)}页面标签</button></div></div>
+        <div class="ob-o"><span class="ob-l">接入到</span><div class="qf ob-e">
+          <button type="button" class="${useG ? 'on' : ''}" data-obe="g" aria-pressed="${useG}">${BRAND.gsc(13)}Search Console</button>
+          <button type="button" class="${useB ? 'on' : ''}" data-obe="b" aria-pressed="${useB}" ${L.bing ? '' : 'disabled data-tipf-always data-tipf="没有配置 Bing API Key（设置 → Bing Webmaster）"'}>${BRAND.bing(13)}Bing</button></div></div>
+        ${L.accounts.length > 1 ? '<div class="ob-o ob-acc"><span class="ob-l">Google 账号</span><div id="ob-acct"></div></div>' : ''}
+      </div>
+      ${mHint ? `<p class="hint ob-mh">${mHint}</p>` : ''}
       ${single && method === 'meta' && one && need(one) ? `<div class="ob-tags">${tags ? `
           ${tags.errors.length ? `<p class="hint ix-err">${ic('alert', 13)}<span>${tags.errors.map(esc).join('<br>')}</span></p>` : ''}
           ${tags.google || tags.bing ? `<p class="hint">贴到 <code>${esc(tags.origin)}</code> 的 &lt;head&gt; 里（和统计代码放在一起就行），发布后点下面的“验证并接入”：</p>
           <pre class="ga-code">${esc([useG && tags.google, useB && tags.bing].filter(Boolean).join('\n'))}</pre>
           <div class="row ob-tr">${copyBtn([useG && tags.google, useB && tags.bing].filter(Boolean).join('\n'), 'btn sm', '复制标签')}</div>` : ''}`
         : `<button type="button" class="btn sm" id="ob-tags">${ic('code', 14)}获取验证标签</button>`}</div>` : ''}
-      ${items.length ? `<div class="ob-w"><table class="tbl gt ob-t"><thead><tr>${single ? '' : `<th class="ob-ck"><input type="checkbox" id="ob-all" aria-label="全选" ${todo.length && todo.length === items.filter(canRun).length ? 'checked' : ''}></th>`}<th>站点</th><th>Search Console</th><th>Bing</th></tr></thead>
+      ${items.length ? `<div class="ob-w"><table class="tbl gt ob-t nosort"><thead><tr>${single ? '' : `<th class="ob-ck"><input type="checkbox" id="ob-all" aria-label="全选" ${todo.length && todo.length === items.filter(canRun).length ? 'checked' : ''}></th>`}${th('host', '站点')}${th('since', '接入时间', 'ob-tm')}${th('g', 'Search Console')}${th('b', 'Bing')}</tr></thead>
         <tbody>${items.map((x) => `<tr>${single ? '' : `<td class="ob-ck"><input type="checkbox" data-obh="${esc(x.host)}" ${sel.has(x.host) && canRun(x) ? 'checked' : ''} ${canRun(x) && !running ? '' : 'disabled'} aria-label="${esc(x.host)}"></td>`}
-          <td><div class="ob-h"><span class="ell mono">${esc(x.host)}</span>${method === 'dns' && x.zone === false ? '<i class="ix-tag" data-tipf-always data-tipf="这个域名不在 Cloudflare 账号里（或 DNS 令牌没有包含它），只能用页面标签验证：到站点详情里单独接入">不在 Cloudflare</i>' : ''}</div></td>
-          <td>${cell(x, 'g')}</td><td>${cell(x, 'b')}</td></tr>`).join('')}</tbody></table></div>`
+          <td><div class="ob-h">${single ? `<span class="ell mono">${esc(x.host)}</span>` : `<button type="button" class="ob-one ell mono" data-one="${esc(x.host)}" data-tipf-always data-tipf="单独接入这个站点（可以用页面标签）">${esc(x.host)}</button>`}${method === 'dns' && x.zone === false ? '<i class="ix-tag" data-tipf-always data-tipf="这个域名不在 Cloudflare 账号里（或 DNS 令牌没有包含它），只能用页面标签验证：到站点详情里单独接入">不在 Cloudflare</i>' : ''}</div></td>
+          <td class="ob-tm">${since(x)}</td><td>${cell(x, 'g')}</td><td>${cell(x, 'b')}</td></tr>`).join('')}</tbody></table></div>`
         : `<div class="empty">${ic('check')}所有站点都已经接入 Search Console 和 Bing</div>`}
       ${single ? '' : `<div class="ob-add"><input class="input sm" id="ob-x" placeholder="其他域名，如 example.com（多个用逗号分开）" autocomplete="off"><button type="button" class="btn sm" id="ob-xa">添加</button></div>`}
       <div class="err" role="alert"></div>
       <div class="row"><button class="btn" data-close>关闭</button><button class="btn primary" id="ob-go" ${todo.length && !running && (useG || useB) && !(single && method === 'meta' && !tags) ? '' : 'disabled'}>${running ? '正在接入…' : single ? method === 'meta' ? '验证并接入' : '开始接入' : `开始接入${todo.length ? ` ${todo.length} 个站点` : ''}`}</button></div>`;
     box.querySelector('[data-close]').onclick = close;
     box.querySelector('[data-ga-re]')?.addEventListener('click', (e) => googleConnect(e.currentTarget));
-    box.querySelector('[data-ob-cf]')?.addEventListener('click', (e) => { e.preventDefault(); close(); goSettings('dns'); });
+    box.querySelectorAll('[data-ob-cf]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); close(); goSettings('dns'); }));
     box.querySelectorAll('[data-obm]').forEach((b) => (b.onclick = () => { method = b.dataset.obm; draw(); }));
     if (L.accounts.length > 1) selectDd(box.querySelector('#ob-acct'), accOpts, acct, { aria: 'Google 账号', onChange: (v) => { acct = v; tags = null; draw(); } });
-    box.querySelector('#ob-g').onchange = (e) => { useG = e.target.checked; draw(); };
-    box.querySelector('#ob-bi').onchange = (e) => { useB = e.target.checked; draw(); };
+    box.querySelectorAll('[data-obe]').forEach((b) => (b.onclick = () => { if (b.dataset.obe === 'g') useG = !useG; else useB = !useB; tags = null; draw(); }));
+    box.querySelectorAll('[data-one]').forEach((b) => (b.onclick = () => { if (running) return; close(); onboardDialog([b.dataset.one], onDone); }));
+    // 点表头排序，再点反过来；第一次点：站点名 A→Z，接入时间新的在前，接入状态没接入的在前
+    box.querySelectorAll('[data-obs]').forEach((h) => {
+      const go = () => {
+        const k = h.dataset.obs;
+        sortAsc = sortK === k ? !sortAsc : k !== 'since';
+        sortK = k;
+        const top = box.querySelector('.ob-w')?.scrollTop || 0;
+        draw();
+        const w = box.querySelector('.ob-w'); if (w) w.scrollTop = top;
+      };
+      h.onclick = go;
+      h.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); box.querySelector(`[data-obs="${h.dataset.obs}"]`)?.focus(); } };
+    });
     box.querySelector('#ob-all')?.addEventListener('change', (e) => { items.filter(canRun).forEach((x) => (e.target.checked ? sel.add(x.host) : sel.delete(x.host))); draw(); });
     box.querySelectorAll('[data-obh]').forEach((c) => (c.onchange = () => { c.checked ? sel.add(c.dataset.obh) : sel.delete(c.dataset.obh); draw(); }));
     const tb = box.querySelector('#ob-tags');
@@ -6561,7 +6619,7 @@ async function onboardDialog(hosts = [], onDone) {
     };
     const xa = box.querySelector('#ob-xa');
     if (xa) {
-      const add = () => { const v = box.querySelector('#ob-x').value.split(/[\s,，]+/).filter(Boolean); if (!v.length) return; extra.push(...v); v.forEach((h) => sel.add(h)); load(); };
+      const add = () => { const v = box.querySelector('#ob-x').value.split(/[\s,，]+/).filter(Boolean); if (!v.length) return; extra.push(...v); v.forEach((h) => sel.add(h.toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/[/?#].*$/, '').replace(/^www\./, ''))); load(); };   // 手动加的域名默认勾上（和后台一样去掉协议、路径、www）
       xa.onclick = add;
       box.querySelector('#ob-x').onkeydown = (e) => { if (e.key === 'Enter') add(); };
     }
