@@ -133,7 +133,7 @@ test('没有网站验证权限：提示重新授权；没填 DNS 令牌：不能
   const { env } = await setup({ scope: 'openid email https://www.googleapis.com/auth/webmasters' });
   const m = mockAll();
   try {
-    assert.match((await ob.onboardRun(env, SECRET, { host: 'a.com', method: 'dns' })).error, /Cloudflare DNS 令牌/);
+    assert.match((await ob.onboardRun(env, SECRET, { host: 'a.com', method: 'dns' })).error, /Cloudflare 令牌还不能加 DNS 记录/);
     const r = await ob.onboardRun(env, SECRET, { host: 'a.com', method: 'meta', b: false });
     assert.equal(r.g.state, 'error'); assert.equal(r.g.reauth, true);
   } finally { m.restore(); }
@@ -153,7 +153,26 @@ test('没单独填 DNS 令牌：“Cloudflare 用量”的令牌能看到域名�
   const real = globalThis.fetch;
   globalThis.fetch = async (u) => (String(u).includes('api.cloudflare.com') ? new Response(JSON.stringify({ success: false, errors: [{ message: 'Authentication error' }] }), { status: 403 }) : real(u));
   try {
-    assert.deepEqual(await ob.cfDnsStatus(env, SECRET), { configured: false });
+    const st = await ob.cfDnsStatus(env, SECRET);
+    assert.equal(st.configured, false); assert.equal(st.usage, true, '告诉设置页：用量令牌在，但还读不到域名');
     assert.equal((await ob.onboardList(env, SECRET, ['a.com'])).cf.configured, false);
+  } finally { globalThis.fetch = real; }
+});
+
+test('保存 DNS 令牌时分清“令牌无效”和“有效但读不到域名”', { skip }, async () => {
+  const { env } = await setup();
+  const real = globalThis.fetch;
+  let verifyOk = true;
+  globalThis.fetch = async (u) => {
+    const s = String(u);
+    if (s.includes('/user/tokens/verify')) return new Response(JSON.stringify(verifyOk ? { success: true, result: { status: 'active' } } : { success: false, errors: [{ message: 'Invalid API Token' }] }), { status: verifyOk ? 200 : 401 });
+    if (s.includes('/zones?')) return new Response(JSON.stringify({ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }), { status: 403 });
+    return real(u);
+  };
+  try {
+    const a = await ob.saveCfDns(env, SECRET, { token: 'tok-tok-tok-tok-tok-tok' });
+    assert.match(a.error, /令牌有效，但读不到域名.*区域资源.*Authentication error/);
+    verifyOk = false;
+    assert.match((await ob.saveCfDns(env, SECRET, { token: 'tok-tok-tok-tok-tok-tok' })).error, /^令牌无效/);
   } finally { globalThis.fetch = real; }
 });

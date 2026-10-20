@@ -412,7 +412,7 @@ VPN 和“机场”节点大多架在机房里，所以“来自机房 IP”本�
 4. 打开后台“设置 → Google 集成”，填写客户端 ID 和客户端密钥并保存（密钥加密保存在 D1，之后只显示末 4 位）。
 5. 到“站点”页点“连接 Google 账号”完成授权。
 
-把新站点接入 Search Console / Bing：站点列表右上角“+ → 接入 Search Console / Bing”，或者站点详情的“接入搜索引擎”。先验证网站所有权，再添加站点、提交站点地图。在“设置 → Cloudflare DNS”填一个“编辑区域 DNS”权限的 Cloudflare API 令牌后，域名在这个 Cloudflare 账号里的站点会自动加验证用的 DNS 记录（Google 一条 TXT，验证整个域名；Bing 一条 CNAME），网站代码不用改；不在 Cloudflare 的用页面 meta 标签验证。DNS 还没生效时定时任务每小时会再试。
+把新站点接入 Search Console / Bing：站点列表右上角“+ → 接入 Search Console / Bing”，或者站点详情的“接入搜索引擎”。先验证网站所有权，再添加站点、提交站点地图。“设置 → Cloudflare”的令牌带上“区域 · DNS · 编辑”权限后（和看用量共用一个令牌，也可以单独填一个只管 DNS 的），域名在这个 Cloudflare 账号里的站点会自动加验证用的 DNS 记录（Google 一条 TXT，验证整个域名；Bing 一条 CNAME），网站代码不用改；不在 Cloudflare 的用页面 meta 标签验证。DNS 还没生效时定时任务每小时会再试。
 
 客户端可以在“设置 → Google 集成”里修改或删除；更换客户端 ID 会断开所有已连接的账号。旧版本写在环境变量（`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`）里的客户端，升级后第一次用到时会自动导入后台，之后可以把环境变量删掉。
 

@@ -2040,6 +2040,19 @@ html.masked input:focus { filter: none; }
 .ob-note { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 14px; padding: 9px 12px; border-radius: 10px; background: var(--sunken); color: var(--text-2); font-size: 12.5px; line-height: 1.55; }
 .ob-note > svg { flex: none; margin-top: 1px; color: var(--muted); }
 .ob-note a, .ob-mh a { color: var(--accent); }
+.dns-u { margin: -4px 0 16px; }
+/* 设置 → Cloudflare 下面的 DNS 自动验证 */
+.dns-in { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line-2); }
+.dns-h { display: grid; gap: 4px; margin-bottom: 10px; }
+.dns-h b { font-size: 14px; font-weight: 600; }
+.dns-r { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--sunken); }
+.dns-r > span:first-child { display: inline-flex; align-items: flex-start; gap: 7px; min-width: 0; font-size: 13px; line-height: 1.55; flex: 1 1 260px; }
+.dns-r > span:first-child > svg { flex: none; margin-top: 3px; }
+.dns-ok > svg { color: var(--good); }
+.dns-bad { color: var(--bad); }
+.dns-off { color: var(--text-2); }
+.dns-off > svg { color: var(--muted); }
+#dns-fw { margin-top: 12px; }
 /* 三项选项排一行（放不下时换行）：小标题在上，按钮 / 下拉在下 */
 .ob-opts { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; margin: 0 0 8px; }
 .ob-o { display: grid; gap: 6px; min-width: 0; }
@@ -6564,10 +6577,10 @@ async function onboardDialog(hosts = [], onDone) {
       : single ? `<span>把验证标签贴到网站首页 &lt;head&gt; 里再验证；Google 验证的是网址前缀</span>${L.cf.configured ? '' : `<a href="#/settings" data-ob-cf>改用 DNS 自动验证</a>`}` : '';
     box.innerHTML = `<p class="hint ob-intro">验证所有权 → 添加站点 → 提交站点地图，接入后站点页就有搜索数据</p>
       ${!L.accounts.length ? gaReauthBar('还没有连接 Google 账号') : noVerify ? gaReauthBar('Google 账号还没授予网站验证权限，重新授权后才能把站点加进 Search Console') : ''}
-      ${!single && !L.cf.configured ? `<div class="ob-note">${ic('info', 15)}<span>批量接入要用 Cloudflare DNS 自动验证。<a href="#/settings" data-ob-cf>去设置 Cloudflare DNS</a>，或者点表格里的站点，单独用页面标签接入。</span></div>` : ''}
+      ${!single && !L.cf.configured ? `<div class="ob-note">${ic('info', 15)}<span>批量接入要用 Cloudflare DNS 自动验证。<a href="#/settings" data-ob-cf>去设置 Cloudflare 令牌</a>，或者点表格里的站点，单独用页面标签接入。</span></div>` : ''}
       <div class="ob-opts">
         <div class="ob-o"><span class="ob-l">验证方式</span><div class="qf ob-m">
-          <button type="button" class="${method === 'dns' ? 'on' : ''}" data-obm="dns" ${L.cf.configured ? '' : 'disabled data-tipf-always data-tipf="还没有 Cloudflare DNS 令牌（设置 → Cloudflare DNS）"'}>${ic('globe', 14)}Cloudflare DNS</button>
+          <button type="button" class="${method === 'dns' ? 'on' : ''}" data-obm="dns" ${L.cf.configured ? '' : 'disabled data-tipf-always data-tipf="Cloudflare 令牌还不能加 DNS 记录（设置 → Cloudflare → DNS 自动验证）"'}>${ic('globe', 14)}Cloudflare DNS</button>
           <button type="button" class="${method === 'meta' && single ? 'on' : ''}" data-obm="meta" ${single ? '' : 'disabled data-tipf-always data-tipf="页面标签要一个一个贴到网站上：点表格里的站点单独接入"'}>${ic('code', 14)}页面标签</button></div></div>
         <div class="ob-o"><span class="ob-l">接入到</span><div class="qf ob-e">
           <button type="button" class="${useG ? 'on' : ''}" data-obe="g" aria-pressed="${useG}">${BRAND.gsc(13)}Search Console</button>
@@ -6591,7 +6604,7 @@ async function onboardDialog(hosts = [], onDone) {
       <div class="row"><button class="btn" data-close>关闭</button><button class="btn primary" id="ob-go" ${todo.length && !running && (useG || useB) && !(single && method === 'meta' && !tags) ? '' : 'disabled'}>${running ? '正在接入…' : single ? method === 'meta' ? '验证并接入' : '开始接入' : `开始接入${todo.length ? ` ${todo.length} 个站点` : ''}`}</button></div>`;
     box.querySelector('[data-close]').onclick = close;
     box.querySelector('[data-ga-re]')?.addEventListener('click', (e) => googleConnect(e.currentTarget));
-    box.querySelectorAll('[data-ob-cf]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); close(); goSettings('dns'); }));
+    box.querySelectorAll('[data-ob-cf]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); close(); goSettings('use'); }));
     box.querySelectorAll('[data-obm]').forEach((b) => (b.onclick = () => { method = b.dataset.obm; draw(); }));
     if (L.accounts.length > 1) selectDd(box.querySelector('#ob-acct'), accOpts, acct, { aria: 'Google 账号', onChange: (v) => { acct = v; tags = null; draw(); } });
     box.querySelectorAll('[data-obe]').forEach((b) => (b.onclick = () => { if (b.dataset.obe === 'g') useG = !useG; else useB = !useB; tags = null; draw(); }));
@@ -8382,7 +8395,7 @@ async function renderSettings(token) {
   const pill = (on) => `<span class="pill ${on ? 'on' : 'off'}">${on ? '已开启' : '未开启'}</span>`;
   document.getElementById('page').innerHTML = `${head}
     <div class="acc">
-      ${item('use', 'cloudflare', 'use brand', 'Cloudflare 用量', usageSummary(use), usagePill(use), '')}
+      ${item('use', 'cloudflare', 'use brand', 'Cloudflare', usageSummary(use), usagePill(use), '<div id="use-in"></div><div class="dns-in" id="dns-in"></div>')}
       ${item('pw', 'key', 'pw', '修改密码', '修改后，其他设备上的登录会自动退出', '', `
         <form class="set-form" id="pwf">
           ${passwordFields('')}
@@ -8403,7 +8416,6 @@ async function renderSettings(token) {
       ${item('trk', 'search', 'trk', '来源追踪', '识别访客从哪个搜索引擎进入推广页', pill(trk.enabled), '')}
       ${item('goo', 'google', 'goo brand', 'Google 集成', googleSummary(goo), googlePill(goo), '')}
       ${item('bing', 'bing', 'bing brand', 'Bing Webmaster', bingSummary(bst), bingPill(bst), '')}
-      ${item('dns', 'cloudflare', 'use brand', 'Cloudflare DNS', dnsSummary(dns), dnsPill(dns), '')}
       ${bls ? item('bl', 'link', 'bl', '外链与权重', blSummary(bls), blPill(bls), '') : ''}
       ${goo.connected || shr.items.length ? item('ai', 'ai', 'ai', 'AI 分析链接', sharesSummary(shr), sharesPill(shr), '') : ''}
       ${aia && (goo.connected || aia.tokens.length) ? item('aiapi', 'key', 'ai', 'AI 接口', aiSummary(aia), aiPill(aia), '') : ''}
@@ -8495,13 +8507,13 @@ async function renderSettings(token) {
     page.querySelector('[data-st="aiapi"]').innerHTML = aiPill(a);
     page.querySelector('[data-sub="aiapi"]').innerHTML = aiSummary(a);
   });
-  renderCfDns(document.getElementById('acc-dns'), dns, (x) => {
-    page.querySelector('[data-st="dns"]').innerHTML = dnsPill(x);
-    page.querySelector('[data-sub="dns"]').innerHTML = dnsSummary(x);
-  });
-  renderUsage(document.getElementById('acc-use'), use, (u) => {
+  // Cloudflare：上面是用量，下面是 DNS 自动验证（默认共用一个令牌）；用量的令牌改了，DNS 这块重新检查一次
+  const dnsIn = document.getElementById('dns-in');
+  renderDnsIn(dnsIn, dns, use.configured);
+  renderUsage(document.getElementById('use-in'), use, (u) => {
     page.querySelector('[data-st="use"]').innerHTML = usagePill(u);
     page.querySelector('[data-sub="use"]').innerHTML = usageSummary(u);
+    api('/google/cf-dns').then((v) => renderDnsIn(dnsIn, v, u.configured)).catch(() => {});
   });
   const ls = document.getElementById('lang-seg');
   ls.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.l === (EN ? 'en' : 'zh')); b.onclick = () => b.dataset.l !== (EN ? 'en' : 'zh') && setLang(b.dataset.l); });
@@ -8649,10 +8661,10 @@ function bindCfForm(box, u, onState) {
 function renderUsage(box, u, onState) {
   if (!u.configured) {
     box.innerHTML = `
-      <p class="set-p">在后台查看 Cloudflare 账号的用量，需要账户 ID 和一个只读的 API 令牌：</p>
+      <p class="set-p">填一个 Cloudflare 令牌，后台就能查看账号的用量；令牌带上 DNS 编辑权限的话，把站点接入 Search Console / Bing 时还能自动加验证记录。</p>
       <ol class="use-steps" style="margin-bottom:18px">
-        <li>打开 Cloudflare 控制台 → 右上角头像 → <b>我的个人资料 → API 令牌 → 创建令牌 → 创建自定义令牌</b>。</li>
-        <li>权限添加 <b>帐户 · 帐户分析 · 读取</b>（英文界面是 Account Analytics · Read）；想显示套餐的话再加 <b>帐户 · 计费 · 读取</b>。帐户资源选你的账户。</li>
+        <li>点 <a class="btn sm" href="${CF_TOKEN_URL}" target="_blank" rel="noopener">${ic('ext', 13)}在 Cloudflare 创建令牌</a>，权限已经填好：帐户分析、计费、D1 读取（看用量），区域 DNS 编辑（自动验证，不需要可以删掉）。</li>
+        <li>在 Cloudflare 页面点 <b>继续以显示摘要</b> → <b>创建令牌</b>，复制令牌。</li>
         <li>账户 ID 在控制台首页（Workers 和 Pages 概览）右侧可以找到，是一串 32 位字符。</li>
       </ol>
       ${cfForm(u.config || {})}`;
@@ -8993,39 +9005,41 @@ function renderBingSettings(box, b, onState) {
   };
 }
 
-// ---------------------------------------------------------------- 设置 → Cloudflare DNS（接入 Search Console / Bing 时自动加验证记录）
-const dnsSummary = (x) => (!x.configured ? '填写 DNS 令牌后，把站点接入 Search Console / Bing 时自动加验证记录，网站代码不用改'
-  : x.error ? esc(x.error) : x.shared ? `用“Cloudflare 用量”的令牌 · 可以管理 ${x.zones} 个域名` : `令牌 ••••${esc(x.tail || '')} · 可以管理 ${x.zones} 个域名`);
-// 在 Cloudflare 创建令牌的页面，权限（区域 DNS 编辑、区域读取）、范围（所有区域）和名称都预先填好，只要点确认
-const CF_DNS_TOKEN_URL = `https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=${encodeURIComponent(JSON.stringify([{ key: 'dns', type: 'edit' }, { key: 'zone', type: 'read' }]))}&accountId=*&zoneId=all&name=${encodeURIComponent('cligc link DNS')}`;
-const dnsPill = (x) => (!x.configured ? '<span class="pill off">未配置</span>' : x.error ? '<span class="pill bad-p">出错</span>' : '<span class="pill on">已连接</span>');
-function renderCfDns(box, x, onState) {
+// ---------------------------------------------------------------- 设置 → Cloudflare 里的“DNS 自动验证”（接入 Search Console / Bing 时自动加验证记录）
+// 默认和用量共用一个令牌（令牌带上“区域 · DNS · 编辑”就行）；也可以单独填一个只管 DNS 的令牌
+// 在 Cloudflare 创建令牌的页面：用量要的（帐户分析、计费、D1 读取）和 DNS 自动验证要的（区域 DNS 编辑、区域读取）权限、范围、名称都预先填好
+const CF_TOKEN_URL = `https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=${encodeURIComponent(JSON.stringify([
+  { key: 'account_analytics', type: 'read' }, { key: 'billing', type: 'read' }, { key: 'd1', type: 'read' }, { key: 'dns', type: 'edit' }, { key: 'zone', type: 'read' }]))}&accountId=*&zoneId=all&name=${encodeURIComponent('cligc link')}`;
+const DNS_PERM = '“区域 · DNS · 编辑”（不是“DNS 设置”），区域资源选“包括 → 所有区域”';
+function renderDnsIn(box, x, usageOn) {
   if (!box) return;
-  const done = (v) => { onState(v); renderCfDns(box, v, onState); };
+  const done = (v) => renderDnsIn(box, v, usageOn);
+  const zonesTip = (v) => esc((v.names || []).join('\n') + (v.zones > (v.names || []).length ? `\n…还有 ${v.zones - v.names.length} 个` : ''));
   const form = `<form class="set-form cfg-f" id="dns-f">
-      <label class="field"><span>API 令牌</span><input class="input" id="dns-tok" type="password" autocomplete="off" placeholder="${x.configured ? '重新填写才会替换' : '粘贴 API 令牌'}"></label>
+      <div class="field"><label for="dns-tok">单独的 DNS 令牌</label><input class="input mono" id="dns-tok" type="password" autocomplete="off" spellcheck="false" placeholder="${x.configured && !x.shared ? '重新填写才会替换' : '只要“区域 · DNS · 编辑”权限'}"></div>
       <div class="err" role="alert"></div>
-      <div class="row" style="justify-content:flex-start"><button class="btn primary">验证并保存</button>${x.configured ? '<button type="button" class="btn" id="dns-cancel">取消</button>' : ''}</div></form>`;
-  const steps = `<ol class="use-steps" style="margin-bottom:18px">
-      <li>点 <a class="btn sm" href="${CF_DNS_TOKEN_URL}" target="_blank" rel="noopener">${ic('ext', 13)}在 Cloudflare 创建令牌</a>，权限和范围已经填好。</li>
-      <li>在 Cloudflare 页面点 <b>继续以显示摘要</b> → <b>创建令牌</b>，复制令牌。</li>
-      <li>粘贴到下面。</li>
-    </ol>`;
-  box.innerHTML = `${!x.configured || x.error ? `<p class="set-p">把站点接入 Google Search Console 和 Bing 时要先验证网站所有权。有了能编辑 DNS 的令牌，后台会自动在 Cloudflare 里加验证用的 DNS 记录（Google 一条 TXT、Bing 一条 CNAME），验证通过就把站点加进去、提交站点地图，网站代码不用改。只适用于在这个 Cloudflare 账号里的域名。</p>
-    ${steps}<p class="hint" style="margin:-6px 0 14px">“Cloudflare 用量”的令牌如果也加了“区域 · DNS · 编辑”权限，这里会自动用它，不用再填。</p>
-    ${x.error ? `<p class="hint ix-err">${ic('alert', 13)}<span>${esc(x.error)}</span></p>` : ''}${form}`
-    : x.shared ? `<div class="cfg-v"><div class="g-acc-l"><div class="g-acc-r"><span class="g-acc-i">${ic('check', 14)}</span>
-        <div class="g-acc-t"><b>用“Cloudflare 用量”的令牌</b><span data-tipf-always data-tipf="${esc((x.names || []).join('\n') + (x.zones > (x.names || []).length ? `\n…还有 ${x.zones - x.names.length} 个` : ''))}">可以管理 ${x.zones} 个域名；它要有“区域 · DNS · 编辑”权限才能加验证记录</span></div><span class="sp"></span>
-        <button type="button" class="btn sm" id="dns-onb">${ic('globe', 14)}接入站点</button>
-        <button type="button" class="btn sm" id="dns-edit">改用单独的令牌</button></div></div>
-      <div id="dns-fw" hidden style="margin-top:16px">${steps}${form}</div></div>`
-    : `<div class="cfg-v"><div class="g-acc-l"><div class="g-acc-r"><span class="g-acc-i">${ic('check', 14)}</span>
-        <div class="g-acc-t"><b>API 令牌 ••••${esc(x.tail || '')}</b><span data-tipf-always data-tipf="${esc((x.names || []).join('\n') + (x.zones > (x.names || []).length ? `\n…还有 ${x.zones - x.names.length} 个` : ''))}">可以管理 ${x.zones} 个域名</span></div><span class="sp"></span>
-        <button type="button" class="btn sm" id="dns-onb">${ic('globe', 14)}接入站点</button>
-        <button type="button" class="btn sm" id="dns-edit">修改</button>
-        <button type="button" class="btn sm ghost danger-t" id="dns-del">删除</button></div></div>
-      <div id="dns-fw" hidden style="margin-top:16px">${form}</div></div>`}`;
-  const f = box.querySelector('#dns-f');
+      <div class="row-l"><button class="btn sm primary">验证并保存</button><button type="button" class="btn sm ghost" id="dns-cancel">取消</button></div></form>`;
+  const ok = x.configured && !x.error;
+  const line = ok
+    ? `<span class="dns-ok">${ic('check', 14)}<span><span>${x.shared ? '和用量共用一个令牌' : `单独的 DNS 令牌 ••••${esc(x.tail || '')}`}</span>${EN ? ' · ' : '，'}<span data-tipf-always data-tipf="${zonesTip(x)}">可以管理 ${x.zones} 个域名</span></span></span>`
+    : x.error ? `<span class="dns-bad">${ic('alert', 14)}<span>${esc(x.error)}</span></span>`
+    : usageOn ? `<span class="dns-off">${ic('info', 14)}<span>这个令牌还不能加 DNS 记录：在 Cloudflare 编辑它，加上 ${DNS_PERM}，改好后点“重新检查”。${x.usageError ? `<br>读取域名出错：${esc(x.usageError)}` : ''}</span></span>`
+    : `<span class="dns-off">${ic('info', 14)}<span>先在上面填好 Cloudflare 令牌；令牌带上 ${DNS_PERM} 就能用。</span></span>`;
+  box.innerHTML = `<div class="dns-h"><b>DNS 自动验证</b><span class="hint">把站点接入 Search Console / Bing 时，自动在 Cloudflare 加验证记录（Google 一条 TXT、Bing 一条 CNAME），网站代码不用改</span></div>
+    <div class="dns-r">${line}<span class="sp"></span>
+      ${ok ? `<button type="button" class="btn sm" id="dns-onb">${ic('globe', 14)}接入站点</button>` : usageOn ? '<button type="button" class="btn sm" id="dns-re">重新检查</button>' : ''}
+      <button type="button" class="btn sm ghost" id="dns-sep">${x.configured && !x.shared ? '换令牌' : '单独填一个令牌'}</button>
+      ${x.configured && !x.shared ? '<button type="button" class="btn sm ghost danger-t" id="dns-del">删除</button>' : ''}</div>
+    <div id="dns-fw" hidden>${form}</div>`;
+  const fw = box.querySelector('#dns-fw'), f = box.querySelector('#dns-f');
+  box.querySelector('#dns-sep').onclick = () => { fw.hidden = !fw.hidden; if (!fw.hidden) f.querySelector('#dns-tok').focus(); };
+  box.querySelector('#dns-cancel').onclick = () => { fw.hidden = true; };
+  box.querySelector('#dns-onb')?.addEventListener('click', () => onboardDialog([]));
+  box.querySelector('#dns-re')?.addEventListener('click', async (e) => {
+    const b = e.currentTarget; b.disabled = true; b.textContent = '正在检查…';
+    try { const v = await api('/google/cf-dns'); done(v); if (v.configured) toast(`可以管理 ${v.zones} 个域名`); else toast('还是读不到域名', 'warn'); }
+    catch (ex) { toast(ex.message, 'bad'); b.disabled = false; b.textContent = '重新检查'; }
+  });
   f.onsubmit = async (e) => {
     e.preventDefault();
     const btn = f.querySelector('.primary'), err = f.querySelector('.err');
@@ -9033,17 +9047,11 @@ function renderCfDns(box, x, onState) {
     try { const v = await api('/google/cf-dns', { method: 'PUT', body: { token: f.querySelector('#dns-tok').value.trim() } }); toast(`已保存，可以管理 ${v.zones} 个域名`); done(v); }
     catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = '验证并保存'; }
   };
-  if (!x.configured || x.error) return;
-  const fw = box.querySelector('#dns-fw');
-  box.querySelector('#dns-edit').onclick = () => { fw.hidden = !fw.hidden; if (!fw.hidden) fw.querySelector('#dns-tok').focus(); };
-  box.querySelector('#dns-cancel').onclick = () => { fw.hidden = true; };
-  box.querySelector('#dns-onb').onclick = () => onboardDialog([]);
-  if (x.shared) return;
-  box.querySelector('#dns-del').onclick = async () => {
-    const ok = await confirmDialog({ title: '删除 Cloudflare DNS 令牌？', text: '之后接入 Search Console / Bing 只能用页面标签验证。已经加过的 DNS 记录不会删除（删了验证会失效）。', ok: '删除', danger: true });
-    if (!ok) return;
-    try { done(await api('/google/cf-dns', { method: 'DELETE' })); toast('已删除 Cloudflare DNS 令牌'); } catch (ex) { toast(ex.message, 'bad'); }
-  };
+  box.querySelector('#dns-del')?.addEventListener('click', async () => {
+    const yes = await confirmDialog({ title: '删除单独的 DNS 令牌？', text: '删除后改用上面 Cloudflare 用量的令牌（它要有“区域 · DNS · 编辑”权限）。已经加过的 DNS 记录不会删除（删了验证会失效）。', ok: '删除', danger: true });
+    if (!yes) return;
+    try { await api('/google/cf-dns', { method: 'DELETE' }); done(await api('/google/cf-dns')); toast('已删除单独的 DNS 令牌'); } catch (ex) { toast(ex.message, 'bad'); }
+  });
 }
 
 // ---------------------------------------------------------------- 设置 → 外链与权重（Bing 外链 / Open PageRank，默认都关闭）
@@ -9540,7 +9548,7 @@ addEventListener('resize', () => document.querySelectorAll('.seg').forEach(segTh
 // ---------------------------------------------------------------- ⌘K：搜索短链、站点、设置，快速跳转
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 const KBAR_SETTINGS = [['pw', 'key', '修改密码'], ['mfa', 'shield', '两步验证'], ['dev', 'desk', '登录设备'], ['trk', 'search', '来源追踪'], ['goo', 'globe', 'Google 集成'],
-  ['bing', 'search', 'Bing Webmaster'], ['dns', 'globe', 'Cloudflare DNS'], ['bl', 'link', '外链与权重'], ['ai', 'ai', 'AI 分析链接'], ['use', 'chart', 'Cloudflare 用量'], ['sys', 'pulse', '系统状态'], ['ret', 'inbox', '数据保留']];
+  ['bing', 'search', 'Bing Webmaster'], ['bl', 'link', '外链与权重'], ['ai', 'ai', 'AI 分析链接'], ['use', 'chart', 'Cloudflare 用量 / DNS'], ['sys', 'pulse', '系统状态'], ['ret', 'inbox', '数据保留']];
 let kbarSites = null;
 function openKbar() {
   if (document.querySelector('.kbar')) return;

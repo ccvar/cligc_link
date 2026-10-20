@@ -43,7 +43,7 @@ async function cf(token, path, init = {}) {
   if (!res.ok || d.success === false) {
     const e = d.errors?.[0];
     const msg = e?.message || `HTTP ${res.status}`;
-    throw Object.assign(new Error(res.status === 403 || /authentication|permission/i.test(msg) ? `Cloudflare 令牌没有权限：${msg}` : `Cloudflare：${msg}`), { status: res.status });
+    throw Object.assign(new Error(res.status === 403 || /authentication|permission/i.test(msg) ? `Cloudflare 令牌没有权限（要有“区域 · DNS · 编辑”，不是“DNS 设置”）：${msg}` : `Cloudflare：${msg}`), { status: res.status, raw: msg });
   }
   return d;
 }
@@ -61,14 +61,27 @@ async function listZones(token) {
 // 域名所在的 Cloudflare 区域：最长匹配（blog.example.com → example.com）
 const zoneOf = (zones, host) => zones.filter((z) => host === z.name || host.endsWith(`.${z.name}`)).sort((a, b) => b.name.length - a.name.length)[0] || null;
 
+// 令牌本身有没有效：个人令牌用 /user/tokens/verify，账户令牌用 /accounts/<ID>/tokens/verify（账户 ID 取“Cloudflare 用量”里填的）
+async function tokenActive(env, secret, token) {
+  try { if ((await cf(token, '/user/tokens/verify')).result?.status === 'active') return true; } catch (e) { if (e.budget) throw e; }
+  const u = await getSetting(env, 'int_cf');
+  const acc = u ? await unseal(secret, u).then((c) => c.accountId).catch(() => '') : '';
+  if (acc) { try { if ((await cf(token, `/accounts/${acc}/tokens/verify`)).result?.status === 'active') return true; } catch (e) { if (e.budget) throw e; } }
+  return false;
+}
+// 读不到域名时说清楚原因：令牌无效，还是有效但没给区域权限 / 区域资源
+const ZONE_HINT = '令牌要有“区域 · DNS · 编辑”权限（不是“DNS 设置”），并且“区域资源”选“包括 → 所有区域”（或包含要接入的域名）';
+async function zonesProblem(env, secret, token, err) {
+  if (!(await tokenActive(env, secret, token))) return '令牌无效：请确认粘贴的是 API 令牌的值（不是 Global API Key 或令牌 ID），并且没有过期或停用';
+  return err ? `令牌有效，但读不到域名：${ZONE_HINT}（Cloudflare：${err.raw || err.message}）` : `令牌有效，但看不到任何域名：${ZONE_HINT}`;
+}
+
 export async function saveCfDns(env, secret, body) {
   const token = String(body.token || '').trim();
   if (token.length < 20) return { error: '请填写 API 令牌' };
   let zones;
-  try { zones = await listZones(token); } catch (e) {
-    return { error: e.status === 400 || /invalid|authentication/i.test(e.message) ? '令牌无效：请确认粘贴的是 API 令牌的值（不是 Global API Key 或令牌 ID）' : e.message };
-  }
-  if (!zones.length) return { error: '这个令牌看不到任何域名：创建令牌时“区域资源”选“所有区域”或包含你的域名' };
+  try { zones = await listZones(token); } catch (e) { if (e.budget) throw e; return { error: await zonesProblem(env, secret, token, e) }; }
+  if (!zones.length) return { error: await zonesProblem(env, secret, token, null) };
   await setSetting(env, 'int_cfdns', await seal(secret, { token, tail: token.slice(-4) }));
   return cfDnsStatus(env, secret, zones);
 }
@@ -79,10 +92,13 @@ export async function deleteCfDns(env) {
 export async function cfDnsStatus(env, secret, zones) {
   const s = await getSetting(env, 'int_cfdns');
   if (!s) {
-    // 没单独填：“Cloudflare 用量”的令牌能看到域名就直接用它
+    // 没单独填：“Cloudflare 用量”的令牌能看到域名就直接用它；看不到时说明缺什么（只在设置页看状态时查，接入时不查）
     const c = await cfDnsToken(env, secret);
-    const z = c ? await listZones(c.token).catch(() => []) : [];
-    return z.length ? { configured: true, shared: true, zones: z.length, names: z.slice(0, 50).map((x) => x.name) } : { configured: false };
+    if (!c) return { configured: false };
+    let z = [], err = null;
+    try { z = await listZones(c.token); } catch (e) { if (e.budget) throw e; err = e; }
+    if (z.length) return { configured: true, shared: true, zones: z.length, names: z.slice(0, 50).map((x) => x.name) };
+    return { configured: false, usage: true, usageError: err && !/没有权限|authentication/i.test(err.message) ? err.message : '' };
   }
   let c;
   try { c = await unseal(secret, s); } catch { return { configured: true, error: '令牌无法解密（会话密钥变了？），请重新填写' }; }
@@ -302,7 +318,7 @@ export async function onboardRun(env, secret, b, ctx) {
   const site = await env.DB.prepare('SELECT gsc_site, bing_site, ga4_acct, gsc_acct FROM g_sites WHERE host = ?').bind(host).first();
   const old = await env.DB.prepare('SELECT * FROM site_onboard WHERE host = ?').bind(host).first();
   ctx = ctx || await context(env, secret, method === 'dns');
-  if (method === 'dns' && !ctx.cfToken) return { error: '还没有填写 Cloudflare DNS 令牌（设置 → Cloudflare DNS）' };
+  if (method === 'dns' && !ctx.cfToken) return { error: 'Cloudflare 令牌还不能加 DNS 记录（设置 → Cloudflare → DNS 自动验证）' };
   ctx = { ...ctx, origin: method === 'meta' ? await homeOrigin(host) : null };
   const acct = b.acct || old?.g_acct || site?.gsc_acct || site?.ga4_acct || '';
   const row = { host, method, acct };
