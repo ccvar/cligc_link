@@ -2029,6 +2029,13 @@ html.masked input:focus { filter: none; }
 .ev-d .empty { flex: none; }
 /* 接入 Search Console / Bing 弹窗 */
 .dialog.ga-d.ob-d { width: min(720px, calc(100vw - 32px)); }
+/* 站点多的时候只让表格在里面滚动，弹窗本身不出滚动条；屏幕太矮放不下时才退回整个弹窗滚动 */
+@media (min-height: 640px) {
+  .dialog.ga-d.ob-d { display: flex; flex-direction: column; overflow: hidden; }
+  .ob-d #ob-b { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  .ob-d #ob-b > * { flex: none; }
+  .ob-d #ob-b > .ob-w { flex: 1 1 auto; min-height: 120px; max-height: none; overscroll-behavior: contain; }
+}
 .ob-intro { margin: 0 0 14px; }
 .ob-m { margin: 0; }
 .ob-m button svg { color: inherit; }
@@ -5922,13 +5929,19 @@ function bindGoogleConfig(root, st, onSaved) {
 }
 // 去 Google 授权（添加账号 / 重新连接都走这里，Google 会让用户选择账号）
 async function googleConnect(btn) {
-  if (btn) btn.disabled = true;
+  if (btn) { btn.disabled = true; btn.dataset.gauthBusy = '1'; }
   try {
     const { url } = await api('/google/auth');
     try { sessionStorage.setItem('gauth', '1'); } catch {}   // 回来时 googleFlash 只显示带这个标记的结果
     location.href = url;
   } catch (err) { toast(err.message, 'bad'); if (btn) btn.disabled = false; }
 }
+
+// 去 Google 授权后在 Google 页面取消、按了返回：浏览器从往返缓存直接恢复页面，按钮还是禁用的，恢复成可以点
+addEventListener('pageshow', (e) => {
+  if (!e.persisted) return;
+  document.querySelectorAll('[data-gauth-busy]').forEach((b) => { b.disabled = false; delete b.dataset.gauthBusy; });
+});
 
 // 按短链筛选：只看某个短链跳转到的站点（默认地址和各条地区规则的域名）
 function googleLinkFilter(root, items, onFilter) {
