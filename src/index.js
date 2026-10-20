@@ -14,7 +14,7 @@ import * as backlinks from './backlinks.js';
 import * as advice from './advice.js';
 import * as ga4admin from './ga4admin.js';
 import * as aiapi from './aiapi.js';
-import { hotQueries } from './queries.js';
+import { hotQueries, warmQueries } from './queries.js';
 import * as onboard from './onboard.js';
 import { subreq } from './budget.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT, normalizeTarget, isAppUrl, isWebUrl, inAppBrowser, intentWithFallback, guardKey, isDbError } from './lib.js';
@@ -263,6 +263,8 @@ async function runCron(env, at = Date.now(), { manual = false, token = '', start
   await step('links', async () => backlinks.cronBatch(env, await sessionSecret(env), { manual }));
   // 接入 Search Console / Bing：DNS 验证还没通过的再试一次（DNS 记录要等生效）
   await step('onboard', async () => onboard.onboardCron(env, await sessionSecret(env), { limit: manual ? 3 : 10 }));
+  // 热门搜索词：每天把各站点“最近 28 天”的搜索词和地区提前查好（每次最多 40 个，超过 20 小时的重查），打开弹窗不用等
+  await step('hotq', async () => (manual ? { skipped: true } : warmQueries(env, await sessionSecret(env), { limit: 40 })));
   await step('health', () => runHealthChecks(env));
   await step('update', () => checkUpdate(env, false, { notify: !manual }));
   if (!manual) {
@@ -2578,7 +2580,7 @@ async function googleApi(request, env, url) {
     // 热门搜索词：body.hosts 是站点列表当前筛选出来的站点（空 = 全部）
     if (path === '/api/google/queries' && method === 'POST') {
       const b = await request.json().catch(() => ({}));
-      return json(await hotQueries(env, secret, Array.isArray(b.hosts) ? b.hosts.slice(0, 2000) : [], days, url.searchParams.get('kind') === 'country' ? 'country' : 'query'));
+      return json(await hotQueries(env, secret, Array.isArray(b.hosts) ? b.hosts.slice(0, 2000) : [], days, url.searchParams.get('kind') === 'country' ? 'country' : 'query', { fresh: Number(b.fresh) || 0 }));
     }
     if (path === '/api/google/tags' && method === 'GET') return json({ tags: await google.tagsList(env) });
     if (path === '/api/google/tags' && method === 'PUT') {

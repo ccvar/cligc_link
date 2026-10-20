@@ -2130,6 +2130,14 @@ html.masked input:focus { filter: none; }
 .hq-x button[role=menuitem]:disabled { opacity: .45; cursor: default; background: none; }
 .hq-more { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 10px 8px 12px; border-radius: 10px; background: var(--sunken); color: var(--text-2); font-size: 12.5px; }
 .hq-more > svg { flex: none; color: var(--muted); }
+.hq-load { flex-wrap: wrap; }
+.hq-top { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+.hq-top .hq-tabs { margin: 0; }
+.hq-upd { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; white-space: nowrap; font-size: 12.5px; color: var(--muted); }
+.hq-upd .btn.icon.sm { width: 26px; height: 26px; }
+.hq-spin { flex: none; width: 13px; height: 13px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+.hq-pb { flex: 1 1 120px; max-width: 220px; height: 4px; margin-left: auto; border-radius: 2px; background: color-mix(in srgb, var(--accent) 15%, transparent); overflow: hidden; }
+.hq-pb s { display: block; height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
 .hq-err { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
 .hq-q { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .hq-q .ell { font-weight: 500; color: var(--text); }
@@ -6346,7 +6354,7 @@ async function hotQueriesDialog(hosts) {
   const { d, close } = gaDlg('hq-d');
   const days = gState.days;
   d.innerHTML = `<div id="hq"><div class="dlg-h"><h3>${ic('flame', 18)}热门搜索词</h3><span class="sp"></span><button type="button" class="btn ghost icon hq-hb" id="hq-host" aria-pressed="false"></button><button type="button" class="btn ghost icon" id="hq-csv" data-tipf-always data-tipf="导出当前列表（按当前筛选和排序）" aria-label="导出" aria-haspopup="menu" aria-expanded="false" disabled>${ic('dl', 17)}</button><button type="button" class="btn ghost icon" data-x aria-label="关闭">${ic('x', 18)}</button></div>
-    <div class="tabs hq-tabs" role="tablist"><button type="button" role="tab" data-hk="query" class="on" aria-selected="true">搜索词</button><button type="button" role="tab" data-hk="country" aria-selected="false">地区</button></div>
+    <div class="hq-top"><div class="tabs hq-tabs" role="tablist"><button type="button" role="tab" data-hk="query" class="on" aria-selected="true">搜索词</button><button type="button" role="tab" data-hk="country" aria-selected="false">地区</button></div><span class="hq-upd" id="hq-upd"></span></div>
     <div class="hint hq-sub"></div>
     <div class="hq-b">${skel(260)}</div></div>`;
   d.querySelector('[data-x]').onclick = close;
@@ -6367,13 +6375,28 @@ async function hotQueriesDialog(hosts) {
   setHost();
   hostBtn.onclick = () => { noHost = !noHost; store.set('hq:nohost', noHost); setHost(); };
   const R = {}, ST = { query: { sort: 'all', kw: '' }, country: { sort: 'all', kw: '' } };
+  const busy = {}, FR = {};   // busy：这个标签正在加载；FR：各标签手动刷新的时间（早于它的缓存都重查）
   const isC = () => kind === 'country';
   const NOUN = () => (isC() ? '地区' : '搜索词');
   const label = (x) => (isC() ? cname3(x.q) : x.q);
   const sub = d.querySelector('.hq-sub');
+  // 说明行：最后是数据更新时间和手动刷新按钮（每天自动更新；刷新时所有站点重新查一遍）
   const setSub = () => {
-    sub.textContent = isC() ? `${hosts.length} 个站点 · 最近 ${days} 天 · 热度 = Google 搜索结果里的展示次数，按搜索的人所在的国家 / 地区统计`
+    const x = R[kind], u = x?.updated;
+    const text = isC() ? `${hosts.length} 个站点 · 最近 ${days} 天 · 热度 = Google 搜索结果里的展示次数，按搜索的人所在的国家 / 地区统计`
       : `${hosts.length} 个站点 · 最近 ${days} 天 · 热度 = 搜索结果里的展示次数，同一个词在各站点的数据加在一起`;
+    const tip = u ? `${u.min === u.max ? `更新于 ${fmtTime(u.min)}` : `各站点的数据更新于 ${fmtTime(u.min)} ～ ${fmtTime(u.max)}`}\n每天自动更新一次（最近 28 天）；超过 24 小时的打开时也会重新查` : '';
+    sub.textContent = text;
+    const upd = d.querySelector('#hq-upd');
+    upd.innerHTML = u ? `<span data-tipf-always data-tipf="${esc(tip)}">更新于 ${ago(u.min)}</span>
+      <button type="button" class="btn ghost icon sm" id="hq-re" aria-label="重新查一遍" data-tipf-always data-tipf="现在重新查一遍所有站点" ${busy[kind] ? 'disabled' : ''}>${ic('refresh', 14)}</button>` : '';
+    const re = upd.querySelector('#hq-re');
+    if (re) re.onclick = () => {
+      FR[kind] = Date.now();
+      // 先显示“正在加载”，旧数据留着，查到新的再换
+      R[kind] = { ...R[kind], pending: 1, pendingSites: R[kind].sites, progress: { done: 0, all: R[kind].progress?.all || 1 }, stalled: '' };
+      r = R[kind]; busy[kind] = true; draw(); setSub(); load(kind);
+    };
   };
   setSub();
   d.querySelectorAll('[data-hk]').forEach((t) => (t.onclick = () => {
@@ -6383,20 +6406,31 @@ async function hotQueriesDialog(hosts) {
     d.querySelectorAll('[data-hk]').forEach((x) => { x.classList.toggle('on', x === t); x.setAttribute('aria-selected', x === t); });
     setSub();
     d.querySelector('.hq-x')?._close();
-    if (r) draw(); else { body.innerHTML = skel(260); csvBtn.disabled = true; load(); }
+    if (r) draw(); else { body.innerHTML = skel(260); csvBtn.disabled = true; if (!busy[kind]) load(kind); }
   }));
-  const load = async () => {
-    const k = kind;
-    try { R[k] = await api(`/google/queries?days=${days}&kind=${k}`, { method: 'POST', body: { hosts } }); }
+  // 站点多时一次查不完（每次最多 60 个）：拿到一批就先显示，再自动接着请求下一批，直到查完；
+  // 某一批没有任何进展（比如都读取失败）就停下，不一直重试
+  const prog = (x) => x?.progress?.done ?? 0;
+  const load = async (k = kind, round = 0) => {
+    busy[k] = true;
+    let res;
+    try { res = await api(`/google/queries?days=${days}&kind=${k}`, { method: 'POST', body: { hosts, fresh: FR[k] || 0 } }); }
     catch (e) {
+      busy[k] = false;
       if (!document.body.contains(d)) return;
+      if (R[k]) { R[k] = { ...R[k], stalled: e.message }; if (k === kind) { r = R[k]; draw(); } return; }
+      if (k !== kind) return;
       body.innerHTML = `<div class="empty">${ic('alert')}${esc(e.message)}<button type="button" class="btn sm" id="hq-retry" style="margin-top:10px">重试</button></div>`;
-      body.querySelector('#hq-retry').onclick = () => { body.innerHTML = skel(260); load(); };
+      body.querySelector('#hq-retry').onclick = () => { body.innerHTML = skel(260); load(k); };
       return;
     }
-    if (k !== kind) return;   // 加载期间切到了另一个标签
-    r = R[k];
-    if (document.body.contains(d)) draw();
+    const prev = round ? R[k] : null;   // 第一批不比较（手动刷新时，进度会从头算）
+    const more = res.pending && round < 30 && (!prev || prog(res) > prog(prev));
+    R[k] = { ...res, stalled: res.pending && !more ? '这一批没有加载出新的站点' : '' };
+    busy[k] = !!more;
+    if (!document.body.contains(d)) return;
+    if (k === kind) { r = R[k]; draw(); setSub(); }   // 加载期间切到了另一个标签：数据先存着，切回来再显示
+    if (more) load(k, round + 1);
   };
   const heat = (x) => (x.g?.i || 0) + (x.b?.i || 0);
   const SORT = { all: heat, g: (x) => x.g?.i || 0, b: (x) => x.b?.i || 0, c: (x) => (x.g?.c || 0) + (x.b?.c || 0) };
@@ -6481,10 +6515,17 @@ async function hotQueriesDialog(hosts) {
         <a class="hq-s" href="#/site/${encodeURIComponent(x.hosts[0][0])}" data-tipf-always data-tipf="${esc(siteTip(x))}">${esc(x.hosts[0][0])}${x.n > 1 ? ` <em>+${x.n - 1}</em>` : ''}</a></div></td>
       ${hasG ? cell(x.g, maxG, 'g') : ''}${hasB ? cell(x.b, maxB, 'b') : ''}</tr>`;
     const loadedAll = r.g.loaded >= r.g.sites && r.b.loaded >= r.b.sites;
+    const auto = r.pending && !r.stalled;   // 正在自动加载下一批
     const chips = isC() ? [['all', '展示'], ['c', '点击']] : [['all', '综合'], hasG && hasB && ['g', 'Google'], hasG && hasB && ['b', 'Bing'], ['c', '点击']].filter(Boolean);
     // 没加载全：一次查不完（还有站点没查）或者有站点读取失败；失败原因放在浮动提示里
     const errTip = r.errors.slice(0, 20).map((e) => `${e.host}（${e.src === 'g' ? 'Google' : 'Bing'}）：${e.error}`).join('\n') + (r.errors.length > 20 ? `\n…还有 ${r.errors.length - 20} 个` : '');
-    body.innerHTML = `${isC() && r.items.length ? `<div class="hint hq-gonly">${BRAND.gsc(12)} 地区只有 Google 的数据：Bing 的接口不提供按国家 / 地区的搜索数据</div>` : ''}${!loadedAll ? `<div class="hq-more">${ic('info', 15)}<span>${[r.pending ? (isC() ? `还有 ${r.pending} 个站点的地区数据没加载（一次最多查 60 个）` : `还有 ${r.pending} 个站点的搜索词没加载（一次最多查 60 个）`) : '',
+    // 重画会换掉筛选框和表格：记下输入框的焦点、光标和表格滚动位置，画完还原（自动加载时也不打断输入）
+    const ae = document.activeElement, keepKw = ae?.id === 'hq-kw' && body.contains(ae) ? ae.selectionStart : null;
+    const keepTop = body.querySelector('.hq-w')?.scrollTop || 0;
+    const pct = r.progress?.all ? Math.round((r.progress.done / r.progress.all) * 100) : 0;
+    body.innerHTML = `${isC() && r.items.length ? `<div class="hint hq-gonly">${BRAND.gsc(12)} 地区只有 Google 的数据：Bing 的接口不提供按国家 / 地区的搜索数据</div>` : ''}${auto
+      ? `<div class="hq-more hq-load"><span class="hq-spin" aria-hidden="true"></span><span>${FR[kind] ? '正在重新查' : '正在加载其余站点'}，还有 ${r.pendingSites ?? r.pending} 个站点（${pct}%）</span><i class="hq-pb"><s style="width:${pct}%"></s></i></div>`
+      : !loadedAll ? `<div class="hq-more">${ic('info', 15)}<span>${[r.pending ? `还有 ${r.pendingSites ?? r.pending} 个站点没加载${r.stalled ? `：${esc(r.stalled)}` : ''}` : '',
         r.errors.length ? `<span class="hq-err" data-tipf-always data-tipf="${esc(errTip)}">${r.errors.length} 个站点读取失败</span>` : ''].filter(Boolean).join('，')}</span><span class="sp"></span>
         <button type="button" class="btn sm" id="hq-go">${r.pending ? '继续加载' : '重试'}</button></div>` : ''}
       ${r.items.length ? `<div class="hq-tb"><div class="qf">${chips.map(([v, l]) => `<button type="button" class="${sort === v ? 'on' : ''}" data-hqs="${v}">${l}</button>`).join('')}</div><span class="sp"></span>
@@ -6495,15 +6536,14 @@ async function hotQueriesDialog(hosts) {
       : `<div class="empty">${ic('inbox')}${hasG || hasB ? '这段时间还没有搜索数据' : isC() ? '这些站点都没有关联 Search Console（地区数据只有 Google 提供）' : '这些站点都没有关联 Search Console 或 Bing'}</div>`}`;
     body.querySelectorAll('[data-hqs]').forEach((b) => (b.onclick = () => { sort = b.dataset.hqs; draw(); }));
     const inp = body.querySelector('#hq-kw');
-    if (inp) inp.oninput = () => {
-      kw = inp.value; const pos = inp.selectionStart;
-      draw();
-      const n = body.querySelector('#hq-kw'); n.focus(); n.setSelectionRange(pos, pos);
-    };
+    if (inp) inp.oninput = () => { kw = inp.value; draw(); };
+    if (inp && keepKw != null) { inp.focus(); inp.setSelectionRange(keepKw, keepKw); }
+    const w = body.querySelector('.hq-w');
+    if (w && keepTop) w.scrollTop = keepTop;
     const go = body.querySelector('#hq-go');
-    if (go) go.onclick = () => { go.disabled = true; go.textContent = '加载中…'; load(); };
+    if (go) go.onclick = () => { go.disabled = true; go.textContent = '加载中…'; load(kind); };
   };
-  load();
+  load(kind);
 }
 
 // 接入 Search Console / Bing：验证网站所有权（Cloudflare DNS 自动加记录，或者页面 meta 标签）→ 添加站点 → 提交站点地图。
@@ -7102,7 +7142,7 @@ function exportSitesCsv(rows, d) {
 // ---------------------------------------------------------------- 系统状态
 // 每一项：ok / warn / bad + 说明；定时任务超过 3 小时没跑算异常
 // 定时任务各步骤的中文名
-const CRON_NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', bing: 'Bing 同步', links: '外链与权重', onboard: '接入搜索引擎', gindex: '网页索引检查', health: '目标页检查', update: '检查更新', notify: '推送通知', usage: '用量预警' };
+const CRON_NAME = { schema: '建表', aggregate: '访问汇总', backfill: '访客回填', prune: '清理明细', cleanup: '清理缓存', google: 'Google 同步', bing: 'Bing 同步', links: '外链与权重', onboard: '接入搜索引擎', hotq: '热门搜索词', gindex: '网页索引检查', health: '目标页检查', update: '检查更新', notify: '推送通知', usage: '用量预警' };
 function sysChecks(st) {
   const H = 3600000, now = st.now, c = st.cron;
   const out = [];

@@ -82,6 +82,8 @@ test('站点太多时分批查，出错的站点单独列出', { skip }, async (
   try {
     const r = await hotQueries(env, SECRET, [], 28);
     assert.equal(r.pending, 71 - 60, '一次最多查 60 个');
+    assert.equal(r.pendingSites, 11, '还没查的涉及几个站点');
+    assert.equal(r.progress.all, 71); assert.equal(r.progress.done, 59, '查过的（一个读取失败）');
     assert.equal(r.errors.length, 1); assert.equal(r.errors[0].host, 's5.com');
     const r2 = await hotQueries(env, SECRET, [], 28);
     assert.equal(r2.pending, 0, '第二次接着查剩下的');
@@ -108,5 +110,37 @@ test('地区：只查 Google 的国家 / 地区，代码统一大写，和搜索
     assert.deepEqual(r.items[0].g, { c: 6, i: 150, p: 3.7 });
     assert.equal(r.items[0].n, 2);
     assert.ok(!m.calls.some((u) => u.includes('GetQueryStats')));
+  } finally { m.restore(); }
+});
+
+test('缓存 24 小时；超过 24 小时或早于手动刷新的先拿旧数据显示，同时重查；定时任务提前查好', { skip }, async () => {
+  const { db, env } = await setup();
+  let n = 0;
+  const m = mock((u) => {
+    n++;
+    if (u.includes('searchAnalytics')) return { rows: [{ keys: [`v${n}`], clicks: 1, impressions: 10, position: 1 }] };
+    if (u.includes('GetQueryStats')) return { d: [] };
+    return {};
+  });
+  try {
+    const { warmQueries } = await import('../src/queries.js');
+    const w = await warmQueries(env, SECRET, { limit: 100 });
+    assert.equal(w.done, 5, '两个站点：Google 搜索词 ×2、Bing ×1、Google 地区 ×2');
+    const calls = m.calls.length;
+    const r1 = await hotQueries(env, SECRET, [], 28);
+    assert.equal(m.calls.length, calls, '提前查好了，打开时不用再查');
+    assert.ok(r1.updated.min > 0);
+    // 23 小时前的照样用；25 小时前的要重查，但这次先显示旧数据
+    db.prepare("UPDATE g_cache SET at = ? WHERE k LIKE 'hq-g|%'").run(Date.now() - 23 * 3600000);
+    await hotQueries(env, SECRET, [], 28);
+    assert.equal(m.calls.length, calls, '24 小时内不重查');
+    db.prepare("UPDATE g_cache SET at = ? WHERE k LIKE 'hq-g|%'").run(Date.now() - 25 * 3600000);
+    const r2 = await hotQueries(env, SECRET, [], 28);
+    assert.equal(m.calls.length, calls + 2, '过期的两个重查');
+    assert.ok(r2.updated.min > Date.now() - 60000, '重查后更新时间是现在');
+    // 手动刷新：早于这个时间的都重查
+    const before = m.calls.length;
+    await hotQueries(env, SECRET, [], 28, 'query', { fresh: Date.now() + 1 });
+    assert.equal(m.calls.length, before + 3, 'Google ×2 + Bing ×1 都重查');
   } finally { m.restore(); }
 });
