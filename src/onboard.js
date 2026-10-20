@@ -226,18 +226,21 @@ async function runBing(env, secret, ctx, row) {
     const s = await bingSite(c, origin);
     const bhost = new URL(origin).hostname;
     if (!s.IsVerified) {
+      let rec = '';
       if (method === 'dns') {
         const zone = zoneOf(ctx.zones, bhost);
         if (!zone) return { state: 'error', msg: '这个域名不在 Cloudflare 账号里，请改用页面标签验证' };
         if (!s.DnsVerificationCode) return { state: 'error', msg: 'Bing 没有给出 DNS 验证码，请改用页面标签验证' };
-        await ensureRecord(ctx.cfToken, zone, 'CNAME', `${s.DnsVerificationCode}.${bhost}`, 'verify.bing.com');
+        rec = `${s.DnsVerificationCode}.${bhost}`;
+        await ensureRecord(ctx.cfToken, zone, 'CNAME', rec, 'verify.bing.com');
       }
-      let ok = false;
-      try { ok = !!(await bpost(c, 'VerifySite', { siteUrl: s.Url })); } catch (e) { if (e.budget) throw e; }
+      // VerifySite 本身出错（限流、参数不对等）也记下来，不然只会一直显示“验证中”看不出原因
+      let ok = false, verr = '';
+      try { ok = !!(await bpost(c, 'VerifySite', { siteUrl: s.Url })); } catch (e) { if (e.budget) throw e; verr = short(e); }
       if (!ok) {
         return method === 'dns'
-          ? { state: 'pending', msg: 'DNS 记录已添加，等生效后验证（一般几分钟到几小时）', site: s.Url }
-          : { state: 'error', msg: `没通过验证：确认验证标签已经贴到 ${origin} 的 <head> 里`, site: s.Url };
+          ? { state: 'pending', msg: `DNS 记录已添加：CNAME ${rec} → verify.bing.com。Bing 检查 DNS 可能要几小时，最长一两天${verr ? `；这次 Bing 返回：${verr}` : ''}`, site: s.Url }
+          : { state: 'error', msg: `没通过验证：确认验证标签已经贴到 ${origin} 的 <head> 里${verr ? `（Bing 返回：${verr}）` : ''}`, site: s.Url };
       }
     }
     let n = 0;
