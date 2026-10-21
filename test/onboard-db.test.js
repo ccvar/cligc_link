@@ -86,6 +86,7 @@ test('DNS 方式：加 TXT 和 CNAME 记录、验证、加进 Search Console 和
     assert.deepEqual(m.st.bFeeds, ['https://a.com/sitemap.xml']);
     assert.ok(m.st.records.some((x) => x.type === 'CNAME' && x.proxied === false), 'Bing 的 CNAME 不走代理');
     assert.equal(db.prepare("SELECT gsc_site FROM g_sites WHERE host = 'a.com'").get().gsc_site, 'sc-domain:a.com', '站点直接关联上 Search Console');
+    assert.deepEqual({ ...db.prepare("SELECT b_synced_at, b_error FROM g_sites WHERE host = 'a.com'").get() }, { b_synced_at: 0, b_error: '' }, 'Bing 接入后马上排进同步');
     assert.equal(JSON.parse(db.prepare('SELECT found FROM g_accounts WHERE id = ?').get(uid).found).gsc[0].url, 'sc-domain:a.com');
     // 再跑一次：已接入的不重复做，也不会重复加记录
     const n = m.st.records.length;

@@ -264,6 +264,8 @@ async function runBing(env, secret, ctx, row) {
       try { await bpost(c, 'SubmitFeed', { siteUrl: s.Url, feedUrl: sm }); n++; } catch (e) { if (e.budget) throw e; }
     }
     await bingDiscover(env, secret);
+    // 刚接入：清掉接入前同步留下的报错（比如“还没验证”），同步时间清零，下一次定时任务就同步这个站点
+    await env.DB.prepare("UPDATE g_sites SET b_synced_at = 0, b_error = '' WHERE host = ?").bind(host).run().catch(() => {});
     return { state: 'done', msg: n ? `已验证并添加，提交了 ${n} 个站点地图` : '已验证并添加（没找到站点地图）', site: s.Url };
   } catch (e) {
     if (e.budget) throw e;
