@@ -372,6 +372,8 @@
 "{} 占 {}%": "{} {}%",
 "{} 台": "{} devices",
 "{} 同步中 {} / {}": "Syncing {} {} / {}",
+"{} 在 GA4 账号“{}”里没有新建媒体资源的权限（需要“编辑者”或“管理员”角色）。到 GA4「管理 → 账号访问权限管理」给它加上编辑者，或者换一个 GA4 账号": "{} can't create properties in the GA4 account “{}” (it needs the Editor or Administrator role). In GA4, go to Admin → Account access management and make it an Editor, or choose another GA4 account",
+"{} 在这个 GA4 媒体资源里没有编辑权限（需要“编辑者”或“管理员”角色）：到 GA4「管理 → 媒体资源访问权限管理」给它加上，或者在 GA4 网页上操作": "{} can't edit this GA4 property (it needs the Editor or Administrator role): add it under GA4 Admin → Property access management, or make the change on the GA4 website",
 "{} 天": "{} days",
 "{} 天前": "{} days ago",
 "{} 天后过期": "Expires in {} days",

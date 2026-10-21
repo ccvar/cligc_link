@@ -108,3 +108,32 @@ test('事件：列表合并收到的事件、关键事件、规则；设置关�
     await assert.rejects(ga.deleteEventRule(env, SECRET, 'a.com', '../x'), /规则 ID/);
   } finally { g.restore(); }
 });
+
+test('新建媒体资源没有权限：换另一个能访问这个 GA4 账号、有编辑权限的 Google 账号；都不行时说清楚缺什么', { skip }, async () => {
+  const { db, env, uid } = await setup();
+  const uid2 = `v${Math.random().toString(36).slice(2)}`;
+  db.prepare("INSERT INTO g_accounts (id, email, auth, connected_at, error, found) VALUES (?, 'boss@x.com', ?, 2, '', '{}')").run(uid2, await seal(SECRET, { refresh: 'r2', scope: EDIT }));
+  let tokenN = 0, allow = true;
+  const real = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    // 两个 Google 账号拿到不同的访问令牌，好分辨是谁在请求
+    if (u.startsWith('https://oauth2.googleapis.com/token')) return new Response(JSON.stringify({ access_token: String(init.body).includes('r2') ? 'boss' : `me${tokenN++}`, expires_in: 3600 }));
+    const who = init.headers?.authorization?.includes('boss') ? 'boss' : 'me';
+    calls.push(`${who} ${init.method || 'GET'} ${u}`);
+    if (u.includes('/accountSummaries')) return new Response(JSON.stringify({ accountSummaries: [{ account: 'accounts/9', displayName: 'blockvar', propertySummaries: [] }] }));
+    if (u.endsWith('/v1beta/properties') && (who === 'me' || !allow)) return new Response(JSON.stringify({ error: { code: 403, message: 'The caller does not have permission', status: 'PERMISSION_DENIED' } }), { status: 403 });
+    if (u.endsWith('/v1beta/properties')) return new Response(JSON.stringify({ name: 'properties/777', displayName: 'new.com' }));
+    if (u.endsWith('/properties/777/dataStreams')) return new Response(JSON.stringify({ name: 'properties/777/dataStreams/1', webStreamData: { measurementId: 'G-OK' } }));
+    return new Response('{}');
+  };
+  try {
+    const r = await ga.createProperty(env, SECRET, { acct: uid, account: 'accounts/9', url: 'new.com' });
+    assert.equal(r.measurementId, 'G-OK', '换成 boss@x.com 建好了');
+    assert.ok(calls.some((c) => c.startsWith('boss POST') && c.endsWith('/v1beta/properties')));
+    allow = false;
+    db.prepare("DELETE FROM g_sites WHERE host = 'new2.com'").run();
+    await assert.rejects(ga.createProperty(env, SECRET, { acct: uid, account: 'accounts/9', url: 'new2.com' }), /me@x\.com 在 GA4 账号“blockvar”里没有新建媒体资源的权限/);
+  } finally { globalThis.fetch = real; }
+});

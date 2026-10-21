@@ -32,6 +32,14 @@ const RECOMMENDED_EVENTS = new Set(['purchase', 'refund', 'sign_up', 'login', 's
   'tutorial_begin', 'tutorial_complete', 'unlock_achievement', 'close_convert_lead', 'close_unconvert_lead', 'disqualify_lead', 'qualify_lead', 'working_lead']);
 export const eventType = (name) => (AUTO_EVENTS.has(name) ? 'auto' : ENHANCED_EVENTS.has(name) ? 'enhanced' : RECOMMENDED_EVENTS.has(name) ? 'recommended' : 'custom');
 const REAUTH = '这个 Google 账号还没授予 GA4 编辑权限，请到 设置 → Google 集成 重新授权';
+// Google 返回“没有权限”：授权里有编辑权限，但这个 Google 账号在 GA4 里的角色不够（只是查看者 / 分析者）
+const noPerm = (e) => /does not have permission|PERMISSION_DENIED|insufficient.*permission/i.test(e?.message || '');
+const emailOf = async (env, acct) => (await env.DB.prepare('SELECT email FROM g_accounts WHERE id = ?').bind(acct).first('email').catch(() => '')) || '这个 Google 账号';
+// 媒体资源里的操作（关键事件、事件规则）没有权限时的提示
+async function propPerm(env, s, e) {
+  if (!noPerm(e)) return e;
+  return fail(`${await emailOf(env, s.ga4_acct)} 在这个 GA4 媒体资源里没有编辑权限（需要“编辑者”或“管理员”角色）：到 GA4「管理 → 媒体资源访问权限管理」给它加上，或者在 GA4 网页上操作`, { perm: true });
+}
 
 // 统计代码（gtag.js），贴到网站每个页面的 <head> 里
 export const gtagSnippet = (mid) => `<!-- Google tag (gtag.js) -->
@@ -81,13 +89,30 @@ export async function createProperty(env, secret, b) {
   const timeZone = /^[A-Za-z_]+(\/[A-Za-z_+-]+){0,2}$|^UTC$/.test(String(b.timeZone || '')) ? String(b.timeZone) : 'Asia/Shanghai';
   const currency = /^[A-Z]{3}$/.test(String(b.currency || '')) ? String(b.currency) : 'USD';
   const name = String(b.name || '').trim().slice(0, 100) || host;
-  const p = await gfetch(env, secret, acct, `${ADMIN}/v1beta/properties`, { parent: account, displayName: name, timeZone, currencyCode: currency });
-  const stream = await gfetch(env, secret, acct, `${ADMIN}/v1beta/${p.name}/dataStreams`, {
-    type: 'WEB_DATA_STREAM', displayName: host, webStreamData: { defaultUri: url.origin },
-  });
+  const create = async (a) => {
+    const p = await gfetch(env, secret, a, `${ADMIN}/v1beta/properties`, { parent: account, displayName: name, timeZone, currencyCode: currency });
+    const stream = await gfetch(env, secret, a, `${ADMIN}/v1beta/${p.name}/dataStreams`, {
+      type: 'WEB_DATA_STREAM', displayName: host, webStreamData: { defaultUri: url.origin },
+    });
+    return { p, stream, a };
+  };
+  let res, all = null;
+  try { res = await create(acct); } catch (e) {
+    if (e.budget || !noPerm(e)) throw e;
+    // 这个 Google 账号在这个 GA4 账号里只是查看者 / 分析者：别的已连接 Google 账号也能访问它、并且授予了编辑权限的，换它试
+    all = await ga4Accounts(env, secret);
+    for (const x of all.filter((y) => y.acct !== acct && y.canEdit && y.accounts.some((z) => z.name === account))) {
+      try { res = await create(x.acct); break; } catch (e2) { if (e2.budget || !noPerm(e2)) throw e2; }
+    }
+    if (!res) {
+      const me = all.find((x) => x.acct === acct), disp = me?.accounts.find((x) => x.name === account)?.displayName || account;
+      throw fail(`${me?.email || '这个 Google 账号'} 在 GA4 账号“${disp}”里没有新建媒体资源的权限（需要“编辑者”或“管理员”角色）。到 GA4「管理 → 账号访问权限管理」给它加上编辑者，或者换一个 GA4 账号`, { perm: true });
+    }
+  }
+  const { p, stream } = res;
   const id = p.name.split('/')[1], mid = stream.webStreamData?.measurementId || '';
-  const summary = (await ga4Accounts(env, secret)).find((x) => x.acct === acct)?.accounts.find((x) => x.name === account);
-  await addProp(env, acct, { id, name, account: summary?.displayName || '', host, created: Date.now() });
+  const summary = (all || await ga4Accounts(env, secret)).find((x) => x.acct === res.a)?.accounts.find((x) => x.name === account);
+  await addProp(env, res.a, { id, name, account: summary?.displayName || '', host, created: Date.now() });
   return { host, property: id, propertyName: name, measurementId: mid, snippet: gtagSnippet(mid) };
 }
 
@@ -171,12 +196,14 @@ export async function setKeyEvent(env, secret, host, event, on) {
   const base = `${ADMIN}/v1beta/properties/${s.ga4_property}/keyEvents`;
   const list = (await gfetch(env, secret, s.ga4_acct, `${base}?pageSize=200`)).keyEvents || [];
   const ex = list.find((k) => k.eventName === event);
-  if (on) {
-    if (!ex) await gfetch(env, secret, s.ga4_acct, base, { eventName: event, countingMethod: 'ONCE_PER_EVENT' });
-  } else if (ex) {
-    if (ex.deletable === false) throw fail(`${event} 是 GA4 默认的关键事件，不能取消`);
-    await gfetch(env, secret, s.ga4_acct, `${ADMIN}/v1beta/${ex.name}`, undefined, 'DELETE');
-  }
+  try {
+    if (on) {
+      if (!ex) await gfetch(env, secret, s.ga4_acct, base, { eventName: event, countingMethod: 'ONCE_PER_EVENT' });
+    } else if (ex) {
+      if (ex.deletable === false) throw fail(`${event} 是 GA4 默认的关键事件，不能取消`);
+      await gfetch(env, secret, s.ga4_acct, `${ADMIN}/v1beta/${ex.name}`, undefined, 'DELETE');
+    }
+  } catch (e) { if (e.budget) throw e; throw await propPerm(env, s, e); }
   return { host: s.host, event, key: !!on };
 }
 
@@ -199,7 +226,8 @@ export async function createEventRule(env, secret, host, b) {
   const body = ruleBody(b);
   const s = await siteRef(env, secret, host, true);
   const stream = await webStream(env, secret, s);
-  const r = await gfetch(env, secret, s.ga4_acct, `${ADMIN}/v1alpha/${stream.name}/eventCreateRules`, body);
+  let r;
+  try { r = await gfetch(env, secret, s.ga4_acct, `${ADMIN}/v1alpha/${stream.name}/eventCreateRules`, body); } catch (e) { if (e.budget) throw e; throw await propPerm(env, s, e); }
   if (b.key) await setKeyEvent(env, secret, host, body.destinationEvent, true);
   return { host: s.host, rule: ruleOut(r), key: !!b.key };
 }
@@ -209,6 +237,6 @@ export async function deleteEventRule(env, secret, host, id) {
   if (!/^\d+$/.test(id)) throw fail('规则 ID 不对');
   const s = await siteRef(env, secret, host, true);
   const stream = await webStream(env, secret, s);
-  await gfetch(env, secret, s.ga4_acct, `${ADMIN}/v1alpha/${stream.name}/eventCreateRules/${id}`, undefined, 'DELETE');
+  try { await gfetch(env, secret, s.ga4_acct, `${ADMIN}/v1alpha/${stream.name}/eventCreateRules/${id}`, undefined, 'DELETE'); } catch (e) { if (e.budget) throw e; throw await propPerm(env, s, e); }
   return { host: s.host, deleted: id };
 }

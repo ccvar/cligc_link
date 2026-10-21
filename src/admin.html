@@ -6224,7 +6224,11 @@ async function newSiteDialog(onDone) {
   const many = accts.length > 1;
   const editable = accts.filter((a) => a.canEdit && !a.error);
   const noEdit = accts.filter((a) => !a.canEdit && !a.error);
-  const accList = editable.flatMap((a) => a.accounts.map((x) => ({ v: `${a.acct}|${x.name}`, l: x.displayName, h: `${x.properties} 个媒体资源`, g: many ? maskEmail(a.email) : '' })));
+  // 同一个 GA4 账号多个 Google 账号都能访问时只列一次（选中后看不出是哪个 Google 账号，容易选到只能查看的那个）；
+  // 用哪个 Google 账号由后台决定：先用这里的，没有编辑权限时自动换另一个能访问它的
+  const seen = new Set();
+  const accList = editable.flatMap((a) => a.accounts.map((x) => ({ v: `${a.acct}|${x.name}`, l: x.displayName, h: `${x.properties} 个媒体资源`, k: x.name })))
+    .filter((x) => !seen.has(x.k) && seen.add(x.k)).map(({ k, ...x }) => x);
   const opts = accList.length;
   let dd = {};
   const form = (pre = {}) => {
