@@ -109,19 +109,24 @@ export async function cfDnsStatus(env, secret, zones) {
 // 加一条 DNS 记录；同名同值的已经有了就不再加。CNAME 同名但指向别处时改成新的（验证用的名字是随机码，不会和正常记录冲突）
 async function ensureRecord(token, zone, type, name, content) {
   const bare = (v) => String(v || '').replace(/^"|"$/g, '').toLowerCase().replace(/\.$/, '');
-  const list = (await cf(token, `/zones/${zone.id}/dns_records?type=${type}&name=${encodeURIComponent(name)}&per_page=100`)).result || [];
+  // Cloudflare 按名字查时不一定是精确匹配（会带出 ….example.com.example.com 这种），这里再按名字精确比一次
+  const list = ((await cf(token, `/zones/${zone.id}/dns_records?type=${type}&name.exact=${encodeURIComponent(name)}&per_page=100`)).result || [])
+    .filter((r) => bare(r.name) === bare(name));
   if (list.some((r) => bare(r.content) === bare(content))) return 'exists';
   const rec = { type, name, content: type === 'TXT' ? `"${content}"` : content, ttl: 1, ...(type === 'CNAME' ? { proxied: false } : {}), comment: COMMENT };
   if (type === 'CNAME' && list[0]) await cf(token, `/zones/${zone.id}/dns_records/${list[0].id}`, { method: 'PUT', body: JSON.stringify(rec) });
-  else await cf(token, `/zones/${zone.id}/dns_records`, { method: 'POST', body: JSON.stringify(rec) });
+  else {
+    try { await cf(token, `/zones/${zone.id}/dns_records`, { method: 'POST', body: JSON.stringify(rec) }); }
+    catch (e) { if (/already exists/i.test(e.raw || e.message)) return 'exists'; throw e; }   // 一模一样的记录已经有了
+  }
   return 'added';
 }
 
-// 删掉一条我们加的记录（名字、值都对上，并且备注是我们写的才删）
+// 删掉一条我们加的记录（名字、值都精确对上才删）
 async function removeRecord(token, zone, type, name, content) {
   const bare = (v) => String(v || '').replace(/^"|"$/g, '').toLowerCase().replace(/\.$/, '');
-  const list = (await cf(token, `/zones/${zone.id}/dns_records?type=${type}&name=${encodeURIComponent(name)}&per_page=100`)).result || [];
-  for (const r of list) if (bare(r.name) === bare(name) && bare(r.content) === bare(content) && r.comment === COMMENT) await cf(token, `/zones/${zone.id}/dns_records/${r.id}`, { method: 'DELETE' });
+  const list = (await cf(token, `/zones/${zone.id}/dns_records?type=${type}&name.exact=${encodeURIComponent(name)}&per_page=100`)).result || [];
+  for (const r of list) if (bare(r.name) === bare(name) && bare(r.content) === bare(content)) await cf(token, `/zones/${zone.id}/dns_records/${r.id}`, { method: 'DELETE' });
 }
 
 // ---------------------------------------------------------------- 工具

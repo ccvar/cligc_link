@@ -40,7 +40,8 @@ function mockAll({ dnsLive = true } = {}) {
     st.calls.push(`${m} ${u}`);
     if (u.startsWith('https://oauth2.googleapis.com/token')) return J({ access_token: 'at', expires_in: 3600 });
     if (u.startsWith('https://api.cloudflare.com/client/v4/zones?')) return J({ success: true, result: [{ id: 'z1', name: 'a.com' }], result_info: { total_pages: 1 } });
-    if (u.includes('/zones/z1/dns_records') && m === 'GET') { const q = new URL(u).searchParams; return J({ success: true, result: st.records.filter((r) => r.type === q.get('type') && r.name === q.get('name')) }); }
+    // 像真实的 Cloudflare 一样：按名字查会把 ….a.com.a.com 这种也带出来（代码要自己再精确比）
+    if (u.includes('/zones/z1/dns_records') && m === 'GET') { const q = new URL(u).searchParams, n = q.get('name.exact') || q.get('name'); return J({ success: true, result: st.records.filter((r) => r.type === q.get('type') && r.name.startsWith(n)) }); }
     if (u.includes('/zones/z1/dns_records') && m === 'POST') { st.records.push({ ...body, id: `r${st.records.length}` }); return J({ success: true, result: {} }); }
     if (u.includes('/zones/z1/dns_records/') && m === 'DELETE') { const id = u.split('/dns_records/')[1]; st.records = st.records.filter((r) => r.id !== id); return J({ success: true, result: {} }); }
     if (u === 'https://www.googleapis.com/siteVerification/v1/token') return J({ token: body.verificationMethod === 'META' ? '<meta name="google-site-verification" content="gm" />' : 'google-site-verification=gt' });
@@ -184,7 +185,7 @@ test('Bing 的 DNS 验证码本身带域名：记录名不再多拼一次，以�
   try {
     await ob.saveCfDns(env, SECRET, { token: 'cf-token-cf-token-cf-token' });
     // 旧版本加错的记录
-    m.st.records.push({ type: 'CNAME', name: 'abc123.a.com.a.com', content: 'verify.bing.com', comment: 'cligc link：搜索引擎所有权验证，验证通过后请保留', id: 'old' });
+    m.st.records.push({ type: 'CNAME', name: 'abc123.a.com.a.com', content: 'verify.bing.com', comment: '', id: 'old' });
     const r = await ob.onboardRun(env, SECRET, { host: 'a.com', method: 'dns' });
     assert.equal(r.b.state, 'done', r.b.msg);
     const cn = m.st.records.filter((x) => x.type === 'CNAME').map((x) => x.name);
