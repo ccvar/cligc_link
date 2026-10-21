@@ -406,11 +406,12 @@ export async function rebuildSites(env) {
     if (!s.gsc_site || (g.url === keep && s.gsc_site !== keep)) Object.assign(s, { gsc_site: g.url, gsc_acct: g.acct });
   }
 
-  // Bing Webmaster 的站点（bing.js 每天列一次，存在 settings.bing_found）；同一域名有多个时优先已验证的、https 的
+  // Bing Webmaster 的站点（bing.js 每天列一次，存在 settings.bing_found）；只关联已验证的（没验证的读不到数据，同步只会报“没有权限”，
+  // 比如接入时刚加进 Bing、还在等 DNS 验证的）；同一域名有多个时优先 https 的
   let bing = null;
   try { bing = JSON.parse((await env.DB.prepare("SELECT value FROM settings WHERE key = 'bing_found'").first('value')) || 'null'); } catch {}
-  const bscore = (b) => (b.verified ? 2 : 0) + (b.url.startsWith('https:') ? 1 : 0);
-  for (const b of (bing?.sites || []).slice().sort((a, b2) => bscore(b2) - bscore(a))) {
+  const bscore = (b) => (b.url.startsWith('https:') ? 1 : 0);
+  for (const b of (bing?.sites || []).filter((x) => x.verified !== false).sort((a, b2) => bscore(b2) - bscore(a))) {
     const s = get(b.host);
     if (!s.bing_site) s.bing_site = b.url;
   }

@@ -273,6 +273,13 @@ async function runBing(env, secret, ctx, row) {
 
 // ---------------------------------------------------------------- 对外
 
+// Bing 站点是否已验证（按每天列出的 Bing 站点；不在列表里的按已验证算，免得列表读取出错时都显示成没接入）
+async function bingVerified(env) {
+  let f = null;
+  try { f = JSON.parse((await getSetting(env, 'bing_found')) || 'null'); } catch {}
+  const v = new Map((f?.sites || []).map((x) => [String(x.url).toLowerCase().replace(/\/+$/, ''), x.verified]));
+  return (url) => !!url && v.get(String(url).toLowerCase().replace(/\/+$/, '')) !== false;
+}
 const normHost = (h) => siteHost(/^[a-z]+:\/\//i.test(String(h || '').trim()) ? String(h).trim() : `https://${String(h || '').trim()}`);
 const rowOut = (r) => r && { method: r.method, acct: r.g_acct, g: { state: r.g_state, msg: r.g_msg }, b: { state: r.b_state, msg: r.b_msg }, at: r.updated_at };
 
@@ -291,19 +298,25 @@ export async function onboardList(env, secret, hosts, extra = []) {
   const sites = (await env.DB.prepare("SELECT host, gsc_site, bing_site, ga4_created FROM g_sites WHERE host LIKE '%.%'").all()).results;
   const rows = new Map((await env.DB.prepare('SELECT * FROM site_onboard').all()).results.map((r) => [r.host, r]));
   const by = new Map(sites.map((s) => [s.host, s]));
-  const list = want.length ? want : sites.filter((s) => !s.gsc_site || !s.bing_site).map((s) => s.host);
-  for (const h of rows.keys()) if (!want.length && !list.includes(h) && !(by.get(h)?.gsc_site && by.get(h)?.bing_site)) list.push(h);
+  const bv = await bingVerified(env);
+  const list = want.length ? want : sites.filter((s) => !s.gsc_site || !bv(s.bing_site)).map((s) => s.host);
+  for (const h of rows.keys()) if (!want.length && !list.includes(h) && !(by.get(h)?.gsc_site && bv(by.get(h)?.bing_site))) list.push(h);
   for (const h of extra.map(normHost).filter(Boolean)) if (!list.includes(h)) list.push(h);
   const ctx = await context(env, secret, true);
+  const bingOk = await bingVerified(env);
   return {
     cf: { configured: !!ctx.cfToken, zones: ctx.zones.length },
     bing: !!ctx.bing,
     accounts: await accountList(env, secret),
     // since：GA4 网站数据流的创建时间（大致是站点上线 / 开始统计的时间）；新站点排在前面，没有的按域名排
-    items: [...new Set(list)].map((host) => ({
-      host, gsc: by.get(host)?.gsc_site || '', bingSite: by.get(host)?.bing_site || '', since: by.get(host)?.ga4_created || 0,
-      zone: ctx.cfToken ? !!zoneOf(ctx.zones, host) : null, ...(rowOut(rows.get(host)) || {}),
-    })).sort((a, b) => (b.since || 0) - (a.since || 0) || a.host.localeCompare(b.host)),
+    items: [...new Set(list)].map((host) => {
+      const gsc = by.get(host)?.gsc_site || '', bingSite = bingOk(by.get(host)?.bing_site) ? by.get(host).bing_site : '';
+      const o = rowOut(rows.get(host)) || {};
+      // 行里记着“已接入”、但现在其实没关联上的（以前把没验证的 Bing 站点当成了已关联）：按没接入显示，可以重新接入
+      if (o.g?.state === 'done' && !gsc) o.g = { state: '', msg: '' };
+      if (o.b?.state === 'done' && !bingSite) o.b = { state: '', msg: '' };
+      return { host, gsc, bingSite, since: by.get(host)?.ga4_created || 0, zone: ctx.cfToken ? !!zoneOf(ctx.zones, host) : null, ...o };
+    }).sort((a, b) => (b.since || 0) - (a.since || 0) || a.host.localeCompare(b.host)),
   };
 }
 
@@ -342,7 +355,7 @@ export async function onboardRun(env, secret, b, ctx) {
   const acct = b.acct || old?.g_acct || site?.gsc_acct || site?.ga4_acct || '';
   const row = { host, method, acct };
   const g = site?.gsc_site ? { state: 'done', msg: '已接入' } : b.g === false ? { state: old?.g_state || '', msg: old?.g_msg || '' } : await runGoogle(env, secret, ctx, row);
-  const bb = site?.bing_site ? { state: 'done', msg: '已接入' } : b.b === false ? { state: old?.b_state || '', msg: old?.b_msg || '' } : await runBing(env, secret, ctx, row);
+  const bb = (await bingVerified(env))(site?.bing_site) ? { state: 'done', msg: '已接入' } : b.b === false ? { state: old?.b_state || '', msg: old?.b_msg || '' } : await runBing(env, secret, ctx, row);
   const now = Date.now();
   const retry = (b.retry ? (old?.tries || 0) + 1 : 0);
   await env.DB.prepare(`INSERT INTO site_onboard (host, method, g_acct, g_site, g_state, g_msg, b_site, b_state, b_msg, tries, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

@@ -192,3 +192,21 @@ test('Bing 的 DNS 验证码本身带域名：记录名不再多拼一次，以�
     assert.deepEqual(cn, ['abc123.a.com'], '只剩正确的那条');
   } finally { m.restore(); }
 });
+
+test('没验证的 Bing 站点不算关联：列表里照样显示成没接入，可以重新接入；同步站点时也不关联', { skip }, async () => {
+  const { db, env } = await setup();
+  const { rebuildSites } = await import('../src/google.js');
+  // Bing 账号里有 a.com，但还没验证（接入时刚加进去、还在等 DNS）
+  db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('bing_found', ?, 1)").run(JSON.stringify({ sites: [{ url: 'https://a.com/', host: 'a.com', verified: false }], at: 1 }));
+  db.prepare("UPDATE g_sites SET bing_site = 'https://a.com/', gsc_site = 'sc-domain:a.com' WHERE host = 'a.com'").run();
+  db.prepare("INSERT INTO site_onboard (host, method, g_state, b_state, b_msg, created_at, updated_at) VALUES ('a.com', 'dns', 'done', 'done', '已接入', 1, 1)").run();
+  const m = mockAll();
+  try {
+    const list = await ob.onboardList(env, SECRET, []);
+    const a = list.items.find((x) => x.host === 'a.com');
+    assert.ok(a, '还在列表里');
+    assert.equal(a.bingSite, ''); assert.equal(a.b.state, '', '以前误记的“已接入”不算');
+    await rebuildSites(env);
+    assert.equal(db.prepare("SELECT bing_site FROM g_sites WHERE host = 'a.com'").get().bing_site, '', '同步站点时不关联没验证的');
+  } finally { m.restore(); }
+});
