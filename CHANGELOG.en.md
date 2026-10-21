@@ -2,6 +2,33 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.12.0 · 2026-10-21
+
+New bulk sitemap submission: see which sitemaps each site has submitted to Google and Bing and fill in the missing ones, with a daily automatic fill-in. Fixes automatic DNS verification for Bing never passing.
+
+### New
+
+- **Submit sitemaps**: "+ → Submit sitemaps" at the top right of the Sites list shows how many sitemaps each connected site has submitted to Google and Bing
+  - Filter by "Missing sitemaps / Not found / All submitted", search when there are many sites, select and fill in with one click
+  - Filling in: sitemaps on one side but not the other are submitted to the other; if neither has any, robots.txt and /sitemap.xml are checked first
+  - The daily cron also fills in known but unsubmitted sitemaps (following the "auto-resubmit sitemaps" switches in Settings; each site is tried at most once a day)
+
+### Improved
+
+- Add to Search Console / Bing: the reason for "Failed" and "Verifying" is shown right under the status; while Bing is verifying, it shows the CNAME record that was added and any error Bing returned
+- The onboarding list can be filtered by domain when it has more than 10 sites, and no longer jumps to the top when selecting sites
+- The "New event" form in the event list is now a compact two-row layout, tidier on phones too
+
+### Fixed
+
+- Automatic DNS verification for Bing stayed at "Verifying": the CNAME name had the domain appended twice (….example.com.example.com); it's now created under the correct name and the misnamed record is removed
+- Unverified Bing sites were treated as linked, causing "No permission: the site isn't in this Bing account or not verified" sync errors and a false "Added" in the onboarding list; only verified sites are linked now
+- After Bing is added, the sync error left from before verification is cleared and the site is queued for the next sync
+
+### Upgrade notes
+
+- Sites added with an older version whose Bing status is still "Verifying" are retried automatically after upgrading and their DNS record corrected; you can also click "Start" again in the onboarding dialog
+
 ## v1.11.0 · 2026-10-20
 
 Add sites to Google Search Console and Bing from the admin: ownership is verified automatically through Cloudflare DNS, then the site is added and its sitemaps submitted. Top queries gain a region tab, a hide-domains toggle and daily automatic updates.
