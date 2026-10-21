@@ -267,9 +267,12 @@ export async function gfetch(env, secret, acct, url, body, method) {
     headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const d = await res.json().catch(() => ({}));
+  const text = await res.text().catch(() => '');
+  let d = {};
+  try { d = text ? JSON.parse(text) : {}; } catch {}
   if (!res.ok) {
-    const msg = d.error?.message || `HTTP ${res.status}`;
+    // 没有 message 时带上状态（如 RESOURCE_EXHAUSTED），能看出是哪种限制
+    const msg = d.error?.message || [d.error?.status, `HTTP ${res.status}`].filter(Boolean).join(' · ');
     if (res.status === 429) throw Object.assign(new Error(`配额已用完：${msg}`), { quota: true });
     throw new Error(/has not been used|is disabled/i.test(msg) ? `接口未启用：${msg}` : msg);
   }
@@ -474,6 +477,9 @@ async function syncSite(env, secret, s) {
   const gaStart = day(first ? BACKFILL_DAYS : GA_REFRESH), scStart = day(first ? BACKFILL_DAYS : SC_REFRESH);
   const chStart = s.ch_at ? gaStart : day(CHANNEL_DAYS);
   const stmts = [], errors = [];
+  // GA4 配额用完（429）：这个站点剩下的 GA4 请求不再发，过一小时再同步（不用等 6 小时）
+  let quota = false;
+  const gaErr = (label, e) => { if (e.budget) throw e; if (e.quota) quota = true; errors.push(`${label}：${e.message}`); };
   // 只写有变化的行：先读出窗口内已有的数据比对（读比写便宜得多）
   const from = [gaStart, scStart, chStart].sort()[0];
   const old = new Map((await env.DB.prepare('SELECT * FROM g_daily WHERE host = ? AND date >= ?').bind(s.host, from).all()).results.map((r) => [r.date, r]));
@@ -498,9 +504,9 @@ async function syncSite(env, secret, s) {
              key_events = excluded.key_events, engagement = excluded.engagement`
         ).bind(s.host, date, ...m));
       }
-    } catch (e) { if (e.budget) throw e; errors.push(`GA4：${e.message}`); }
+    } catch (e) { gaErr('GA4', e); }
     // 每天的渠道分组会话数（存成 JSON），首次补一年
-    try {
+    if (!quota) try {
       const d = await gfetch(env, secret, s.ga4_acct, `https://analyticsdata.googleapis.com/v1beta/properties/${s.ga4_property}:runReport`, {
         dateRanges: [{ startDate: chStart, endDate: end }],
         dimensions: [{ name: 'date' }, { name: 'sessionDefaultChannelGroup' }],
@@ -522,7 +528,7 @@ async function syncSite(env, secret, s) {
           .bind(s.host, date, val));
       }
       if (!s.ch_at) stmts.push(env.DB.prepare('UPDATE g_sites SET ch_at = ? WHERE host = ?').bind(Date.now(), s.host));
-    } catch (e) { if (e.budget) throw e; errors.push(`GA4 渠道：${e.message}`); }
+    } catch (e) { gaErr('GA4 渠道', e); }
   }
   if (s.gsc_site) {
     try {
@@ -541,8 +547,10 @@ async function syncSite(env, secret, s) {
       }
     } catch (e) { if (e.budget) throw e; errors.push(`GSC：${e.message}`); }
   }
-  // 区间去重用户数（GA4 按天的用户数不能直接相加）
-  if (s.ga4_property) {
+  // 区间去重用户数（GA4 按天的用户数不能直接相加）：一天查一次就够（每次要 3 个请求，是 GA4 配额的大头）
+  const uKey = `ga4u|${s.host}`;
+  const uAt = s.ga4_property && !quota ? await env.DB.prepare('SELECT at FROM g_cache WHERE k = ?').bind(uKey).first('at').catch(() => 0) : 0;
+  if (s.ga4_property && !quota && (!s.users || !uAt || uAt < Date.now() - 20 * 3600000)) {
     try {
       const y = (n) => ymd(Date.now() - n * DAY);
       // 每个区间和它的上一周期：键 7 / p7、28 / p28……；一次请求最多 4 个区间
@@ -564,14 +572,16 @@ async function syncSite(env, secret, s) {
       let prevVal = '';
       try { prevVal = s.users ? JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(s.users)).sort(([a], [b]) => (a < b ? -1 : 1)))) : ''; } catch {}
       if (val !== prevVal) stmts.push(env.DB.prepare('UPDATE g_sites SET users = ? WHERE host = ?').bind(val, s.host));
-    } catch (e) { if (e.budget) throw e; errors.push(`GA4 用户：${e.message}`); }
+      stmts.push(env.DB.prepare('INSERT INTO g_cache (k, v, at) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET at = excluded.at').bind(uKey, '1', Date.now()));
+    } catch (e) { gaErr('GA4 用户', e); }
   }
   // 有数据变化时更新版本号，站点列表的缓存据此失效（没变化就继续用缓存）
   const err = errors.join('；');
   if (stmts.length || err !== (s.error || '')) stmts.push(gVerStmt(env));
-  stmts.push(env.DB.prepare('UPDATE g_sites SET synced_at = ?, error = ? WHERE host = ?').bind(Date.now(), err, s.host));
+  // 配额用完的：记成 5 小时前同步过，一小时后（下一次定时任务）再同步
+  stmts.push(env.DB.prepare('UPDATE g_sites SET synced_at = ?, error = ? WHERE host = ?').bind(quota ? Date.now() - 5 * 3600000 : Date.now(), err, s.host));
   for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
-  return errors;
+  return Object.assign(errors, { quota });
 }
 
 // Google 数据版本号：每日数据、站点对应关系、区间用户数变了就更新
@@ -597,11 +607,14 @@ export async function syncBatch(env, secret, { limit = 12, cutoff = Date.now() -
   const due = (await env.DB.prepare(`SELECT * FROM g_sites WHERE ${DUE} ORDER BY ch_at > 0, synced_at LIMIT ?`)
     .bind(cutoff, limit).all()).results;
   let done = 0;
+  // 遇到 GA4 配额用完：这一批剩下有 GA4 的站点先不同步（多半是整个项目的配额），下一次定时任务再继续
+  let gaQuota = false;
   for (const s of due) {
-    try { await syncSite(env, secret, s); done++; } catch (e) { if (e.budget) break; throw e; }
+    if (gaQuota && s.ga4_property) continue;
+    try { const errs = await syncSite(env, secret, s); done++; if (errs.quota) gaQuota = true; } catch (e) { if (e.budget) break; throw e; }
   }
   const left = await env.DB.prepare(`SELECT COUNT(*) AS n FROM g_sites WHERE ${DUE}`).bind(cutoff).first('n');
-  return { done, left };
+  return { done, left, ...(gaQuota ? { quota: true } : {}) };
 }
 
 // ---------------------------------------------------------------- 读取
@@ -991,7 +1004,7 @@ async function cached(env, key, ttl, fn) {
 export async function siteDetail(env, secret, host, days) {
   const s = await env.DB.prepare(`SELECT s.*, a.email AS ga4_email, b.email AS gsc_email, m.c_mod, m.c_trust, m.c_seen, m.c_since, m.c_new30, m.c_upd30 FROM g_sites s
     LEFT JOIN g_accounts a ON a.id = s.ga4_acct LEFT JOIN g_accounts b ON b.id = s.gsc_acct LEFT JOIN g_sitemaps m ON m.host = s.host WHERE s.host = ?`).bind(host).first();
-  if (!s) return { error: '站点不存在' };
+  if (!s) return { error: '站点不存在', notFound: true };
   const { from, to, pfrom, pto } = ranges(days);
   const rows = (await env.DB.prepare('SELECT * FROM g_daily WHERE host = ? AND date >= ? AND date <= ? ORDER BY date').bind(host, pfrom, to).all()).results;
   const out = {

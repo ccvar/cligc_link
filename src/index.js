@@ -2614,7 +2614,8 @@ async function googleApi(request, env, url) {
     if (path === '/api/google/link') return json({ days, ranges: google.ranges(days), ...(await google.linkSites(env, Number(url.searchParams.get('id')) || 0, days, secret)) });
     if (path === '/api/google/site') {
       const d = await google.siteDetail(env, secret, String(url.searchParams.get('host') || ''), days);
-      return d.error ? json(d, 404) : json({ ...d, blOn: await backlinks.blFlags(env) });
+      // 只有站点不存在才返回 404；d.error 也可能是上次同步出的错（比如 GA4 配额用完），页面照常显示、顶部提示
+      return d.notFound ? json(d, 404) : json({ ...d, blOn: await backlinks.blFlags(env) });
     }
   } catch (err) {
     return json({ error: err.message || String(err) }, 500);
