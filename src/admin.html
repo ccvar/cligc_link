@@ -1051,6 +1051,8 @@ details[open] > summary::before { transform: rotate(90deg); }
 .use-mini.seg { display: flex; gap: 1px; }
 .use-mini.seg i { flex: none; height: 6px; border-radius: 0; }
 .use-mini.seg i:first-child { border-radius: 3px 0 0 3px; } .use-mini.seg i:last-child { border-radius: 0 3px 3px 0; } .use-mini.seg i:only-child { border-radius: 3px; }
+/* 特别多、被截断的那天：右端两道斜线表示“超出” */
+.use-mini.over::after { content: ''; position: absolute; right: 10px; top: -2px; width: 7px; height: 10px; background: linear-gradient(115deg, transparent 0 30%, var(--panel) 30% 45%, transparent 45% 60%, var(--panel) 60% 75%, transparent 75%); pointer-events: none; }
 .use-who { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
 .use-who span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .use-who i { width: 7px; height: 7px; border-radius: 2px; flex: none; }
@@ -8859,7 +8861,10 @@ function renderUsage(box, u, onState) {
       ${has ? `<div class="use-mine">其中本项目 <b>${fmt(mine || 0)}</b></div>` : ''}${key ? topLine(key) : ''}</div>`;
   };
   const mine = cur.mine || zero.mine;
-  const maxDay = Math.max(1, ...(u.days || []).map((d) => d.rowsRead));
+  // 每天 D1 读取条的长度基准：一般按最多的那天；有一天特别多（超过第二多那天的 3 倍，比如一次性大查询）时按第二多的算，
+  // 不然其他天的条都只剩一小截。特别多的那天画满，末端加截断标记
+  const readSorted = (u.days || []).map((d) => d.rowsRead).sort((a, b) => b - a);
+  const maxDay = readSorted[1] > 0 && readSorted[0] > readSorted[1] * 3 ? readSorted[1] * 1.15 : Math.max(1, readSorted[0] || 0);
   // 占用最多的数据库 / Worker：名称（拿不到名称时显示 ID 前 8 位），本项目加标记
   const dbName = (id) => (u.dbNames?.[id] || `${String(id).slice(0, 8)}…`) + (id && id === u.myDb ? '（本项目）' : '');
   const wkName = (n) => (n || '未知') + (n && n === u.myWorker ? '（本项目）' : '');
@@ -8891,10 +8896,13 @@ function renderUsage(box, u, onState) {
   // 每天的 D1 读取：长度按最近 7 天最高的那天，按数据库分段着色；下面列出占用最多的几个
   const useBar = (d) => {
     const list = d.top?.rowsRead || [];
-    if (!list.length || !d.rowsRead) return `<div class="use-mini"><i style="width:${(d.rowsRead / maxDay) * 100}%"></i></div>`;
+    const over = d.rowsRead > maxDay, total = Math.min(1, d.rowsRead / maxDay);
+    const overTip = over ? ` data-tipf-always data-tipf="${esc(`这一天读取特别多（${wan(d.rowsRead)}），超过其他日子很多，条已截断`)}"` : '';
+    if (!list.length || !d.rowsRead) return `<div class="use-mini${over ? ' over' : ''}"${overTip}><i style="width:${total * 100}%"></i></div>`;
     const rest = d.rowsRead - list.reduce((a, [, n]) => a + n, 0);
-    const seg = (n, c, tip) => `<i style="width:${(n / maxDay) * 100}%;background:${c}" data-tipf-always data-tipf="${esc(tip)}"></i>`;
-    return `<div class="use-mini seg">${list.map(([id, n]) => seg(n, colorOf.get(id) || 'var(--faint)', `${dbName(id)}：${wan(n)}（${pctText(n / d.rowsRead)}）`)).join('')}${rest > 0 ? seg(rest, 'var(--sunken-2, var(--line))', `其他：${wan(rest)}`) : ''}</div>
+    // 各数据库按占比分这一天的条长（截断时整条画满）
+    const seg = (n, c, tip) => `<i style="width:${(n / d.rowsRead) * total * 100}%;background:${c}" data-tipf-always data-tipf="${esc(tip)}"></i>`;
+    return `<div class="use-mini seg${over ? ' over' : ''}"${overTip}>${list.map(([id, n]) => seg(n, colorOf.get(id) || 'var(--faint)', `${dbName(id)}：${wan(n)}（${pctText(n / d.rowsRead)}）`)).join('')}${rest > 0 ? seg(rest, 'var(--sunken-2, var(--line))', `其他：${wan(rest)}`) : ''}</div>
       <div class="use-who">${list.slice(0, 2).map(([id, n]) => `<span><i style="background:${colorOf.get(id) || 'var(--faint)'}"></i>${esc(dbName(id))} ${pctText(n / d.rowsRead)}</span>`).join('')}</div>`;
   };
   const plans = [['auto', '自动识别'], ['free', '免费版'], ['paid', '付费版']];

@@ -2692,6 +2692,7 @@
 "还没检查": "Not checked yet",
 "还没用过": "not used yet",
 "这一周没有明显的变化。": "No notable changes this week.",
+"这一天读取特别多（{}），超过其他日子很多，条已截断": "Reads were unusually high this day ({}), far above the other days; the bar is truncated",
 "这一批没有加载出新的站点": "the last batch loaded no new sites",
 "这个 GA4 媒体资源没有网站数据流": "This GA4 property has no web data stream",
 "这个 Google 账号还没授予 GA4 编辑权限，请到 设置 → Google 集成 重新授权": "This Google account hasn't granted GA4 edit access; re-authorize it in Settings → Google integration",
