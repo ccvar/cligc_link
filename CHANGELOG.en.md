@@ -2,6 +2,21 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.12.1 · 2026-10-22
+
+Fixes the site page failing to load after a sync error, uses less GA4 quota, and avoids picking a Google account without edit access when creating site tracking.
+
+### Fixed
+
+- When a site's last sync had an error (for example, GA4 quota exhausted), its page failed to load entirely; it now loads normally with the sync error shown at the top
+- Creating site tracking: when several connected Google accounts can access the same GA4 account, it appeared multiple times in the dropdown with no way to tell which Google account would be used, making it easy to pick a view-only one; it's now listed once, the Google account is chosen automatically, and another one with edit access is tried if needed
+- GA4 "The caller does not have permission" errors are now explained in plain words: which Google account lacks the Editor role in which GA4 account or property, and where to add it; this applies to creating site tracking, setting key events, and creating / deleting event rules
+
+### Improved
+
+- GA4 sync uses less quota: unique users per date range are computed once a day instead of every 6 hours, cutting GA4 requests by more than half
+- On GA4 quota errors (HTTP 429), the rest of that site's GA4 requests and the remaining GA4 sites in the batch are skipped and retried an hour later (instead of 6 hours), keeping existing data; the error now includes Google's status so the limit can be identified
+
 ## v1.12.0 · 2026-10-21
 
 New bulk sitemap submission: see which sitemaps each site has submitted to Google and Bing and fill in the missing ones, with a daily automatic fill-in. Fixes automatic DNS verification for Bing never passing.
