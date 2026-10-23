@@ -424,3 +424,50 @@ export async function aggQuery(env, { days, tz, bots, linkId = 0 }) {
 }
 
 export { HOUR, DAY, addDays };
+
+// “访问记录”面板的按天汇总：访问次数、独立访客、访问最多的短链和国家 / 地区。
+// 已汇总的部分读 agg_d / agg_uv，还没汇总的（最近不到一小时）读原始明细。
+// days：要汇总的日期（按汇总时区 agg_tz）；tz：浏览器的时区，和汇总时区不一致时日期对不上，不返回
+export async function daySummary(env, { days, tz, bots, linkId = 0 }) {
+  const st = await aggState(env);
+  if (st.tz === null || st.tz !== tz || !days.length) return { tz: st.tz, days: {} };
+  const list = JSON.stringify(days), mc = bots ? '' : 'AND machine = 0', lf = linkId ? 'AND link_id = ?' : '', lb = linkId ? [linkId] : [];
+  const q = (sql, ...a) => env.DB.prepare(sql).bind(...a).all().then((r) => r.results);
+  const [tot, links, ctry, uvs] = await Promise.all([
+    q(`SELECT day, machine, SUM(n) AS n FROM agg_d WHERE dim = '' AND day IN (SELECT value FROM json_each(?)) ${lf} ${mc} GROUP BY day, machine`, list, ...lb),
+    linkId ? [] : q(`SELECT day, link_id, SUM(n) AS n FROM agg_d WHERE dim = '' AND day IN (SELECT value FROM json_each(?)) AND machine = 0 GROUP BY day, link_id`, list),
+    q(`SELECT day, k, SUM(n) AS n FROM agg_d WHERE dim = 'country' AND day IN (SELECT value FROM json_each(?)) ${lf} AND machine = 0 GROUP BY day, k`, list, ...lb),
+    q(`SELECT day, machine, hll FROM agg_uv WHERE day IN (SELECT value FROM json_each(?)) AND link_id = ? ${mc}`, list, linkId),
+  ]);
+  const out = {};
+  const get = (d) => (out[d] ||= { n: 0, human: 0, machine: 0, links: new Map(), ctry: new Map(), reg: hllNew() });
+  const add = (m, k, n) => m.set(k, (m.get(k) || 0) + n);
+  for (const r of tot) { const o = get(r.day); o.n += r.n; o[r.machine ? 'machine' : 'human'] += r.n; }
+  for (const r of links) add(get(r.day).links, r.link_id, r.n);
+  for (const r of ctry) if (r.k) add(get(r.day).ctry, r.k, r.n);
+  for (const r of uvs) hllMerge(get(r.day).reg, hllDecode(r.hll));
+  // 还没汇总的最近访问
+  const want = new Set(days);
+  if (st.mark < Date.now()) {
+    const tail = await q(`SELECT link_id, ts, is_bot, ip, country FROM clicks WHERE ts >= ? ${linkId ? 'AND link_id = ?' : ''} ${bots ? '' : 'AND is_bot = 0'} LIMIT 50000`, st.mark, ...lb);
+    for (const r of tail) {
+      const day = dayKey(r.ts, st.tz);
+      if (!want.has(day)) continue;
+      const o = get(day);
+      o.n++; o[r.is_bot ? 'machine' : 'human']++;
+      hllAdd(o.reg, r.ip || '');
+      if (!r.is_bot) { add(o.links, r.link_id, 1); if (r.country) add(o.ctry, r.country, 1); }
+    }
+  }
+  const top = (m) => [...m].sort((a, b) => b[1] - a[1])[0] || null;
+  const ids = [...new Set(Object.values(out).map((o) => top(o.links)?.[0]).filter(Boolean))];
+  const slugs = ids.length ? new Map((await q(`SELECT id, slug FROM links WHERE id IN (${ids.map(() => '?').join(',')})`, ...ids)).map((r) => [r.id, r.slug])) : new Map();
+  const res = {};
+  for (const [d, o] of Object.entries(out)) {
+    const tl = top(o.links), tc = top(o.ctry), human = [...o.ctry.values()].reduce((a, b) => a + b, 0);
+    res[d] = { n: o.n, human: o.human, machine: o.machine, uv: hllCount(o.reg),
+      topLink: tl && slugs.has(tl[0]) ? { slug: slugs.get(tl[0]), n: tl[1] } : null,
+      topCountry: tc ? { k: tc[0], n: tc[1], pct: human ? tc[1] / human : 0 } : null };
+  }
+  return { tz: st.tz, days: res };
+}

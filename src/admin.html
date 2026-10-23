@@ -499,6 +499,11 @@ code { font-family: var(--mono); font-size: .92em; background: var(--sunken); pa
 .drawer.visits .vis-b { display: block; gap: 0; padding: 0 0 24px; }
 .vis-t thead th { position: sticky; top: 0; z-index: 2; background: var(--panel); box-shadow: inset 0 -1px 0 var(--line); border-bottom: 0; }
 .vis-t .vis-dr td { position: sticky; top: var(--vis-th, 39px); z-index: 1; padding-top: 10px; padding-bottom: 6px; background: var(--panel-2); font-size: 12px; font-weight: 600; color: var(--muted); }
+.vis-dh, .tbl.vt tr.vis-dr td > div.vis-dh { display: flex; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; overflow: visible; white-space: normal; max-width: none !important; }
+.vis-ds { margin-left: auto; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.vis-ds b { font-weight: 600; color: var(--text-2); }
+.vis-ds b.mono { font-family: var(--mono); }
+.vis-ds i { font-style: normal; margin: 0 7px; opacity: .6; }
 .vis-slug { font-family: var(--mono); font-weight: 600; color: var(--text); text-decoration: none; }
 .vis-slug:hover { color: var(--accent); }
 .vis-done { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 18px 0 4px; font-size: 12.5px; color: var(--muted); text-align: center; }
@@ -4057,6 +4062,24 @@ function visitsDrawer(qs) {
     const t = { countries: String(r.t_countries || '').split(',').filter(Boolean), devices: String(r.t_devices || '').split(',').filter(Boolean) };
     return `<div>跳转规则</div><div class="sm" data-tipf-always data-tipf="${esc(r.t_url)}">${esc(ruleText(t) || bareUrl(r.t_url))}</div>`;
   };
+  // 日期行右边：这一天的汇总（访问、访客、最多的短链和地区；含机器人时另列机器访问）
+  const summarize = async (days) => {
+    if (!days.length) return;
+    let r;
+    try { r = await api(`/recent/days?days=${days.join(',')}&tz=${TZ}&bots=${state.bots ? 1 : 0}${qs}`); } catch { return; }
+    for (const d of days) {
+      const x = r.days?.[d], el = dr.querySelector(`.vis-ds[data-day="${d}"]`);
+      if (!x || !el) continue;
+      const parts = [`访问 <b>${num(x.n)}</b>`, `访客 <b>${num(x.uv)}</b>`];
+      if (state.bots && x.machine) parts.push(`机器 ${num(x.machine)}`);
+      if (x.topLink) parts.push(`最多 <b class="mono">/${esc(x.topLink.slug)}</b> ${num(x.topLink.n)}${EN ? '' : ' 次'}`);
+      if (x.topCountry) parts.push(`${esc(country(x.topCountry.k))} ${pctText(x.topCountry.pct)}`);
+      el.innerHTML = parts.join('<i>·</i>');
+      el.setAttribute('data-tipf-always', '');
+      el.setAttribute('data-tipf', `${d} 全天${state.link ? '（这个短链）' : ''}：访问 ${num(x.n)} 次${state.bots ? `（真人 ${num(x.human)}、机器 ${num(x.machine)}）` : ''}，独立访客约 ${num(x.uv)} 位`
+        + (x.topLink ? `\n访问最多的短链：/${x.topLink.slug}（${num(x.topLink.n)} 次）` : '') + (x.topCountry ? `\n访问最多的地区：${country(x.topCountry.k)}（${pctText(x.topCountry.pct)}）` : ''));
+    }
+  };
   const row = (r) => `<tr>
       <td><div data-tipf="${esc(`/${r.slug} · ${r.source}${r.utm_campaign ? ' · ' + r.utm_campaign : ''}`)}"><a class="vis-slug" href="#/link/${r.link_id}">/${esc(r.slug)}</a><span class="sm"> · ${esc(r.source)}</span></div>
         <div class="sm"><span data-tipf="${esc(fmtTime(r.ts))}" data-tipf-always>${ago(r.ts)} · ${shortTime(r.ts)}</span></div></td>
@@ -4071,12 +4094,14 @@ function visitsDrawer(qs) {
     try {
       const r = await api(`/recent?full=1&limit=50&bots=${state.bots ? 1 : 0}${qs}${before ? `&before=${before}` : ''}`);
       let html = '';
+      const newDays = [];
       for (const x of r.items) {
         const day = ymd(new Date(x.ts));
-        if (day !== lastDay) { html += `<tr class="vis-dr"><td colspan="6">${dayLabel(x.ts)}</td></tr>`; lastDay = day; }
+        if (day !== lastDay) { html += `<tr class="vis-dr"><td colspan="6"><div class="vis-dh"><span>${dayLabel(x.ts)}</span><span class="vis-ds" data-day="${day}"></span></div></td></tr>`; lastDay = day; newDays.push(day); }
         html += row(x);
       }
       body.insertAdjacentHTML('beforeend', html);
+      summarize(newDays);
       n += r.items.length;
       const last = r.items[r.items.length - 1];
       if (last) before = `${last.ts}:${last.id}`;

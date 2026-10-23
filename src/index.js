@@ -19,7 +19,7 @@ import * as onboard from './onboard.js';
 import { smList, smSubmit, smAutoFill } from './sitemaps.js';
 import { subreq } from './budget.js';
 import { classifyVisit, parseUA, deviceKey, pickRule, pickArm, ARM_NAMES, DEVICES, RAW_COLS, tally, uniq, hourKey, dateKey, buckets, CF_LIMITS, CF_NAMES, usageForecast, semverGt, ROBOTS_TXT, normalizeTarget, isAppUrl, isWebUrl, inAppBrowser, intentWithFallback, guardKey, isDbError } from './lib.js';
-import { aggregate, aggQuery, aggState, rebuildAgg, dropLinkAggStmts, pruneClicks, backfillSourceUv, prunePerRun, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
+import { daySummary, aggregate, aggQuery, aggState, rebuildAgg, dropLinkAggStmts, pruneClicks, backfillSourceUv, prunePerRun, hllNew, hllMerge, hllAdd, hllCount, dayKey, HOUR, DAY } from './agg.js';
 
 // 后台页面的 ETag（按内容算 FNV-1a 哈希，同一个实例里只算一次）
 // 英文界面：词典 + 翻译脚本，按需加载（中文界面不下载）
@@ -917,6 +917,12 @@ async function authedApi(request, env, url, cred) {
     await setSetting(env, 'retention_days', String(days));
     await env.DB.prepare("DELETE FROM settings WHERE key = 'clicks_count'").run();
     return json(await retentionInfo(env));
+  }
+  // 访问记录面板的按天汇总：days 是逗号分隔的日期（最多 14 天）
+  if (path === '/api/recent/days' && method === 'GET') {
+    const days = String(url.searchParams.get('days') || '').split(',').filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 14);
+    const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
+    return json(await daySummary(env, { days, tz: Number(url.searchParams.get('tz')) || 0, bots: url.searchParams.get('bots') === '1', linkId }));
   }
   if (path === '/api/recent' && method === 'GET') {
     const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
