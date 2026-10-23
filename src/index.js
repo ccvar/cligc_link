@@ -920,7 +920,12 @@ async function authedApi(request, env, url, cred) {
   }
   if (path === '/api/recent' && method === 'GET') {
     const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
-    return json({ items: await recentClicks(env, url.searchParams.get('bots') === '1', linkId) });
+    // before / limit：“查看更多访问”侧边面板往下翻页用（before = 上一页最后一条的“时间:ID”，同一毫秒的几条不会漏）
+    const [bts, bid] = String(url.searchParams.get('before') || '').split(':').map((x) => Math.max(0, Number(x) || 0));
+    const before = bts ? { ts: bts, id: bid || 0 } : null;
+    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 12));
+    const items = await recentClicks(env, url.searchParams.get('bots') === '1', linkId, { before, limit, full: url.searchParams.get('full') === '1' });
+    return json({ items, more: items.length === limit });
   }
   if (path === '/api/links' && method === 'GET') return listLinks(env, url);
   if (path === '/api/links/bulk' && method === 'POST') return bulkLinks(request, env);
@@ -2840,13 +2845,17 @@ async function retentionInfo(env) {
   };
 }
 
-async function recentClicks(env, bots, linkId = 0) {
-  const where = [bots ? '' : 'c.is_bot = 0', linkId ? 'c.link_id = ?' : ''].filter(Boolean);
+// full：“查看更多访问”面板要和访问明细一样的完整字段，外加短链和实际命中的规则 / 分流地址（t_*）
+async function recentClicks(env, bots, linkId = 0, { before = null, limit = 12, full = false } = {}) {
+  const where = [bots ? '' : 'c.is_bot = 0', linkId ? 'c.link_id = ?' : '', before ? '(c.ts < ? OR (c.ts = ? AND c.id < ?))' : ''].filter(Boolean);
+  const cols = full
+    ? 'c.*, l.slug, l.target_url AS l_url, t.id AS t_id, t.url AS t_url, t.countries AS t_countries, t.devices AS t_devices, t.ab_of AS t_ab'
+    : 'c.id, c.ts, c.source, c.country, c.city, c.device, c.os, c.browser, c.kind, c.reason, c.proxy, l.id AS link_id, l.slug';
   const r = await env.DB.prepare(
-    `SELECT c.id, c.ts, c.source, c.country, c.city, c.device, c.os, c.browser, c.kind, c.reason, c.proxy, l.id AS link_id, l.slug
-     FROM clicks c JOIN links l ON l.id = c.link_id
-     ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY c.ts DESC LIMIT 12`
-  ).bind(...(linkId ? [linkId] : [])).all();
+    `SELECT ${cols}
+     FROM clicks c JOIN links l ON l.id = c.link_id${full ? ' LEFT JOIN link_targets t ON t.id = c.rule_id' : ''}
+     ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY c.ts DESC, c.id DESC LIMIT ?`
+  ).bind(...(linkId ? [linkId] : []), ...(before ? [before.ts, before.ts, before.id] : []), limit).all();
   return r.results;
 }
 
