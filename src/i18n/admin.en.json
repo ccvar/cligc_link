@@ -2026,6 +2026,7 @@
 "正在重新查，还有 {} 个站点（{}）": "Re-fetching, {} sites left ({})",
 "正在验证…": "Verifying…",
 "正常": "OK",
+"每 30 秒自动刷新": "refreshes every 30 seconds",
 "每个版本的比例都要在 1–100 之间": "Each variant's weight must be between 1 and 100",
 "每个站点用不同链接，来源统计更准": "Use a different link per site for more accurate sources",
 "每周 SEO 变化": "Weekly SEO changes",

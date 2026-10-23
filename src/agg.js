@@ -309,8 +309,9 @@ export async function pruneClicks(env) {
  * 统计查询上下文：范围 = 今天及之前 days-1 天（按浏览器时区的自然日），上一周期 = 再往前 days 天。
  * 已汇总部分读汇总表，mark 之后的访问读原始明细（tail）。
  */
-export async function aggQuery(env, { days, tz, bots, linkId = 0 }) {
-  const st = await aggregate(env, tz).catch((e) => { console.error('aggregate failed', e); return aggState(env); });
+// setTz：请求里带了浏览器时区才用它确定汇总时区（第一次汇总时定下来，之后不变）
+export async function aggQuery(env, { days, tz, bots, linkId = 0, setTz = true }) {
+  const st = await aggregate(env, setTz ? tz : undefined).catch((e) => { console.error('aggregate failed', e); return aggState(env); });
   const atz = st.tz ?? tz, mark = st.mark;
   const now = Date.now();
   const dayStart = Math.floor((now + tz * 60000) / DAY) * DAY - tz * 60000;
@@ -430,7 +431,9 @@ export { HOUR, DAY, addDays };
 // days：要汇总的日期（按汇总时区 agg_tz）；tz：浏览器的时区，和汇总时区不一致时日期对不上，不返回
 export async function daySummary(env, { days, tz, bots, linkId = 0 }) {
   const st = await aggState(env);
-  if (st.tz === null || st.tz !== tz || !days.length) return { tz: st.tz, days: {} };
+  if (!days.length) return { tz: st.tz, days: {} };
+  // 汇总表的时区和浏览器不一样（日期边界对不上）：直接按浏览器的日期从明细里算（面板里的日期都来自明细，明细一定在）
+  if (st.tz === null || st.tz !== tz) return { tz, days: await daySummaryRaw(env, { days, tz, bots, linkId }) };
   const list = JSON.stringify(days), mc = bots ? '' : 'AND machine = 0', lf = linkId ? 'AND link_id = ?' : '', lb = linkId ? [linkId] : [];
   const q = (sql, ...a) => env.DB.prepare(sql).bind(...a).all().then((r) => r.results);
   const [tot, links, ctry, uvs] = await Promise.all([
@@ -470,4 +473,30 @@ export async function daySummary(env, { days, tz, bots, linkId = 0 }) {
       topCountry: tc ? { k: tc[0], n: tc[1], pct: human ? tc[1] / human : 0 } : null };
   }
   return { tz: st.tz, days: res };
+}
+
+// 按天汇总（从明细算）：浏览器时区的这几天，一次读出范围内的明细，在内存里分天统计
+async function daySummaryRaw(env, { days, tz, bots, linkId }) {
+  const start = (d) => Date.parse(`${d}T00:00:00Z`) - tz * 60000;
+  const from = Math.min(...days.map(start)), to = Math.max(...days.map(start)) + DAY;
+  const rows = (await env.DB.prepare(`SELECT c.link_id, c.ts, c.is_bot, c.ip, c.country, l.slug FROM clicks c JOIN links l ON l.id = c.link_id
+    WHERE c.ts >= ? AND c.ts < ? ${linkId ? 'AND c.link_id = ?' : ''} ${bots ? '' : 'AND c.is_bot = 0'} LIMIT 300000`)
+    .bind(from, to, ...(linkId ? [linkId] : [])).all()).results;
+  const want = new Set(days), out = {};
+  const add = (m, k, n = 1) => m.set(k, (m.get(k) || 0) + n);
+  for (const r of rows) {
+    const d = dayKey(r.ts, tz);
+    if (!want.has(d)) continue;
+    const o = (out[d] ||= { n: 0, human: 0, machine: 0, ips: new Set(), links: new Map(), ctry: new Map() });
+    o.n++; o[r.is_bot ? 'machine' : 'human']++; o.ips.add(r.ip || '');
+    if (!r.is_bot) { add(o.links, r.slug); if (r.country) add(o.ctry, r.country); }
+  }
+  const top = (m) => [...m].sort((a, b) => b[1] - a[1])[0] || null;
+  const res = {};
+  for (const [d, o] of Object.entries(out)) {
+    const tl = top(o.links), tc = top(o.ctry), human = [...o.ctry.values()].reduce((a, b) => a + b, 0);
+    res[d] = { n: o.n, human: o.human, machine: o.machine, uv: o.ips.size,
+      topLink: tl ? { slug: tl[0], n: tl[1] } : null, topCountry: tc ? { k: tc[0], n: tc[1], pct: human ? tc[1] / human : 0 } : null };
+  }
+  return res;
 }

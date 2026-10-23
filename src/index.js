@@ -929,8 +929,11 @@ async function authedApi(request, env, url, cred) {
     // before / limit：“查看更多访问”侧边面板往下翻页用（before = 上一页最后一条的“时间:ID”，同一毫秒的几条不会漏）
     const [bts, bid] = String(url.searchParams.get('before') || '').split(':').map((x) => Math.max(0, Number(x) || 0));
     const before = bts ? { ts: bts, id: bid || 0 } : null;
+    // after：面板开着时取比最上面那条更新的访问（实时刷新）
+    const [ats, aid] = String(url.searchParams.get('after') || '').split(':').map((x) => Math.max(0, Number(x) || 0));
+    const after = ats ? { ts: ats, id: aid || 0 } : null;
     const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 12));
-    const items = await recentClicks(env, url.searchParams.get('bots') === '1', linkId, { before, limit, full: url.searchParams.get('full') === '1' });
+    const items = await recentClicks(env, url.searchParams.get('bots') === '1', linkId, { before, after, limit, full: url.searchParams.get('full') === '1' });
     return json({ items, more: items.length === limit });
   }
   if (path === '/api/links' && method === 'GET') return listLinks(env, url);
@@ -1921,7 +1924,8 @@ async function listLinks(env, url) {
   if (items.length) {
     // 一组 id 只占一个绑定参数（D1 每条语句最多 100 个参数，size=100 时按个数展开会超）
     const ids = items.map((l) => l.id), jIds = JSON.stringify(ids), inIds = 'SELECT value FROM json_each(?)';
-    const st = await aggregate(env, tz).catch(() => aggState(env));
+    // 没带 tz 参数的请求（比如脚本直接调接口）不能用来确定汇总时区（否则会被定成 UTC）
+    const st = await aggregate(env, url.searchParams.has('tz') ? tz : undefined).catch(() => aggState(env));
     const since = Date.now() - 15 * DAY, atz = st.tz ?? tz;
     const [agg, tail] = await Promise.all([
       env.DB.prepare(
@@ -2177,7 +2181,7 @@ const machineRows = (rows) => rows.map((r) => {
 
 async function overviewAgg(env, url, { days, tz, bots }) {
   const linkId = Math.max(0, parseInt(url.searchParams.get('link'), 10) || 0);
-  const q = await aggQuery(env, { days, tz, bots, linkId });
+  const q = await aggQuery(env, { days, tz, bots, linkId, setTz: url.searchParams.has('tz') });
   const { now, dayStart, start, prevStart, firstDay, today, prevFirst, prevLast } = q;
   const [topDc, topDa] = q.dayIn(firstDay, today);
 
@@ -2852,8 +2856,9 @@ async function retentionInfo(env) {
 }
 
 // full：“查看更多访问”面板要和访问明细一样的完整字段，外加短链和实际命中的规则 / 分流地址（t_*）
-async function recentClicks(env, bots, linkId = 0, { before = null, limit = 12, full = false } = {}) {
-  const where = [bots ? '' : 'c.is_bot = 0', linkId ? 'c.link_id = ?' : '', before ? '(c.ts < ? OR (c.ts = ? AND c.id < ?))' : ''].filter(Boolean);
+async function recentClicks(env, bots, linkId = 0, { before = null, after = null, limit = 12, full = false } = {}) {
+  const where = [bots ? '' : 'c.is_bot = 0', linkId ? 'c.link_id = ?' : '', before ? '(c.ts < ? OR (c.ts = ? AND c.id < ?))' : '',
+    after ? '(c.ts > ? OR (c.ts = ? AND c.id > ?))' : ''].filter(Boolean);
   const cols = full
     ? 'c.*, l.slug, l.target_url AS l_url, t.id AS t_id, t.url AS t_url, t.countries AS t_countries, t.devices AS t_devices, t.ab_of AS t_ab'
     : 'c.id, c.ts, c.source, c.country, c.city, c.device, c.os, c.browser, c.kind, c.reason, c.proxy, l.id AS link_id, l.slug';
@@ -2861,7 +2866,7 @@ async function recentClicks(env, bots, linkId = 0, { before = null, limit = 12, 
     `SELECT ${cols}
      FROM clicks c JOIN links l ON l.id = c.link_id${full ? ' LEFT JOIN link_targets t ON t.id = c.rule_id' : ''}
      ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY c.ts DESC, c.id DESC LIMIT ?`
-  ).bind(...(linkId ? [linkId] : []), ...(before ? [before.ts, before.ts, before.id] : []), limit).all();
+  ).bind(...(linkId ? [linkId] : []), ...(before ? [before.ts, before.ts, before.id] : []), ...(after ? [after.ts, after.ts, after.id] : []), limit).all();
   return r.results;
 }
 

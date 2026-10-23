@@ -41,5 +41,8 @@ test('按天汇总：访问、访客、最多的短链和地区；汇总过的�
   assert.ok(sum('uv') >= 6 && sum('uv') <= 8, `独立访客约 7：${sum('uv')}`);
   const withBots = await daySummary(env, { days: [d1], tz, bots: true });
   assert.equal(withBots.days[d1].machine, 1);
-  assert.deepEqual((await daySummary(env, { days: [d1], tz: 0, bots: false })).days, {}, '浏览器时区和汇总时区不一样时不给（日期对不上）');
+  // 浏览器时区和汇总时区不一样：按浏览器的日期从明细里算
+  const raw = await daySummary(env, { days: [dayKey(t1, 0), dayKey(t2, 0)], tz: 0, bots: false });
+  assert.equal(Object.values(raw.days).reduce((a, x) => a + x.n, 0), 7, '从明细算，数字一样');
+  assert.equal(raw.days[dayKey(t2, 0)].topLink.slug, 'dbn');
 });
