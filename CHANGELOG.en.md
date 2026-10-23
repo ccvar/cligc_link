@@ -2,6 +2,26 @@
 
 Versions follow [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH. See ["Upgrading" in the README](README.en.md#upgrading) for how to upgrade. 中文：[CHANGELOG.md](CHANGELOG.md)
 
+## v1.13.0 · 2026-10-23
+
+The overview's "Live visits" can now be expanded into a full visit log: the same table as visit details, grouped by day with a daily summary, loading earlier visits as you scroll, and updating live while open.
+
+### New
+
+- **Visits panel**: scroll to the end of the overview's "Live visits" list and click "View more visits" to open the visit log on the right
+  - The same table as a link's "Visit details": link · source / time, region, destination (default URL, redirect rule, A/B split), device (with proxy / VPN), IP (with ISP) and Referer; click a link to open its page
+  - Grouped by day, each with a summary row: visits, unique visitors, and the top link and country / region (for the whole day, not just the loaded rows)
+  - Scroll down to load earlier visits; while open it refreshes every 30 seconds, with new visits added at the top and highlighted
+  - Follows the overview's current link and "include bots" choice; shown as two lines per visit on phones
+
+### Improved
+
+- Cloudflare usage: when one day has unusually high D1 reads (for example, a one-off large query), the daily read bars are scaled to the other days, with that day drawn full width and marked as truncated, instead of every other bar shrinking to a sliver
+
+### Fixed
+
+- The first aggregation of visit data could set the aggregation timezone to UTC from a request without a timezone parameter; only requests carrying the browser's timezone can set it now (an already-set timezone is unchanged)
+
 ## v1.12.1 · 2026-10-22
 
 Fixes the site page failing to load after a sync error, uses less GA4 quota, and avoids picking a Google account without edit access when creating site tracking.
